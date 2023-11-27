@@ -12,9 +12,17 @@ from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
+from ai.backend.common.types import (
+    AcceleratorMetadata,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    SlotName,
+    SlotTypes,
+)
 
-from .. import __version__
+from .. import __version__  # pants: no-infer-dep
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -23,11 +31,11 @@ from ..resources import (
     DiscretePropertyAllocMap,
     MountInfo,
 )
-from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
+from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -145,6 +153,11 @@ class CPUPlugin(AbstractComputePlugin):
 
         return []
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
@@ -213,6 +226,16 @@ class CPUPlugin(AbstractComputePlugin):
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[str]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cpu",
+            "description": "CPU",
+            "human_readable_name": "CPU",
+            "display_unit": "Core",
+            "number_format": {"binary": False, "round_length": 0},
+            "display_icon": "cpu",
+        }
 
 
 class MemoryDevice(AbstractComputeDevice):
@@ -287,9 +310,15 @@ class MemoryPlugin(AbstractComputePlugin):
         # TODO: Implement Kubernetes-specific container metric collection
         return []
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
@@ -350,3 +379,13 @@ class MemoryPlugin(AbstractComputePlugin):
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[str]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "ram",
+            "description": "Memory",
+            "human_readable_name": "RAM",
+            "display_unit": "GiB",
+            "number_format": {"binary": True, "round_length": 0},
+            "display_icon": "cpu",
+        }

@@ -1,0 +1,21 @@
+{
+  "token": {
+    "fontFamily": "'Ubuntu', Roboto, sans-serif",
+    "colorPrimary": "#37B076",
+    "colorLink": "#37B076",
+    "colorLinkHover": "#71b98c",
+    "colorSuccess": "#37B076",
+    "colorBorder": "#DEE1E7",
+    "colorBorderSecondary": "#E1E1E2",
+    "colorWarning": "#f1a239"
+  },
+  "components": {
+    "Tag": {
+      "borderRadiusSM": 1
+    },
+    "Tabs": {
+      "colorPrimary": "var(--general-sidebar-selected-color, #72EB51)",
+      "colorTextHeading": "var(--general-sidebar-color, #949494)"
+    }
+  }
+}

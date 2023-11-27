@@ -3,7 +3,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
@@ -11,14 +11,15 @@ from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
 from ..models import (
     DefaultForUnspecified,
-    domains,
-    groups,
-    kernels,
-    keypair_resource_policies,
-    session_dependencies,
+    DomainRow,
+    GroupRow,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
+    SessionDependencyRow,
+    SessionRow,
 )
 from ..models.utils import execute_with_retry
-from .types import PendingSession, PredicateResult, SchedulingContext
+from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -41,20 +42,16 @@ return result
 
 
 async def check_reserved_batch_session(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
     """
     Check if a batch-type session should not be started for a certain amount of time.
     """
     if sess_ctx.session_type == SessionTypes.BATCH:
-        query = (
-            sa.select([kernels.c.starts_at])
-            .select_from(kernels)
-            .where(kernels.c.id == sess_ctx.session_id)
-        )
-        starts_at = await db_conn.scalar(query)
+        query = sa.select(SessionRow.starts_at).where(SessionRow.id == sess_ctx.id)
+        starts_at = await db_sess.scalar(query)
         if starts_at is not None and datetime.now(tzutc()) < starts_at:
             return PredicateResult(
                 False,
@@ -64,31 +61,40 @@ async def check_reserved_batch_session(
 
 
 async def check_concurrency(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
     async def _get_max_concurrent_sessions() -> int:
-        select_query = (
-            sa.select([keypair_resource_policies])
-            .select_from(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == sess_ctx.resource_policy)
+        resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
+            KeyPairRow.access_key == sess_ctx.access_key
         )
-        result = await db_conn.execute(select_query)
-        return result.first()["max_concurrent_sessions"]
+        if sess_ctx.is_private:
+            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
+        else:
+            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sessions
+        select_query = sa.select(concurrent_session_column).where(
+            KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
+        )
+        result = await db_sess.execute(select_query)
+        return result.scalar()
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    if sess_ctx.is_private:
+        redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
+    else:
+        redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
     ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         "check_keypair_concurrency_used",
         _check_keypair_concurrency_script,
-        [f"keypair.concurrency_used.{sess_ctx.access_key}"],
+        [redis_key],
         [max_concurrent_sessions],
     )
     if ok == 0:
         return PredicateResult(
             False,
-            "You cannot run more than " f"{max_concurrent_sessions} concurrent sessions",
+            f"You cannot run more than {max_concurrent_sessions} concurrent sessions",
         )
     log.debug(
         "number of concurrent sessions of ak:{0} = {1} / {2}",
@@ -100,31 +106,29 @@ async def check_concurrency(
 
 
 async def check_dependencies(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
     j = sa.join(
-        session_dependencies,
-        kernels,
-        session_dependencies.c.depends_on == kernels.c.session_id,
+        SessionDependencyRow,
+        SessionRow,
+        SessionDependencyRow.depends_on == SessionRow.id,
     )
     query = (
         sa.select(
-            [
-                kernels.c.session_id,
-                kernels.c.session_name,
-                kernels.c.result,
-            ]
+            SessionRow.id,
+            SessionRow.name,
+            SessionRow.result,
         )
         .select_from(j)
-        .where(session_dependencies.c.session_id == sess_ctx.session_id)
+        .where(SessionDependencyRow.session_id == sess_ctx.id)
     )
-    result = await db_conn.execute(query)
+    result = await db_sess.execute(query)
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row["result"] != SessionResult.SUCCESS:
+        if row.result != SessionResult.SUCCESS:
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
@@ -132,27 +136,34 @@ async def check_dependencies(
     return PredicateResult(
         False,
         "Waiting dependency sessions to finish as success. ({})".format(
-            ", ".join(
-                f"{row['session_name']} ({row['session_id']})" for row in pending_dependencies
-            ),
+            ", ".join(f"{row.name} ({row.id})" for row in pending_dependencies),
         ),
     )
 
 
 async def check_keypair_resource_limit(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
-    query = (
-        sa.select([keypair_resource_policies])
-        .select_from(keypair_resource_policies)
-        .where(keypair_resource_policies.c.name == sess_ctx.resource_policy)
+    resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
+        KeyPairRow.access_key == sess_ctx.access_key
     )
-    result = await db_conn.execute(query)
-    resource_policy = result.first()
-    total_keypair_allowed = ResourceSlot.from_policy(resource_policy, sched_ctx.known_slot_types)
-    key_occupied = await sched_ctx.registry.get_keypair_occupancy(sess_ctx.access_key, conn=db_conn)
+    select_query = sa.select(KeyPairResourcePolicyRow).where(
+        KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
+    )
+    result = await db_sess.execute(select_query)
+    resource_policy = result.scalars().first()
+    resource_policy_map = {
+        "total_resource_slots": resource_policy.total_resource_slots,
+        "default_for_unspecified": resource_policy.default_for_unspecified,
+    }
+    total_keypair_allowed = ResourceSlot.from_policy(
+        resource_policy_map, sched_ctx.known_slot_types
+    )
+    key_occupied = await sched_ctx.registry.get_keypair_occupancy(
+        sess_ctx.access_key, db_sess=db_sess
+    )
     log.debug("keypair:{} current-occupancy: {}", sess_ctx.access_key, key_occupied)
     log.debug("keypair:{} total-allowed: {}", sess_ctx.access_key, total_keypair_allowed)
     if not (key_occupied + sess_ctx.requested_slots <= total_keypair_allowed):
@@ -171,12 +182,12 @@ async def check_keypair_resource_limit(
 
 
 async def check_group_resource_limit(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
-    query = sa.select([groups.c.total_resource_slots]).where(groups.c.id == sess_ctx.group_id)
-    group_resource_slots = await db_conn.scalar(query)
+    query = sa.select(GroupRow.total_resource_slots).where(GroupRow.id == sess_ctx.group_id)
+    group_resource_slots = await db_sess.scalar(query)
     group_resource_policy = {
         "total_resource_slots": group_resource_slots,
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
@@ -184,7 +195,9 @@ async def check_group_resource_limit(
     total_group_allowed = ResourceSlot.from_policy(
         group_resource_policy, sched_ctx.known_slot_types
     )
-    group_occupied = await sched_ctx.registry.get_group_occupancy(sess_ctx.group_id, conn=db_conn)
+    group_occupied = await sched_ctx.registry.get_group_occupancy(
+        sess_ctx.group_id, db_sess=db_sess
+    )
     log.debug("group:{} current-occupancy: {}", sess_ctx.group_id, group_occupied)
     log.debug("group:{} total-allowed: {}", sess_ctx.group_id, total_group_allowed)
     if not (group_occupied + sess_ctx.requested_slots <= total_group_allowed):
@@ -201,14 +214,12 @@ async def check_group_resource_limit(
 
 
 async def check_domain_resource_limit(
-    db_conn: SAConnection,
+    db_sess: SASession,
     sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
+    sess_ctx: SessionRow,
 ) -> PredicateResult:
-    query = sa.select([domains.c.total_resource_slots]).where(
-        domains.c.name == sess_ctx.domain_name
-    )
-    domain_resource_slots = await db_conn.scalar(query)
+    query = sa.select(DomainRow.total_resource_slots).where(DomainRow.name == sess_ctx.domain_name)
+    domain_resource_slots = await db_sess.scalar(query)
     domain_resource_policy = {
         "total_resource_slots": domain_resource_slots,
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
@@ -217,7 +228,7 @@ async def check_domain_resource_limit(
         domain_resource_policy, sched_ctx.known_slot_types
     )
     domain_occupied = await sched_ctx.registry.get_domain_occupancy(
-        sess_ctx.domain_name, conn=db_conn
+        sess_ctx.domain_name, db_sess=db_sess
     )
     log.debug("domain:{} current-occupancy: {}", sess_ctx.domain_name, domain_occupied)
     log.debug("domain:{} total-allowed: {}", sess_ctx.domain_name, total_domain_allowed)

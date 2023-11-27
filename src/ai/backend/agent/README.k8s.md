@@ -24,7 +24,6 @@ and come back here again.
 
 #### Prequisites
 
-* `libsnappy-dev` or `snappy-devel` system package depending on your distro
 * Python 3.6 or higher with [pyenv](https://github.com/pyenv/pyenv)
 and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
 * Docker 18.03 or later with docker-compose (18.09 or later is recommended)

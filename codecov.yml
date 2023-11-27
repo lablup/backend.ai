@@ -1,0 +1,18 @@
+ignore:
+  - src/ai/backend/manager/models/alembic
+  - src/ai/backend/runner
+  - src/ai/backend/kernel
+coverage:
+  status:
+    project:
+      default:
+        threshold: 5%
+        paths:
+        - src
+        informational: true
+    patch:
+      default:
+        threshold: 5%
+        paths:
+        - src
+        informational: true

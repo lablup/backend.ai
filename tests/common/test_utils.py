@@ -171,6 +171,11 @@ def test_string_set_flag() -> None:
     assert MyFlags.A in {"a", "c"}
     assert MyFlags.B not in {"a", "c"}
 
+    assert MyFlags.A in {MyFlags.A, MyFlags.B}
+    assert MyFlags.B in {MyFlags.A, MyFlags.B}
+
+    assert MyFlags.A == MyFlags.A
+    assert MyFlags.A != MyFlags.B
     assert MyFlags.A == "a"
     assert MyFlags.A != "b"
     assert "a" == MyFlags.A
@@ -237,7 +242,6 @@ class TestAsyncBarrier:
 
 @pytest.mark.asyncio
 async def test_run_through() -> None:
-
     i = 0
 
     async def do():

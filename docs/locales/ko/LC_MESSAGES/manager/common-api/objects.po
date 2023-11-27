@@ -1175,7 +1175,7 @@ msgid "``last_used``"
 msgstr ""
 
 #: ../../manager/common-api/objects.rst:648 a7d7c0483d994d56b69d2d0664432e70
-msgid "The date adn time when the folder is last used."
+msgid "The date and time when the folder is last used."
 msgstr ""
 
 #: ../../manager/common-api/objects.rst:651 6764c6a42bb34ee5b6750988381da10f

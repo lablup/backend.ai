@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from .base import BaseContainerRegistry
 
 
-def get_container_registry(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
+def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
     registry_url = yarl.URL(registry_info[""])
     registry_type = registry_info.get("type", "docker")
     cr_cls: Type[BaseContainerRegistry]
@@ -28,6 +28,10 @@ def get_container_registry(registry_info: Mapping[str, Any]) -> Type[BaseContain
         from .harbor import HarborRegistry_v2
 
         cr_cls = HarborRegistry_v2
+    elif registry_type == "local":
+        from .local import LocalRegistry
+
+        cr_cls = LocalRegistry
     else:
         raise RuntimeError(f"Unsupported registry type: {registry_type}")
     return cr_cls

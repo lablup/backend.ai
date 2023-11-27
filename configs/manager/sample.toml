@@ -22,6 +22,17 @@ name = "backend"                            # env: BACKEND_DB_NAME
 user = "postgres"                           # env: BACKEND_DB_USER
 password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 
+# The connection pool's initial size
+# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
+# pool-size = 8
+
+# The maximum allowed overflow of the connection pool
+# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.max_overflow)
+# max-overflow = 64
+
+# NOTE: The warning threshold for the number of concurrent transactions in a single manager process
+#       is determined as dividing the addition of the pool-size and max-overflow settings by two
+#       because the threshold applies to both generic and read-only transactions.
 
 # NOTE: Redis settings are configured in etcd as it is shared by both the manager and agents.
 
@@ -53,7 +64,7 @@ ssl-enabled = false
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
 
 # Set the timeout for agent heartbeats in seconds.
-heartbeat-timeout = 30.0
+heartbeat-timeout = 40.0
 
 # Override the name of this manager node.
 # If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",
@@ -63,15 +74,37 @@ heartbeat-timeout = 30.0
 # This affects the per-node configuration scope.
 # id = ""
 
+# Set the manager's RPC client certificate (public key and secret key).
+# This is a mandatory option even when no agents require authentication.
+# It must be generated for any new setup for security using
+# the `backend.ai mgr generate-rpc-keypair` command.
+# rpc-auth-manager-keypair = "fixtures/manager/manager.key_secret"
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
+
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+# ipc-base-path = "/tmp/backend.ai/ipc"
+
+# Explicitly set allowed plugins in order to load only selected plugin.
+# If use this feature,
+#   1) Replace '# allowed-plugins = []' with 'allowed-plugins = ["example.plugin.what.you.want"]'
+#   2) Add allowlist parameters when plugin_ctx initiate like 'example_plugin_ctx.init(allowlist=local_config["manager"]["allowed-plugins"])
+# Note: If you set allowed-plugins, they could only be loaded. The others would be blocked.
+# allowed-plugins = []
 
 # The list of black-listed manager plugins.
 disabled-plugins = []
 
 # Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
 hide-agents = false
+
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.
@@ -91,6 +124,15 @@ hide-agents = false
 # You need to change this if your are at offline environments so that the manager
 # uses an importer image from a private registry.
 importer-image = "lablup/importer:manylinux2010"
+
+# The maximum size of websocket messages in bytes.
+# max-wsmsg-size = 16777216  # 16 MiB
+
+# The starting port number for aiomonitor.
+# Since the manager is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-termui-port = 48100
+# aiomonitor-webui-port = 49100
 
 
 [docker-registry]
@@ -160,4 +202,12 @@ ssl-verify = true
 
 [debug]
 enabled = false
-periodic-sync-stats = false  # periodically sync container stat from Redis to the kernels.last_stat column.
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
+
+# Periodically sync container stat from Redis to the kernels.last_stat column.
+periodic-sync-stats = false

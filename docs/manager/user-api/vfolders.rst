@@ -55,7 +55,7 @@ Response
    * - HTTP Status Code
      - Description
    * - 200 OK
-     - Success.
+     - Success
 
 .. list-table::
    :widths: 15 5 80
@@ -66,7 +66,7 @@ Response
      - Values
    * - (root)
      - ``list[object]``
-     - A list of :ref:`vfolder-list-item-object`.
+     - A list of :ref:`vfolder-list-item-object`
 
 Example:
 
@@ -107,7 +107,7 @@ new virtual folders.
 Parameters
 """"""""""
 
-None.
+None
 
 Response
 """"""""
@@ -119,7 +119,7 @@ Response
    * - HTTP Status Code
      - Description
    * - 200 OK
-     - Success.
+     - Success
 
 .. list-table::
    :widths: 15 5 80
@@ -130,10 +130,10 @@ Response
      - Values
    * - ``default``
      - ``str``
-     - The default virtual folder host.
+     - The default virtual folder host
    * - ``allowed``
      - ``list[str]``
-     - The list of available virtual folder hosts.
+     - The list of available virtual folder hosts
 
 Example:
 
@@ -166,10 +166,10 @@ Parameters
 
    * - ``name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``host``
      - ``str``
-     - (optional) The name of the virtual folder host.
+     - (optional) The name of the virtual folder host
    * - ``usage_mode``
      - ``str``
      - (optional) The purpose of the virtual folder. Allowed values are
@@ -226,13 +226,13 @@ Response
      - Values
    * - ``id``
      - ``slug``
-     - The unique folder ID used for later API calls.
+     - The unique folder ID used for later API calls
    * - ``name``
      - ``str``
-     - The human-readable name of the created virtual folder.
+     - The human-readable name of the created virtual folder
    * - ``host``
      - ``str``
-     - The name of the virtual folder host where the new folder is created.
+     - The name of the virtual folder host where the new folder is created
 
 
 Example:
@@ -274,7 +274,7 @@ Parameters
      - Description
    * - ``name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
 
 Response
 """"""""
@@ -300,7 +300,7 @@ Response
      - Values
    * - (root)
      - ``object``
-     - :ref:`vfolder-item-object`.
+     - :ref:`vfolder-item-object`
 
 
 Deleting Virtual Folder
@@ -331,7 +331,7 @@ Parameters
    * - Parameter
      - Description
    * - ``name``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
 
 Response
 """"""""
@@ -370,10 +370,10 @@ Parameters
 
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``new_name``
      - ``str``
-     - New virtual folder name.
+     - New virtual folder name
 
 Response
 """"""""
@@ -411,10 +411,10 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``path``
      - ``str``
-     - Path inside the virtual folder (default: root).
+     - Path inside the virtual folder (default: root)
 
 Response
 """"""""
@@ -447,7 +447,7 @@ Uploading a File to Virtual Folder
 
 Upload a local file to a virtual folder associated with the current keypair.
 Internally, the Manager will deligate the upload to a Backend.AI Storage-Proxy
-service. JSON web token is used for the authenticaiton of the request.
+service. JSON web token is used for the authentication of the request.
 
 * URI: ``/folders/:name/request-upload``
 * Method: ``POST``
@@ -468,13 +468,13 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``path``
      - ``str``
-     - Path of the local file to upload.
+     - Path of the local file to upload
    * - ``size``
      - ``int``
-     - The total size of the local file to upload.
+     - The total size of the local file to upload
 
 Response
 """"""""
@@ -532,7 +532,7 @@ Parameters
    * - ``path``
      - ``str``
      - The relative path of a new folder to create
-       inside the virtual folder.
+       inside the virtual folder
    * - ``parents``
      - ``bool``
      - If ``True``, the parent directories will be created if they do not exist.
@@ -563,7 +563,7 @@ Downloading a File or a Directory from a Virtual Folder
 
 Download a file or a directory from a virtual folder associated with the current
 keypair. Internally, the Manager will deligate the download to a Backend.AI
-Storage-Proxy service. JSON web token is used for the authenticaiton of the
+Storage-Proxy service. JSON web token is used for the authentication of the
 request.
 
 .. versionadded:: v4.20190315
@@ -583,7 +583,7 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``path``
      - ``str``
      - The path to a file or a directory inside the virtual folder to download.
@@ -646,10 +646,10 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``files``
      - ``list[str]``
-     - File paths inside the virtual folder to delete.
+     - File paths inside the virtual folder to delete
    * - ``recursive``
      - ``bool``
      - Recursive option to delete folders if set to True. The default is False.
@@ -691,16 +691,16 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``target_path``
      - ``str``
-     - The relative path of target file or directory.
+     - The relative path of target file or directory
    * - ``new_name``
      - ``str``
-     - The new name of the file or directory.
+     - The new name of the file or directory
    * - ``is_dir``
      - ``bool``
-     - Flag that indicates the ``target_path`` is a directory or not.
+     - Flag that indicates the ``target_path`` is a directory or not
 
 Response
 """"""""
@@ -753,7 +753,7 @@ Response
      - Values
    * - ``invitations``
      - ``list[object]``
-     - A list of :ref:`vfolder-invitation-object`.
+     - A list of :ref:`vfolder-invitation-object`
 
 
 Creating an Invitation
@@ -778,13 +778,13 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``perm``
      - ``str``
-     - The permission to grant to invitee.
+     - The permission to grant to invitee
    * - ``emails``
      - ``list[slug]``
-     - A list of user emails to invite.
+     - A list of user emails to invite
 
 Response
 """"""""
@@ -811,7 +811,7 @@ Response
      - Values
    * - ``invited_ids``
      - ``list[slug]``
-     - A list of invited user emails.
+     - A list of invited user emails
 
 
 Accepting an Invitation
@@ -834,7 +834,7 @@ Parameters
      - Description
    * - ``inv_id``
      - ``slug``
-     - The unique invitation ID.
+     - The unique invitation ID
 
 Response
 """"""""
@@ -874,7 +874,7 @@ Parameters
      - Description
    * - ``inv_id``
      - ``slug``
-     - The unique invitation ID.
+     - The unique invitation ID
 
 Response
 """"""""
@@ -899,7 +899,7 @@ Response
      - Values
    * - ``msg``
      - ``str``
-     - Detail message for the invitation deletion.
+     - Detail message for the invitation deletion
 
 
 Listing Sent Invitations
@@ -937,7 +937,7 @@ Response
      - Values
    * - ``invitations``
      - ``list[object]``
-     - A list of :ref:`vfolder-invitation-object`.
+     - A list of :ref:`vfolder-invitation-object`
 
 
 Updating an Invitation
@@ -960,10 +960,10 @@ Parameters
      - Description
    * - ``:inv_id``
      - ``str``
-     - The unique invitation ID.
+     - The unique invitation ID
    * - ``perm``
      - ``str``
-     - The permission to grant to invitee.
+     - The permission to grant to invitee
 
 Response
 """"""""
@@ -990,7 +990,7 @@ Response
      - Values
    * - ``msg``
      - ``str``
-     - An update message string.
+     - An update message string
 
 
 Leave an Shared Virtual Folder
@@ -1015,7 +1015,7 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
 
 Response
 """"""""
@@ -1040,7 +1040,7 @@ Response
      - Values
    * - ``msg``
      - ``str``
-     - A result message string.
+     - A result message string
 
 
 Listing Users Share Virtual Folders
@@ -1127,13 +1127,13 @@ Parameters
      - Description
    * - ``vfolder``
      - ``UUID``
-     - The unique virtual folder ID.
+     - The unique virtual folder ID
    * - ``user``
      - ``UUID``
-     - The unique user ID.
+     - The unique user ID
    * - ``perm``
      - ``str``
-     - The permission to update for the ``user`` on ``vfolder``.
+     - The permission to update for the ``user`` on ``vfolder``
 
 Response
 """"""""
@@ -1160,7 +1160,7 @@ Response
      - Values
    * - ``msg``
      - ``str``
-     - An update message string.
+     - An update message string
 
 
 Share a Group Virtual Folder to an Individual Users
@@ -1192,13 +1192,13 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``permission``
      - ``str``
-     - Overriding permission to share the group virtual folder.
+     - Overriding permission to share the group virtual folder
    * - ``emails``
      - ``list[str]``
-     - A list of user emails to share.
+     - A list of user emails to share
 
 Response
 """"""""
@@ -1225,13 +1225,13 @@ Response
      - Values
    * - ``shared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully shared the virtual folder.
+     - A list of user emails those are successfully shared the virtual folder
 
 
 Unshare a Group Virtual Folder from Users
 -----------------------------------------
 
-Unshare a group virtual folder from users.
+Unshare a group virtual folder from users
 
 NOTE: This API is only available for group virtual folders.
 
@@ -1250,10 +1250,10 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``emails``
      - ``list[str]``
-     - A list of user emails to unshare.
+     - A list of user emails to unshare
 
 Response
 """"""""
@@ -1280,13 +1280,13 @@ Response
      - Values
    * - ``unshared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully unshared the virtual folder.
+     - A list of user emails those are successfully unshared the virtual folder
 
 
 Clone a Virtual Folder
 ----------------------
 
-Clone a virtual folder.
+Clone a virtual folder
 
 * URI: ``/folders/:name/clone``
 * Method: ``POST``
@@ -1303,16 +1303,16 @@ Parameters
      - Description
    * - ``:name``
      - ``str``
-     - The human-readable name of the virtual folder.
+     - The human-readable name of the virtual folder
    * - ``cloneable``
      - ``bool``
      - If ``True``, cloned virtual folder will be cloneable again.
    * - ``target_name``
      - ``str``
-     - The name of the new virtual folder.
+     - The name of the new virtual folder
    * - ``target_host``
      - ``str``
-     - The targe host volume of the new virtual folder.
+     - The targe host volume of the new virtual folder
    * - ``usage_mode``
      - ``str``
      - (optional) The purpose of the new virtual folder. Allowed values are
@@ -1351,7 +1351,7 @@ Response
      - Values
    * - ``unshared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully unshared the virtual folder.
+     - A list of user emails those are successfully unshared the virtual folder.
 
 .. list-table::
    :widths: 15 5 80
@@ -1362,7 +1362,7 @@ Response
      - Values
    * - (root)
      - ``list[object]``
-     - :ref:`vfolder-list-item-object`.
+     - :ref:`vfolder-list-item-object`
 
 Example:
 

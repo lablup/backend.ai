@@ -4,7 +4,6 @@ which do not provide query/batch-mode code execution.
 """
 
 import logging
-import os
 from typing import List
 
 from .. import BaseRunner
@@ -15,30 +14,8 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "app-kernel"
     default_runtime_path = "/opt/backend.ai/bin/python"
-    default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": ":".join(
-            [
-                "/usr/local/nvidia/bin",
-                "/usr/local/cuda/bin",
-                "/usr/local/sbin",
-                "/usr/local/bin",
-                "/usr/sbin",
-                "/usr/bin",
-                "/sbin",
-                "/bin",
-            ]
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

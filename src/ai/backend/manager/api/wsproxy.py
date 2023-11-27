@@ -17,7 +17,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ServiceProxy(metaclass=ABCMeta):
@@ -57,7 +57,6 @@ class ServiceProxy(metaclass=ABCMeta):
 
 
 class TCPProxy(ServiceProxy):
-
     __slots__ = (
         *ServiceProxy.__slots__,
         "down_task",

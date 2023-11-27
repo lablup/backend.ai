@@ -13,6 +13,12 @@ num-proc = 4
 # pid-file = "./storage-proxy.pid"
 event-loop = "uvloop"
 
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+# ipc-base-path = "/tmp/backend.ai/ipc"
+
 # The maximum number of directory entries to return upon
 # a scandir operation to prevent excessive loads/delays on filesystems.
 # Settings it zero means no limit.
@@ -33,6 +39,23 @@ session-expire = "1d"
 # of the installed package.
 # user = 1000
 # group = 1000
+
+# The starting port number for aiomonitor.
+# Since the storage-proxy is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-termui-port = 48300
+# aiomonitor-webui-port = 49300
+
+
+# The socket fd path prefix to communicate with storage proxy watcher
+# The path should not have any permission issue with UID/GID
+# The full socket fd name will be like this. `/path/to/file/socket-<PIDx>`
+# watcher-insock-path-prefix = ""
+# watcher-outsock-path-prefix = ""
+
+
+# Watcher delegates root permission and do privileged tasks. This option enables the use of watcher.
+use-watcher = false
 
 
 [api.client]
@@ -56,6 +79,15 @@ secret = "some-secret-shared-with-manager"
 [debug]
 # Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
 enabled = false
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
+
+# Enable logging events from EventProducer and EventDispatcher
+log-events = true
 
 
 [logging]
@@ -125,20 +157,55 @@ purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
 # An extended version for CephFS, which supports extended inode attributes
 # for per-directory quota and fast metadata queries.
 backend = "cephfs"
-path = "/vfroot/ceph-fuse"
+path = "/mnt/vfroot/ceph-fuse"
 
 [volume.netapp]
 backend = "netapp"
 path = "/vfroot/netapp"
 
 [volume.netapp.options]
-netapp_endpoint = "https://netapp.example.com"
-netapp_admin = "signed-in-id"
-netapp_password = "signed-in-pw"
+netapp_ontap_endpoint = "https://netapp.example.com"
+netapp_ontap_user = "admin-username"
+netapp_ontap_password = "admin-passwd"
 netapp_svm = "svm-name"
 netapp_volume_name = "netapp-volume-name"
-netapp_qtree_name = "bai_qtree" # default qtree name for backend.ai exclusive
-netapp_xcp_container_name = "netapp-xcp" # only required when xcp activated by container
-netapp_xcp_hostname = "xcp-hostname"
-# default xcp catalog path goes to the directory named "catalog" of the first NetApp volume
-netapp_xcp_catalog_path = "path for xcp-catalog" # Hint: execute command cat /opt/NetApp/xFiles/xcp/xcp.ini and see nfs mount path
+netapp_xcp_cmd = ["/home/user/xcp/linux/xcp"]
+# For containerized xcp: netapp_xcp_cmd = ["docker", "exec", "netapp-xcp", "xcp"]
+netapp_nfs_host = "xcp-hostname"
+
+[volume.weka]
+backend = "weka"
+path = "/vfroot/weka"
+
+[volume.weka.options]
+weka_endpoint = "https://wekaio.example.com"  # Endpoint to Weka.IO API
+weka_username = ""  # Weka.IO Username
+weka_password = ""  # Weka.IO Password
+weka_organization = ""  # Weka.IO Organization
+weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`
+weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context
+
+[volume.gpfs]
+backend = "spectrumscale"
+path = "/gpfs/example_fs"
+
+[volume.gpfs.options]
+gpfs_endpoint = "https://gpfs.example.com"  # Endpoint to Spectrum Scale API
+gpfs_username = "admin"  # Spectrum Scale GUI Username
+gpfs_password = "admin"  # Spectrum Scale GUI Password
+gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
+gpfs_verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
+gpfs_owner = "1000:1000"  # Default ownership to created fileset
+
+[volume.vast]
+backend = "vast"
+path = "/vfroot/vast"
+
+[volume.vast.options]
+vast_endpoint = "https://vast.example.com"  # Endpoint to Vast mgmt system API
+vast_username = ""  # Vast mgmt system Username
+vast_password = ""  # Vast mgmt system Password
+vast_verify_ssl = false # If set to true, allow to communicate to server with insecure ssl context. Defaults to false.
+vast_api_version = "v2" # Vast mgmt system API version. Defaults to `v2`
+vast_cluster_id = 1 # Vast mgmt system Cluster ID
+vast_storage_base_dir = "/" # Vast storage base directory that is mounted to our volume base path

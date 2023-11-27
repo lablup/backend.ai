@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 
@@ -14,7 +16,7 @@ from .image_impl import list_images as list_images_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()
@@ -28,8 +30,7 @@ def cli() -> None:
 @click.pass_obj
 def list(cli_ctx, short, installed) -> None:
     """List all configured images."""
-    with cli_ctx.logger:
-        asyncio.run(list_images_impl(cli_ctx, short, installed))
+    asyncio.run(list_images_impl(cli_ctx, short, installed))
 
 
 @cli.command()
@@ -38,8 +39,7 @@ def list(cli_ctx, short, installed) -> None:
 @click.pass_obj
 def inspect(cli_ctx, canonical_or_alias, architecture) -> None:
     """Show the details of the given image or alias."""
-    with cli_ctx.logger:
-        asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
+    asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
 @cli.command()
@@ -48,8 +48,7 @@ def inspect(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.pass_obj
 def forget(cli_ctx, canonical_or_alias, architecture) -> None:
     """Forget (delete) a specific image."""
-    with cli_ctx.logger:
-        asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
+    asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
 @cli.command()
@@ -66,29 +65,33 @@ def set_resource_limit(
     architecture,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
-    with cli_ctx.logger:
-        asyncio.run(
-            set_image_resource_limit_impl(
-                cli_ctx,
-                canonical_or_alias,
-                slot_type,
-                range_value,
-                architecture,
-            )
+    asyncio.run(
+        set_image_resource_limit_impl(
+            cli_ctx,
+            canonical_or_alias,
+            slot_type,
+            range_value,
+            architecture,
         )
+    )
 
 
 @cli.command()
-@click.argument("registry")
+@click.argument("registry_or_image", required=False, default="")
+@click.option(
+    "--local",
+    is_flag=True,
+    default=False,
+    help="Scan the local Docker daemon instead of a registry",
+)
 @click.pass_obj
-def rescan(cli_ctx, registry) -> None:
+def rescan(cli_ctx, registry_or_image: str, local: bool) -> None:
     """
     Update the kernel image metadata from all configured docker registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
-    with cli_ctx.logger:
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, local))
 
 
 @cli.command()
@@ -98,8 +101,7 @@ def rescan(cli_ctx, registry) -> None:
 @click.pass_obj
 def alias(cli_ctx, alias, target, architecture) -> None:
     """Add an image alias from the given alias to the target image reference."""
-    with cli_ctx.logger:
-        asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
+    asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
 
 
 @cli.command()
@@ -107,5 +109,4 @@ def alias(cli_ctx, alias, target, architecture) -> None:
 @click.pass_obj
 def dealias(cli_ctx, alias) -> None:
     """Remove an alias."""
-    with cli_ctx.logger:
-        asyncio.run(dealias_impl(cli_ctx, alias))
+    asyncio.run(dealias_impl(cli_ctx, alias))

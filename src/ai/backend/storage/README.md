@@ -27,17 +27,17 @@ storage-specific optimization support.
 
 ## Installation
 
-### Prequisites
+### Prerequisites
 
 -   Python 3.8 or higher with [pyenv](https://github.com/pyenv/pyenv)
-    and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
+    and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommended)
 
 ### Installation Process
 
 First, prepare the source clone of this agent:
 
 ```console
-# git clone https://github.com/lablup/backend.ai-storage-agent
+# git clone https://github.com/lablup/backend.ai-storage-proxy
 ```
 
 From now on, let's assume all shell commands are executed inside the virtualenv.
@@ -150,7 +150,7 @@ or NFS.
 
 #### Prerequisites
 
--   FUSE export mounted unde `/vfroot`
+-   FUSE export mounted under `/vfroot`
 
 ### NetApp ONTAP
 

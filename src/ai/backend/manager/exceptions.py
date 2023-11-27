@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Tuple, TypedDict
+import traceback
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    List,
+    NotRequired,
+    Tuple,
+    TypedDict,
+)
 
 from aiotools import TaskGroupError
 
@@ -55,47 +63,59 @@ class MultiAgentError(TaskGroupError):
     """
 
 
-class ErrorDetail(TypedDict, total=False):
+class ErrorDetail(TypedDict):
     src: str
     name: str
     repr: str
-    agent_id: str  # optional
-    collection: List[Any]  # optional; currently mypy cannot handle recursive types
+    agent_id: NotRequired[str]
+    collection: NotRequired[List[ErrorDetail]]
+    traceback: NotRequired[str]
 
 
 class ErrorStatusInfo(TypedDict):
     error: ErrorDetail
 
 
-def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusInfo:
-    if isinstance(e, MultiAgentError):
-        data = ErrorStatusInfo(
-            error={
-                "src": "agent",
-                "name": "MultiAgentError",
-                "repr": f"MultiAgentError({len(e.__errors__)})",
-                "collection": [
-                    convert_to_status_data(sub_error, is_debug)["error"]
-                    for sub_error in e.__errors__
-                ],
-            },
-        )
-        return data
-    elif isinstance(e, AgentError):
-        data = ErrorStatusInfo(
-            error={
-                "src": "agent",
-                "name": e.exc_name,
-                "repr": e.exc_repr,
-            },
-        )
-        if is_debug:
-            data["error"]["agent_id"] = e.agent_id
-        return data
-    return ErrorStatusInfo(
-        error={
-            "src": "other",
-            "name": e.__class__.__name__,
-            "repr": repr(e),
-        },
-    )
+def convert_to_status_data(
+    e: Exception,
+    is_debug: bool = False,
+    *,
+    src: str | None = None,
+) -> ErrorStatusInfo:
+    data: ErrorStatusInfo
+    match e:
+        case MultiAgentError():
+            return {
+                "error": {
+                    "src": "agent",
+                    "name": "MultiAgentError",
+                    "repr": f"MultiAgentError({len(e.__errors__)})",
+                    "collection": [
+                        convert_to_status_data(sub_error, is_debug, src="agent")["error"]
+                        for sub_error in e.__errors__
+                    ],
+                },
+            }
+        case AgentError():
+            data = {
+                "error": {
+                    "src": "agent",
+                    "name": e.exc_name,
+                    "repr": e.exc_repr,
+                },
+            }
+            if is_debug:
+                data["error"]["agent_id"] = e.agent_id
+                data["error"]["traceback"] = e.exc_tb or ""
+            return data
+        case _:
+            data = {
+                "error": {
+                    "src": "other" if src is None else src,
+                    "name": e.__class__.__name__,
+                    "repr": repr(e),
+                },
+            }
+            if is_debug:
+                data["error"]["traceback"] = "\n".join(traceback.format_tb(e.__traceback__))
+            return data

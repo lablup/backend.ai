@@ -3,6 +3,7 @@ import logging
 from typing import AsyncIterator, Optional, cast
 
 import aiohttp
+import typing_extensions
 import yarl
 
 from ai.backend.common.docker import login as registry_login
@@ -10,15 +11,27 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class DockerHubRegistry(BaseContainerRegistry):
+    @typing_extensions.deprecated(
+        "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
+    )
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         # We need some special treatment for the Docker Hub.
+        raise DeprecationWarning(
+            "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
+        )
+        yield ""  # dead code to ensure the type of method
+
+    async def fetch_repositories_legacy(
+        self,
+        sess: aiohttp.ClientSession,
+    ) -> AsyncIterator[str]:
         params = {"page_size": "30"}
         username = self.registry_info["username"]
         hub_url = yarl.URL("https://hub.docker.com")
@@ -35,7 +48,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                         yield f"{username}/{item['name']}"
                 else:
                     log.error(
-                        "Failed to fetch repository list from {0} " "(status={1})",
+                        "Failed to fetch repository list from {0} (status={1})",
                         repo_list_url,
                         resp.status,
                     )
@@ -74,8 +87,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
                     log.debug("found {} repositories", len(data["repositories"]))
                 else:
                     log.warning(
-                        "Docker registry {0} does not allow/support "
-                        "catalog search. (status={1})",
+                        "Docker registry {0} does not allow/support catalog search. (status={1})",
                         self.registry_url,
                         resp.status,
                     )

@@ -1,5 +1,6 @@
 import json
 import logging
+import ssl
 import time
 import urllib.parse
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from ai.backend.common.types import BinarySize
 
 from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @dataclass
@@ -24,6 +25,7 @@ class WekaQuota:
     hard_limit: Optional[int]
     soft_limit: Optional[int]
     grace_seconds: Optional[int]
+    used_bytes: Optional[int]
 
     @classmethod
     def from_json(cls, quota_id: str, data: Any):
@@ -33,6 +35,7 @@ class WekaQuota:
             data["hard_limit_bytes"],
             data["soft_limit_bytes"],
             data["grace_seconds"],
+            data["used_bytes"],
         )
 
     def to_json(self):
@@ -42,6 +45,7 @@ class WekaQuota:
             "hard_limit": self.hard_limit,
             "soft_limit": self.soft_limit,
             "grace_seconds": self.grace_seconds,
+            "used_bytes": self.used_bytes,
         }
 
 
@@ -100,6 +104,7 @@ class WekaAPIClient:
     username: str
     password: str
     organization: str
+    ssl_context: Optional[ssl.SSLContext | bool]
 
     _access_token: Optional[str]
     _refresh_token: Optional[str]
@@ -111,6 +116,7 @@ class WekaAPIClient:
         username: str,
         password: str,
         organization: str,
+        ssl: Optional[ssl.SSLContext | bool] = None,
     ) -> None:
         self.api_endpoint = endpoint
         self.username = username
@@ -119,6 +125,7 @@ class WekaAPIClient:
 
         self._access_token = None
         self._refresh_token = None
+        self.ssl_context = ssl
 
     @property
     def _is_token_valid(self) -> bool:
@@ -136,6 +143,7 @@ class WekaAPIClient:
             response = await sess.post(
                 "/api/v2/login/refresh",
                 data={"refresh_token": self._refresh_token},
+                ssl=self.ssl_context,
             )
         else:
             response = await sess.post(
@@ -145,6 +153,7 @@ class WekaAPIClient:
                     "password": self.password,
                     "org": self.organization,
                 },
+                ssl=self.ssl_context,
             )
         data = await response.json()
         self._access_token = data["data"]["access_token"]
@@ -177,20 +186,25 @@ class WekaAPIClient:
 
         try:
             if method == "GET" or method == "DELETE":
-                return await func("/api/v2" + path, headers=self._req_header)
+                return await func("/api/v2" + path, headers=self._req_header, ssl=self.ssl_context)
             else:
-                return await func("/api/v2" + path, headers=self._req_header, json=body)
+                return await func(
+                    "/api/v2" + path, headers=self._req_header, json=body, ssl=self.ssl_context
+                )
         except web.HTTPUnauthorized:
             await self._login(sess)
             try:
                 if method == "GET" or method == "DELETE":
-                    return await func("/api/v2" + path, headers=self._req_header)
+                    return await func(
+                        "/api/v2" + path, headers=self._req_header, ssl=self.ssl_context
+                    )
 
                 else:
                     return await func(
                         "/api/v2" + path,
                         headers=self._req_header,
                         json=body,
+                        ssl=self.ssl_context,
                     )
 
             except web.HTTPUnauthorized:
@@ -251,10 +265,13 @@ class WekaAPIClient:
                 f"/fileSystems/{fs_uid}/quota/{inode_id}",
             )
             data = await response.json()
-        if len(data["data"].keys()) == 0:
+        if data.get("message") == "Directory has no quota" or len(data["data"].keys()) == 0:
             raise WekaNotFoundError
-        quota_id = data["data"].keys()[0]
-        return WekaQuota.from_json(quota_id, data["data"][quota_id])
+        if "inode_id" in data["data"]:
+            return WekaQuota.from_json("", data["data"])
+        else:
+            quota_id = list(data["data"].keys())[0]
+            return WekaQuota.from_json(quota_id, data["data"][quota_id])
 
     @error_handler
     async def set_quota(
@@ -295,6 +312,7 @@ class WekaAPIClient:
             data["data"][quota_id]["hard_limit_bytes"],
             data["data"][quota_id]["soft_limit_bytes"],
             data["data"][quota_id]["grace_seconds"],
+            data["data"][quota_id]["used_bytes"],
         )
 
     @error_handler
@@ -302,8 +320,8 @@ class WekaAPIClient:
         self,
         path: str,
         inode_id: int,
-        hard_limit: Optional[BinarySize] = None,
-        soft_limit: Optional[BinarySize] = None,
+        hard_limit: Optional[int] = None,
+        soft_limit: Optional[int] = None,
     ) -> None:
         """
         Sets quota using undocumented V1 API. Should be considered deprecated
@@ -321,15 +339,16 @@ class WekaAPIClient:
         }
 
         if soft_limit is not None:
-            body["params"]["soft_limit_bytes"] = int(soft_limit)
+            body["params"]["soft_limit_bytes"] = soft_limit
         if hard_limit is not None:
-            body["params"]["hard_limit_bytes"] = int(hard_limit)
+            body["params"]["hard_limit_bytes"] = hard_limit
 
         async with aiohttp.ClientSession() as sess:
             await sess.post(
                 self.api_endpoint + "/api/v1",
                 headers=self._req_header,
                 data=json.dumps(body),
+                ssl=self.ssl_context,
             )
 
     @error_handler

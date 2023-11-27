@@ -48,7 +48,6 @@ class AsyncContextManagerMock:
 
 
 class MockableZMQAsyncSock:
-
     # Since zmq.Socket/zmq.asyncio.Socket uses a special AttributeSetter mixin which
     # breaks mocking of those instances as-is, we define a dummy socket interface
     # which does not have such side effects.
@@ -76,4 +75,83 @@ class MockableZMQAsyncSock:
         pass
 
     async def recv_multipart(self):
+        pass
+
+
+class AsyncContextMock(mock.Mock):
+    """
+    Provides a mock that can be used:
+
+        async with mock():
+          ...
+
+    Example:
+
+        # In the test code:
+        mock_obj = unittest.mock.Mock()
+        mock_obj.fetch.return_value = AsyncContextMock(
+            status=200,
+            json=mock.AsyncMock(return_value={'hello': 'world'})
+        )
+        mocker.patch('mypkg.mymod.MyClass', return_value=mock_obj)
+
+        # In the tested code:
+        obj = mpkg.mymod.MyClass()
+        async with obj.fetch() as resp:
+            # resp.status is 200
+            result = await resp.json()
+            # result is {'hello': 'world'}
+    """
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+class AsyncContextMagicMock(mock.MagicMock):
+    """
+    Provides a magic mock that can be used:
+
+        async with mock():
+          ...
+    """
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+class AsyncContextCoroutineMock(AsyncMock):
+    """
+    Provides a mock that can be used:
+
+        async with (await mock(...)):
+          ...
+
+    Example:
+
+        # In the test code:
+        mock_obj = unittest.mock.AsyncMock()
+        mock_obj.fetch.return_value = AsyncContextMock(
+            status=200,
+            json=mock.AsyncMock(return_value={'hello': 'world'})
+        )
+        mocker.patch('mypkg.mymod.MyClass', return_value=mock_obj)
+
+        # In the tested code:
+        obj = mpkg.mymod.MyClass()
+        async with (await obj.fetch()) as resp:
+            # resp.status is 200
+            result = await resp.json()
+            # result is {'hello': 'world'}
+    """
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass

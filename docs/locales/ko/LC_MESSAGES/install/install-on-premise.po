@@ -9,79 +9,99 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../install/install-on-premise.rst:3 e3fb5d735f044d9f8227a0774e28d98b
+#: ../../install/install-on-premise.rst:2 80f4e09a09554a60b2b8a87a659ed42a
 msgid "Install on Premise"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:6 62924e5cca06497880fa8e02ec48a503
-msgid "Prepare the instances and databases."
+#: ../../install/install-on-premise.rst:4 fb10b36ed3b44ea393e6770b51a42a94
+msgid "The minimal server node configuration:"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:8 cd3e9d7f383142ed8bdfba4bc6753bf2
-msgid ""
-"1x SSL certificate with a private key for your own domain (for production)"
+#: ../../install/install-on-premise.rst:6 808dd27b89fa451baa8760f6f434e925
+msgid "1x SSL certificate with a private key for your own domain (for production)"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:9 4331a04bb11745a989c2b51a384ffea9
-msgid "1x gateway server"
+#: ../../install/install-on-premise.rst:7 646fe37983e24c48b90f76bd17c40791
+msgid "1x manager server"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:10 d89ff3e2b4074f9c94cf7b8b1dcd4f82
-msgid "1x agent server"
+#: ../../install/install-on-premise.rst:8 cf4ef9493cb6478297c07c15e182d893
+msgid "Nx agent servers"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:11 bd62eb707b624dddbb09ec2d84050a18
+#: ../../install/install-on-premise.rst:9 6d9bb37432ca43eeabaf812b9cc26288
 msgid "1x PostgreSQL server"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:12 b9f158cb4aad42a2841eb24d11604eee
+#: ../../install/install-on-premise.rst:10 42a8b3930bcd45a5ac16adef3c02065f
 msgid "1x Redis server"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:13 5990acdbb2b648e69e6b72547cbe051a
+#: ../../install/install-on-premise.rst:11 750d170e4bd440269f593460b5c26627
 msgid "1x etcd cluster"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:15 9c5ad6b4fe974621b91e88fa89436036
-msgid ""
-"It is up to you whether to setup a HA-enabled multi-server cluster or a "
-"single-server cluster with backups."
+#: ../../install/install-on-premise.rst:13 1fc1fe6796bf415487300e87a32db639
+msgid "For HA setup, it should consist of 5 separate server nodes."
 msgstr ""
 
-#: ../../install/install-on-premise.rst:16 782246cdb1d54c2f9bcf71185dbfe750
-msgid ""
-"Check out [[this page|Install etcd]] for details. If you install etcd on the "
-"same instance where the manager runs, you could try using docker-compose "
-"configuration in this meta-repository's code."
-msgstr ""
-
-#: ../../install/install-on-premise.rst:18 dec908159ec4494ebccfcfb117319238
+#: ../../install/install-on-premise.rst:15 3af67d2e3c044d62b39addf868647d55
 msgid "1x network-accessible storage server (NAS) with NFS/SMB mounts"
 msgstr ""
 
-#: ../../install/install-on-premise.rst:20 687746285c1f4d67af948a15c6ec4f9b
+#: ../../install/install-on-premise.rst:17 06c84b0e66704f1cad98badcd743745c
 msgid "All should be in the same private network (LAN)."
 msgstr ""
 
-#: ../../install/install-on-premise.rst:22 248856f23486491b8ce07007ea92b1f7
+#: ../../install/install-on-premise.rst:19 fae03e12e2fe4314bbd41da3ed2c98c1
 msgid ""
-"Depending on the cluster size, different service daemons may run on the same "
-"physical server."
+"Depending on the cluster size, several service/database daemons may run "
+"on the same physical server."
 msgstr ""
 
-#: ../../install/install-on-premise.rst:24 25685087f2744a589fc58e32626a6a35
-msgid ":doc:`Install Manager </install/install-manager>`"
-msgstr ""
+#~ msgid "Prepare the instances and databases."
+#~ msgstr ""
 
-#: ../../install/install-on-premise.rst:25 281a960837a14e208bb8d6924c958b42
-msgid ":doc:`Install Agent </install/install-agent>`"
-msgstr ""
+#~ msgid "1x gateway server"
+#~ msgstr ""
+
+#~ msgid "1x agent server"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "It is up to you whether to "
+#~ "setup a HA-enabled multi-server "
+#~ "cluster or a single-server cluster "
+#~ "with backups."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Check out [[this page|Install etcd]] for"
+#~ " details. If you install etcd on "
+#~ "the same instance where the manager "
+#~ "runs, you could try using docker-"
+#~ "compose configuration in this meta-"
+#~ "repository's code."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Depending on the cluster size, different"
+#~ " service daemons may run on the "
+#~ "same physical server."
+#~ msgstr ""
+
+#~ msgid ":doc:`Install Manager </install/install-manager>`"
+#~ msgstr ""
+
+#~ msgid ":doc:`Install Agent </install/install-agent>`"
+#~ msgstr ""
+

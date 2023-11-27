@@ -9,56 +9,86 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/auth.rst:2 7d594f43c52a4ce4a11ffeea9cc96428
+#: ../../client/func/auth.rst:2 9b91038dd2364e94a9bc23ce2f816e95
 msgid "Auth Functions"
 msgstr ""
 
-#: 9967d976efdb4692b233cab9246247e6 ai.backend.client.func.auth.Auth:1 of
+#: 71ce0765d8734e17aee97beabc2c5232 ai.backend.client.func.auth.Auth:1 of
 msgid ""
 "Provides the function interface for login session management and "
 "authorization."
 msgstr ""
 
-#: ai.backend.client.func.auth.Auth.login:1 d37912322a6843d8a017afae158f7d80 of
+#: ai.backend.client.func.auth.Auth.login:1 cff2325c2454440f9a98a68c3c89e643 of
 msgid ""
-"Log-in into the endpoint with the given user ID and password. It creates a "
-"server-side web session and return a dictionary with ``\"authenticated\"`` "
-"boolean field and JSON-encoded raw cookie data."
+"Log-in into the endpoint with the given user ID and password. It creates "
+"a server-side web session and return a dictionary with "
+"``\"authenticated\"`` boolean field and JSON-encoded raw cookie data."
 msgstr ""
 
-#: a5057bf576e9467896c8ff6d8a8cca8f ai.backend.client.func.auth.Auth.login
+#: 2ff201e7ad434d6b9d9455078874592e 47a775c835294747a4f2c6569aaab197
+#: 826767fc205a4896bfcaf0a36d39a97d ai.backend.client.func.auth.Auth.login
 #: ai.backend.client.func.auth.Auth.logout
-#: ai.backend.client.func.auth.Auth.update_password
-#: fbbb37b8bcb445acafe8d39cc4a75d93 fcdecde267ef4163b05c997c6c5528ed of
+#: ai.backend.client.func.auth.Auth.update_password of
 msgid "Return type"
 msgstr ""
 
-#: 8d56d72a4b3e4feaa6f3cfee4d9ca608 ai.backend.client.func.auth.Auth.login:7
-#: ai.backend.client.func.auth.Auth.update_password:4
-#: f1eb56ea62504e3f86549377fc2343b1 of
+#: 378d397311914b6f913078ad51b4f8ed a8758819569b4dfc8e911575c80d62d5
+#: ai.backend.client.func.auth.Auth.login:7
+#: ai.backend.client.func.auth.Auth.update_password:4 of
 msgid ":py:class:`dict`"
 msgstr ""
 
-#: 840598417a5d4693868e598cc7a1c333 ai.backend.client.func.auth.Auth.logout:1
+#: 83e1a107cb9a4b398195029c866e9f01 ai.backend.client.func.auth.Auth.logout:1
 #: of
 msgid "Log-out from the endpoint. It clears the server-side web session."
 msgstr ""
 
-#: 52021e4e862147118ce5c60574254929 ai.backend.client.func.auth.Auth.logout:5
+#: 86373794489e40fbb2d79f02a46ec4b0 ai.backend.client.func.auth.Auth.logout:5
 #: of
 msgid ":py:obj:`None`"
 msgstr ""
 
-#: ai.backend.client.func.auth.Auth.update_password:1
-#: c17fa990b37140c0a53deba44ef14047 of
+#: 465a66f4b1b84d0ab38f31ca877ba5ad
+#: ai.backend.client.func.auth.Auth.update_password:1 of
 msgid "Update user's password. This API works only for account owner."
 msgstr ""
+
+#~ msgid ""
+#~ "Provides the function interface for "
+#~ "login session management and authorization."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Log-in into the endpoint with the"
+#~ " given user ID and password. It "
+#~ "creates a server-side web session "
+#~ "and return a dictionary with "
+#~ "``\"authenticated\"`` boolean field and "
+#~ "JSON-encoded raw cookie data."
+#~ msgstr ""
+
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid ":py:class:`dict`"
+#~ msgstr ""
+
+#~ msgid "Log-out from the endpoint. It clears the server-side web session."
+#~ msgstr ""
+
+#~ msgid ":py:obj:`None`"
+#~ msgstr ""
+
+#~ msgid "Update user's password. This API works only for account owner."
+#~ msgstr ""
+

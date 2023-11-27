@@ -3,10 +3,10 @@ from types import TracebackType
 from typing import Type
 
 import aiotools
-import attr
+import attrs
 import pytest
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.events import (
     AbstractEvent,
     CoalescingOptions,
@@ -17,11 +17,11 @@ from ai.backend.common.events import (
 from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class DummyEvent(AbstractEvent):
     name = "testing"
 
-    value: int = attr.ib()
+    value: int = attrs.field()
 
     def serialize(self) -> tuple:
         return (self.value + 1,)
@@ -31,12 +31,20 @@ class DummyEvent(AbstractEvent):
         return cls(value[0] + 1)
 
 
+EVENT_DISPATCHER_CONSUMER_GROUP = "test"
+
+
 @pytest.mark.asyncio
 async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1])
-    dispatcher = await EventDispatcher.new(redis_config)
+    redis_config = EtcdRedisConfig(
+        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
+    )
+    dispatcher = await EventDispatcher.new(
+        redis_config,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+    )
     producer = await EventProducer.new(redis_config)
 
     records = set()
@@ -84,9 +92,12 @@ async def test_error_on_dispatch(redis_container) -> None:
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1])
+    redis_config = EtcdRedisConfig(
+        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
+    )
     dispatcher = await EventDispatcher.new(
         redis_config,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         consumer_exception_handler=handle_exception,
         subscriber_exception_handler=handle_exception,
     )

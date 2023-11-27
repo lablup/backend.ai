@@ -5,34 +5,29 @@ import base64
 import json
 import logging
 import random
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
+import jwt
 from aiohttp import web
-from aiohttp_session import STORAGE_KEY, get_session
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .auth import get_anonymous_session, get_api_session
+from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
+from .stats import WebStats
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:
@@ -127,37 +122,51 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request: web.Request) -> str:
-    if not request.content:
-        return ""
+@web.middleware
+async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if secure_context:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
+            request["payload"] = ""
+            return await handler(request)
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        initial_vector, real_payload = payload.split(":")
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
+        crypt = AES.new(
+            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
+        )
+        b64p = base64.b64decode(real_payload)
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+    else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
+        request["payload"] = ""
+    return await handler(request)
+
+
+async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
-    scheme = config["service"]["force_endpoint_protocol"]
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f"{scheme}://{request.host}"
-    payload = await request.text()
-    iv, real_payload = payload.split(":")  # Extract initial vector and actual payload
-    key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(iv, encoding="utf8"))
-    b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-    result = dec.decode("UTF-8")
-    return result
-
-
-async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get("path", "")
-    first_path = request.path.lstrip("/").partition("/")[
-        0
-    ]  # extract the first path  # extract the first path
-    if is_anonymous:
+    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
+    if proxy_path == "pipeline":
+        pipeline_config = config["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"]
+        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_api_session(request, endpoint))
+    elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-
-    if first_path == "pipeline":
-        pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
-        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
@@ -168,16 +177,11 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             secure_context = request_headers.get("X-BackendAI-Encoded", None)
             decrypted_payload_length = 0
             if secure_context:
-                payload = await decrypt_payload(request)
+                payload = request["payload"]
                 decrypted_payload_length = len(payload)
             else:
                 payload = request.content
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
@@ -201,6 +205,24 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
+            if proxy_path == "pipeline":
+                aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
+                if not (sso_token := request.headers.get("X-BackendAI-SSO")):
+                    jwt_secret = config["pipeline"]["jwt"]["secret"]
+                    now = datetime.now().astimezone()
+                    payload = {
+                        # Registered claims
+                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
+                        "iss": "Backend.AI Webserver",
+                        "iat": now,
+                        # Private claims
+                        "aiohttp_session": aiohttp_session,
+                        "access_key": api_session.config.access_key,  # since 23.03.10
+                    }
+                    sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
+                api_rqst.headers["X-BackendAI-SSO"] = sso_token
+                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
+                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
@@ -257,6 +279,8 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
+    stats: WebStats = request.app["stats"]
+    stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
@@ -270,12 +294,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
                 body["domain"] = request.app["config"]["api"]["domain"]
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             api_rqst = Request(
@@ -336,6 +355,8 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
 
 
 async def websocket_handler(request, *, is_anonymous=False) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
     session = await get_session(request)
     app = request.query.get("app")
@@ -355,13 +376,22 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
-    if is_anonymous:
+    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
+    if proxy_path == "pipeline":
+        pipeline_config = request.app["config"]["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"].with_scheme("ws")
+        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
+    elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     try:
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             api_rqst = Request(
                 request.method,
                 path,

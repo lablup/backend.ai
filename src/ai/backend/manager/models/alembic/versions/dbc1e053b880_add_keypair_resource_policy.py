@@ -8,6 +8,7 @@ Create Date: 2019-02-07 15:30:54.861821
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 from ai.backend.common.types import DefaultForUnspecified
 
@@ -60,11 +61,14 @@ def upgrade():
         0,
         array['local']
     );
+    """
+    connection = op.get_bind()
+    connection.execute(text(query))
+    query = """
     UPDATE keypairs
     SET resource_policy = 'default';
     """
-    connection = op.get_bind()
-    connection.execute(query)
+    connection.execute(text(query))
     print("\n!!! NOTICE !!!\n")
     print("Created a default resource policy and linked all keypairs to it.")
     print("Please inspect and adjust it!\n")

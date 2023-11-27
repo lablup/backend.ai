@@ -12,9 +12,9 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import TemplateType, UserRole
-from ..models import association_groups_users as agus
 from ..models import (
+    TemplateType,
+    UserRole,
     domains,
     groups,
     keypairs,
@@ -22,6 +22,7 @@ from ..models import (
     session_templates,
     users,
 )
+from ..models import association_groups_users as agus
 from ..models.session_template import check_cluster_template
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
@@ -32,7 +33,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)

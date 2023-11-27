@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "22964745c12b"
@@ -36,13 +37,11 @@ def upgrade():
     # ### end Alembic commandk ###
 
     print("\nSet group's total_resource_slots with empty dictionary.")
-    query = textwrap.dedent(
-        """\
+    query = textwrap.dedent("""\
         UPDATE groups SET total_resource_slots = '{}'::jsonb;
-    """
-    )
+    """)
     connection = op.get_bind()
-    connection.execute(query)
+    connection.execute(text(query))
 
 
 def downgrade():

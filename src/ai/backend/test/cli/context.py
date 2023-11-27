@@ -1,6 +1,6 @@
-import attr
+import attrs
 
 
-@attr.s(auto_attribs=True, frozen=True)
+@attrs.define(auto_attribs=True, frozen=True)
 class CLIContext:
     pass

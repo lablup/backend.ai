@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, List, Tuple
 
 import aiotools
-import attr
+import attrs
 import pytest
 from etcetra.types import HostPortPair as EtcdHostPortPair
 from redis.asyncio import Redis
 
+from ai.backend.common import config
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
@@ -26,7 +27,7 @@ from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair, Redi
 
 @dataclass
 class TimerNodeContext:
-    test_ns: str
+    test_case_ns: str
     redis_addr: HostPortPair
     interval: float
 
@@ -53,18 +54,21 @@ def dslice(start: Decimal, stop: Decimal, num: int):
     yield from (start + step * Decimal(tick) for tick in range(0, num))
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class NoopEvent(AbstractEvent):
     name = "_noop"
 
-    test_ns: str = attr.ib()
+    test_case_ns: str = attrs.field()
 
     def serialize(self) -> tuple:
-        return (self.test_ns,)
+        return (self.test_case_ns,)
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(value[0])
+
+
+EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
 async def run_timer(
@@ -72,27 +76,32 @@ async def run_timer(
     stop_event: asyncio.Event,
     event_records: List[float],
     redis_addr: HostPortPair,
-    test_ns: str,
+    test_case_ns: str,
     interval: int | float,
 ) -> None:
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = EtcdRedisConfig(addr=redis_addr)
+    redis_config = EtcdRedisConfig(
+        addr=redis_addr, redis_helper_config=config.redis_helper_default_config
+    )
     event_dispatcher = await EventDispatcher.new(
         redis_config,
-        node_id=test_ns,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=test_case_ns,
+        stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
         redis_config,
+        stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
     timer = GlobalTimer(
         lock_factory(),
         event_producer,
-        lambda: NoopEvent(test_ns),
+        lambda: NoopEvent(test_case_ns),
         interval=interval,
     )
     try:
@@ -117,13 +126,18 @@ def etcd_timer_node_process(
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
+        redis_config = EtcdRedisConfig(
+            addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
+        )
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            node_id=timer_ctx.test_ns,
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=timer_ctx.test_case_ns,
+            stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_producer = await EventProducer.new(
             redis_config,
+            stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
@@ -139,7 +153,7 @@ def etcd_timer_node_process(
         timer = GlobalTimer(
             EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True),
             event_producer,
-            lambda: NoopEvent(timer_ctx.test_ns),
+            lambda: NoopEvent(timer_ctx.test_case_ns),
             timer_ctx.interval,
         )
         try:
@@ -167,7 +181,7 @@ class TimerNode(threading.Thread):
         self.lock_factory = lock_factory
         self.thread_idx = thread_idx
         self.interval = timer_ctx.interval
-        self.test_ns = timer_ctx.test_ns
+        self.test_case_ns = timer_ctx.test_case_ns
         self.redis_addr = timer_ctx.redis_addr
 
     async def timer_node_async(self) -> None:
@@ -178,20 +192,25 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = EtcdRedisConfig(addr=self.redis_addr)
+        redis_config = EtcdRedisConfig(
+            addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
+        )
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            node_id=self.test_ns,
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=self.test_case_ns,
+            stream_key=f"events-{self.test_case_ns}",
         )
         event_producer = await EventProducer.new(
             redis_config,
+            stream_key=f"events-{self.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
         timer = GlobalTimer(
             self.lock_factory(),
             event_producer,
-            lambda: NoopEvent(self.test_ns),
+            lambda: NoopEvent(self.test_case_ns),
             interval=self.interval,
         )
         try:
@@ -207,8 +226,8 @@ class TimerNode(threading.Thread):
 
 
 @pytest.mark.asyncio
-async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
-    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
+async def test_global_timer_filelock(request, test_case_ns, redis_container) -> None:
+    lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
 
@@ -225,7 +244,7 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
             lock_factory,
             thread_idx,
             TimerNodeContext(
-                test_ns=test_ns,
+                test_case_ns=test_case_ns,
                 redis_addr=redis_container[1],
                 interval=interval,
             ),
@@ -250,13 +269,16 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
 
 
 @pytest.mark.asyncio
-async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
+async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
+        sentinel=None,
+        name="test",
         service_name=None,
+        redis_helper_config=config.redis_helper_default_config,
     )
-    lock_factory = lambda: RedisLock(f"{test_ns}lock", r, debug=True)
+    lock_factory = lambda: RedisLock(f"{test_case_ns}lock", r, debug=True)
 
     event_records: List[float] = []
     num_threads = 7
@@ -273,7 +295,7 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
                 stop_event,
                 event_records,
                 redis_addr,
-                test_ns,
+                test_case_ns,
                 interval,
             ),
         )
@@ -297,11 +319,11 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
 
 @pytest.mark.asyncio
 async def test_global_timer_etcdlock(
-    test_ns,
+    test_case_ns,
     etcd_container,
     redis_container,
 ) -> None:
-    lock_name = f"{test_ns}lock"
+    lock_name = f"{test_case_ns}lock"
     event_records_queue: Queue = Queue()
     num_processes = 7
     num_records = 0
@@ -319,11 +341,11 @@ async def test_global_timer_etcdlock(
                 stop_event,
                 EtcdLockContext(
                     addr=etcd_container[1],
-                    namespace=test_ns,
+                    namespace=test_case_ns,
                     lock_name=lock_name,
                 ),
                 TimerNodeContext(
-                    test_ns=test_ns,
+                    test_case_ns=test_case_ns,
                     redis_addr=redis_container[1],
                     interval=interval,
                 ),
@@ -351,31 +373,35 @@ async def test_global_timer_etcdlock(
 
 
 @pytest.mark.asyncio
-async def test_global_timer_join_leave(request, test_ns, redis_container) -> None:
-
+async def test_global_timer_join_leave(request, test_case_ns, redis_container) -> None:
     event_records = []
 
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1])
+    redis_config = EtcdRedisConfig(
+        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
+    )
     event_dispatcher = await EventDispatcher.new(
         redis_config,
-        node_id=test_ns,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=test_case_ns,
+        stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
         redis_config,
+        stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
-    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
+    lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     for _ in range(10):
         timer = GlobalTimer(
             FileLock(lock_path, timeout=0, debug=True),
             event_producer,
-            lambda: NoopEvent(test_ns),
+            lambda: NoopEvent(test_case_ns),
             0.01,
         )
         await timer.join()
@@ -386,7 +412,7 @@ async def test_global_timer_join_leave(request, test_ns, redis_container) -> Non
 
 
 @pytest.mark.asyncio
-async def test_filelock_watchdog(request, test_ns) -> None:
+async def test_filelock_watchdog(request, test_case_ns) -> None:
     """
     This test case is for verifying
     if watchdog releases the lock after the timeout(ttl)
@@ -394,7 +420,7 @@ async def test_filelock_watchdog(request, test_ns) -> None:
 
     TODO: For further implementation, the `FileLock` should be able to **cancel** current job after timeout.
     """
-    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
+    lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
 
     loop = asyncio.get_running_loop()

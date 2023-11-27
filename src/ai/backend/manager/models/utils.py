@@ -15,6 +15,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 from ..defs import LockID
 from ..types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -45,18 +46,23 @@ class ExtendedAsyncSAEngine(SAEngine):
     """
 
     def __init__(self, *args, **kwargs) -> None:
+        self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 8)
+        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
 
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:
         async with super().begin() as conn:
             self._generic_txn_count += 1
-            if self._generic_txn_count >= self._txn_concurrency_threshold:
+            if (
+                self._txn_concurrency_threshold > 0
+                and self._generic_txn_count >= self._txn_concurrency_threshold
+            ):
                 log.warning(
-                    "The number of concurrent generic transaction ({}) exceeded the threshold {}.",
+                    "The number of concurrent generic transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._generic_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -70,9 +76,13 @@ class ExtendedAsyncSAEngine(SAEngine):
     async def begin_readonly(self, deferrable: bool = False) -> AsyncIterator[SAConnection]:
         async with self.connect() as conn:
             self._readonly_txn_count += 1
-            if self._readonly_txn_count >= self._txn_concurrency_threshold:
+            if (
+                self._txn_concurrency_threshold > 0
+                and self._readonly_txn_count >= self._txn_concurrency_threshold
+            ):
                 log.warning(
-                    "The number of concurrent read-only transaction ({}) exceeded the threshold {}.",
+                    "The number of concurrent read-only transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._readonly_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -88,9 +98,10 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self) -> AsyncIterator[SASession]:
+    async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            session = SASession(bind=conn)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
             try:
                 yield session
                 await session.commit()
@@ -99,9 +110,13 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise e
 
     @actxmgr
-    async def begin_readonly_session(self, deferrable: bool = False) -> AsyncIterator[SASession]:
+    async def begin_readonly_session(
+        self, deferrable: bool = False, expire_on_commit=False
+    ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            yield SASession(bind=conn)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
+            yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -135,15 +150,23 @@ class ExtendedAsyncSAEngine(SAEngine):
                     )
 
 
-def create_async_engine(*args, **kwargs) -> ExtendedAsyncSAEngine:
+def create_async_engine(
+    *args,
+    _txn_concurrency_threshold: int = 0,
+    **kwargs,
+) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
-    return ExtendedAsyncSAEngine(sync_engine)
+    return ExtendedAsyncSAEngine(
+        sync_engine,
+        _txn_concurrency_threshold=_txn_concurrency_threshold,
+    )
 
 
 @actxmgr
 async def connect_database(
     local_config: LocalConfig | Mapping[str, Any],
+    isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
@@ -156,7 +179,8 @@ async def connect_database(
     version_check_db = create_async_engine(url)
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
-        major, minor, *_ = map(int, result.scalar().split("."))
+        version_str = result.scalar()
+        major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
@@ -164,11 +188,15 @@ async def connect_database(
     db = create_async_engine(
         url,
         connect_args=pgsql_connect_opts,
-        pool_size=8,
-        max_overflow=64,
+        pool_size=local_config["db"]["pool-size"],
+        max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
-        isolation_level="SERIALIZABLE",
+        isolation_level=isolation_level,
         future=True,
+        _txn_concurrency_threshold=max(
+            int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
+            2,
+        ),
     )
     yield db
     await db.dispose()
@@ -191,6 +219,24 @@ async def reenter_txn(
             yield conn
 
 
+@actxmgr
+async def reenter_txn_session(
+    pool: ExtendedAsyncSAEngine,
+    sess: SASession,
+    read_only: bool = False,
+) -> AsyncIterator[SAConnection]:
+    if sess is None:
+        if read_only:
+            async with pool.begin_readonly_session() as sess:
+                yield sess
+        else:
+            async with pool.begin_session() as sess:
+                yield sess
+    else:
+        async with sess.begin_nested():
+            yield sess
+
+
 TQueryResult = TypeVar("TQueryResult")
 
 
@@ -207,7 +253,7 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                 try:
                     result = await txn_func()
                 except DBAPIError as e:
-                    if getattr(e.orig, "pgcode", None) == "40001":
+                    if is_db_retry_error(e):
                         raise TryAgain
                     raise
     except RetryError:
@@ -234,18 +280,20 @@ def sql_json_merge(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
-        sa.func.jsonb_build_object(
-            key[_depth],
-            (
-                sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
-                    sa.func.cast(obj, psql.JSONB)
-                )
-                if _depth == len(key) - 1
-                else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
-            ),
-        )
-        if key
-        else sa.func.cast(obj, psql.JSONB),
+        (
+            sa.func.jsonb_build_object(
+                key[_depth],
+                (
+                    sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
+                        sa.func.cast(obj, psql.JSONB)
+                    )
+                    if _depth == len(key) - 1
+                    else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
+                ),
+            )
+            if key
+            else sa.func.cast(obj, psql.JSONB)
+        ),
     )
     return expr
 
@@ -301,3 +349,30 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
         new_metadata,
         *[_populate_column(c) for c in table.columns],
     )
+
+
+def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
+    # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
+    return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
+
+
+def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
+    return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
+
+
+def is_db_retry_error(e: Exception) -> bool:
+    return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
+
+
+def description_msg(version: str, detail: str | None = None) -> str:
+    val = f"Added since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val
+
+
+def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
+    val = f"Deprecated since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val

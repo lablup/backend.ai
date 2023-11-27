@@ -8,11 +8,11 @@ FAQ
 
    * - Product
      - Role
-     - Problem and Solution
+     - Value
 
    * - Apache Zeppelin, Jupyter Notebook
      - Notebook-style document + code *frontends*
-     - Insecure host resource sharing
+     - Familiarity from data scientists and researchers, but hard to avoid insecure host resource sharing
 
    * - **Backend.AI**
      - Pluggable *backend* to any frontends
@@ -28,16 +28,16 @@ FAQ
      - Value
 
    * - Amazon ECS, Kubernetes
-     - Long-running service daemons
+     - Long-running interactive services
      - Load balancing, fault tolerance, incremental deployment
 
-   * - **Backend.AI**
-     - Stateful compute sessions
-     - Low-cost high-density computation
-
    * - Amazon Lambda, Azure Functions
-     - Stateless, light-weight functions
+     - Stateless light-weight, short-lived functions
      - Serverless, zero-management
+
+   * - **Backend.AI**
+     - Stateful batch computations mixed with interactive applications
+     - Low-cost high-density computation, maximization of hardware potentials
 
 .. rubric:: vs. Big-data and AI Frameworks
 
@@ -46,15 +46,15 @@ FAQ
 
    * - Product
      - Role
-     - Problem and Solution
+     - Value
 
    * - TensorFlow, Apache Spark, Apache Hive
      - Computation runtime
-     - Difficult to install, configure, and operate
+     - Difficult to install, configure, and operate at scale
 
    * - Amazon ML, Azure ML, GCP ML
      - Managed MLaaS
-     - Still complicated for scientists, too restrictive for engineers
+     - Highly scalable but dependent on each platform, still requires system engineering backgrounds
 
    * - **Backend.AI**
      - Host of computation runtimes

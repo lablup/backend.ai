@@ -1,4 +1,18 @@
 {
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
+        }
+    ],
     "domains": [
         {
             "name": "default",
@@ -6,7 +20,9 @@
             "is_active": true,
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
-            "allowed_docker_registries": ["cr.backend.ai"]
+            "allowed_docker_registries": [
+                "cr.backend.ai"
+            ]
         }
     ],
     "groups": [
@@ -16,6 +32,7 @@
             "description": "The default user group",
             "is_active": true,
             "domain_name": "default",
+            "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {}
         }
@@ -49,6 +66,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "superadmin"
         },
         {
@@ -62,6 +80,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "admin"
         },
         {
@@ -75,6 +94,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "user"
         },
         {
@@ -88,6 +108,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "monitor"
         }
     ],
@@ -117,10 +138,19 @@
             "max_session_lifetime": 0,
             "max_concurrent_sessions": 5,
             "max_containers_per_session": 1,
-            "max_vfolder_count": 10,
-            "max_vfolder_size": 0,
             "idle_timeout": 3600,
-            "allowed_vfolder_hosts": ["local:volume1"]
+            "allowed_vfolder_hosts": {
+                "local:volume1": [
+                    "create-vfolder",
+                    "modify-vfolder",
+                    "delete-vfolder",
+                    "mount-in-session",
+                    "upload-file",
+                    "download-file",
+                    "invite-others",
+                    "set-user-specific-permission"
+                ]
+            }
         }
     ],
     "keypairs": [

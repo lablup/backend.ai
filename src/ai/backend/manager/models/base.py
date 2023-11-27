@@ -26,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import graphene
@@ -36,22 +37,32 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql.language import ast
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from graphql import Undefined
+from graphql.language import ast  # pants: no-infer-dep
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.auth import PublicKey
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AbstractPermission,
     BinarySize,
+    EndpointId,
     JSONSerializableMixin,
     KernelId,
+    QuotaScopeID,
+    ReadableCIDR,
     ResourceSlot,
     SessionId,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
 )
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -59,15 +70,13 @@ from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
-
     from .gql import GraphQueryContext
     from .user import UserRole
 
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 # The common shared metadata instance
 convention = {
@@ -164,6 +173,51 @@ class EnumValueType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
+class CurvePublicKeyColumn(TypeDecorator):
+    """
+    A column type wrapper for string-based Z85-encoded CURVE public key.
+
+    In the database, it resides as a string but it's safe to just convert them to PublicKey (bytes)
+    because zmq uses Z85 encoding to use printable characters only in the key while the pyzmq API
+    treats them as bytes.
+
+    The pure binary representation of a public key is 32 bytes and its Z85-encoded form used in the
+    pyzmq APIs is 40 ASCII characters.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(40))
+
+    def process_bind_param(self, value: Optional[PublicKey], dialect) -> Optional[str]:
+        return value.decode("ascii") if value else None
+
+    def process_result_value(self, raw_value: str | None, dialect) -> Optional[PublicKey]:
+        if raw_value is None:
+            return None
+        return PublicKey(raw_value.encode("ascii"))
+
+
+class QuotaScopeIDType(TypeDecorator):
+    """
+    A column type wrapper for string-based quota scope ID.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+        return str(value) if value else None
+
+    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
+        return QuotaScopeID.parse(raw_value)
+
+
 class ResourceSlotColumn(TypeDecorator):
     """
     A column type wrapper for ResourceSlot from JSONB.
@@ -172,18 +226,26 @@ class ResourceSlotColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def process_bind_param(self, value: Union[Mapping, ResourceSlot], dialect):
-        if isinstance(value, Mapping) and not isinstance(value, ResourceSlot):
-            return value
-        return value.to_json() if value is not None else None
+    def process_bind_param(
+        self, value: Union[Mapping, ResourceSlot, None], dialect
+    ) -> Optional[Mapping]:
+        if value is None:
+            return None
+        if isinstance(value, ResourceSlot):
+            return value.to_json()
+        return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect):
+    def process_result_value(
+        self, raw_value: dict[str, str] | None, dialect
+    ) -> ResourceSlot | None:
+        if raw_value is None:
+            return None
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")
         if isinstance(mem, str) and not mem.isdigit():
             interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value) if raw_value is not None else None
+        return ResourceSlot.from_json(interim_value)
 
     def copy(self):
         return ResourceSlotColumn()
@@ -295,6 +357,92 @@ class URLColumn(TypeDecorator):
             return yarl.URL(value)
 
 
+class IPColumn(TypeDecorator):
+    """
+    A column type to convert IP string values back and forth to CIDR.
+    """
+
+    impl = CIDR
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        try:
+            cidr = ReadableCIDR(value).address
+        except InvalidIpAddressValue:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        return cidr
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return ReadableCIDR(value)
+
+
+class PermissionListColumn(TypeDecorator):
+    """
+    A column type to convert Permission values back and forth.
+    """
+
+    impl = ARRAY
+    cache_ok = True
+
+    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+        super().__init__(sa.String)
+        self._perm_type = perm_type
+
+    @overload
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]: ...
+
+    @overload
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]: ...
+
+    @overload
+    def process_bind_param(self, value: None, dialect) -> List[str]: ...
+
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+    ) -> List[str]:
+        if value is None:
+            return []
+        try:
+            return [self._perm_type(perm).value for perm in value]
+        except ValueError:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
+
+    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
+        if value is None:
+            return set()
+        return set(self._perm_type(perm) for perm in value)
+
+
+class VFolderHostPermissionColumn(TypeDecorator):
+    """
+    A column type to convert vfolder host permission back and forth.
+    """
+
+    impl = JSONB
+    cache_ok = True
+    perm_col = PermissionListColumn(VFolderHostPermission)
+
+    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+        if value is None:
+            return {}
+        return {
+            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+        }
+
+    def process_result_value(
+        self, value: Mapping[str, Any] | None, dialect
+    ) -> VFolderHostPermissionMap:
+        if value is None:
+            return VFolderHostPermissionMap()
+        return VFolderHostPermissionMap(
+            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
+        )
+
+
 class CurrencyTypes(enum.Enum):
     KRW = "KRW"
     USD = "USD"
@@ -320,7 +468,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
             return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
-        # NOTE: SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -348,6 +496,11 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
+class EndpointIDColumnType(GUID[EndpointId]):
+    uuid_subtype_func = EndpointId
+    cache_ok = True
+
+
 class SessionIDColumnType(GUID[SessionId]):
     uuid_subtype_func = SessionId
     cache_ok = True
@@ -360,6 +513,12 @@ class KernelIDColumnType(GUID[KernelId]):
 
 def IDColumn(name="id"):
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+
+
+def EndpointIDColumn(name="id"):
+    return sa.Column(
+        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
 def SessionIDColumn(name="id"):
@@ -498,13 +657,12 @@ class _SQLBasedGQLObject(Protocol):
         cls: Type[_GenericSQLBasedGQLObject],
         ctx: GraphQueryContext,
         row: Row,
-    ) -> _GenericSQLBasedGQLObject:
-        ...
+    ) -> _GenericSQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -517,14 +675,18 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in (await db_conn.stream(query)):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
 
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -537,7 +699,55 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in (await db_conn.stream(query)):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_result_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> item) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = None
+    async for row in await db_sess.stream(query):
+        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in await db_sess.stream(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -548,14 +758,17 @@ def privileged_query(required_role: UserRole):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
                 raise GenericForbidden("superadmin privilege required")
-            return await func(executor, info, *args, **kwargs)
+            return await func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -581,7 +794,10 @@ def scoped_query(
     def wrap(resolve_func):
         @functools.wraps(resolve_func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
@@ -627,8 +843,10 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
+            if kwargs.get("project", None) is not None:
+                kwargs["project"] = group_id
             kwargs[user_key] = user_id
-            return await resolve_func(executor, info, *args, **kwargs)
+            return await resolve_func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -721,12 +939,15 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -738,10 +959,16 @@ async def simple_db_mutate(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate(): other error")
         return result_cls(False, f"unexpected error: {e}")
 
 
@@ -777,13 +1004,16 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -797,10 +1027,18 @@ async def simple_db_mutate_returning_item(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)
+    except sa.exc.StatementError as e:
+        log.warning(
+            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
+        )
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate_returning_item(): other error")
         return result_cls(False, f"unexpected error: {e}", None)
 
 
@@ -812,9 +1050,14 @@ def set_if_set(
     clean_func=None,
     target_key: Optional[str] = None,
 ) -> None:
+    """
+    Set the target dict with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
     v = getattr(src, name)
-    # NOTE: unset optional fields are passed as null.
-    if v is not None:
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
         if callable(clean_func):
             target[target_key or name] = clean_func(v)
         else:
@@ -844,3 +1087,14 @@ async def populate_fixture(
                     for row in rows:
                         row[col.name] = col.type._schema.from_json(row[col.name])
             await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+
+
+class InferenceSessionError(graphene.ObjectType):
+    class InferenceSessionErrorInfo(graphene.ObjectType):
+        src = graphene.String(required=True)
+        name = graphene.String(required=True)
+        repr = graphene.String(required=True)
+
+    session_id = graphene.UUID()
+
+    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)

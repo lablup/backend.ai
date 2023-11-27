@@ -1,0 +1,40 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/bionic64"
+  config.ssh.forward_agent = true
+  config.ssh.insert_key = false
+  config.hostmanager.enabled = true
+
+  # Ceph admin machine to manage the cluster
+  config.vm.define "ceph-admin" do |admin|
+    admin.vm.hostname = "ceph-admin"
+    admin.vm.network :private_network, ip: "192.168.56.10"
+    
+
+    admin.vm.provision :shell, :inline => "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -yq ntp ceph-deploy", :privileged => true
+  end
+
+  # The Ceph client will be client machine to mount volumes and interact with the cluster. Also it will contain Storage Proxy
+  config.vm.define "ceph-client" do |client|
+    client.vm.box = "bento/ubuntu-20.04"
+    client.vm.hostname = "ceph-client"
+    client.vm.network :private_network, ip: "192.168.56.11"
+    client.vm.provider "virtualbox" do |v|
+      v.memory = 3024
+      v.cpus = 3
+    end
+   config.vm.provision :shell, :inline => "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -yq python", :privileged => true
+  end
+
+  # We provision three nodes to be Ceph servers
+  (1..3).each do |i|
+    config.vm.define "ceph-server-#{i}" do |config|
+      config.vm.hostname = "ceph-server-#{i}"
+      config.vm.network :private_network, ip: "192.168.56.#{i+11}"
+      # ceph-deploy will assume remote machines have python2 installed
+      config.vm.provision :shell, :inline => "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -yq python", :privileged => true
+    end
+  end
+end

@@ -6,11 +6,12 @@ import sys
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Awaitable, Callable, Iterable, Optional
 
 import aiodns
-import netifaces
+import ifaddr
+import psutil
 
 from .utils import curl
 
@@ -21,9 +22,11 @@ __all__ = (
     "get_instance_ip",
     "get_instance_type",
     "get_instance_region",
+    "get_root_fs_type",
+    "get_wsl_version",
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def is_containerized() -> bool:
@@ -78,16 +81,45 @@ def detect_cloud() -> Optional[str]:
 
 
 def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
-    ifnames = netifaces.interfaces()
-    proto = netifaces.AF_INET if cidr.version == 4 else netifaces.AF_INET6
-    for ifname in ifnames:
-        addrs = netifaces.ifaddresses(ifname).get(proto, None)
-        if addrs is None:
+    proto = socket.AF_INET if cidr.version == 4 else socket.AF_INET6
+    for adapter in ifaddr.get_adapters():
+        if not adapter.ips:
             continue
-        for entry in addrs:
-            addr = ip_address(entry["addr"])
+        for entry in adapter.ips:
+            if entry.is_IPv4 and proto == socket.AF_INET:
+                assert isinstance(entry.ip, str)
+                addr = ip_address(entry.ip)
+            elif entry.is_IPv6 and proto == socket.AF_INET6:
+                assert isinstance(entry.ip, tuple)
+                addr = ip_address(entry.ip[0])
+            else:
+                continue
             if addr in cidr:
                 yield addr
+
+
+def get_root_fs_type() -> tuple[PosixPath, str]:
+    for partition in psutil.disk_partitions():
+        if partition.mountpoint == "/":
+            return PosixPath(partition.device), partition.fstype
+    raise RuntimeError("Could not find the root filesystem from the mounts.")
+
+
+def get_wsl_version() -> int:
+    """
+    Returns the current WSL version we are running on, and 0 if we are not on WSL.
+
+    ref) https://github.com/snapcore/snapd/blob/3a88dc38ca122eba97192dba3aad30f3bd3e3081/release/release.go#L116-L172
+    """
+    if not Path("/proc/sys/fs/binfmt_misc/WSLInterop").exists() and not Path("/run/WSL").exists():
+        return 0
+    try:
+        _, root_fs_type = get_root_fs_type()
+    except RuntimeError:
+        return 2
+    if root_fs_type in ("wslfs", "lxfs"):
+        return 1
+    return 2
 
 
 # Detect upon module load.

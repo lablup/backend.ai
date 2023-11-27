@@ -1,6 +1,7 @@
 """
 Resource preset APIs.
 """
+from __future__ import annotations
 
 import copy
 import functools
@@ -9,7 +10,8 @@ import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
+from uuid import UUID
 
 import aiohttp
 import aiohttp_cors
@@ -23,6 +25,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -35,6 +38,8 @@ from ..models import (
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
+    KernelRow,
+    SessionRow,
     agents,
     association_groups_users,
     domains,
@@ -43,6 +48,12 @@ from ..models import (
     query_allowed_sgroups,
     resource_presets,
     users,
+)
+from ..models.resource_usage import (
+    ProjectResourceUsage,
+    fetch_resource_usage,
+    parse_resource_usage_groups,
+    parse_total_resource_group,
 )
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -53,7 +64,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -73,7 +84,7 @@ async def list_presets(request: web.Request) -> web.Response:
         # if scaling_group is not None:
         #     query = query.where(resource_presets.c.scaling_group == scaling_group)
         resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
             resp["presets"].append(
                 {
@@ -130,7 +141,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
+            access_key, db_sess=SASession(conn)
+        )
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check group resource limit and get group_id.
@@ -145,7 +158,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             .where(
                 (association_groups_users.c.user_id == request["user"]["uuid"])
                 & (groups.c.name == params["group"])
-                & (domains.c.name == domain_name),
+                & (groups.c.domain_name == domain_name),
             )
         )
         result = await conn.execute(query)
@@ -159,7 +172,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
+        group_occupied = await root_ctx.registry.get_group_occupancy(
+            group_id, db_sess=SASession(conn)
+        )
         group_remaining = group_limits - group_occupied
 
         # Check domain resource limit.
@@ -170,7 +185,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(
+            domain_name, db_sess=SASession(conn)
+        )
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.
@@ -198,17 +215,18 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         }
 
         # Per scaling group resource using from resource occupying kernels.
+        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
-            sa.select([kernels.c.occupied_slots, kernels.c.scaling_group])
-            .select_from(kernels)
+            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            .select_from(j)
             .where(
-                (kernels.c.user_uuid == request["user"]["uuid"])
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (kernels.c.scaling_group.in_(sgroup_names)),
+                (KernelRow.user_uuid == request["user"]["uuid"])
+                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
-        async for row in (await conn.stream(query)):
-            per_sgroup[row["scaling_group"]]["using"] += row["occupied_slots"]
+        async for row in await conn.stream(query):
+            per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
         sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
@@ -220,7 +238,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             remaining = row["available_slots"] - row["occupied_slots"]
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
@@ -240,7 +258,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Fetch all resource presets in the current scaling group.
         query = sa.select([resource_presets]).select_from(resource_presets)
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             # Check if there are any agent that can allocate each preset.
             allocatable = False
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
@@ -252,9 +270,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": row["name"],
                     "resource_slots": preset_slots.to_json(),
-                    "shared_memory": str(row["shared_memory"])
-                    if row["shared_memory"] is not None
-                    else None,
+                    "shared_memory": (
+                        str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                    ),
                     "allocatable": allocatable,
                 }
             )
@@ -295,8 +313,24 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     return web.json_response({}, status=200)
 
 
+async def get_project_stats_for_period(
+    root_ctx: RootContext,
+    start_date: datetime,
+    end_date: datetime,
+    project_ids: Optional[Sequence[UUID]] = None,
+) -> dict[UUID, ProjectResourceUsage]:
+    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, project_ids=project_ids)
+    local_tz = root_ctx.shared_config["system"]["timezone"]
+    usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
+    total_groups, _ = parse_total_resource_group(usage_groups)
+    return total_groups
+
+
 async def get_container_stats_for_period(
-    request: web.Request, start_date, end_date, group_ids=None
+    request: web.Request,
+    start_date: datetime,
+    end_date: datetime,
+    group_ids: Optional[Sequence[UUID]] = None,
 ):
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
@@ -308,6 +342,7 @@ async def get_container_stats_for_period(
                 [
                     kernels.c.id,
                     kernels.c.container_id,
+                    kernels.c.session_id,
                     kernels.c.session_name,
                     kernels.c.access_key,
                     kernels.c.agent,
@@ -320,13 +355,16 @@ async def get_container_stats_for_period(
                     kernels.c.mounts,
                     kernels.c.image,
                     kernels.c.status,
+                    kernels.c.status_info,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -399,6 +437,7 @@ async def get_container_stats_for_period(
             gpu_allocated = row.occupied_slots["cuda.shares"]
         c_info = {
             "id": str(row["id"]),
+            "session_id": str(row["session_id"]),
             "container_id": row["container_id"],
             "domain_name": row["domain_name"],
             "group_id": str(row["group_id"]),
@@ -406,6 +445,7 @@ async def get_container_stats_for_period(
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
+            "full_name": row["full_name"],
             "agent": row["agent"],
             "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
             "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
@@ -413,7 +453,7 @@ async def get_container_stats_for_period(
             "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
             "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
             "disk_allocated": 0,  # TODO: disk quota limit
-            "disk_used": (int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))),
+            "disk_used": int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
             "io_read": int(nmget(last_stat, "io_read.current", 0)),
             "io_write": int(nmget(last_stat, "io_write.current", 0)),
             "used_time": used_time,
@@ -428,8 +468,10 @@ async def get_container_stats_for_period(
             "created_at": str(row["created_at"]),
             "terminated_at": str(row["terminated_at"]),
             "status": row["status"].name,
+            "status_info": row["status_info"],
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {
@@ -510,7 +552,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("group_id"): t.String | t.Null,
+            tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
             t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
             t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         }
@@ -523,12 +565,12 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     period in dates.
     The date/time comparison is done using the configured timezone.
 
-    :param group_id: If not None, query containers only in the group.
+    :param project_id: If not None, query containers only in the project.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
+    project_id = params["project_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
@@ -540,9 +582,12 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
     if end_date <= start_date:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
-    log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", group_id, start_date, end_date)
-    group_ids = [group_id] if group_id is not None else None
-    resp = await get_container_stats_for_period(request, start_date, end_date, group_ids=group_ids)
+    log.info("USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
+    project_ids = [project_id] if project_id is not None else None
+    usage_map = await get_project_stats_for_period(
+        root_ctx, start_date, end_date, project_ids=project_ids
+    )
+    resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
     return web.json_response(resp, status=200)
 
@@ -566,12 +611,20 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     """
     # Get all or user kernels for the last month from DB.
     time_window = 900  # 15 min
+    stat_length = 2880  # 15 * 4 * 24 * 30
     now = datetime.now(tzutc())
     start_date = now - timedelta(days=30)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([kernels])
+            sa.select(
+                [
+                    kernels.c.id,
+                    kernels.c.created_at,
+                    kernels.c.terminated_at,
+                    kernels.c.occupied_slots,
+                ]
+            )
             .select_from(kernels)
             .where(
                 (kernels.c.terminated_at >= start_date)
@@ -585,80 +638,87 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         rows = result.fetchall()
 
     # Build time-series of time-binned stats.
-    rowcount = len(rows)
-    now_ts = now.timestamp()
     start_date_ts = start_date.timestamp()
-    ts = start_date_ts
-    idx = 0
-    tseries = []
-    # Iterate over each time window.
-    while ts < now_ts:
-        # Initialize the time-binned stats.
-        num_sessions = 0
-        cpu_allocated = 0
-        mem_allocated = 0
-        gpu_allocated = Decimal(0)
-        io_read_bytes = 0
-        io_write_bytes = 0
-        disk_used = 0
-        # Accumulate stats for containers overlapping with this time window.
-        while (
-            idx < rowcount
-            and ts + time_window > rows[idx].created_at.timestamp()
-            and ts < rows[idx].terminated_at.timestamp()
-        ):
-            # Accumulate stats for overlapping containers in this time window.
-            row = rows[idx]
-            num_sessions += 1
-            cpu_allocated += int(row.occupied_slots.get("cpu", 0))
-            mem_allocated += int(row.occupied_slots.get("mem", 0))
-            if "cuda.devices" in row.occupied_slots:
-                gpu_allocated += int(row.occupied_slots["cuda.devices"])
-            if "cuda.shares" in row.occupied_slots:
-                gpu_allocated += Decimal(row.occupied_slots["cuda.shares"])
-            raw_stat = await redis_helper.execute(
-                root_ctx.redis_stat, lambda r: r.get(str(row["id"]))
-            )
-            if raw_stat:
-                last_stat = msgpack.unpackb(raw_stat)
-                io_read_bytes += int(nmget(last_stat, "io_read.current", 0))
-                io_write_bytes += int(nmget(last_stat, "io_write.current", 0))
-                disk_used += int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))
-            idx += 1
-        stat = {
-            "date": ts,
+    time_series_list: list[dict[str, Any]] = [
+        {
+            "date": start_date_ts + (idx * time_window),
             "num_sessions": {
-                "value": num_sessions,
+                "value": 0,
                 "unit_hint": "count",
             },
             "cpu_allocated": {
-                "value": cpu_allocated,
+                "value": 0,
                 "unit_hint": "count",
             },
             "mem_allocated": {
-                "value": mem_allocated,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "gpu_allocated": {
-                "value": float(gpu_allocated),
+                "value": 0,
                 "unit_hint": "count",
             },
             "io_read_bytes": {
-                "value": io_read_bytes,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "io_write_bytes": {
-                "value": io_write_bytes,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "disk_used": {
-                "value ": disk_used,
+                "value": 0,
                 "unit_hint": "bytes",
             },
         }
-        tseries.append(stat)
-        ts += time_window
-    return tseries
+        for idx in range(stat_length)
+    ]
+
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
+        pipe = r.pipeline()
+        for row in rows:
+            await pipe.get(str(row["id"]))
+        return pipe
+
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+
+    for row, raw_stat in zip(rows, raw_stats):
+        if raw_stat is not None:
+            last_stat = msgpack.unpackb(raw_stat)
+            io_read_byte = int(nmget(last_stat, "io_read.current", 0))
+            io_write_byte = int(nmget(last_stat, "io_write.current", 0))
+            disk_used = int(nmget(last_stat, "io_scratch_size.stats.max", 0, "/"))
+        else:
+            io_read_byte = 0
+            io_write_byte = 0
+            disk_used = 0
+
+        occupied_slots: Mapping[str, Any] = row.occupied_slots
+        kernel_created_at: float = row.created_at.timestamp()
+        kernel_terminated_at: float = row.terminated_at.timestamp()
+        cpu_value = int(occupied_slots.get("cpu", 0))
+        mem_value = int(occupied_slots.get("mem", 0))
+        cuda_device_value = int(occupied_slots.get("cuda.devices", 0))
+        cuda_share_value = Decimal(occupied_slots.get("cuda.shares", 0))
+
+        start_index = int((kernel_created_at - start_date_ts) // time_window)
+        end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
+        if start_index < 0:
+            start_index = 0
+        for time_series in time_series_list[start_index:end_index]:
+            time_series["num_sessions"]["value"] += 1
+            time_series["cpu_allocated"]["value"] += cpu_value
+            time_series["mem_allocated"]["value"] += mem_value
+            time_series["gpu_allocated"]["value"] += cuda_device_value
+            time_series["gpu_allocated"]["value"] += cuda_share_value
+            time_series["io_read_bytes"]["value"] += io_read_byte
+            time_series["io_write_bytes"]["value"] += io_write_byte
+            time_series["disk_used"]["value"] += disk_used
+
+    # Change Decimal type to float to serialize to JSON
+    for time_series in time_series_list:
+        time_series["gpu_allocated"]["value"] = float(time_series["gpu_allocated"]["value"])
+    return time_series_list
 
 
 @server_status_required(READ_ALLOWED)
@@ -819,6 +879,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
+    app["prefix"] = "resource"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))

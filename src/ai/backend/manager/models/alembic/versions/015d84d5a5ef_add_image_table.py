@@ -8,6 +8,7 @@ Create Date: 2022-02-15 23:45:19.814677
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import ForeignKeyIDColumn, IDColumn, convention
 from ai.backend.manager.models.image import ImageType
@@ -56,4 +57,4 @@ def upgrade():
 def downgrade():
     op.drop_table("image_aliases")
     op.drop_table("images")
-    op.execute("DROP TYPE image_type")
+    op.execute(text("DROP TYPE image_type"))

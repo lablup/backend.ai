@@ -9,53 +9,60 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../client/cli/config.rst:2 6d1f9ef050614ae7ae32d149451ba107
+#: ../../client/cli/config.rst:2 c9220b21385343b38d81d0c725ed9101
 msgid "Configuration"
 msgstr ""
 
-#: ../../client/cli/config.rst:6 18c7fb9642254298ba4b23bb095382a5
+#: ../../client/cli/config.rst:6 e0c0c3417eb548e783bd1c997d559544
 msgid ""
-"Please consult the detailed usage in the help of each command (use ``-h`` or "
-"``--help`` argument to display the manual)."
+"Please consult the detailed usage in the help of each command (use ``-h``"
+" or ``--help`` argument to display the manual)."
 msgstr ""
 
-#: ../../client/cli/config.rst:9 0ecfc4a5acd345ab806b1c42d94f2910
+#: ../../client/cli/config.rst:9 28cc63c13dd240d7b6205fe17c8534f5
 msgid ""
-"Check out :doc:`the client configuration </gsg/config>` for configurations "
-"via environment variables."
+"Check out :doc:`the client configuration </client/gsg/config>` for "
+"configurations via environment variables."
 msgstr ""
 
-#: ../../client/cli/config.rst:12 677805fcc30a49be83f9e9cad38b7a3d
+#: ../../client/cli/config.rst:12 0745b471f5874427bf6ce5136c6b483c
 msgid "Session Mode"
 msgstr ""
 
-#: ../../client/cli/config.rst:14 9e1a752f946b4c4d9a75bddbd6ed6f98
+#: ../../client/cli/config.rst:14 363181f58abb4ca2b50b1eb7b9022c1a
 msgid ""
 "When the endpoint type is ``\"session\"``, you must explicitly login and "
 "logout into/from the console server."
 msgstr ""
 
-#: ../../client/cli/config.rst:31 cdf419fa03054a8096716f0a64d3d04c
+#: ../../client/cli/config.rst:31 8ae157da32f944899672f59134de0273
 msgid "API Mode"
 msgstr ""
 
-#: ../../client/cli/config.rst:33 4c4da0e6e8224beab9cef4ab8c30c1ff
+#: ../../client/cli/config.rst:33 03c9fecc7583491d9dbb8a4830356f52
 msgid "After setting up the environment variables, just run any command:"
 msgstr ""
 
-#: ../../client/cli/config.rst:41 e90770b01c164f5fb895952691c9f6e3
+#: ../../client/cli/config.rst:41 dab3af647d414f91aca8599cabdf6898
 msgid "Checking out the current configuration"
 msgstr ""
 
-#: ../../client/cli/config.rst:43 42b0344403924a3fb14985f94c4fd5de
+#: ../../client/cli/config.rst:43 f15649098fd6472c9a2bc7ef992dfc23
 msgid "Run the following command to list your current active configurations."
 msgstr ""
+
+#~ msgid ""
+#~ "Check out :doc:`the client configuration "
+#~ "</gsg/config>` for configurations via "
+#~ "environment variables."
+#~ msgstr ""
+

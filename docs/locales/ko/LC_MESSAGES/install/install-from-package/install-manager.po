@@ -1,0 +1,249 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/install-manager.rst:2
+#: 0b5476e9ac594bec8d61838fd4199f0c
+msgid "Install Backend.AI Manager"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:4
+#: f1385e6641f54aa381c4c2cc115df393
+msgid ""
+"Refer to :ref:`prepare_python_and_venv` to setup Python and virtual "
+"environment for the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:7
+#: 9afaa3ffad644e3a9d30dc7a0d061ea6
+msgid ""
+"Install the latest version of Backend.AI Manager for the current Python "
+"version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:15
+#: d04cc2979d41486890f90228f44dc8c7
+msgid "If you want to install a specific version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:23
+#: f7d40810ed8f4c96a070108da90e5368
+msgid "Local configuration"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:25
+#: c1f49f10e87d483f99d360e2a6464a6e
+msgid ""
+"Backend.AI Manager uses a TOML file (``manager.toml``) to configure local"
+" service. Refer to the `manager.toml sample file "
+"<https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.toml>`_"
+" for a detailed description of each section and item. A configuration "
+"example would be:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:90
+#: 70280290c81f4fd882762d186e296650
+msgid ""
+"Save the contents to ``${HOME}/.config/backend.ai/manager.toml``. "
+"Backend.AI will automatically recognize the location. Adjust each field "
+"to conform to your system."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:96
+#: fc0af9408d90464db06e857d5460c95a
+msgid "Global configuration"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:98
+#: 5f2307ab295b466388ddde361a5fd60a
+msgid ""
+"Etcd (cluster) stores globally shared configurations for all nodes. Some "
+"of them should be populated prior to starting the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:103
+#: 23e2b9eb0f98480f98ca3f10ebedc247
+msgid ""
+"It might be a good idea to create a backup of the current Etcd "
+"configuration before modifying the values. You can do so by simply "
+"executing:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:110
+#: f818a5fbf69249ef8bf879a7e9854a7e
+msgid "To restore the backup:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:117
+#: 02f704f08a6a47839d39c13b8d6ab300
+msgid "The commands below should be executed at ``${HOME}/manager`` directory."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:119
+#: 04bfa7d0700d4a3c96a5cb12ef7e5a2e
+msgid "To list a specific key from Etcd, for example, ``config`` key:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:125
+#: 10e467588b4344a590dc67347b65b4ce
+msgid ""
+"Now, configure Redis access information. This should be accessible from "
+"all nodes."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:133
+#: 73d8b07d49c542f5b0b676a88f06ea2c
+msgid ""
+"Set the container registry. The following is the Lablup's open registry "
+"(cr.backend.ai). You can set your own registry with username and password"
+" if needed.  This can be configured via GUI as well."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:146
+#: e717a68510174138bcef137dfe157860
+msgid "Also, populate the Storage Proxy configuration to the Etcd:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:167
+#: 15ff399ce41c4cddb2aafaeba3d50b9b
+msgid "Check if the configuration is properly populated:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:173
+#: d22f9b58a6e24ccda92daa5d320caf50
+msgid ""
+"Note that you have to change the secret to a unique random string for "
+"secure communication between the manager and Storage Proxy. The most "
+"recent set of parameters can be found from `sample.etcd.volumes.json "
+"<https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.etcd.volumes.json>`_."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:178
+#: 7bf96a2d25aa48afa199baf22749b9b1
+msgid ""
+"To enable access to the volumes defined by the Storage Proxy from every "
+"user, you need to update the ``allowed_vfolder_hosts`` column of the "
+"``domains`` table to hold the storage volume reference (e.g., "
+"``bai-m1:local``). You can do this by issuing SQL statement directly "
+"inside the PostgreSQL container:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:191
+#: 5a705e340817450499496930ebfc3a27
+msgid "Populate the database with initial fixtures"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:193
+#: be4206b27e7340258817080688e14a61
+msgid ""
+"You need to prepare ``alembic.ini`` file under ``${HOME}/manager`` to "
+"manage the database schema. Copy the sample `halfstack.alembic.ini "
+"<https://github.com/lablup/backend.ai/blob/main/configs/manager/halfstack.alembic.ini>`_"
+" and save it as ``${HOME}/manager/alembic.ini``. Adjust the "
+"``sqlalchemy.url`` field if database connection information is different "
+"from the default one. You may need to change ``localhost`` to ``bai-m1``."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:200
+#: 31e2de0cd1614138a571abe4c56331e9
+msgid ""
+"Populate the database schema and initial fixtures. Copy the example JSON "
+"files (`example-keypairs.json "
+"<https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-"
+"keypairs.json>`_ and `example-resource-presets.json "
+"<https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-"
+"resource-presets.json>`_) as ``keypairs.json`` and ``resource-"
+"presets.json``, save them under ``${HOME}/manager/``. Customize them to "
+"have unique keypairs and passwords for your initial superadmin and sample"
+" user accounts for security."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:216
+#: e6fecc7e601b49a084e4e62351f16c0d
+msgid "Sync the information of container registry"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:218
+#: 25d497cba4d74b418809ab5a901d66c1
+msgid ""
+"You need to scan the image catalog and metadata from the container "
+"registry to the Manager. This is required to display the list of compute "
+"environments in the user web GUI (Web UI). You can run the following "
+"command to sync the information with Lablup's public container registry:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:229
+#: 423d66bf70d74a87a4781bfeab3002a6
+msgid "Run Backend.AI Manager service"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:231
+#: 312381ebc2ec45a1a5fc04efeb4bafda
+msgid "You can run the service:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:238
+#: 29bfdc678eb144f19dc7190ce9037418
+msgid ""
+"Check if the service is running. The default Manager API port is 8081, "
+"but it can be configured from ``manager.toml``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:246
+#: 6abfe547798e4e6daf1a13569db3bd57
+msgid "Press ``Ctrl-C`` to stop the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:250
+#: 0f1a2c7a3fa44aa48b1751882043c7de
+msgid "Register systemd service"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:252
+#: fce62eb170eb48e48609524ed0ed170e
+msgid ""
+"The service can be registered as a systemd daemon. It is recommended to "
+"automatically run the service after rebooting the host machine, although "
+"this is entirely optional."
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:256
+#: e4acc78dc2434786acf45cf21a2116cf
+msgid "First, create a runner script at ``${HOME}/bin/run-manager.sh``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:281
+#: 2eb9173acebd4b57aa3ff0962b4cdd03
+msgid "Make the script executable:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:287
+#: b42c00a504fb46238bd52f6df17c5522
+msgid ""
+"Then, create a systemd service file at ``/etc/systemd/system/backendai-"
+"manager.service``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-manager.rst:316
+#: ed8762ae624a48e9b347c65de5b8b3ad
+msgid "Finally, enable and start the service:"
+msgstr ""
+

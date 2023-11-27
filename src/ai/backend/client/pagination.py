@@ -8,6 +8,7 @@ from .output.types import FieldSpec, PaginatedResult
 from .session import api_session
 
 MAX_PAGE_SIZE: Final = 100
+MIN_PAGE_SIZE: Final = 1
 
 T = TypeVar("T")
 
@@ -22,6 +23,8 @@ async def execute_paginated_query(
 ) -> PaginatedResult:
     if limit > MAX_PAGE_SIZE:
         raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
+    if limit < MIN_PAGE_SIZE:
+        raise ValueError(f"The page size cannot be less than {MIN_PAGE_SIZE}")
     query = """
     query($limit:Int!, $offset:Int!, $var_decls) {
       $root_field(
@@ -52,7 +55,7 @@ async def execute_paginated_query(
     )
 
 
-async def generate_paginated_results(
+async def fetch_paginated_result(
     root_field: str,
     variables: Dict[str, Tuple[Any, str]],
     fields: Sequence[FieldSpec],
@@ -62,6 +65,8 @@ async def generate_paginated_results(
 ) -> PaginatedResult:
     if page_size > MAX_PAGE_SIZE:
         raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
+    if page_size < MIN_PAGE_SIZE:
+        raise ValueError(f"The page size cannot be less than {MIN_PAGE_SIZE}")
     if api_session.get().api_version < (6, "20210815"):
         if variables["filter"][0] is not None or variables["order"][0] is not None:
             raise BackendAPIVersionError(
@@ -70,15 +75,11 @@ async def generate_paginated_results(
         # should remove to work with older managers
         variables.pop("filter")
         variables.pop("order")
-    offset = page_offset
-    while True:
-        limit = page_size
-        result = await execute_paginated_query(
-            root_field,
-            variables,
-            fields,
-            limit=limit,
-            offset=offset,
-        )
-        offset += page_size
-        return result
+    result = await execute_paginated_query(
+        root_field,
+        variables,
+        fields,
+        limit=page_size,
+        offset=page_offset,
+    )
+    return result

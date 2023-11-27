@@ -1,55 +1,376 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import functools
 import logging
 import os
 import secrets
 import shutil
 import time
-import warnings
+from collections import deque
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Sequence, Union
-from uuid import UUID
+from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final
 
+import aiofiles.os
 import janus
+import trafaret as t
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
-from ..abc import CAP_VFOLDER, AbstractVolume
-from ..exception import ExecutionError, InvalidAPIParameters
+from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ..exception import (
+    ExecutionError,
+    InvalidAPIParameters,
+    InvalidQuotaScopeError,
+    NotEmptyError,
+    QuotaScopeNotFoundError,
+)
+from ..subproc import run
 from ..types import (
     SENTINEL,
+    CapacityUsage,
     DirEntry,
     DirEntryType,
     FSPerfMetric,
-    FSUsage,
+    QuotaConfig,
+    QuotaUsage,
     Sentinel,
     Stat,
-    VFolderCreationOptions,
-    VFolderUsage,
+    TreeUsage,
+    VFolderID,
 )
 from ..utils import fstime2datetime
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-async def run(cmd: Sequence[Union[str, Path]]) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    out, err = await proc.communicate()
-    if err:
-        raise ExecutionError(err.decode())
-    return out.decode()
+class BaseQuotaModel(AbstractQuotaModel):
+    """
+    This quota model just creates the first-level volume directories
+    to split vfolders into per-user/per-project namespaces, without
+    imposing any actual quota limits.
+    """
+
+    def __init__(self, mount_path: Path) -> None:
+        self.mount_path = mount_path
+
+    def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
+        try:
+            match ref:
+                case VFolderID():
+                    if ref.quota_scope_id is None:
+                        return self.mount_path  # for legacy vfolder paths during migration
+                    return Path(self.mount_path, ref.quota_scope_id.pathname)
+                case QuotaScopeID():
+                    return Path(self.mount_path, ref.pathname)
+                case str():
+                    typed_scope_id = QuotaScopeID.parse(ref)
+                    return Path(self.mount_path, typed_scope_id.pathname)
+                case None:
+                    return self.mount_path  # for legacy vfolder paths during migration
+                case _:
+                    raise InvalidQuotaScopeError(
+                        f"Invalid value format for quota scope ID: {ref!r}"
+                    )
+        except t.DataError:
+            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+        )
+
+    async def describe_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+
+        return QuotaUsage(-1, -1)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: QuotaConfig,
+    ) -> None:
+        # This is a no-op.
+        pass
+
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        # This is a no-op.
+        pass
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: shutil.rmtree(qspath),
+        )
+
+
+class SetGIDQuotaModel(BaseQuotaModel):
+    """
+    This quota model uses the Linux's vanilla gid-based quota scheme
+    with setgid on the first-level namespace directories for each user
+    or each project.
+    """
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+        )
+        # TODO: setgid impl.
+
+    async def describe_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+        # TODO: setgid impl.
+        return QuotaUsage(-1, -1)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: QuotaConfig,
+    ) -> None:
+        # TODO: setgid impl.
+        raise NotImplementedError
+
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        # TODO: setgid impl.
+        raise NotImplementedError
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: shutil.rmtree(qspath),
+        )
+        # TODO: setgid impl.
+
+
+class BaseFSOpModel(AbstractFSOpModel):
+    def __init__(self, mount_path: Path, scandir_limit: int) -> None:
+        self.mount_path = mount_path
+        self.scandir_limit = scandir_limit
+
+    async def copy_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                shutil.copytree,
+                src_path,
+                dst_path,
+                dirs_exist_ok=True,
+            ),
+        )
+
+    async def move_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: shutil.move(str(src_path), str(dst_path)),
+        )
+
+    async def delete_tree(
+        self,
+        path: Path,
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
+        except FileNotFoundError:
+            pass
+
+    def scan_tree(
+        self,
+        target_path: Path,
+        recursive: bool = True,
+    ) -> AsyncIterator[DirEntry]:
+        q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
+        loop = asyncio.get_running_loop()
+
+        def _scandir(target_path: Path, q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
+            count = 0
+            limit = self.scandir_limit
+            next_paths: deque[Path] = deque()
+            next_paths.append(target_path)
+            while next_paths:
+                next_path = next_paths.popleft()
+                with os.scandir(next_path) as scanner:
+                    for entry in scanner:
+                        if limit > 0 and count == limit:
+                            break
+                        symlink_target = ""
+                        entry_type = DirEntryType.FILE
+                        try:
+                            if entry.is_dir(follow_symlinks=False):
+                                entry_type = DirEntryType.DIRECTORY
+                            if entry.is_symlink():
+                                entry_type = DirEntryType.SYMLINK
+                                try:
+                                    symlink_dst = Path(entry).resolve()
+                                    symlink_dst = symlink_dst.relative_to(target_path)
+                                except (ValueError, RuntimeError):
+                                    # ValueError and ELOOP
+                                    pass
+                                else:
+                                    symlink_target = os.fsdecode(symlink_dst)
+                            entry_stat = entry.stat(follow_symlinks=False)
+                        except (FileNotFoundError, PermissionError):
+                            # the filesystem may be changed during scan
+                            continue
+                        item = DirEntry(
+                            name=entry.name,
+                            path=Path(entry.path).relative_to(target_path),
+                            type=entry_type,
+                            stat=Stat(
+                                size=entry_stat.st_size,
+                                owner=str(entry_stat.st_uid),
+                                mode=entry_stat.st_mode,
+                                modified=fstime2datetime(entry_stat.st_mtime),
+                                created=fstime2datetime(entry_stat.st_ctime),
+                            ),
+                            symlink_target=symlink_target,
+                        )
+                        q.put(item)
+                        if recursive and entry.is_dir() and not entry.is_symlink():
+                            next_paths.append(Path(entry.path))
+                        count += 1
+
+        async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
+            try:
+                await loop.run_in_executor(None, _scandir, target_path, q.sync_q)
+            finally:
+                await q.async_q.put(SENTINEL)
+
+        async def _aiter() -> AsyncIterator[DirEntry]:
+            scan_task = asyncio.create_task(_scan_task(q))
+            await asyncio.sleep(0)
+            try:
+                while True:
+                    item = await q.async_q.get()
+                    try:
+                        if item is SENTINEL:
+                            break
+                        yield item
+                    finally:
+                        q.async_q.task_done()
+            finally:
+                await scan_task
+                q.close()
+                await q.wait_closed()
+
+        return _aiter()
+
+    async def scan_tree_usage(
+        self,
+        target_path: Path,
+    ) -> TreeUsage:
+        total_size = 0
+        total_count = 0
+        start_time = time.monotonic()
+        _timeout = 30
+
+        def _calc_usage(target_path: Path) -> None:
+            nonlocal total_size, total_count
+            next_paths: deque[Path] = deque()
+            next_paths.append(target_path)
+            while next_paths:
+                next_path = next_paths.popleft()
+                with os.scandir(next_path) as scanner:  # type: ignore
+                    for entry in scanner:
+                        try:
+                            stat = entry.stat(follow_symlinks=False)
+                        except (FileNotFoundError, PermissionError):
+                            # the filesystem may be changed during scan
+                            continue
+                        total_size += stat.st_size
+                        total_count += 1
+                        if entry.is_dir() and not entry.is_symlink():
+                            next_paths.append(Path(entry.path))
+                        if total_count % 1000 == 0:
+                            # Cancel if this I/O operation takes too much time.
+                            if time.monotonic() - start_time > _timeout:
+                                raise TimeoutError
+
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, _calc_usage, target_path)
+        except TimeoutError:
+            # -1 indicates "too many"
+            total_size = -1
+            total_count = -1
+        return TreeUsage(file_count=total_count, used_bytes=total_size)
+
+    async def scan_tree_size(
+        self,
+        target_path: Path,
+    ) -> BinarySize:
+        info = await run(["du", "-hs", target_path])
+        used_bytes, _ = info.split()
+        return BinarySize.finite_from_str(used_bytes)
 
 
 class BaseVolume(AbstractVolume):
+    name = "vfs"
 
-    # ------ volume operations -------
+    async def create_quota_model(self) -> AbstractQuotaModel:
+        return BaseQuotaModel(self.mount_path)
+
+    async def create_fsop_model(self) -> AbstractFSOpModel:
+        return BaseFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER])
@@ -61,90 +382,71 @@ class BaseVolume(AbstractVolume):
             "metadata": {},
         }
 
+    @final
     async def create_vfolder(
         self,
-        vfid: UUID,
-        options: VFolderCreationOptions = None,
-        *,
-        exist_ok: bool = False,
+        vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
+        qspath = self.quota_model.mangle_qspath(vfid)
+        if not qspath.exists():
+            raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
-        )
+        await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    @final
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-        loop = asyncio.get_running_loop()
-
-        def _delete_vfolder():
+        await self.fsop_model.delete_tree(vfpath)
+        for p in [vfpath, vfpath.parent, vfpath.parent.parent]:
             try:
-                shutil.rmtree(vfpath)
+                await aiofiles.os.rmdir(p)
             except FileNotFoundError:
                 pass
-            # remove intermediate prefix directories if they become empty
-            if not os.listdir(vfpath.parent):
-                vfpath.parent.rmdir()
-            if not os.listdir(vfpath.parent.parent):
-                vfpath.parent.parent.rmdir()
+            except OSError as e:
+                match e.errno:
+                    case errno.ENOTEMPTY:
+                        pass
+                    case _:
+                        raise
 
-        await loop.run_in_executor(None, _delete_vfolder)
-
+    @final
     async def clone_vfolder(
         self,
-        src_vfid: UUID,
-        dst_volume: AbstractVolume,
-        dst_vfid: UUID,
-        options: VFolderCreationOptions = None,
+        src_vfid: VFolderID,
+        dst_vfid: VFolderID,
     ) -> None:
         # check if there is enough space in the destination
-        fs_usage = await dst_volume.get_fs_usage()
+        fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise ExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
-        await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
-        dst_vfpath = dst_volume.mangle_vfpath(dst_vfid)
+        await self.create_vfolder(dst_vfid)
+        dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
         try:
-            await self.copy_tree(src_vfpath, dst_vfpath)
+            await self.fsop_model.copy_tree(src_vfpath, dst_vfpath)
         except Exception:
-            await dst_volume.delete_vfolder(dst_vfid)
+            await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
             raise ExecutionError("Copying files from source directories failed.")
 
-    async def copy_tree(
-        self,
-        src_vfpath: Path,
-        dst_vfpath: Path,
-    ) -> None:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            functools.partial(
-                shutil.copytree,
-                src_vfpath,
-                dst_vfpath,
-                dirs_exist_ok=True,
-            ),
-        )
-
-    async def get_vfolder_mount(self, vfid: UUID, subpath: str) -> Path:
+    @final
+    async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         self.sanitize_vfpath(vfid, PurePosixPath(subpath))
         return self.mangle_vfpath(vfid).resolve()
 
-    async def put_metadata(self, vfid: UUID, payload: bytes) -> None:
+    async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, metadata_path.write_bytes, payload)
 
-    async def get_metadata(self, vfid: UUID) -> bytes:
+    async def get_metadata(self, vfid: VFolderID) -> bytes:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
         loop = asyncio.get_running_loop()
@@ -158,131 +460,43 @@ class BaseVolume(AbstractVolume):
             return b""
         # Other IO errors should be bubbled up.
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
-        raise NotImplementedError
-
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
-        raise NotImplementedError
-
     async def get_performance_metric(self) -> FSPerfMetric:
         raise NotImplementedError
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         loop = asyncio.get_running_loop()
         stat = await loop.run_in_executor(None, os.statvfs, self.mount_path)
-        return FSUsage(
+        return CapacityUsage(
             capacity_bytes=BinarySize(stat.f_frsize * stat.f_blocks),
             used_bytes=BinarySize(stat.f_frsize * (stat.f_blocks - stat.f_bavail)),
         )
 
+    @final
     async def get_usage(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        total_size = 0
-        total_count = 0
-        start_time = time.monotonic()
+        return await self.fsop_model.scan_tree_usage(target_path)
 
-        def _calc_usage(target_path: os.DirEntry | Path) -> None:
-            nonlocal total_size, total_count
-            _timeout = 3
-            # FIXME: Remove "type: ignore" when python/mypy#11964 is resolved.
-            with os.scandir(target_path) as scanner:  # type: ignore
-                for entry in scanner:
-                    if entry.is_dir():
-                        _calc_usage(entry)
-                        continue
-                    if entry.is_file() or entry.is_symlink():
-                        stat = entry.stat(follow_symlinks=False)
-                        total_size += stat.st_size
-                        total_count += 1
-                    if total_count % 1000 == 0:
-                        # Cancel if this I/O operation takes too much time.
-                        if time.monotonic() - start_time > _timeout:
-                            raise TimeoutError
-
-        loop = asyncio.get_running_loop()
-        try:
-            await loop.run_in_executor(None, _calc_usage, target_path)
-        except TimeoutError:
-            # -1 indicates "too many"
-            total_size = -1
-            total_count = -1
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
-
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    @final
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
-        info = await run(["du", "-hs", vfpath])
-        used_bytes, _ = info.split()
-        return BinarySize.finite_from_str(used_bytes)
+        return await self.fsop_model.scan_tree_size(vfpath)
 
     # ------ vfolder internal operations -------
 
-    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    @final
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        q: janus.Queue[Union[Sentinel, DirEntry]] = janus.Queue()
-        loop = asyncio.get_running_loop()
-
-        def _scandir(q: janus._SyncQueueProxy[Union[Sentinel, DirEntry]]) -> None:
-            count = 0
-            limit = self.local_config["storage-proxy"]["scandir-limit"]
-            try:
-                with os.scandir(target_path) as scanner:
-                    for entry in scanner:
-                        symlink_target = ""
-                        entry_type = DirEntryType.FILE
-                        if entry.is_dir():
-                            entry_type = DirEntryType.DIRECTORY
-                        if entry.is_symlink():
-                            entry_type = DirEntryType.SYMLINK
-                            symlink_target = str(Path(entry).resolve())
-                        entry_stat = entry.stat(follow_symlinks=False)
-                        q.put(
-                            DirEntry(
-                                name=entry.name,
-                                path=Path(entry.path),
-                                type=entry_type,
-                                stat=Stat(
-                                    size=entry_stat.st_size,
-                                    owner=str(entry_stat.st_uid),
-                                    mode=entry_stat.st_mode,
-                                    modified=fstime2datetime(entry_stat.st_mtime),
-                                    created=fstime2datetime(entry_stat.st_ctime),
-                                ),
-                                symlink_target=symlink_target,
-                            ),
-                        )
-                        count += 1
-                        if limit > 0 and count == limit:
-                            break
-            finally:
-                q.put(SENTINEL)
-
-        async def _scan_task(_scandir, q) -> None:
-            await loop.run_in_executor(None, _scandir, q.sync_q)
-
-        async def _aiter() -> AsyncIterator[DirEntry]:
-            scan_task = asyncio.create_task(_scan_task(_scandir, q))
-            await asyncio.sleep(0)
-            try:
-                while True:
-                    item = await q.async_q.get()
-                    if item is SENTINEL:
-                        break
-                    yield item
-                    q.async_q.task_done()
-            finally:
-                await scan_task
-                q.close()
-                await q.wait_closed()
-
-        return _aiter()
+        return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
     async def mkdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         parents: bool = False,
@@ -297,7 +511,7 @@ class BaseVolume(AbstractVolume):
 
     async def rmdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         recursive: bool = False,
@@ -308,45 +522,31 @@ class BaseVolume(AbstractVolume):
 
     async def move_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
         src_path = self.sanitize_vfpath(vfid, src)
         dst_path = self.sanitize_vfpath(vfid, dst)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: shutil.move(str(src_path), str(dst_path)),
-        )
+        await self.fsop_model.move_tree(src_path, dst_path)
 
     async def move_tree(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
-        warnings.warn(
-            "Use move_file() instead. move_tree() will be deprecated",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_dir():
             raise InvalidAPIParameters(
                 msg=f"source path {str(src_path)} is not a directory",
             )
         dst_path = self.sanitize_vfpath(vfid, dst)
-        src_path = self.sanitize_vfpath(vfid, src)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: shutil.move(str(src_path), str(dst_path)),
-        )
+        await self.fsop_model.move_tree(src_path, dst_path)
 
     async def copy_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -359,12 +559,9 @@ class BaseVolume(AbstractVolume):
             None,
             lambda: dst_path.parent.mkdir(parents=True, exist_ok=True),
         )
-        await loop.run_in_executor(
-            None,
-            lambda: shutil.copyfile(str(src_path), str(dst_path)),
-        )
+        await self.fsop_model.copy_tree(src_path, dst_path)
 
-    async def prepare_upload(self, vfid: UUID) -> str:
+    async def prepare_upload(self, vfid: VFolderID) -> str:
         vfpath = self.mangle_vfpath(vfid)
         session_id = secrets.token_hex(16)
 
@@ -380,7 +577,7 @@ class BaseVolume(AbstractVolume):
 
     async def add_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         payload: AsyncIterator[bytes],
     ) -> None:
@@ -412,7 +609,7 @@ class BaseVolume(AbstractVolume):
 
     def read_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         chunk_size: int = 0,
@@ -465,18 +662,13 @@ class BaseVolume(AbstractVolume):
 
     async def delete_files(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
         recursive: bool = False,
     ) -> None:
         target_paths = [self.sanitize_vfpath(vfid, p) for p in relpaths]
-
-        def _delete() -> None:
-            for p in target_paths:
-                if p.is_dir() and recursive:
-                    shutil.rmtree(p)
-                else:
-                    p.unlink()
-
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _delete)
+        for p in target_paths:
+            if p.is_dir() and recursive:
+                await self.fsop_model.delete_tree(p)
+            else:
+                await aiofiles.os.remove(p)

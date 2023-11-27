@@ -126,24 +126,30 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                             "type": "string",
                             "label": "Source Docker image",
                             "placeholder": "index.docker.io/lablup/tensorflow:2.0-source",
-                            "help": "The full Docker image name to import from. "
-                            "The registry must be accessible by the client.",
+                            "help": (
+                                "The full Docker image name to import from. "
+                                "The registry must be accessible by the client."
+                            ),
                         },
                         {
                             "name": "target",
                             "type": "string",
                             "label": "Target Docker image",
                             "placeholder": "index.docker.io/lablup/tensorflow:2.0-target",
-                            "help": "The full Docker image name of the imported image."
-                            "The registry must be accessible by the client.",
+                            "help": (
+                                "The full Docker image name of the imported image."
+                                "The registry must be accessible by the client."
+                            ),
                         },
                         {
                             "name": "brand",
                             "type": "string",
                             "label": "Name of Jupyter kernel",
                             "placeholder": "TensorFlow 2.0",
-                            "help": "The name of kernel to be shown in the Jupyter's kernel menu. "
-                            'This will be suffixed with "on Backend.AI".',
+                            "help": (
+                                "The name of kernel to be shown in the Jupyter's kernel menu. "
+                                'This will be suffixed with "on Backend.AI".'
+                            ),
                         },
                         {
                             "name": "baseDistro",
@@ -191,10 +197,11 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                             "choices": ["python"],
                             "default": "python",
                             "label": "Runtime type of the image",
-                            "help": "The runtime type of the image. "
-                            "Currently, the source image must have installed Python 2.7, 3.5, 3.6, "
-                            "or 3.7 at least to import. "
-                            "This will be used as the kernel of Jupyter service in this image.",
+                            "help": (
+                                "The runtime type of the image. Currently, the source image must"
+                                " have installed Python 2.7, 3.5, 3.6, or 3.7 at least to import."
+                                " This will be used as the kernel of Jupyter service in this image."
+                            ),
                         },
                         {
                             "name": "runtimePath",
@@ -202,21 +209,25 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                             "default": "/usr/local/bin/python",
                             "label": "Path of the runtime",
                             "placeholder": "/usr/local/bin/python",
-                            "help": "The path to the main executalbe of runtime language of the image. "
-                            'Even for the same "python"-based images, this may differ significantly '
-                            "image by image. (e.g., /usr/bin/python, /usr/local/bin/python, "
-                            "/opt/something/bin/python, ...) "
-                            "Please check this carefully not to get confused with OS-default ones "
-                            "and custom-installed ones.",
+                            "help": (
+                                "The path to the main executalbe of runtime language of the image."
+                                ' Even for the same "python"-based images, this may differ'
+                                " significantly image by image. (e.g., /usr/bin/python,"
+                                " /usr/local/bin/python, /opt/something/bin/python, ...) Please"
+                                " check this carefully not to get confused with OS-default ones and"
+                                " custom-installed ones."
+                            ),
                         },
                         {
                             "name": "CPUCountEnvs",
                             "type": "list[string]",
                             "default": ["NPROC", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS"],
                             "label": "CPU count environment variables",
-                            "help": "The name of environment variables to be overriden to the number of CPU "
-                            "cores actually allocated to the container. Required for legacy "
-                            "computation libraries.",
+                            "help": (
+                                "The name of environment variables to be overriden to the number of"
+                                " CPU cores actually allocated to the container. Required for"
+                                " legacy computation libraries."
+                            ),
                         },
                         {
                             "name": "servicePorts",
@@ -230,11 +241,13 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                                 {"name": "h2o-dai", "protocol": "http", "ports": [12345]},
                             ],
                             "label": "Supported service ports",
-                            "help": "The list of service ports supported by this image. "
-                            "Note that sshd (port 2200) and ttyd (port 7681) are intrinsic; "
-                            "they are always included regardless of the source image. "
-                            "The port number 2000-2003 are reserved by Backend.AI, and "
-                            "all port numbers must be larger than 1024 and smaller than 65535.",
+                            "help": (
+                                "The list of service ports supported by this image. "
+                                "Note that sshd (port 2200) and ttyd (port 7681) are intrinsic; "
+                                "they are always included regardless of the source image. "
+                                "The port number 2000-2003 are reserved by Backend.AI, and "
+                                "all port numbers must be larger than 1024 and smaller than 65535."
+                            ),
                         },
                     ],
                 },
@@ -254,7 +267,9 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                             "type": "choice",
                             "choices": accessible_scaling_groups,
                             "label": "Scaling group to build image",
-                            "help": "The scaling group where the import task will take resources from.",
+                            "help": (
+                                "The scaling group where the import task will take resources from."
+                            ),
                         },
                     ],
                 },
@@ -350,7 +365,9 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
             "accelerators": params["supportedAccelerators"],
             "src": params["src"],
             "brand": params["brand"],
-            "has_ipykernel": True,  # TODO: in the future, we may allow import of service-port only kernels.
+            "has_ipykernel": (
+                True
+            ),  # TODO: in the future, we may allow import of service-port only kernels.
         }
     )
 
@@ -413,28 +430,42 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         session_creation_id,
         session_id,
         access_key,
-        [
-            {
-                "image_ref": importer_image,
-                "cluster_role": DEFAULT_ROLE,
-                "cluster_idx": 1,
-                "cluster_hostname": f"{DEFAULT_ROLE}1",
-                "creation_config": {
-                    "resources": {"cpu": "1", "mem": "2g"},
-                    "scaling_group": params["launchOptions"]["scalingGroup"],
-                    "environ": {
-                        "SRC_IMAGE": source_image.canonical,
-                        "TARGET_IMAGE": target_image.canonical,
-                        "RUNTIME_PATH": params["runtimePath"],
-                        "BUILD_SCRIPT": (
-                            base64.b64encode(dockerfile_content.encode("utf8")).decode("ascii")
-                        ),
-                    },
+        {
+            "creation_config": {
+                "scaling_group": params["launchOptions"]["scalingGroup"],
+                "environ": {
+                    "SRC_IMAGE": source_image.canonical,
+                    "TARGET_IMAGE": target_image.canonical,
+                    "RUNTIME_PATH": params["runtimePath"],
+                    "BUILD_SCRIPT": base64.b64encode(dockerfile_content.encode("utf8")).decode(
+                        "ascii"
+                    ),
                 },
-                "startup_command": "/root/build-image.sh",
-                "bootstrap_script": "",
-            }
-        ],
+            },
+            "kernel_configs": [
+                {
+                    "image_ref": importer_image,
+                    "cluster_role": DEFAULT_ROLE,
+                    "cluster_idx": 1,
+                    "local_rank": 0,
+                    "cluster_hostname": f"{DEFAULT_ROLE}1",
+                    "creation_config": {
+                        "resources": {"cpu": "1", "mem": "2g"},
+                        "scaling_group": params["launchOptions"]["scalingGroup"],
+                        "environ": {
+                            "SRC_IMAGE": source_image.canonical,
+                            "TARGET_IMAGE": target_image.canonical,
+                            "RUNTIME_PATH": params["runtimePath"],
+                            "BUILD_SCRIPT": base64.b64encode(
+                                dockerfile_content.encode("utf8")
+                            ).decode("ascii"),
+                        },
+                    },
+                    "startup_command": "/root/build-image.sh",
+                    "bootstrap_script": "",
+                },
+            ],
+        },
         None,
         SessionTypes.BATCH,
         resource_policy,
@@ -450,6 +481,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
             "prevent_vfolder_mounts": True,
             "block_service_ports": True,
         },
+        sudo_session_enabled=False,
     )
     return web.json_response(
         {

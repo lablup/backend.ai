@@ -1,7 +1,7 @@
 import logging
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Mapping, MutableMapping, Optional
 
 import aiofiles
 
@@ -17,25 +17,18 @@ from ..resources import (
     known_slot_types,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-async def detect_resources(
+async def load_resources(
     etcd: AsyncEtcd,
     local_config: Mapping[str, Any],
-) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
+) -> Mapping[DeviceName, AbstractComputePlugin]:
     """
-    Detect available computing resource of the system.
-    It also loads the accelerator plugins.
+    Detect and load the accelerator plugins.
 
     limit_cpus, limit_gpus are deprecated.
     """
-    reserved_slots = {
-        "cpu": local_config["resource"]["reserved-cpu"],
-        "mem": local_config["resource"]["reserved-mem"],
-        "disk": local_config["resource"]["reserved-disk"],
-    }
-    slots: MutableMapping[SlotName, Decimal] = {}
 
     compute_device_types: MutableMapping[DeviceName, AbstractComputePlugin] = {}
 
@@ -46,7 +39,10 @@ async def detect_resources(
         etcd,
         local_config,
     )
-    await compute_plugin_ctx.init(allowlist=local_config["agent"]["allow-compute-plugins"])
+    await compute_plugin_ctx.init(
+        allowlist=local_config["agent"]["allow-compute-plugins"],
+        blocklist=local_config["agent"]["block-compute-plugins"],
+    )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config)
@@ -62,8 +58,7 @@ async def detect_resources(
             if sname not in {"cpu", "mem"}
         ):
             raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed "
-                "by the plugin's key.",
+                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
                 invalid_name,  # noqa: F821
                 plugin_instance.key,
             )
@@ -73,6 +68,23 @@ async def detect_resources(
                 "You may need to uninstall it first."
             )
         compute_device_types[plugin_instance.key] = plugin_instance
+
+    return compute_device_types
+
+
+async def scan_available_resources(
+    local_config: Mapping[str, Any],
+    compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
+) -> Mapping[SlotName, Decimal]:
+    """
+    Detect available computing resource of the system.
+    """
+    reserved_slots = {
+        "cpu": local_config["resource"]["reserved-cpu"],
+        "mem": local_config["resource"]["reserved-mem"],
+        "disk": local_config["resource"]["reserved-disk"],
+    }
+    slots: MutableMapping[SlotName, Decimal] = {}
 
     for key, computer in compute_device_types.items():
         known_slot_types.update(computer.slot_types)  # type: ignore  # (only updated here!)
@@ -84,10 +96,7 @@ async def detect_resources(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "
                     "Try to adjust the reserved resources or use a larger machine."
                 )
-
-    log.info("Resource slots: {!r}", slots)
-    log.info("Slot types: {!r}", known_slot_types)
-    return compute_device_types, slots
+    return slots
 
 
 async def get_resource_spec_from_container(container_info) -> Optional[KernelResourceSpec]:

@@ -262,7 +262,7 @@ msgid "The main program managed by supervisord"
 msgstr ""
 
 #: ../../install/install-manager.rst:258 56e97e9e75a142f6b8d288bcf5f7e0f5
-msgid "Initialize database and load intial fixtures"
+msgid "Initialize database and load initial fixtures"
 msgstr ""
 
 #: ../../install/install-manager.rst:260 4b5f25a9f44b48ffb599f6f85d0d57ea

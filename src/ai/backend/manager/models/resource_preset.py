@@ -109,7 +109,6 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
 
 
 class CreateResourcePreset(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -131,9 +130,9 @@ class CreateResourcePreset(graphene.Mutation):
         data = {
             "name": name,
             "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
-            "shared_memory": BinarySize.from_str(props.shared_memory)
-            if props.shared_memory
-            else None,
+            "shared_memory": (
+                BinarySize.from_str(props.shared_memory) if props.shared_memory else None
+            ),
         }
         insert_query = sa.insert(resource_presets).values(data)
         return await simple_db_mutate_returning_item(
@@ -145,7 +144,6 @@ class CreateResourcePreset(graphene.Mutation):
 
 
 class ModifyResourcePreset(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -180,7 +178,6 @@ class ModifyResourcePreset(graphene.Mutation):
 
 
 class DeleteResourcePreset(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

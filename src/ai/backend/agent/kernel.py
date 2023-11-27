@@ -36,13 +36,27 @@ from ai.backend.common import msgpack
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
+from ai.backend.common.events import (
+    EventProducer,
+    KernelLifecycleEventReason,
+    ModelServiceStatusEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, aobject
+from ai.backend.common.types import (
+    AgentId,
+    CommitStatus,
+    KernelId,
+    ModelServiceStatus,
+    ServicePort,
+    SessionId,
+    aobject,
+)
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
+from .types import AgentEventData
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -102,7 +116,6 @@ default_api_version = 4
 
 
 class RunEvent(Exception):
-
     data: Any
 
     def __init__(self, data=None):
@@ -151,16 +164,18 @@ class NextResult(TypedDict, total=False):
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
-
     version: int
     agent_config: Mapping[str, Any]
+    session_id: SessionId
     kernel_id: KernelId
+    agent_id: AgentId
+    container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
-    service_ports: Any
+    service_ports: List[ServicePort]
     data: Dict[Any, Any]
     last_used: float
-    termination_reason: Optional[str]
+    termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
@@ -173,6 +188,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -184,6 +201,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.agent_id = agent_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
@@ -196,16 +215,17 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self._tasks = set()
         self.environ = environ
         self.runner = None
+        self.container_id = None
 
-    async def init(self) -> None:
+    async def init(self, event_producer: EventProducer) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
             default_api_version,
             default_client_features,
         )
         self.runner = await self.create_code_runner(
-            client_features=default_client_features, api_version=default_api_version
+            event_producer, client_features=default_client_features, api_version=default_api_version
         )
 
     def __getstate__(self) -> Mapping[str, Any]:
@@ -246,6 +266,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     @abstractmethod
     async def create_code_runner(
         self,
+        event_producer: EventProducer,
         *,
         client_features: FrozenSet[str],
         api_version: int,
@@ -273,15 +294,19 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def start_model_service(self, model_service):
+        raise NotImplementedError
+
+    @abstractmethod
     async def shutdown_service(self, service):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, path):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
-    async def commit(self, path, lock_path, filename):
+    async def commit(self, kernel_id, subdir, filename):
         raise NotImplementedError
 
     @abstractmethod
@@ -297,8 +322,20 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def download_single(self, filepath):
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_files(self, path: str):
         raise NotImplementedError
+
+    @abstractmethod
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
+
+    async def ping(self) -> dict[str, float] | None:
+        assert self.runner is not None
+        return await self.runner.ping()
 
     async def execute(
         self,
@@ -344,19 +381,22 @@ _zctx = None
 
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
-
     kernel_id: KernelId
+    session_id: SessionId
     started_at: float
     finished_at: Optional[float]
     exec_timeout: float
     max_record_size: int
     client_features: FrozenSet[str]
 
+    event_producer: EventProducer
+
     input_sock: zmq.asyncio.Socket
     output_sock: zmq.asyncio.Socket
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
+    model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -372,17 +412,20 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
         client_features: FrozenSet[str] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.event_producer = event_producer
         self.started_at = time.monotonic()
         self.finished_at = None
         if not math.isfinite(exec_timeout) or exec_timeout < 0:
             raise ValueError("execution timeout must be a zero or finite positive number.")
-        self.kernel_id = kernel_id
         self.exec_timeout = exec_timeout
         self.max_record_size = 10 * (2**20)  # 10 MBytes
         self.client_features = client_features or frozenset()
@@ -393,6 +436,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -423,6 +467,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["output_sock"]
         del props["completion_queue"]
         del props["service_queue"]
+        del props["model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -431,6 +476,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["status_task"]
         del props["watchdog_task"]
         del props["_closed"]
+        del props["event_producer"]
         return props
 
     def __setstate__(self, props):
@@ -443,6 +489,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -484,6 +531,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
+
+    async def ping(self) -> dict[str, float] | None:
+        try:
+            return await self.feed_and_get_status()
+        except Exception:
+            log.exception("AbstractCodeRunner.ping(): unexpected error")
+            return None
 
     async def ping_status(self):
         """
@@ -542,12 +596,21 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"input", text.encode("utf8")])
 
+    async def feed_event(self, evdata: AgentEventData):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        data = {
+            "type": evdata.type,
+            "data": evdata.data,
+        }
+        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+
     async def feed_interrupt(self):
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"interrupt", b""])
 
-    async def feed_and_get_status(self):
+    async def feed_and_get_status(self) -> dict[str, float] | None:
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"status", b""])
@@ -577,6 +640,31 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return json.loads(result)
         except asyncio.CancelledError:
             return []
+
+    async def feed_start_model_service(self, model_info):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart(
+            [
+                b"start-model-service",
+                json.dumps(model_info).encode("utf8"),
+            ]
+        )
+        if health_check_info := model_info.get("service", {}).get("health_check"):
+            timeout_seconds = (
+                health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
+            )
+        else:
+            timeout_seconds = 10
+        try:
+            async with timeout(timeout_seconds):
+                result = await self.model_service_queue.get()
+            self.model_service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
@@ -637,9 +725,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
-
         if api_ver == 1:
-
             stdout_items = []
             stderr_items = []
             media_items = []
@@ -662,13 +748,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-
             console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
             for rec in records:
-
                 if last_stdout.tell() and rec.msg_type != "stdout":
                     console_items.append(("stdout", last_stdout.getvalue()))
                     last_stdout.seek(0)
@@ -778,7 +862,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
+            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
@@ -862,47 +946,63 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 msg_type, msg_data = await self.output_sock.recv_multipart()
                 try:
-                    if msg_type == b"status":
-                        await self.status_queue.put(msg_data)
-                    elif msg_type == b"completion":
-                        await self.completion_queue.put(msg_data)
-                    elif msg_type == b"service-result":
-                        await self.service_queue.put(msg_data)
-                    elif msg_type == b"apps-result":
-                        await self.service_apps_info_queue.put(msg_data)
-                    elif msg_type == b"stdout":
-                        if self.output_queue is None:
-                            continue
-                        if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[: self.max_record_size]
-                        await self.output_queue.put(
-                            ResultRecord(
-                                "stdout",
-                                decoders[0].decode(msg_data),
+                    match msg_type:
+                        case b"status":
+                            await self.status_queue.put(msg_data)
+                        case b"completion":
+                            await self.completion_queue.put(msg_data)
+                        case b"service-result":
+                            await self.service_queue.put(msg_data)
+                        case b"model-service-result":
+                            await self.model_service_queue.put(msg_data)
+                        case b"model-service-status":
+                            response = json.loads(msg_data)
+                            event = ModelServiceStatusEvent(
+                                self.kernel_id,
+                                self.session_id,
+                                response["model_name"],
+                                (
+                                    ModelServiceStatus.HEALTHY
+                                    if response["is_healthy"]
+                                    else ModelServiceStatus.UNHEALTHY
+                                ),
                             )
-                        )
-                    elif msg_type == b"stderr":
-                        if self.output_queue is None:
-                            continue
-                        if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[: self.max_record_size]
-                        await self.output_queue.put(
-                            ResultRecord(
-                                "stderr",
-                                decoders[1].decode(msg_data),
+                            await self.event_producer.produce_event(event)
+                        case b"apps-result":
+                            await self.service_apps_info_queue.put(msg_data)
+                        case b"stdout":
+                            if self.output_queue is None:
+                                continue
+                            if len(msg_data) > self.max_record_size:
+                                msg_data = msg_data[: self.max_record_size]
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    "stdout",
+                                    decoders[0].decode(msg_data),
+                                )
                             )
-                        )
-                    else:
-                        # Normal outputs should go to the current
-                        # output queue.
-                        if self.output_queue is None:
-                            continue
-                        await self.output_queue.put(
-                            ResultRecord(
-                                cast(ResultType, msg_type.decode("ascii")),
-                                msg_data.decode("utf8"),
+                        case b"stderr":
+                            if self.output_queue is None:
+                                continue
+                            if len(msg_data) > self.max_record_size:
+                                msg_data = msg_data[: self.max_record_size]
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    "stderr",
+                                    decoders[1].decode(msg_data),
+                                )
                             )
-                        )
+                        case _:
+                            # Normal outputs should go to the current
+                            # output queue.
+                            if self.output_queue is None:
+                                continue
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    cast(ResultType, msg_type.decode("ascii")),
+                                    msg_data.decode("utf8"),
+                                )
+                            )
                 except asyncio.QueueFull:
                     pass
                 if msg_type == b"build-finished":
@@ -931,6 +1031,13 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     joined by single dots (e.g., "1.2.3", "18.04").
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
+
+    def _extract_version(key: str) -> Tuple[int, ...]:
+        m = rx_ver_suffix.search(key)
+        if m is not None:
+            return tuple(map(int, m.group(1).split(".")))
+        return (0,)
+
     m = rx_ver_suffix.search(distro)
     if m is None:
         # Assume latest
@@ -938,7 +1045,7 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
         distro_ver = None
     else:
         distro_prefix = distro[: -len(m.group(1))]
-        distro_ver = m.group(1)
+        distro_ver = tuple(map(int, m.group(1).split(".")))
 
     # Check if there are static-build krunners first.
     if distro_prefix == "alpine":
@@ -951,23 +1058,17 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
 
     # Search through the per-distro versions
     match_list = [
-        (distro_key, value)
+        (distro_key, value, _extract_version(distro_key))
         for distro_key, value in data.items()
         if distro_key.startswith(distro_prefix)
     ]
 
-    def _extract_version(item: Tuple[str, Any]) -> Tuple[int, ...]:
-        m = rx_ver_suffix.search(item[0])
-        if m is not None:
-            return tuple(map(int, m.group(1).split(".")))
-        return (0,)
-
-    match_list = sorted(match_list, key=_extract_version, reverse=True)
+    match_list = sorted(match_list, key=lambda x: x[2], reverse=True)
     if match_list:
         if distro_ver is None:
-            return match_list[0]
-        for distro_key, value in match_list:
-            if distro_key == distro:
+            return match_list[0][:-1]  # return latest
+        for distro_key, value, matched_distro_ver in match_list:
+            if distro_ver >= matched_distro_ver:
                 return (distro_key, value)
-        return match_list[0]  # fallback to the latest of its kind
+        return match_list[-1][:-1]  # fallback to the latest of its kind
     raise UnsupportedBaseDistroError(distro)

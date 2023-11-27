@@ -81,7 +81,9 @@ def downgrade():
     op.drop_index(op.f("ix_agents_status"), table_name="agents")
     op.drop_column("agents", "status")
     op.drop_column("agents", "lost_at")
-    op.alter_column("kernels", column_name="status", type_=sa.String(length=64))
+    op.alter_column(
+        "kernels", column_name="status", type_=sa.String(length=64), server_default=None
+    )
     op.add_column("kernels", sa.Column("allocated_cores", sa.ARRAY(sa.Integer), nullable=True))
     op.drop_column("kernels", "cpu_set")
     op.drop_column("kernels", "gpu_set")

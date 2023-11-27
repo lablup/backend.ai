@@ -7,9 +7,9 @@ Create Date: 2019-12-16 13:39:13.210996
 """
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.sql import text
 
-from ai.backend.manager.models.base import GUID, ForeignKeyIDColumn, IDColumn
+from ai.backend.manager.models.base import GUID, IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "ce209920f654"
@@ -47,5 +47,5 @@ def upgrade():
 
 def downgrade():
     op.drop_table("session_templates")
-    op.execute("DROP TYPE templatetypes")
+    op.execute(text("DROP TYPE templatetypes"))
     op.drop_column("kernels", "bootstrap_script")

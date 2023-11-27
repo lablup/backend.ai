@@ -1,0 +1,276 @@
+{
+  "appTemplate": {
+    "sftp": [
+      {
+        "name": "sftp",
+        "title": "SFTP",
+        "category": "1.Utilities",
+        "redirect": "",
+        "src": "./resources/icons/sftp.png"
+      }
+    ],
+    "sshd": [
+      {
+        "name": "sshd",
+        "title": "SSH / SFTP",
+        "category": "1.Utilities",
+        "redirect": "",
+        "src": "./resources/icons/sftp.png"
+      }
+    ],
+    "ttyd": [
+      {
+        "name": "ttyd",
+        "title": "Console",
+        "category": "1.Utilities",
+        "redirect": "",
+        "src": "./resources/icons/terminal.svg"
+      }
+    ],
+    "filebrowser": [
+      {
+        "name": "filebrowser",
+        "title": "FileBrowser",
+        "category": "1.Utilities",
+        "redirect": "",
+        "src": "./resources/icons/filebrowser.svg"
+      }
+    ],
+    "jupyter": [
+      {
+        "name": "jupyter",
+        "title": "Jupyter Notebook",
+        "category": "2.Development",
+        "redirect": "&redirect=/tree",
+        "src": "./resources/icons/jupyter.png"
+      }
+    ],
+    "jupyterextension": [
+      {
+        "name": "jupyter",
+        "title": "Jupyter Extension",
+        "category": "2.Development",
+        "redirect": "&redirect=/nbextensions",
+        "src": "./resources/icons/jupyter.png",
+        "icon": "vaadin:clipboard-pulse"
+      }
+    ],
+    "jupyterlab": [
+      {
+        "name": "jupyterlab",
+        "title": "JupyterLab",
+        "category": "2.Development",
+        "redirect": "&redirect=/lab",
+        "src": "./resources/icons/jupyterlab.png",
+        "icon": "vaadin:flask"
+      }
+    ],
+    "tensorboard": [
+      {
+        "name": "tensorboard",
+        "title": "TensorBoard",
+        "category": "3.Machine Learning Tools",
+        "redirect": "&redirect=/",
+        "src": "./resources/icons/tensorflow.png"
+      }
+    ],
+    "digits": [
+      {
+        "name": "digits",
+        "title": "DIGITS",
+        "category": "3.Machine Learning Tools",
+        "redirect": "&redirect=/",
+        "src": "./resources/icons/nvidia.png"
+      }
+    ],
+    "h2o-dai": [
+      {
+        "name": "h2o-dai",
+        "title": "H2O driverless AI",
+        "category": "3.Machine Learning Tools",
+        "redirect": "",
+        "src": "./resources/icons/h2o.png"
+      }
+    ],
+    "vscode": [
+      {
+        "name": "vscode",
+        "title": "Visual Studio Code",
+        "category": "2.Development",
+        "redirect": "",
+        "src": "./resources/icons/vscode.svg"
+      }
+    ],
+    "nniboard": [
+      {
+        "name": "nniboard",
+        "title": "NNI Board",
+        "category": "4.AutoML",
+        "redirect": "",
+        "src": "./resources/icons/nni.png"
+      }
+    ],
+    "mlflow-ui": [
+      {
+        "name": "mlflow-ui",
+        "title": "MLFlow UI",
+        "category": "4.AutoML",
+        "redirect": "",
+        "src": "./resources/icons/mlflow.png"
+      }
+    ],
+    "spark": [
+      {
+        "name": "spark",
+        "title": "Spark",
+        "category": "5.Big Data Tools",
+        "redirect": "",
+        "src": "./resources/icons/apache-spark.svg"
+      }
+    ],
+    "vnc": [
+      {
+        "name": "vnc",
+        "title": "VNC",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/novnc.svg"
+      }
+    ],
+    "vnc-web": [
+      {
+        "name": "vnc-web",
+        "title": "VNC (Web)",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/novnc.svg"
+      }
+    ],
+    "novnc": [
+      {
+        "name": "novnc",
+        "title": "VNC (Web)",
+        "category": "6.Desktop Environment",
+        "redirect": "/vnc.html?autoconnect=true&amp;password=backendai",
+        "src": "./resources/icons/novnc.svg"
+      }
+    ],
+    "xfce": [
+      {
+        "name": "xfce",
+        "title": "XFCE",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/xfce.png"
+      }
+    ],
+    "gnome": [
+      {
+        "name": "gnome",
+        "title": "GNOME Desktop",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/gnome.svg"
+      }
+    ],
+    "KDE": [
+      {
+        "name": "kde",
+        "title": "KDE",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/kde.svg"
+      }
+    ],
+    "xrdp": [
+      {
+        "name": "xrdp",
+        "title": "RDP",
+        "category": "6.Desktop Environment",
+        "redirect": "",
+        "src": "./resources/icons/xrdp.svg"
+      }
+    ],
+    "rstudio": [
+      {
+        "name": "rstudio",
+        "title": "R-Studio",
+        "category": "7.Scientific Computing",
+        "redirect": "",
+        "src": "./resources/icons/r-lang.svg"
+      }
+    ],
+    "matlab": [
+      {
+        "name": "matlab",
+        "title": "MATLAB",
+        "category": "7.Scientific Computing",
+        "redirect": "",
+        "src": "./resources/icons/matlab.png"
+      }
+    ],
+    "spectravis": [
+      {
+        "name": "spectravis",
+        "title": "SpectraVIS",
+        "category": "7.Scientific Computing",
+        "redirect": "",
+        "src": "./resources/icons/default_app.svg"
+      }
+    ],
+    "triton-server": [
+      {
+        "name": "triton-server",
+        "title": "Triton Server",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/nvidia.png"
+      }
+    ],
+    "triton-server-http": [
+      {
+        "name": "triton-server-http",
+        "title": "Triton Server (HTTP)",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/nvidia.png"
+      }
+    ],
+    "orbit-server-http": [
+      {
+        "name": "orbit-server-http",
+        "title": "Orbit Inference Server (HTTP)",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/orbit.svg"
+      }
+    ],
+    "gradio-cat-client": [
+      {
+        "name": "gradio-cat-client",
+        "title": "Cat Generator",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/kitty.png"
+      }
+    ],
+    "gradio-resnet-client": [
+      {
+        "name": "gradio-resnet-client",
+        "title": "Image Classifier",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/classification.svg"
+      }
+    ],
+    "submit": [
+      {
+        "name": "submit",
+        "title": "Submit",
+        "category": "9.ETC",
+        "redirect": "",
+        "src": "./resources/icons/check-list.svg"
+      }
+    ]
+  }
+}

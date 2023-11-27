@@ -64,33 +64,28 @@ task_template_v1 = t.Dict(
                         t.Key("image"): t.String,
                         t.Key("architecture", default="x86_64"): t.Null | t.String,
                         t.Key("environ", default={}): t.Null | t.Mapping(t.String, t.String),
-                        t.Key("run", default=None): t.Null
-                        | t.Dict(
+                        t.Key("run", default=None): t.Null | t.Dict(
                             {
                                 t.Key("bootstrap", default=None): t.Null | t.String,
                                 tx.AliasedKey(
                                     ["startup", "startup_command", "startupCommand"], default=None
                                 )
-                                >> "startup_command": t.Null
-                                | t.String,
+                                >> "startup_command": t.Null | t.String,
                             }
                         ),
-                        t.Key("git", default=None): t.Null
-                        | t.Dict(
+                        t.Key("git", default=None): t.Null | t.Dict(
                             {
                                 t.Key("repository"): t.String,
                                 t.Key("commit", default=None): t.Null | t.String,
                                 t.Key("branch", default=None): t.Null | t.String,
-                                t.Key("credential", default=None): t.Null
-                                | t.Dict(
+                                t.Key("credential", default=None): t.Null | t.Dict(
                                     {
                                         t.Key("username"): t.String,
                                         t.Key("password"): t.String,
                                     }
                                 ),
                                 tx.AliasedKey(["destination_dir", "destinationDir"], default=None)
-                                >> "dest_dir": t.Null
-                                | t.String,
+                                >> "dest_dir": t.Null | t.String,
                             }
                         ),
                     }
@@ -98,8 +93,8 @@ task_template_v1 = t.Dict(
                 t.Key("scaling_group", default=None): t.Null | t.String,
                 t.Key("mounts", default={}): t.Null | t.Mapping(t.String, t.Any),
                 t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-                tx.AliasedKey(["agent_list", "agentList"], default=None) >> "agent_list": t.Null
-                | t.List(t.String),
+                tx.AliasedKey(["agent_list", "agentList"], default=None)
+                >> "agent_list": t.Null | t.List(t.String),
             }
         ),
     }
@@ -273,9 +268,11 @@ async def query_accessible_session_templates(
                         if row.session_templates_user_uuid
                         else None
                     ),
-                    "group": str(row.session_templates_group_id)
-                    if row.session_templates_group_id
-                    else None,
+                    "group": (
+                        str(row.session_templates_group_id)
+                        if row.session_templates_group_id
+                        else None
+                    ),
                     "user_email": None,
                     "group_name": row.groups_name,
                 }

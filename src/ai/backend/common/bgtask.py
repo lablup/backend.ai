@@ -6,7 +6,19 @@ import logging
 import time
 import uuid
 import weakref
-from typing import Awaitable, Callable, Final, Literal, Optional, Set, Type, TypeAlias, Union
+from collections import defaultdict
+from typing import (
+    Awaitable,
+    Callable,
+    DefaultDict,
+    Final,
+    Literal,
+    Optional,
+    Set,
+    Type,
+    TypeAlias,
+    Union,
+)
 
 from aiohttp import web
 from aiohttp_sse import sse_response
@@ -26,7 +38,7 @@ from .logging import BraceStyleAdapter
 from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.background"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 TaskResult = Literal["bgtask_done", "bgtask_cancelled", "bgtask_failed"]
 BgtaskEvents: TypeAlias = (
     BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
@@ -92,12 +104,14 @@ BackgroundTask = Callable[[ProgressReporter], Awaitable[Optional[str]]]
 class BackgroundTaskManager:
     event_producer: EventProducer
     ongoing_tasks: weakref.WeakSet[asyncio.Task]
-    task_update_queues: Set[asyncio.Queue[Sentinel | BgtaskEvents]]
+    task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
+    dict_lock: asyncio.Lock
 
     def __init__(self, event_producer: EventProducer) -> None:
         self.event_producer = event_producer
         self.ongoing_tasks = weakref.WeakSet()
-        self.task_update_queues = set()
+        self.task_update_queues = defaultdict(set)
+        self.dict_lock = asyncio.Lock()
 
     def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -114,7 +128,8 @@ class BackgroundTaskManager:
         source: AgentId,
         event: BgtaskEvents,
     ) -> None:
-        for q in self.task_update_queues:
+        task_id = event.task_id
+        for q in self.task_update_queues[task_id]:
             q.put_nowait(event)
 
     async def push_bgtask_events(
@@ -157,7 +172,8 @@ class BackgroundTaskManager:
 
         # It is an ongoing task.
         my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
-        self.task_update_queues.add(my_queue)
+        async with self.dict_lock:
+            self.task_update_queues[task_id].add(my_queue)
         try:
             async with sse_response(request) as resp:
                 try:
@@ -188,7 +204,10 @@ class BackgroundTaskManager:
                 finally:
                     return resp
         finally:
-            self.task_update_queues.remove(my_queue)
+            self.task_update_queues[task_id].remove(my_queue)
+            async with self.dict_lock:
+                if len(self.task_update_queues[task_id]) == 0:
+                    del self.task_update_queues[task_id]
 
     async def start(
         self,
@@ -284,7 +303,8 @@ class BackgroundTaskManager:
                 await task
             except asyncio.CancelledError:
                 pass
-        for tq in self.task_update_queues:
-            tq.put_nowait(sentinel)
-            join_tasks.append(tq.join())
+        for qset in self.task_update_queues.values():
+            for tq in qset:
+                tq.put_nowait(sentinel)
+                join_tasks.append(tq.join())
         await asyncio.gather(*join_tasks)

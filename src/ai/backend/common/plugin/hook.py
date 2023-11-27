@@ -5,12 +5,12 @@ import logging
 from abc import ABCMeta, abstractmethod
 from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
 
-import attr
+import attrs
 
 from ..logging_utils import BraceStyleAdapter
 from . import AbstractPlugin, BasePluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "HookHandler",
@@ -81,7 +81,7 @@ ALL_COMPLETED: Final = HookReturnTiming.ALL_COMPLETED
 FIRST_COMPLETED: Final = HookReturnTiming.FIRST_COMPLETED
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class HookResult:
     status: HookResults
     src_plugin: Optional[Union[str, Sequence[str]]] = None

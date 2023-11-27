@@ -62,7 +62,7 @@ Query Schema
      dependencies: List[ComputeSession]  # full list of dependency sessions
    }
 
-The sessions may be queried one by one using ``compute_sesssion`` field on the root query schema,
+The sessions may be queried one by one using ``compute_session`` field on the root query schema,
 or as a paginated list using ``compute_session_list``.
 
 .. code-block:: graphql

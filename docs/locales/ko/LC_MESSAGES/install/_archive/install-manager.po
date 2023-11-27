@@ -347,7 +347,7 @@ msgstr ""
 
 #: ../../install/_archive/install-manager.md:220
 #: ccd5b763a400490b86ee74f4117fb0cc
-msgid "## Initialize database and load intial fixtures"
+msgid "## Initialize database and load initial fixtures"
 msgstr ""
 
 #: ../../install/_archive/install-manager.md:222

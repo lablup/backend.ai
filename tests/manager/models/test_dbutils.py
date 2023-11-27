@@ -31,7 +31,6 @@ async def test_execute_with_retry():
 
     vclock = aiotools.VirtualClock()
     with vclock.patch_loop():
-
         with pytest.raises(sa.exc.IntegrityError):
             await execute_with_retry(txn_func_generic_failure)
 

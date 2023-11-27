@@ -23,7 +23,7 @@ from typing import (
     Union,
 )
 
-import attr
+import attrs
 
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
@@ -38,20 +38,19 @@ class Action(TypedDict):
     ref: Optional[str]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ServiceDefinition:
     command: List[str]
     noop: bool = False
     url_template: str = ""
-    prestart_actions: List[Action] = attr.Factory(list)
-    env: Mapping[str, str] = attr.Factory(dict)
-    allowed_envs: List[str] = attr.Factory(list)
-    allowed_arguments: List[str] = attr.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, List[str]]] = attr.Factory(dict)
+    prestart_actions: List[Action] = attrs.Factory(list)
+    env: Mapping[str, str] = attrs.Factory(dict)
+    allowed_envs: List[str] = attrs.Factory(list)
+    allowed_arguments: List[str] = attrs.Factory(list)
+    default_arguments: Mapping[str, Union[None, str, List[str]]] = attrs.Factory(dict)
 
 
 class ServiceParser:
-
     variables: MutableMapping[str, str]
     services: MutableMapping[str, ServiceDefinition]
 
@@ -82,6 +81,13 @@ class ServiceParser:
                 self.services[name] = ServiceDefinition(**raw_service_def)
             except TypeError as e:
                 raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+
+    def add_model_service(self, name, model_service_info) -> None:
+        service_def = ServiceDefinition(
+            model_service_info["start_command"],
+            prestart_actions=model_service_info["pre_start_actions"] or [],
+        )
+        self.services[name] = service_def
 
     async def start_service(
         self,

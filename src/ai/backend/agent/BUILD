@@ -1,40 +1,53 @@
 python_sources(
     name="src",
+    sources=[
+        "*.py",
+        "!watcher.py",
+    ],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/agent/docker:src",  # not auto-inferred
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
-        "src/ai/backend/kernel:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
+        "!./__init__.py:src-watcher",
     ],
 )
-
-pex_binary(
-    name="server",
+python_sources(
+    name="src-watcher",
+    sources=[
+        "__init__.py",
+        "watcher.py",
+    ],
     dependencies=[
-        ":src",
+        ":resources",
+        # Exclude transitive dependencies of the agent itself!
+        "!./__init__.py:src",
     ],
-    entry_point="server.py",
 )
 
-pex_binary(
-    name="watcher",
-    entry_point="watcher.py",
-)
-
-python_requirement(
-    name="kernel-support",
-    requirements=[],
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/accelerator/**",
+    ],
+    allowed_dependencies=[
+        "//src/ai/backend/accelerator/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/cli/**",  # not auto-inferred
+        "//src/ai/backend/runner/**",
+        "//src/ai/backend/kernel/**",
+        "//src/ai/backend/helpers/**",
+    ],
 )
 
 python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        ":kernel-support",  # not auto-inferred
+        "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -52,8 +65,78 @@ python_distribution(
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "//src/ai/backend/kernel:src",  # included only in binary dists
+        # Bundle cuda-open and mock accelerator plugins
+        "//src/ai/backend/accelerator/cuda_open:lib",
+        "//src/ai/backend/accelerator/cuda_open:buildscript",
+        "//src/ai/backend/accelerator/mock:lib",
+        "//src/ai/backend/accelerator/mock:buildscript",
+        "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src-watcher",
+    ],
+)
+pex_binary(
+    name="pex-watcher",
+    entry_point="watcher.py",
+    dependencies=[
+        ":src-watcher",
+        "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src",
+    ],
+)
 
+scie_binary(
+    name="backendai-agent",
+    fat=False,
+    dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-agent-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+scie_binary(
+    name="backendai-agent-watcher",
+    fat=False,
+    dependencies=[":pex-watcher"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-agent-watcher-fat",
+    fat=True,
+    dependencies=[":pex-watcher"],
+    tags=["scie", "fat"],
+)
+
+run_shell_command(
+    name="checksum",
+    command=(
+        "find . -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
+    workdir="/dist",
+    execution_dependencies=[
+        ":backendai-agent",
+        ":backendai-agent-watcher",
+        ":backendai-agent-fat",
+        ":backendai-agent-watcher-fat",
+    ],
+    tags=["checksum"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[

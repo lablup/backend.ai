@@ -78,7 +78,7 @@ Common Structure of API Responses
    * - ``Link``
      - Web link headers specified as in `RFC 5988 <https://tools.ietf.org/html/rfc5988>`_. Only optionally used when returning a collection of objects.
    * - ``X-RateLimit-*``
-     - The rate-limiting information (see :doc:`/common-api/ratelimit`).
+     - The rate-limiting information (see :doc:`ratelimit`).
    * - Body
      - JSON-encoded results
 

@@ -5,20 +5,20 @@ import time
 from decimal import Decimal
 from typing import Final, Iterable, Tuple
 
-import attr
+import attrs
 from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common import redis_helper
+from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
-from ..defs import REDIS_RLIM_DB
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _time_prec: Final = Decimal("1e-3")  # msec
 _rlim_window: Final = 60 * 15
@@ -67,7 +67,7 @@ async def rlim_middleware(
             remaining = rate_limit
         else:
             rolling_count = int(ret)
-            if rolling_count > rate_limit:
+            if rate_limit is not None and rolling_count > rate_limit:
                 raise RateLimitExceeded
             remaining = rate_limit - rolling_count
         response = await handler(request)
@@ -84,7 +84,7 @@ async def rlim_middleware(
         return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     redis_rlim: RedisConnectionInfo
     redis_rlim_script: str
@@ -94,7 +94,7 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
     app_ctx.redis_rlim = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], db=REDIS_RLIM_DB
+        root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
     )
     app_ctx.redis_rlim_script = await redis_helper.execute(
         app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script)

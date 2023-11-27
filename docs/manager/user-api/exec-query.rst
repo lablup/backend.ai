@@ -10,7 +10,7 @@ Executing Snippet
 Executes a snippet of user code using the specified session.
 Each execution request to a same session may have side-effects to subsequent executions.
 For instance, setting a global variable in a request and reading the variable in another request is completely legal.
-It is the job of the user (or the front-end) to gaurantee the correct execution order of multiple interdependent requests.
+It is the job of the user (or the front-end) to guarantee the correct execution order of multiple interdependent requests.
 When the session is terminated or restarted, all such volatile states vanish.
 
 Parameters
@@ -81,7 +81,7 @@ Response
 
 .. warning::
 
-   If the user code tries to breach the system, causes crashs (e.g., segmentation fault), or runs too long (timeout), the session is automatically terminated.
+   If the user code tries to breach the system, causes crashes (e.g., segmentation fault), or runs too long (timeout), the session is automatically terminated.
    In such cases, you will get incomplete console logs with ``"finished"`` status earlier than expected.
    Depending on situation, the ``result.stderr`` may also contain specific error information.
 

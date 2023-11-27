@@ -5,7 +5,7 @@ from typing import Dict
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 # the names of following AWS variables follow boto3 convention.
 s3_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "dummy-access-key")

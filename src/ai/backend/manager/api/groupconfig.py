@@ -11,9 +11,14 @@ from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import MAXIMUM_DOTFILE_SIZE
+from ..models import (
+    MAXIMUM_DOTFILE_SIZE,
+    groups,
+    query_group_domain,
+    query_group_dotfiles,
+    verify_dotfile_name,
+)
 from ..models import association_groups_users as agus
-from ..models import groups, query_group_domain, query_group_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required
 from .exceptions import (
     DotfileAlreadyExists,
@@ -30,7 +35,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)

@@ -1,6 +1,6 @@
-FROM alpine:3.12
+FROM alpine:3.17
 
-RUN apk add --no-cache socat  # 1.7.3.4-r1
+RUN apk add --no-cache socat  # 1.7.4.4-r0
 
 ENTRYPOINT ["/usr/bin/socat"]
 

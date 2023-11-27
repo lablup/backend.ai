@@ -36,6 +36,14 @@
   "watcher": {
     "token": "some-random-long-string"
   },
+  "session": {
+    "hang-tolerance": {
+      "threshold": {
+        "PREPARING": "1h",
+        "TERMINATING": "30m"
+      }
+    }
+  },
   "plugins": {
     "accelerator": {
       "cuda": {

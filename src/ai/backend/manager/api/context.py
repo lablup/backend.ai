@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import attr
+import attrs
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
 
+    from ..agent_cache import AgentRPCCache
     from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
@@ -25,7 +26,7 @@ class BaseContext:
     pass
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext(BaseContext):
     pidx: int
     db: ExtendedAsyncSAEngine
@@ -47,6 +48,7 @@ class RootContext(BaseContext):
     hook_plugin_ctx: HookPluginContext
 
     registry: AgentRegistry
+    agent_cache: AgentRPCCache
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

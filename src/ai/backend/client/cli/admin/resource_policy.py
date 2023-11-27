@@ -1,15 +1,19 @@
+import json
 import sys
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.keypair_resource_policy import (
+from ai.backend.client.cli.params import OptionalType
+from ai.backend.common.types import VFolderHostPermission
+
+from ...func.keypair_resource_policy import (
     _default_detail_fields,
     _default_list_fields,
 )
-from ai.backend.client.session import Session
-
+from ...session import Session
+from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
@@ -45,7 +49,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-def list(ctx):
+def list(ctx: CLIContext) -> None:
     """
     List and manage keypair resource policies.
     (admin privilege required)
@@ -66,14 +70,31 @@ def list(ctx):
     "--default-for-unspecified",
     type=str,
     default="UNLIMITED",
-    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
-)
-@click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
-@click.option(
-    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+    help="Default behavior for unspecified resources: LIMITED, UNLIMITED",
 )
 @click.option(
-    "--max-concurrent-sessions", type=int, default=30, help="Number of maximum concurrent sessions."
+    "--total-resource-slots",
+    type=str,
+    default="{}",
+    help="Set total resource slots.",
+)
+@click.option(
+    "--max-session-lifetime",
+    type=int,
+    default=0,
+    help="Maximum lifetime to keep session alive.",
+)
+@click.option(
+    "--max-concurrent-sessions",
+    type=int,
+    default=30,
+    help="Number of maximum concurrent sessions.",
+)
+@click.option(
+    "--max-concurrent-sftp-sessions",
+    type=int,
+    default=30,
+    help="Number of maximum concurrent SFTP sessions.",
 )
 @click.option(
     "--max-containers-per-session",
@@ -82,35 +103,39 @@ def list(ctx):
     help="Number of maximum containers per session.",
 )
 @click.option(
-    "--max-vfolder-count", type=int, default=10, help="Number of maximum virtual folders allowed."
-)
-@click.option(
-    "--max-vfolder-size", type=int, default=0, help="Maximum virtual folder size (future plan)."
-)
-@click.option(
     "--idle-timeout",
     type=int,
     default=1800,
-    help="The maximum period of time allowed for kernels to wait " "further requests.",
+    help="The maximum period of time allowed for kernels to wait further requests.",
 )
-# @click.option('--allowed-vfolder-hosts', type=click.Tuple(str), default=['local'],
-#               help='Locations to create virtual folders.')
 @click.option(
-    "--allowed-vfolder-hosts", default=["local"], help="Locations to create virtual folders."
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=str,
+    default=json.dumps(
+        {
+            "local:volume1": [perm.value for perm in VFolderHostPermission],
+        }
+    ),
+    help=(
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
 )
 def add(
     ctx: CLIContext,
-    name,
-    default_for_unspecified,
-    total_resource_slots,
-    max_session_lifetime,
-    max_concurrent_sessions,
-    max_containers_per_session,
-    max_vfolder_count,
-    max_vfolder_size,
-    idle_timeout,
-    allowed_vfolder_hosts,
-):
+    name: str,
+    default_for_unspecified: str,
+    total_resource_slots: str,  # JSON string
+    max_session_lifetime: int,
+    max_concurrent_sessions: int,
+    max_concurrent_sftp_sessions: int,
+    max_containers_per_session: int,
+    idle_timeout: int,
+    vfolder_host_perms: str,  # JSON string
+) -> None:
     """
     Add a new keypair resource policy.
 
@@ -124,11 +149,10 @@ def add(
                 total_resource_slots=total_resource_slots,
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
+                max_concurrent_sftp_sessions=max_concurrent_sftp_sessions,
                 max_containers_per_session=max_containers_per_session,
-                max_vfolder_count=max_vfolder_count,
-                max_vfolder_size=max_vfolder_size,
                 idle_timeout=idle_timeout,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -155,38 +179,70 @@ def add(
 @click.argument("name", type=str, default=None, metavar="NAME")
 @click.option(
     "--default-for-unspecified",
-    type=str,
-    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
+    type=OptionalType(str),
+    default=undefined,
+    help="Default behavior for unspecified resources: LIMITED, UNLIMITED",
 )
-@click.option("--total-resource-slots", type=str, help="Set total resource slots.")
 @click.option(
-    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+    "--total-resource-slots",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set total resource slots.",
 )
-@click.option("--max-concurrent-sessions", type=int, help="Number of maximum concurrent sessions.")
 @click.option(
-    "--max-containers-per-session", type=int, help="Number of maximum containers per session."
+    "--max-session-lifetime",
+    type=OptionalType(int),
+    default=undefined,
+    help="Maximum lifetime to keep session alive.",
 )
-@click.option("--max-vfolder-count", type=int, help="Number of maximum virtual folders allowed.")
-@click.option("--max-vfolder-size", type=int, help="Maximum virtual folder size (future plan).")
+@click.option(
+    "--max-concurrent-sessions",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum concurrent sessions.",
+)
+@click.option(
+    "--max-concurrent-sftp-sessions",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum concurrent SFTP sessions.",
+)
+@click.option(
+    "--max-containers-per-session",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum containers per session.",
+)
 @click.option(
     "--idle-timeout",
-    type=int,
-    help="The maximum period of time allowed for kernels to wait " "further requests.",
+    type=OptionalType(int),
+    default=undefined,
+    help="The maximum period of time allowed for kernels to wait further requests.",
 )
-@click.option("--allowed-vfolder-hosts", help="Locations to create virtual folders.")
+@click.option(
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=OptionalType(str),
+    default=undefined,
+    help=(
+        "Allowed virtual folder hosts. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
+)
 def update(
     ctx: CLIContext,
-    name,
-    default_for_unspecified,
-    total_resource_slots,
-    max_session_lifetime,
-    max_concurrent_sessions,
-    max_containers_per_session,
-    max_vfolder_count,
-    max_vfolder_size,
-    idle_timeout,
-    allowed_vfolder_hosts,
-):
+    name: str,
+    default_for_unspecified: str | Undefined,
+    total_resource_slots: str | Undefined,  # JSON string
+    max_session_lifetime: int | Undefined,
+    max_concurrent_sessions: int | Undefined,
+    max_concurrent_sftp_sessions: int | Undefined,
+    max_containers_per_session: int | Undefined,
+    idle_timeout: int | Undefined,
+    vfolder_host_perms: str | Undefined,  # JSON string
+) -> None:
     """
     Update an existing keypair resource policy.
 
@@ -200,11 +256,10 @@ def update(
                 total_resource_slots=total_resource_slots,
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
+                max_concurrent_sftp_sessions=max_concurrent_sftp_sessions,
                 max_containers_per_session=max_containers_per_session,
-                max_vfolder_count=max_vfolder_count,
-                max_vfolder_size=max_vfolder_size,
                 idle_timeout=idle_timeout,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -230,8 +285,8 @@ def update(
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-@click.argument("name", type=str, default=None, metavar="NAME")
-def delete(ctx: CLIContext, name):
+@click.argument("name", type=str, metavar="NAME")
+def delete(ctx: CLIContext, name: str) -> None:
     """
     Delete a keypair resource policy.
 

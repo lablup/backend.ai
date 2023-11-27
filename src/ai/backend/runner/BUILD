@@ -5,6 +5,14 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/kernel/**",
+        "//src/ai/backend/agent/**",
+    ],
+    allowed_dependencies=[],
+)
+
 pex_binary(
     name="extract-dotfiles",
     entry_point="extract_dotfiles.py",
@@ -42,8 +50,10 @@ resources(
         "*.css",
         "*.ttf",
         "*.dockerfile",
+        "*.json",
         ".bash_profile",
         ".bashrc",
+        ".zshrc",
         ".tmux.conf",
         ".vimrc",
         "terminfo.alpine3.8/**/*",
@@ -55,6 +65,8 @@ platform_resources(
     dependency_map={
         "linux_x86_64": ":linux-x86_64-binaries",
         "linux_arm64": ":linux-arm64-binaries",
+        "macos_x86_64": ":linux-x86_64-binaries",
+        "macos_arm64": ":linux-arm64-binaries",
     },
 )
 

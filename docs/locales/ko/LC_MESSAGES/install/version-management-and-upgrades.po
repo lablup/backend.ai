@@ -9,173 +9,197 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-09-13 15:33+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 #: ../../install/version-management-and-upgrades.rst:6
-#: 909d204a6f474f489e529e301d665764
+#: babf1c8ca412436dae6a8c80faafca4c
 msgid "Version Numbering"
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:8
-#: 01a641476bcd4e32b2e7a1f405618fe5
+#: 4623a25ba6904dfcb4d58d47c8d03835
 msgid ""
-"Version numbering uses ``x.y.z`` format (where ``x``\\ , ``y``\\ , ``z`` are "
-"integers)."
+"Version numbering uses ``x.y.z`` format (where ``x``\\ , ``y``\\ , ``z`` "
+"are integers)."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:9
-#: 6f6aecc8134d43b4aba80b4ee740d5ce
-msgid ""
-"Mostly, we follow `the calendar versioning scheme <https://calver.org/>`_."
+#: 93c963d1bf864308bea21c5fd4719626
+msgid "Mostly, we follow `the calendar versioning scheme <https://calver.org/>`_."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:10
-#: 57b0913f4d884058b6952752725aae51
+#: c41fd52ff7dd46719f6080e9b6f6a309
 msgid "``x.y`` is a release branch name (major releases per 6 months)."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:12
-#: 84488cf07c4a4a96beee57bdd8775cec
+#: 8727cb8dd3914a72bf1cf17969c17fe1
 msgid ""
 "When ``y`` is smaller than 10, we prepend a zero sign like ``05`` in the "
 "version numbers (e.g., ``20.09.0``)."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:13
-#: 0477cbb1af08481195f962a7b9af0341
+#: 696034fb2be242ee9b25482bb5cd917f
 msgid ""
 "When referring the version in other Python packages as requirements, you "
-"need to strip the leading zeros (e.g., ``20.9.0`` instead of ``20.09.0``) "
-"because Python setuptools normalizes the version integers."
+"need to strip the leading zeros (e.g., ``20.9.0`` instead of ``20.09.0``)"
+" because Python setuptools normalizes the version integers."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:15
-#: 646d18f574634d169aadc662bb1cfcbd
+#: d4da296f1fe945daaacebac1c534b765
 msgid "``x.y.z`` is a release tag name (patch releases)."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:16
-#: 656bdbe7c5b94ad7b13fffd5f769cddc
+#: f646dda728b24012ad613cd01865c79b
 msgid "When releasing ``x.y.0``\\ :"
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:18
-#: 7a22fed6818647a78a76b3f3330efd8d
+#: 093a0a889eb54f61b8f357230fb851e7
 msgid ""
-"Create a new ``x.y`` branch, do all bugfix/hotfix there, and make ``x.y.z`` "
-"releases there."
+"Create a new ``x.y`` branch, do all bugfix/hotfix there, and make "
+"``x.y.z`` releases there."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:19
-#: 15115438af1a45e7adc40427e77542a9
+#: 33b71bcfd5bb4b8080cf4c3e2ba42da8
 msgid ""
 "All fixes must be *first* implemented on the ``main`` branch and then "
 "*cherry-picked* back to ``x.y`` branches."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:21
-#: 0e9e5e6b518547a2b5a204b9f2b27883
+#: 26c21f1939c948f09bf97f7440101174
 msgid ""
-"When cherry-picking, use the ``-e`` option to edit the commit message.\\ :"
-"raw-html-m2r:`<br>` Append ``Backported-From: main`` and ``Backported-To: X."
-"Y`` lines after one blank line at the end of the existing commit message."
+"When cherry-picking, use the ``-e`` option to edit the commit message.\\ "
+":raw-html-m2r:`<br>` Append ``Backported-From: main`` and ``Backported-"
+"To: X.Y`` lines after one blank line at the end of the existing commit "
+"message."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:24
-#: 0eb49fcaa3f842659b8ec09f7871a776
+#: ab6cf15a6bac451d9a5ca9ab4d15f80f
 msgid "Change the version number of ``main`` to ``x.(y+1).0.dev0``"
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:25
-#: 37dc2d42cc444261b13bf27add369f94
+#: df012ab50b6145c89fa32157779676aa
 msgid ""
-"There is no strict rules about alpha/beta/rc builds yet. We will elaborate "
-"as we scale up.\\ :raw-html-m2r:`<br>` Once used, alpha versions will have "
-"``aN`` suffixes, beta versions ``bN`` suffixes, and RC versions ``rcN`` "
-"suffixes where ``N`` is an integer."
+"There is no strict rules about alpha/beta/rc builds yet. We will "
+"elaborate as we scale up.\\ :raw-html-m2r:`<br>` Once used, alpha "
+"versions will have ``aN`` suffixes, beta versions ``bN`` suffixes, and RC"
+" versions ``rcN`` suffixes where ``N`` is an integer."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:28
-#: f746478bc4494357aeeb43877d704485
+#: cc0532a0fd8b4c78bb3a25a05b31c41d
 msgid "New development should go on the ``main`` branch."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:30
-#: d9c0958ad9bc41fda117bdf9a1933486
+#: 5f5f703f71c24fd8a6050dc674d93eaa
 msgid ""
-"``main``\\ : commit here directly if your changes are a self-complete one as "
-"a single commit."
+"``main``\\ : commit here directly if your changes are a self-complete one"
+" as a single commit."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:31
-#: a4f908cfd89549368b2845aae8099497
+#: 3c70db29adc042cbb18d616a15e337f9
 msgid ""
-"Use both short-lived and long-running feature branches freely, but ensure "
-"there names differ from release branches and tags."
+"Use both short-lived and long-running feature branches freely, but ensure"
+" there names differ from release branches and tags."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:33
-#: c29782476c9941299a473456a0ed6976
+#: 264513184c8d40e8957bef60d0ba9596
 msgid ""
-"The major/minor (\\ ``x.y``\\ ) version of Backend.AI subprojects will go "
-"together to indicate compatibility.  Currently manager/agent/common versions "
-"progress this way, while client SDKs have their own version numbers and the "
-"API specification has a different ``vN.yyyymmdd`` version format."
+"The major/minor (\\ ``x.y``\\ ) version of Backend.AI subprojects will go"
+" together to indicate compatibility.  Currently manager/agent/common "
+"versions progress this way, while client SDKs have their own version "
+"numbers and the API specification has a different ``vN.yyyymmdd`` version"
+" format."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:35
-#: e6f90cd351ff4bd1b34e7632d3fb0794
+#: e17d42ebee264dcfb5450c305b6cb122
 msgid ""
-"``backend.ai-manager 1.2.p`` is guaranteed to be compatible with ``backend."
-"ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)"
+"``backend.ai-manager 1.2.p`` is guaranteed to be compatible with "
+"``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different "
+"integers)"
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:37
-#: da4ed1b8f0e449f5996b03701b5cce38
+#: a32cfeb98a2742a889185c5512a61cd1
 msgid ""
 "When there are exceptions, it will be noted as breaking changes in the "
 "change logs."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:39
-#: 6fec38c9456c4925b0093530cdb06c4e
+#: 26e982aa32b94c218dbb2ebac55834ca
 msgid ""
 "The client is guaranteed to be backward-compatible with the server they "
 "share the same API specification version."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:42
-#: 0f5f0a3e059744829becd425159d9329
+#: f6a1d90c4914409dada15d605e337adf
 msgid "Upgrading"
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:44
-#: 66b1681811fe4f3eb8d8014e24409a7d
+#: 57980a159c96451ba541c5884c4708dd
 msgid ""
-"You can upgrade the installed Python packages using ``pip install -U ...`` "
-"command along with dependencies."
+"You can upgrade the installed Python packages using ``pip install -U "
+"...`` command along with dependencies."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:46
-#: 1dc1bd4ce2214fdd99ec29161f39b9af
+#: 43bfe4aa59a84217a45167dc85360c99
 msgid ""
-"If you have cloned the stable version of source code from git, then pull and "
-"check out the next ``x.y`` release branch. It is recommended to re-run ``pip "
-"install -U -r requirements.txt`` as dependencies might be updated."
+"If you have cloned the stable version of source code from git, then pull "
+"and check out the next ``x.y`` release branch. It is recommended to re-"
+"run ``pip install -U -r requirements.txt`` as dependencies might be "
+"updated."
 msgstr ""
 
 #: ../../install/version-management-and-upgrades.rst:49
-#: ee8e49d38ce64e638308195a8dee5ff6
+#: 01e9a92b2ca04770be28e4285bbb412c
 msgid ""
-"For the manager, ensure that your database schema is up-to-date by running "
-"``alembic upgrade head``. Also check if any manual etcd configuration scheme "
-"change is required, though we will try to keep it compatible and "
-"automatically upgrade when first executed."
+"For the manager, ensure that your database schema is up-to-date by "
+"running ``alembic upgrade head``. If you setup your development "
+"environment with Pants and ``install-dev.sh`` script, keep your database "
+"schema up-to-date via ``./py -m alembic upgrade head`` instead of plain "
+"alembic command above."
 msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:51
+#: 79bac66fe5eb4c99946b2e79d6d33c5e
+msgid ""
+"Also check if any manual etcd configuration scheme change is required, "
+"though we will try to keep it compatible and automatically upgrade when "
+"first executed."
+msgstr ""
+
+#~ msgid ""
+#~ "For the manager, ensure that your "
+#~ "database schema is up-to-date by"
+#~ " running ``alembic upgrade head``. Also "
+#~ "check if any manual etcd configuration"
+#~ " scheme change is required, though we"
+#~ " will try to keep it compatible "
+#~ "and automatically upgrade when first "
+#~ "executed."
+#~ msgstr ""
+

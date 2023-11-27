@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import tempfile
 from asyncio import create_subprocess_exec, subprocess
 from pathlib import Path
@@ -40,6 +41,7 @@ async def write_tempfile(
 async def run_command(
     variables: Mapping[str, Any],
     command: Iterable[str],
+    echo=False,
 ) -> Optional[MutableMapping[str, str]]:
     proc = await create_subprocess_exec(
         *(str(piece).format_map(variables) for piece in command),
@@ -47,6 +49,11 @@ async def run_command(
         stderr=subprocess.PIPE
     )
     out, err = await proc.communicate()
+    if echo:
+        sys.stdout.buffer.write(out)
+        sys.stdout.flush()
+        sys.stderr.buffer.write(err)
+        sys.stderr.flush()
     return {"out": out.decode("utf8"), "err": err.decode("utf8")}
 
 

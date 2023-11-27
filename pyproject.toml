@@ -2,13 +2,16 @@
 package = "ai.backend.manager"  # reference point for getting __version__
 filename = "CHANGELOG.md"
 directory = "changes/"
-title_format = "## {version} ({project_date})"
+title_format = ""  # embedded inside the template
 template = "changes/template.md"
 start_string = "<!-- towncrier release notes start -->\n"
 issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
 underlines = ["", "", ""]
 
+# NOTE: A single PR may have multiple news fragments with different types.
+
 [[tool.towncrier.type]]
+    # Put breaking changes that should be announced loudly.
     directory = "breaking"
     name = "Breaking Changes"
     showcontent = true
@@ -16,6 +19,13 @@ underlines = ["", "", ""]
 [[tool.towncrier.type]]
     directory = "feature"
     name = "Features"
+    showcontent = true
+
+[[tool.towncrier.type]]
+    # Describe general improvements, such as internal refactoring, optimization,
+    # performance improvements, and etc. that do not introduce new features.
+    directory = "enhance"
+    name = "Improvements"
     showcontent = true
 
 [[tool.towncrier.type]]
@@ -30,7 +40,15 @@ underlines = ["", "", ""]
 
 [[tool.towncrier.type]]
     directory = "doc"
-    name = "Documentation Changes"
+    name = "Documentation Updates"
+    showcontent = true
+
+[[tool.towncrier.type]]
+    # Describe notable changes of external/upstream dependencies
+    # that may require installers updates and extra concerns
+    # to upgrade existing setups.
+    directory = "deps"
+    name = "External Dependency Updates"
     showcontent = true
 
 [[tool.towncrier.type]]
@@ -48,33 +66,37 @@ filterwarnings = [
 ]
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 100
+src = ["src"]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    # "C",  # flake8-comprehensions
+    # "B",  # flake8-bugbear
+]
+ignore = ["E203","E731","E501"]
+
+[tool.ruff.isort]
+known-first-party = ["ai.backend"]
+known-local-folder = ["src"]
+split-on-trailing-comma = true
+
+[tool.ruff.per-file-ignores]
+"src/ai/backend/manager/config.py" = ["E402"]
+"src/ai/backend/manager/models/alembic/env.py" = ["E402"]
+
 [tool.mypy]
 ignore_missing_imports = true
-mypy_path = "stubs:src"
+implicit_optional = true  # FIXME: remove after adding https://github.com/hauntsaninja/no_implicit_optional to fmt
+mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.5/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.11.6/bin/python"
+disable_error_code = ["typeddict-unknown-key"]
 
 [tool.black]
 line-length = 100
-
-[tool.isort]
-profile = "black"
-line_length = 100
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-known_first_party = ["ai.backend"]
-skip_glob = [
-    "dist",
-    "plugins",
-    "docs",
-    "scratches",
-    "vfroot",
-    "volumes",
-    ".tmp",
-    ".git",
-    ".pants.d",
-    ".pytest_cache",
-    ".vscode",
-    "tools/pants-src",
-    "src/ai/backend/webui",
-]
+preview = true

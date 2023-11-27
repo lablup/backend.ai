@@ -1,8 +1,8 @@
 # copied from https://github.com/lablup/backend.ai-krunner-static-gnu/blob/main/src/ai/backend/krunner/static_gnu/requirements.txt
-async_timeout~=3.0
-pyzmq~=22.2
-uvloop~=0.16
-attrs~=21.2
-janus~=0.6.1
+async_timeout~=4.0
+pyzmq~=24.0
+uvloop~=0.17
+attrs~=22.1
+janus~=1.0
 msgpack~=1.0
-jupyter-client~=6.1
+jupyter-client~=7.4.5

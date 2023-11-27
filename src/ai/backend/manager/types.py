@@ -5,18 +5,17 @@ import uuid
 from typing import TYPE_CHECKING, Protocol
 
 import attr
-from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
 
     from .defs import LockID
+    from .models import SessionRow
 
 
 class SessionGetter(Protocol):
-    def __call__(self, *, db_connection: SAConnection) -> Row:
-        ...
+    def __call__(self, *, db_session: SASession) -> SessionRow: ...
 
 
 # Sentinel is a special object that indicates a special status instead of a value
@@ -41,5 +40,4 @@ class UserScope:
 
 
 class DistributedLockFactory(Protocol):
-    def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock:
-        ...
+    def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock: ...

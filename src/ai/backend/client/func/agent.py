@@ -5,7 +5,7 @@ from typing import Sequence
 
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
@@ -35,6 +35,7 @@ _default_detail_fields = (
     agent_fields["mem_cur_bytes"],
     agent_fields["available_slots"],
     agent_fields["occupied_slots"],
+    agent_fields["local_config"],
 )
 
 
@@ -67,7 +68,7 @@ class Agent(BaseFunction):
         Lists the keypairs.
         You need an admin privilege for this operation.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "agent_list",
             {
                 "status": (status, "String"),
@@ -87,13 +88,11 @@ class Agent(BaseFunction):
         agent_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($agent_id: String!) {
                 agent(agent_id: $agent_id) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"agent_id": agent_id}
         data = await api_session.get().Admin._query(query, variables)

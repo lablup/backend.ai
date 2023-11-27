@@ -1,12 +1,15 @@
 import sys
+from typing import Sequence
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.domain import _default_detail_fields, _default_list_fields
-from ai.backend.client.session import Session
 
+from ...cli.params import BoolExprType, CommaSeparatedListType, OptionalType
+from ...func.domain import _default_detail_fields, _default_list_fields
+from ...session import Session
+from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
@@ -59,23 +62,40 @@ def list(ctx: CLIContext) -> None:
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new domain")
-@click.option("-i", "--inactive", is_flag=True, help="New domain will be inactive.")
-@click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
+@click.option("--inactive", is_flag=True, help="New domain will be inactive.")
 @click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+    "--total-resource-slots",
+    type=str,
+    default="{}",
+    help="Set total resource slots as a JSON string.",
 )
 @click.option(
-    "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=OptionalType(str),
+    default=undefined,
+    help=(
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
+)
+@click.option(
+    "--allowed-docker-registries",
+    type=OptionalType(CommaSeparatedListType),
+    default=undefined,
+    help="Allowed docker registries.",
 )
 def add(
     ctx: CLIContext,
-    name,
-    description,
-    inactive,
-    total_resource_slots,
-    allowed_vfolder_hosts,
-    allowed_docker_registries,
-):
+    name: str,
+    description: str,
+    inactive: bool,
+    total_resource_slots: str,
+    vfolder_host_perms: str | Undefined,
+    allowed_docker_registries: Sequence[str] | Undefined,
+) -> None:
     """
     Add a new domain.
 
@@ -88,7 +108,7 @@ def add(
                 description=description,
                 is_active=not inactive,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
                 allowed_docker_registries=allowed_docker_registries,
             )
         except Exception as e:
@@ -114,26 +134,58 @@ def add(
 @domain.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("--new-name", type=str, help="New name of the domain")
-@click.option("--description", type=str, help="Description of the domain")
-@click.option("--is-active", type=bool, help="Set domain inactive.")
-@click.option("--total-resource-slots", type=str, help="Update total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+    "--new-name",
+    type=OptionalType(str),
+    default=undefined,
+    help="New name of the domain",
 )
 @click.option(
-    "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
+    "--description",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set the description of the domain",
+)
+@click.option(
+    "--is-active",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Change the active/inactive status if specified.",
+)
+@click.option(
+    "--total-resource-slots",
+    type=OptionalType(str),
+    default=undefined,
+    help="Update total resource slots.",
+)
+@click.option(
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=OptionalType(str),
+    default=undefined,
+    help=(
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
+)
+@click.option(
+    "--allowed-docker-registries",
+    type=OptionalType(CommaSeparatedListType),
+    default=undefined,
+    help="Allowed docker registries.",
 )
 def update(
     ctx: CLIContext,
-    name,
-    new_name,
-    description,
-    is_active,
-    total_resource_slots,
-    allowed_vfolder_hosts,
-    allowed_docker_registries,
-):
+    name: str,
+    new_name: str | Undefined,
+    description: str | Undefined,
+    is_active: bool | Undefined,
+    total_resource_slots: str | Undefined,
+    vfolder_host_perms: str | Undefined,
+    allowed_docker_registries: Sequence[str] | Undefined,
+) -> None:
     """
     Update an existing domain.
 
@@ -147,7 +199,7 @@ def update(
                 description=description,
                 is_active=is_active,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
                 allowed_docker_registries=allowed_docker_registries,
             )
         except Exception as e:
@@ -175,7 +227,7 @@ def update(
 @domain.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def delete(ctx: CLIContext, name):
+def delete(ctx: CLIContext, name: str) -> None:
     """
     Inactive an existing domain.
 
@@ -209,7 +261,7 @@ def delete(ctx: CLIContext, name):
 @domain.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def purge(ctx: CLIContext, name):
+def purge(ctx: CLIContext, name: str) -> None:
     """
     Delete an existing domain.
 

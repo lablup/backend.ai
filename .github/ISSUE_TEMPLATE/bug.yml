@@ -1,0 +1,56 @@
+name: Bug Report
+description: Create a report to help us improve
+labels: type:bug
+assignees: []
+body:
+  - type: dropdown
+    id: os
+    attributes:
+      label: What Operating System(s) are you seeing this problem on?
+      options:
+        - Linux (x86-64)
+        - Linux (aarch64)
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Windows (for client SDK or UI issues only)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Backend.AI version
+      description: "The commit hash, tag name, or package version"
+      placeholder: "22.09.0b1"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is
+      placeholder: |
+        Tell us what happened.  You can attach screenshots by clicking
+        this area to highlight it and then drag the files in, or just paste the image from
+        the clipboard to upload it.
+    validations:
+      required: true
+  - type: textarea
+    id: to_repro
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        Please include as much information as possible that can help to reproduce and
+        understand the issue.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: |
+        A clear and concise description of what you expected to happen
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?
+      description: |
+        Add any other context about the problem here.

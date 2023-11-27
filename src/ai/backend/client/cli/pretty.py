@@ -1,10 +1,13 @@
+import asyncio
 import enum
 import functools
 import sys
 import textwrap
 import traceback
+from typing import Sequence
 
 from click import echo, style
+from tqdm import tqdm
 
 from ..exceptions import BackendAPIError
 
@@ -52,7 +55,7 @@ def format_pretty(msg, status=PrintStatus.NONE, colored=True):
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
-        indicator = style("\u22EF", fg="bright_yellow", reset=False)
+        indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
         indicator = style("\u2714", fg="bright_green", reset=False)
     elif status == PrintStatus.FAILED:
@@ -78,11 +81,11 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
         assert "\n" not in msg, "Waiting message must be a single line."
-        indicator = style("\u22EF", fg="bright_yellow", reset=False)
+        indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
-        indicator = style("\u2714", fg="bright_green", reset=False)
+        indicator = style("\u2713", fg="bright_green", reset=False)
     elif status == PrintStatus.FAILED:
-        indicator = style("\u2718", fg="bright_red", reset=False)
+        indicator = style("\u2717", fg="bright_red", reset=False)
     elif status == PrintStatus.WARNING:
         indicator = style("\u2219", fg="yellow", reset=False)
     else:
@@ -101,6 +104,17 @@ print_wait = functools.partial(print_pretty, status=PrintStatus.WAITING)
 print_done = functools.partial(print_pretty, status=PrintStatus.DONE)
 print_fail = functools.partial(print_pretty, status=PrintStatus.FAILED)
 print_warn = functools.partial(print_pretty, status=PrintStatus.WARNING)
+
+
+def _format_gql_path(items: Sequence[str | int]) -> str:
+    pieces = []
+    for item in items:
+        match item:
+            case int():
+                pieces.append(f"[{item}]")
+            case _:
+                pieces.append(f".{str(item)}")
+    return "".join(pieces)[1:]  # strip first dot
 
 
 def format_error(exc: Exception):
@@ -130,7 +144,11 @@ def format_error(exc: Exception):
         else:
             if exc.data["type"].endswith("/graphql-error"):
                 yield "\n\u279c Message:\n"
-                yield from (f"{err_item['message']}\n" for err_item in exc.data.get("data", []))
+                for err_item in exc.data.get("data", []):
+                    yield f"{err_item['message']}"
+                    if err_path := err_item.get("path"):
+                        yield f" (path: {_format_gql_path(err_path)})"
+                    yield "\n"
             else:
                 other_details = exc.data.get("msg", None)
                 if other_details:
@@ -182,3 +200,73 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
         ),
         file=file,
     )
+
+
+class Spinner:
+    def __init__(self, msg: str, delay: float = 0.3):
+        self.msg = msg
+        self.task = None
+        self.delay = delay
+
+    async def __aenter__(self):
+        self.run()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.stop()
+
+    def run(self):
+        self.task = asyncio.create_task(self.spin())
+
+    async def spin(self):
+        try:
+            while True:
+                for char in "|/-\\":
+                    print_wait("{} {}".format(self.msg, char))
+                    await asyncio.sleep(self.delay)
+        except asyncio.CancelledError:
+            pass
+
+    async def stop(self):
+        self.task.cancel()
+        await self.task
+
+
+class ProgressViewer:
+    """
+
+    A context manager that displays a spinner and a tqdm progress bar.
+
+    It shows the spinner until it is switched explicitly to the tqdm progress bar.
+
+    Usage:
+
+    ```
+    async with ProgressViewer("Waiting...") as viewer:
+        for i in range(10):
+            await asyncio.sleep(0.2)
+        tqdm = await viewer.to_tqdm()
+        tqdm.total = 10
+        for i in range(10):
+            await asyncio.sleep(0.2)
+            tqdm.update(1)
+    ```
+    """
+
+    def __init__(self, spinner_msg: str = "", delay: float = 0.3) -> None:
+        self.spinner = Spinner(spinner_msg, delay)
+        self.tqdm = None
+
+    async def __aenter__(self):
+        self.spinner.run()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        await self.spinner.stop()
+        if self.tqdm:
+            self.tqdm.close()
+
+    async def to_tqdm(self, unit: str = "it") -> tqdm:
+        await self.spinner.stop()
+        self.tqdm = tqdm(total=0, unit=unit)
+        return self.tqdm

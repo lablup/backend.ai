@@ -1,15 +1,17 @@
 Backend.AI
 ==========
 
-[![PyPI release version](https://badge.fury.io/py/backend.ai.svg)](https://pypi.org/project/backend.ai/)
-![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai.svg)
+[![PyPI release version](https://badge.fury.io/py/backend.ai-manager.svg)](https://pypi.org/project/backend.ai-manager/)
+![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai-manager.svg)
+![Wheels](https://img.shields.io/pypi/wheel/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined, container-based computing cluster orchestrator
-that hosts diverse programming languages and popular computing/ML frameworks,
-with pluggable heterogeneous accelerator support including CUDA and ROCM.
+Backend.AI is a streamlined, container-based computing cluster platform 
+that hosts popular computing/ML frameworks and diverse programming languages, 
+with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
+
 It allocates and isolates the underlying computing resources for multi-tenant
-computation sessions on-demand or in batches with customizable job schedulers.
+computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator.
 All its functions are exposed as REST/GraphQL/WebSocket APIs.
 
 
@@ -36,6 +38,7 @@ as a reference implementation of API clients.
   - `storage/`: Storage proxy
   - `storage/api`: Storage proxy's manager-facing and client-facing APIs
   - `web/`: Web UI server
+    - `static/`: Backend.AI WebUI release artifacts
   - `plugin/`: Plugin subsystem
   - `test/`: Integration test suite
   - `testutils/`: Shared utilities used by unit tests
@@ -107,7 +110,7 @@ in a secure way.
 * SSH
    * All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
      PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
-* VSCode (coming soon)
+* VSCode
    * Most container sessions have intrinsic web-based VSCode support.
 
 ### Working with Storage
@@ -129,10 +132,10 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
 * `src/ai/backend/manager`
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
-  * Availble plugin interfaces
+  * Available plugin interfaces
     - `backendai_scheduler_v10`
-    - `backendai_hook_v10`
-    - `backendai_webapp_v10`
+    - `backendai_hook_v20`
+    - `backendai_webapp_v20`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
 
@@ -147,7 +150,7 @@ heartbeats.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/agent/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-agent
   * Available plugin interfaces
-    - `backendai_accelerator_v12`
+    - `backendai_accelerator_v21`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
 
@@ -170,15 +173,22 @@ and basic administration tasks.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
+**Synchronizing the static Backend.AI WebUI version:**
+```console
+$ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
+$ scripts/download-webui-release.sh <target version to download>
+```
+
 ### Kernels
 
+Computing environment recipes (Dockerfile) to build the container images to execute
+on top of the Backend.AI platform.
+
 * https://github.com/lablup/backend.ai-kernels
-  - Computing environment recipes (Dockerfile) to build the container images to execute
-    on top of the Backend.AI platform
 
 ### Jail
 
-A programmable sandbox implemented using ptrace-based sytem call filtering written in Go.
+A programmable sandbox implemented using ptrace-based system call filtering written in Rust.
 
 * https://github.com/lablup/backend.ai-jail
 
@@ -197,7 +207,7 @@ commercial and non-commercial software products and services.
 
 * Python (provides the command-line interface)
    * `pip install backend.ai-client`
-   * https://github.com/lablup/backend.ai-client-py
+   * https://github.com/lablup/backend.ai/tree/main/src/ai/backend/client
 * Java
    * Currently only available via GitHub releases
    * https://github.com/lablup/backend.ai-client-java
@@ -212,18 +222,18 @@ commercial and non-commercial software products and services.
 Plugins
 -------
 
-* `backendai_accelerator_v12`
-  - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai-accelerator-cuda): CUDA accelerator plugin
-  - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai-accelerator-cuda-mock): CUDA mockup plugin
+* `backendai_accelerator_v21`
+  - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_open): CUDA accelerator plugin
+  - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
     - This emulates the presence of CUDA devices without actual CUDA devices,
       so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`](https://github.com/lablup/backend.ai-accelerator-rocm): ROCM accelerator plugin
+  - [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
   - More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
-  - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-stats-monitor)
+  - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
     - Statistics collector based on the Datadog API
 * `backendai_monitor_error_v10`
-  - [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-error-monitor)
+  - [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-monitor-sentry)
     - Exception collector based on the Sentry API
 
 
@@ -254,6 +264,15 @@ animated vector graphics)
 
 We now recommend using in-kernel applications such as Jupyter Lab, Visual Studio Code Server,
 or native SSH connection to kernels via our client SDK or desktop apps.
+
+Python Version Compatibility
+----------------------------
+
+| Backend.AI Core Version | Compatible Python Version |
+|:-----------------------:|:-------------------------:|
+| 23.03.x / 23.09.x       | 3.11.x                    |
+| 22.03.x / 22.09.x       | 3.10.x                    |
+| 21.03.x / 21.09.x       | 3.8.x                     |
 
 
 License

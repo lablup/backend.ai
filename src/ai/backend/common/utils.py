@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import numbers
 import random
@@ -9,10 +10,26 @@ import uuid
 from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Tuple,
+    TypeVar,
+    Union,
+)
+
+import aiofiles
+from async_timeout import timeout
 
 if TYPE_CHECKING:
     from decimal import Decimal
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 # It is a bad practice to keep all "miscellaneous" stuffs
 # into the single "utils" module.
@@ -29,6 +46,8 @@ from .enum_extension import StringSetFlag  # for legacy imports  # noqa
 from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
+from .exception import VolumeMountFailed, VolumeUnmountFailed
+from .defs import DEFAULT_FILE_IO_TIMEOUT
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -90,9 +109,10 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 
     :return: An iterator over the generated sequence
     """
-    assert (
-        num_points * min_distance <= length + min_distance
-    ), "There are too many points or it has a too large distance which cannot be fit into the given length."
+    assert num_points * min_distance <= length + min_distance, (
+        "There are too many points or it has a too large distance which cannot be fit into the"
+        " given length."
+    )
     extra = length - (num_points - 1) * min_distance
     ro = [random.uniform(0, 1) for _ in range(num_points + 1)]
     sum_ro = sum(ro)
@@ -194,7 +214,9 @@ class FstabEntry:
     Entry class represents a non-comment line on the `fstab` file.
     """
 
-    def __init__(self, device, mountpoint, fstype, options, d=0, p=0) -> None:
+    def __init__(
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+    ) -> None:
         self.device = device
         self.mountpoint = mountpoint
         self.fstype = fstype
@@ -225,13 +247,13 @@ class Fstab:
           (https://gist.github.com/niedbalski/507e974ed2d54a87ad37)
     """
 
-    def __init__(self, fp) -> None:
+    def __init__(self, fp: AsyncTextIOWrapper) -> None:
         self._fp = fp
 
-    def _hydrate_entry(self, line):
+    def _hydrate_entry(self, line: str) -> FstabEntry:
         return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
 
-    async def get_entries(self):
+    async def get_entries(self) -> AsyncIterator[FstabEntry]:
         await self._fp.seek(0)
         for line in await self._fp.readlines():
             try:
@@ -241,45 +263,144 @@ class Fstab:
             except TypeError:
                 pass
 
-    async def get_entry_by_attr(self, attr, value):
+    async def get_entry_by_attr(self, attr: str, value: Any) -> FstabEntry | None:
         async for entry in self.get_entries():
             e_attr = getattr(entry, attr)
             if e_attr == value:
                 return entry
         return None
 
-    async def add_entry(self, entry):
+    async def add_entry(self, entry: FstabEntry) -> None:
         if await self.get_entry_by_attr("device", entry.device):
-            return False
+            return
         await self._fp.write(str(entry) + "\n")
         await self._fp.truncate()
-        return entry
 
-    async def add(self, device, mountpoint, fstype, options=None, d=0, p=0):
+    async def add(
+        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+    ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 
-    async def remove_entry(self, entry):
+    async def remove_entry(self, entry: FstabEntry) -> bool:
         await self._fp.seek(0)
         lines = await self._fp.readlines()
-        found = False
+        line_no: int | None = None
         for index, line in enumerate(lines):
-            try:
-                if not line.strip().startswith("#"):
+            if not line.strip().startswith("#"):
+                try:
                     if self._hydrate_entry(line) == entry:
-                        found = True
+                        line_no = index
                         break
-            except TypeError:
-                pass
-        if not found:
+                except TypeError:
+                    pass
+        else:
             return False
-        lines.remove(line)
+        assert line_no is not None
+        del lines[line_no]
         await self._fp.seek(0)
         await self._fp.write("".join(lines))
         await self._fp.truncate()
         return True
 
-    async def remove_by_mountpoint(self, mountpoint):
+    async def remove_by_mountpoint(self, mountpoint: str) -> bool:
         entry = await self.get_entry_by_attr("mountpoint", mountpoint)
         if entry:
             return await self.remove_entry(entry)
         return False
+
+
+async def mount(
+    mount_path: str,
+    fs_location: str,
+    fs_type: str = "nfs",
+    cmd_options: str | None = None,
+    edit_fstab: bool = False,
+    fstab_path: str | None = None,
+    mount_prefix: str | None = None,
+) -> None:
+    if mount_prefix is None:
+        mount_prefix = "/"
+    if fstab_path is None:
+        fstab_path = "/etc/fstab"
+    mountpoint = Path(mount_prefix) / mount_path
+    mountpoint.mkdir(exist_ok=True)
+    if cmd_options is not None:
+        cmd = [
+            "mount",
+            "-t",
+            fs_type,
+            "-o",
+            cmd_options,
+            fs_location,
+            str(mountpoint),
+        ]
+    else:
+        cmd = ["mount", "-t", fs_type, fs_location, str(mountpoint)]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    raw_out, raw_err = await proc.communicate()
+    raw_out.decode("utf8")
+    err = raw_err.decode("utf8")
+    await proc.wait()
+    if err:
+        raise VolumeMountFailed(f"Failed to mount {fs_location} on {mountpoint}. (e: {err})")
+    if edit_fstab:
+        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+            fstab = Fstab(fp)
+            await fstab.add(
+                fs_location,
+                str(mountpoint),
+                fs_type,
+                cmd_options,
+            )
+
+
+async def umount(
+    mount_path: str,
+    mount_prefix: str | None = None,
+    edit_fstab: bool = False,
+    fstab_path: str | None = None,
+    rmdir_if_empty: bool = False,
+    *,
+    timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
+) -> bool:
+    if mount_prefix is None:
+        mount_prefix = "/"
+    if fstab_path is None:
+        fstab_path = "/etc/fstab"
+    mountpoint = Path(mount_prefix) / mount_path
+    assert Path(mount_prefix) != mountpoint
+    if not mountpoint.is_mount():
+        return False
+    try:
+        with timeout(timeout_sec):
+            proc = await asyncio.create_subprocess_exec(
+                *[
+                    "umount",
+                    str(mountpoint),
+                ],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            raw_out, raw_err = await proc.communicate()
+            raw_out.decode("utf8")
+            err = raw_err.decode("utf8")
+            await proc.wait()
+    except asyncio.TimeoutError:
+        raise VolumeUnmountFailed(
+            f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
+            "The process may be hanging in state D, which needs to be checked."
+        )
+    if err:
+        raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
+    if rmdir_if_empty:
+        try:
+            mountpoint.rmdir()  # delete directory if empty
+        except OSError:
+            pass
+    if edit_fstab:
+        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+            fstab = Fstab(fp)
+            await fstab.remove_by_mountpoint(str(mountpoint))
+    return True

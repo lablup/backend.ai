@@ -1,0 +1,129 @@
+version: "3.9"
+
+services:
+
+  # Initial master is node01.
+  backendai-half-redis-node01:
+    image: redis:7-alpine
+    hostname: node01
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    ports:
+    - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
+    command: >
+      redis-server
+      --port ${REDIS_MASTER_PORT}
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --replica-announce-ip node01
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
+    # IMPORTANT: We have INTENTIONALLY OMITTED the healthchecks
+    # because it interferes with pause/unpause of container to simulate
+    # network partitioning.
+
+  backendai-half-redis-node02:
+    image: redis:7-alpine
+    hostname: node02
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    ports:
+    - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
+    command: >
+      redis-server
+      --port ${REDIS_SLAVE1_PORT}
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node02
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
+
+  backendai-half-redis-node03:
+    image: redis:7-alpine
+    hostname: node03
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    ports:
+    - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
+    command: >
+      redis-server
+      --port ${REDIS_SLAVE2_PORT}
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node03
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
+
+  backendai-half-redis-sentinel01:
+    image: redis:7-alpine
+    hostname: sentinel01
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-server
+      /config/sentinel01.conf
+      --sentinel
+      --port ${REDIS_SENTINEL1_PORT}
+
+  backendai-half-redis-sentinel02:
+    image: redis:7-alpine
+    hostname: sentinel02
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-server
+      /config/sentinel02.conf
+      --sentinel
+      --port ${REDIS_SENTINEL2_PORT}
+
+  backendai-half-redis-sentinel03:
+    image: redis:7-alpine
+    hostname: sentinel03
+    user: ${DOCKER_USER}
+    networks:
+    - testnet
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-server
+      /config/sentinel03.conf
+      --sentinel
+      --port ${REDIS_SENTINEL3_PORT}
+
+networks:
+  testnet:

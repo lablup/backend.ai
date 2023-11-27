@@ -16,13 +16,25 @@ Developer guide for Backend.AI documentation
 Then, follow the instructions below:
 
 ```console
-$ pyenv virtualenv 3.10.4 venv-bai-docs
-$ git clone https://github.com/lablup/backend.ai backend.ai
-$ cd ~/backend.ai/docs
-$ pyenv local venv-bai-docs
+$ pyenv virtualenv $(pyenv latest 3.11) bai-docs
+$ git clone https://github.com/lablup/backend.ai bai-dev
+$ cd ./bai-dev/docs
+$ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
-$ pip install -U -r requirements.txt   # docs/requirements.txt
+$ pip install -U \
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio \
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
+    --find-links=https://dist.backend.ai/pypi/simple/hiredis \
+    --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
+    -r requirements.txt
 ```
+
+## Building API Reference JSON file
+```console
+$ ./py -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
+```
+This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
+Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
 
 ## Building HTML document
 
@@ -62,16 +74,34 @@ $ make -e SPHINXOPTS="-D language='ko'" html
 ```
 
 
-## 🚧 Building PDF document (WIP) 🚧
+## Building PDF document
 
-> Help wanted!
+```console
+$ make latexpdf
+```
 
-We are looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
 
+Building PDF requires following libraries to be present on your system.
+
+* TeX Live 
+  - ko.TeX (texlive-lang-korean)
+  - latexmk
+* ImageMagick
+* Font files (All required font files must be installed)
+
+### Installing dependencies on macOS
+1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
+2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
+3. Exceute following command to install missing dependencies.   
+```console
+sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
+```
+4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
 
 ## Advanced Settings
 
-### Managing the hierachy of toctree (Table of Contents) of documentation
+### Managing the hierarchy of toctree (Table of Contents) of documentation
 
 When documentation of each file gets too big to contain all things in one topic,
 It should be branched with proper sub-topics.

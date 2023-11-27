@@ -9,226 +9,239 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 #: ../../manager/user-api/resource-presets.rst:2
-#: f6432f5d000b46f297f55a3a0f464025
+#: 510a8b4e7f184654b56b4166b7b9a123
 msgid "Resource Presets"
-msgstr ""
+msgstr "리소스 프리셋"
 
 #: ../../manager/user-api/resource-presets.rst:4
-#: a880cc479eaa451dbcf09aad0680ea8b
+#: 556a9d12c7e04e0689911323756f7437
 msgid ""
-"Resource presets provide a simple storage for pre-configured resource slots "
-"and a dynamic checker for allocatability of given presets before actually "
-"calling the kernel creation API."
+"Resource presets provide a simple storage for pre-configured resource "
+"slots and a dynamic checker for allocatability of given presets before "
+"actually calling the kernel creation API."
 msgstr ""
+"리소스 프리셋은 사전에 구성된 리소스 슬롯을 저장하고, 커널 생성 API를 호출하기 전에 주어진 프리셋의 할당 가능 여부를 동적으로"
+" 확인하는 간단한 저장소를 제공합니다."
 
 #: ../../manager/user-api/resource-presets.rst:8
-#: b98924a8b808492bba29242e8e41a455
+#: d9bae496ff5b4f108708d8cada922ad0
 msgid ""
-"To add/modify/delete resource presets, you need to use the admin GraphQL API."
-msgstr ""
+"To add/modify/delete resource presets, you need to use the admin GraphQL "
+"API."
+msgstr "리소스 프리셋을 추가/수정/삭제하려면 관리자 GraphQL API를 사용해야 합니다."
 
 #: ../../manager/user-api/resource-presets.rst:14
-#: 2a6458d6478b4e0b99f58dc059342b4d
+#: dc09f3a5dc084111ace0ca853e20aceb
 msgid "Listing Resource Presets"
-msgstr ""
+msgstr "리소스 프리셋 목록"
 
 #: ../../manager/user-api/resource-presets.rst:16
-#: f9d997b335764933a53ea8e82fde750f
+#: c7163d78d85e48ed9e0da5e2ca6c2394
 msgid "Returns the list of admin-configured resource presets."
-msgstr ""
+msgstr "관리자가 구성한 리소스 프리셋 목록을 반환합니다."
 
 #: ../../manager/user-api/resource-presets.rst:18
-#: d4340edf12f542639f16543e150550cd
+#: 165202470bcd46a197327372addb0d40
 msgid "URI: ``/resource/presets``"
-msgstr ""
+msgstr "URI: ``/resource/presets``"
 
 #: ../../manager/user-api/resource-presets.rst:19
-#: b05e5d83e7d84e08af07aaba4be3cf23
+#: 23cd3fa97e474ea38f102cfd4a66bd12
 msgid "Method: ``GET``"
 msgstr "메소드 : ``GET``"
 
 #: ../../manager/user-api/resource-presets.rst:22
 #: ../../manager/user-api/resource-presets.rst:62
-#: 5a917e7706d64bb29c66f4224e32ec18 aca5e9b3ba594aa4af15cefbbc47b529
+#: 1788d83cbe93432f98cdd2616b9d0a1b 5503ba77b4aa4acbac15da12d9361fe5
 msgid "Parameters"
-msgstr "매개변수들"
+msgstr "매개변수"
 
 #: ../../manager/user-api/resource-presets.rst:24
 #: ../../manager/user-api/resource-presets.rst:64
-#: 8f24337bc9004adca61ea2b2eeb9ef8f c157a3516a28466298257f40afb3b404
+#: 949abb5dafa145558c7b87d49650afe6 bc09f9a427ee446096d2da6dbbf8a7f7
+#, fuzzy
 msgid "None."
-msgstr ""
+msgstr "없음"
 
 #: ../../manager/user-api/resource-presets.rst:27
 #: ../../manager/user-api/resource-presets.rst:67
-#: 3166fb63de6d4cbb8a613354e59e7bcb 364c26c6842c49ec913df1be63304ba5
+#: 00e185dc01d7465dad60cd37b8297767 b7e57c6a165342d1b005893bb216dcac
 msgid "Response"
 msgstr "응답"
 
 #: ../../manager/user-api/resource-presets.rst:33
 #: ../../manager/user-api/resource-presets.rst:73
-#: 7f16876162de4c3e87e4ccbc6c22abb9 debd385fbcec48ceb075e473f7a3ac8b
+#: 5ceda0e185894c39bb47442cabcffdcf b18b83174b364bb68f08df77ea08773e
 msgid "HTTP Status Code"
-msgstr "HTTP Status Code"
+msgstr "HTTP 상태 코드"
 
 #: ../../manager/user-api/resource-presets.rst:34
 #: ../../manager/user-api/resource-presets.rst:74
-#: 72560b19c4684050b75e4814be4c7d91 b93a418a4a79487299fb789e86b3f2e2
+#: 5245636289304bc5a9eb5e5fe243105e 7fb876ed79e4464da653933254ca73d3
 msgid "Description"
 msgstr "설명"
 
 #: ../../manager/user-api/resource-presets.rst:35
 #: ../../manager/user-api/resource-presets.rst:75
-#: 2b0174dfb9f640f38d2d623ef4794a3d b265959ad2e14af2aebf12ea5af312c0
+#: 5529ec9039a04e8ca0498ed78a0c76c5 76101a3679244340a074ba4285e9525c
 msgid "200 OK"
 msgstr "200 OK"
 
 #: ../../manager/user-api/resource-presets.rst:36
 #: ../../manager/user-api/resource-presets.rst:76
-#: 431230db15934568b9a2889b9e68c954 d9073c2252214eb08ea26e5a1f851421
+#: d9804005f362477faf3d4716e1ca0a7d e4eedd5424664240ad3a5407e813b345
 msgid "The preset list is returned."
-msgstr ""
+msgstr "프리셋 목록이 반환됩니다."
 
 #: ../../manager/user-api/resource-presets.rst:42
 #: ../../manager/user-api/resource-presets.rst:84
-#: 51059509bfdc433c909b007595099317 9aebee0684b14c47b604fc925e5d9d89
+#: 087b527a7d6146d893db68453c8d9cf4 9824a731f425416792da3ccc3d571515
 msgid "Fields"
 msgstr "필드"
 
 #: ../../manager/user-api/resource-presets.rst:43
 #: ../../manager/user-api/resource-presets.rst:85
-#: 42ba546717d5442c92b417b8fc332f17 4f31b7ea91ca4896875f2d7c2517e86c
+#: b8225d90b7324d4d802fa24c74e88d92 b8cfa583d50d4975a93cefd901a9a612
 msgid "Type"
 msgstr "타입"
 
 #: ../../manager/user-api/resource-presets.rst:44
 #: ../../manager/user-api/resource-presets.rst:86
-#: 5a5a2aa3588e4426a25962c558eb99c5 d6c6d084fc2e4f4f809f5f72eb7a9b4f
+#: 431a81efef674a639a686cccb7ee69b5 e5861e4863304c6fb466bad495659516
 msgid "Values"
 msgstr "값"
 
 #: ../../manager/user-api/resource-presets.rst:45
 #: ../../manager/user-api/resource-presets.rst:103
-#: cd7fef78c1104aea86a95524c55fb435 f178b87d5c234cafbf8eda0326b581dc
+#: 8fdc82bb698f4c10b0fe293e198d8ff4 fc10b4940b064771a606c12074b977b8
 msgid "``presets``"
-msgstr ""
+msgstr "``presets``"
 
 #: ../../manager/user-api/resource-presets.rst:46
 #: ../../manager/user-api/resource-presets.rst:104
-#: 98fbab3da57e4afea8e3c114cfd5a309 c009cead02a74fc6866748ef9f18fc72
+#: 73e204c9ad204c4d926a007f2e4edd27 87ed56ad88744b2eab66368a03c66715
 msgid "``list[object]``"
-msgstr ""
+msgstr "``list[object]``"
 
 #: ../../manager/user-api/resource-presets.rst:47
-#: 81231e5f5864465fb40072bc9e9cea12
+#: 0a9a99483f514feba4294575cf36955e
 msgid "The list of :ref:`resource-preset-object`"
-msgstr ""
+msgstr ":ref:`resource-preset-object` 목록"
 
 #: ../../manager/user-api/resource-presets.rst:51
-#: 3777724632984deeabad2787e0b1873c
+#: 87dd6a5916534fcb8256ee8ab4b308cd
 msgid "Checking Allocatability of Resource Presets"
-msgstr ""
+msgstr "리소스 프리셋의 할당 가능 여부 확인"
 
 #: ../../manager/user-api/resource-presets.rst:53
-#: 69199e0cbb0c4c74bf5b05fee20c39cc
+#: 286bdd01bae041ccba4a1462a18941b2
 msgid ""
-"Returns current keypair and scaling-group's resource limits in addition to "
-"the list of admin-configured resource presets. It also checks the "
+"Returns current keypair and scaling-group's resource limits in addition "
+"to the list of admin-configured resource presets. It also checks the "
 "allocatability of the resource presets and adds ``allocatable`` boolean "
 "field to each preset item."
 msgstr ""
+"현재 keypair와 스케일링 그룹의 리소스 제한을 추가로 반환하고, 리소스 프리셋의 할당 가능 여부를 확인하여 각 프리셋 항목에 "
+"``allocatable`` boolean 필드를 추가합니다."
 
 #: ../../manager/user-api/resource-presets.rst:58
-#: 20903059ef4042b7aeae0b745aa94d54
+#: 0f3d04bd3adf48e2adcd79d6baaf97f8
 msgid "URI: ``/resource/check-presets``"
-msgstr ""
+msgstr "URI: ``/resource/check-presets``"
 
 #: ../../manager/user-api/resource-presets.rst:59
-#: 034e17c32a4c4ef88c530c7ea3ddf170
+#: 1e8e286fff1649069490351983f6c78a
 msgid "Method: ``POST``"
 msgstr "Method: ``POST``"
 
 #: ../../manager/user-api/resource-presets.rst:77
-#: 669ff96a9b604ee8b6727f377245301a
+#: 2923e23a267043cbba432576d3f247db
 msgid "401 Unauthorized"
-msgstr ""
+msgstr "401 Unauthorized"
 
 #: ../../manager/user-api/resource-presets.rst:78
-#: 1123b8a31d40438cb504a41930ab2c01
+#: a1bc85d0391648f4a0715860c31e27cc
 msgid "The client is not authorized."
-msgstr ""
+msgstr "인증되지 않은 클라이언트입니다."
 
 #: ../../manager/user-api/resource-presets.rst:87
-#: 8a8ad8c25eef47d18f2f9e41002513f7
+#: 901da864e654485cab594b5ca56bb93d
 msgid "``keypair_limits``"
-msgstr ""
+msgstr "``keypair_limits``"
 
 #: ../../manager/user-api/resource-presets.rst:88
 #: ../../manager/user-api/resource-presets.rst:92
 #: ../../manager/user-api/resource-presets.rst:95
 #: ../../manager/user-api/resource-presets.rst:99
-#: 4b976ce8f0e44d2698ca84df3e82a614 4ef86a5549b6427eab2db92980d024e7
-#: e6c739ad60f24c2e82a2a7112197573d ea1b6ffbb49945e2b6e4f92b3c6f88e6
+#: 025b012dfcb84d1390e4645ca0a3f5f2 84a3bb91e14f4beba2681f36cfb1c2da
+#: 9e3eae2d8fc443a2ae14db74fd2e7e57 f380c158ffc74830bc24d5213ca0f1f9
 msgid ":ref:`resource-slot-object`"
-msgstr ""
+msgstr ":ref:`resource-slot-object`"
 
 #: ../../manager/user-api/resource-presets.rst:89
-#: e6e03e6d31d34ce184805eeae46488e5
+#: 6f4c43405c144dfe851c7a5bdff8f672
 msgid ""
-"The maximum amount of total resource slots allowed for the current access "
-"key. It may contain infinity values as the string \"Infinity\"."
-msgstr ""
+"The maximum amount of total resource slots allowed for the current access"
+" key. It may contain infinity values as the string \"Infinity\"."
+msgstr "현재 액세스 키에 대해 허용되는 총 리소스 슬롯의 최대량. \"Infinity\" 문자열로 무한대를 표현할 수 있습니다."
 
 #: ../../manager/user-api/resource-presets.rst:91
-#: 958dbcd7455948bebb908404e76a720e
+#: f60a764e57814de48564d17969eaabe9
 msgid "``keypair_using``"
-msgstr ""
+msgstr "``keypair_using``"
 
 #: ../../manager/user-api/resource-presets.rst:93
-#: 9c7c12b732e2427fad8b69804c5d9516
+#: 9d42a48b41b94b0fb424ff84b75aaf29
+#, fuzzy
 msgid "The amount of total resource slots used by the current access key."
-msgstr ""
+msgstr "현재 액세스 키에 의해 사용되는 총 리소스 슬롯 양"
 
 #: ../../manager/user-api/resource-presets.rst:94
-#: 94bf6b75383a4c619a0a90983025034f
+#: 32387b6d99094ae698fd39893cd9eeae
 msgid "``keypair_remaining``"
-msgstr ""
+msgstr "``keypair_remaining``"
 
 #: ../../manager/user-api/resource-presets.rst:96
-#: 4c6dd565eeec4f47b360d041b0dcb2a9
+#: 2b9432ef0d9f46ac826fd90fa5e09323
 msgid ""
-"The amount of total resource slots remaining for the current access key. It "
-"may contain infinity values as the string \"Infinity\"."
-msgstr ""
+"The amount of total resource slots remaining for the current access key. "
+"It may contain infinity values as the string \"Infinity\"."
+msgstr "현재 액세스 키에 대해 남아있는 총 리소스 슬롯 양. \"Infinity\" 문자열로 무한대를 표현할 수 있습니다."
 
 #: ../../manager/user-api/resource-presets.rst:98
-#: 76f72b790f1f4c458a8d299b65b3863d
+#: 545ea1aa996246cca485a5d391a53937
 msgid "``scaling_group_remaining``"
-msgstr ""
+msgstr "``scaling_group_remaining``"
 
 #: ../../manager/user-api/resource-presets.rst:100
-#: f05cffc785ab4948923b433df9efec40
+#: 8640948596b844789c10b493819f36e1
 msgid ""
-"The amount of total resource slots remaining for the current scaling group. "
-"It may contain infinity values as the string \"Infinity\" if the server is "
-"configured for auto-scaling."
+"The amount of total resource slots remaining for the current scaling "
+"group. It may contain infinity values as the string \"Infinity\" if the "
+"server is configured for auto-scaling."
 msgstr ""
+"현재 스케일링 그룹에 대해 남아있는 총 리소스 슬롯 양. 서버가 자동 스케일링을 위해 구성되어 있으면 \"Infinity\" "
+"문자열로 무한대를 표현할 수 있습니다."
 
 #: ../../manager/user-api/resource-presets.rst:105
-#: abdaaa59423f44a58c54df48847a4124
+#: 8361f57404024b0c93c2ffb2759e281c
 msgid ""
-"The list of :ref:`resource-preset-object`, but with an extra boolean field "
-"``allocatable`` which indicates if the given resource slot is actually "
-"allocatable considering the keypair's resrouce limits and the scaling "
-"group's current usage."
+"The list of :ref:`resource-preset-object`, but with an extra boolean "
+"field ``allocatable`` which indicates if the given resource slot is "
+"actually allocatable considering the keypair's resource limits and the "
+"scaling group's current usage."
 msgstr ""
+":ref:`resource-preset-object`의 목록, 하지만 추가 boolean 필드인 ``allocatable``이 "
+"있습니다. 이 필드는 주어진 리소스 슬롯이 실제로 keypair의 리소스 제한과 스케일링 그룹의 현재 사용량을 고려하여 할당 "
+"가능한지를 표시합니다."
+

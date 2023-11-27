@@ -8,7 +8,6 @@ from yarl import URL
 
 
 class PurityClient:
-
     endpoint: URL
     api_token: str
     api_version: str

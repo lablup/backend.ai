@@ -3,19 +3,18 @@ import asyncio
 import pytest
 from etcetra.types import WatchEventType
 
-from ai.backend.common.etcd import ConfigScopes
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
 @pytest.mark.asyncio
-async def test_basic_crud(etcd):
-
+async def test_basic_crud(etcd: AsyncEtcd) -> None:
     await etcd.put("wow", "abc")
 
     v = await etcd.get("wow")
     assert v == "abc"
-    v = await etcd.get_prefix("wow")
-    assert len(v) == 1
-    assert v == {"": "abc"}
+    vp = await etcd.get_prefix("wow")
+    assert len(vp) == 1
+    assert vp == {"": "abc"}
 
     r = await etcd.replace("wow", "aaa", "ccc")
     assert r is False
@@ -28,12 +27,12 @@ async def test_basic_crud(etcd):
 
     v = await etcd.get("wow")
     assert v is None
-    v = await etcd.get_prefix("wow")
-    assert len(v) == 0
+    vp = await etcd.get_prefix("wow")
+    assert len(vp) == 0
 
 
 @pytest.mark.asyncio
-async def test_quote_for_put_prefix(etcd):
+async def test_quote_for_put_prefix(etcd: AsyncEtcd) -> None:
     await etcd.put_prefix(
         "data",
         {
@@ -62,7 +61,7 @@ async def test_quote_for_put_prefix(etcd):
 
 
 @pytest.mark.asyncio
-async def test_unquote_for_get_prefix(etcd):
+async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
     await etcd.put("obj/aa%3Abb/option1", "value1")
     await etcd.put("obj/aa%3Abb/option2", "value2")
     await etcd.put("obj/aa%3Abb/myhost%2Fpath", "this")
@@ -90,7 +89,7 @@ async def test_unquote_for_get_prefix(etcd):
 
 
 @pytest.mark.asyncio
-async def test_scope_empty_prefix(gateway_etcd):
+async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
     # This test case is to ensure compatibility with the legacy managers.
     # gateway_etcd is created with a scope prefix map that contains
     # ConfigScopes.GLOBAL => ''
@@ -100,9 +99,9 @@ async def test_scope_empty_prefix(gateway_etcd):
     v = await gateway_etcd.get("wow")
     assert v == "abc"
 
-    v = await gateway_etcd.get_prefix("wow")
-    assert len(v) == 1
-    assert v == {"": "abc"}
+    vp = await gateway_etcd.get_prefix("wow")
+    assert len(vp) == 1
+    assert vp == {"": "abc"}
 
     r = await gateway_etcd.replace("wow", "aaa", "ccc")
     assert r is False
@@ -115,12 +114,12 @@ async def test_scope_empty_prefix(gateway_etcd):
 
     v = await gateway_etcd.get("wow")
     assert v is None
-    v = await gateway_etcd.get_prefix("wow")
-    assert len(v) == 0
+    vp = await gateway_etcd.get_prefix("wow")
+    assert len(vp) == 0
 
 
 @pytest.mark.asyncio
-async def test_scope(etcd):
+async def test_scope(etcd: AsyncEtcd) -> None:
     await etcd.put("wow", "abc", scope=ConfigScopes.GLOBAL)
     await etcd.put("wow", "def", scope=ConfigScopes.SGROUP)
     await etcd.put("wow", "ghi", scope=ConfigScopes.NODE)
@@ -145,33 +144,32 @@ async def test_scope(etcd):
 
 
 @pytest.mark.asyncio
-async def test_scope_dict(etcd):
+async def test_scope_dict(etcd: AsyncEtcd) -> None:
     await etcd.put_dict({"point/x": "1", "point/y": "2"}, scope=ConfigScopes.GLOBAL)
     await etcd.put_dict({"point/y": "3"}, scope=ConfigScopes.SGROUP)
     await etcd.put_dict({"point/x": "4", "point/z": "5"}, scope=ConfigScopes.NODE)
-    v = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
-    assert v == {"x": "4", "y": "3", "z": "5"}
-    v = await etcd.get_prefix("point", scope=ConfigScopes.SGROUP)
-    assert v == {"x": "1", "y": "3"}
-    v = await etcd.get_prefix("point", scope=ConfigScopes.GLOBAL)
-    assert v == {"x": "1", "y": "2"}
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
+    assert vp == {"x": "4", "y": "3", "z": "5"}
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.SGROUP)
+    assert vp == {"x": "1", "y": "3"}
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.GLOBAL)
+    assert vp == {"x": "1", "y": "2"}
 
     await etcd.delete_prefix("point", scope=ConfigScopes.NODE)
-    v = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
-    assert v == {"x": "1", "y": "3"}
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
+    assert vp == {"x": "1", "y": "3"}
 
     await etcd.delete_prefix("point", scope=ConfigScopes.SGROUP)
-    v = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
-    assert v == {"x": "1", "y": "2"}
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
+    assert vp == {"x": "1", "y": "2"}
 
     await etcd.delete_prefix("point", scope=ConfigScopes.GLOBAL)
-    v = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
-    assert len(v) == 0
+    vp = await etcd.get_prefix("point", scope=ConfigScopes.MERGED)
+    assert len(vp) == 0
 
 
 @pytest.mark.asyncio
-async def test_multi(etcd):
-
+async def test_multi(etcd: AsyncEtcd) -> None:
     v = await etcd.get("foo")
     assert v is None
     v = await etcd.get("bar")
@@ -191,45 +189,43 @@ async def test_multi(etcd):
 
 
 @pytest.mark.asyncio
-async def test_watch(etcd):
-
+async def test_watch(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
     r_ready = asyncio.Event()
     rp_ready = asyncio.Event()
 
     async def _record():
-        try:
-            async for ev in etcd.watch("wow", ready_event=r_ready):
-                records.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch("wow", ready_event=r_ready):
+            records.append(ev)
+            recv_count += 1
+            if recv_count == 2:
+                return
 
     async def _record_prefix():
-        try:
-            async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
-                records_prefix.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
+            records_prefix.append(ev)
+            recv_count += 1
+            if recv_count == 4:
+                return
 
-    t1 = asyncio.create_task(_record())
-    t2 = asyncio.create_task(_record_prefix())
+    async with (
+        asyncio.timeout(10),
+        asyncio.TaskGroup() as tg,
+    ):
+        tg.create_task(_record())
+        tg.create_task(_record_prefix())
 
-    await r_ready.wait()
-    await rp_ready.wait()
+        await r_ready.wait()
+        await rp_ready.wait()
 
-    await etcd.put("wow", "123")
-    await etcd.delete("wow")
-    await etcd.put("wow/child", "hello")
-    await etcd.delete_prefix("wow")
+        await etcd.put("wow", "123")
+        await etcd.delete("wow")
+        await etcd.put("wow/child", "hello")
+        await etcd.delete_prefix("wow")
 
-    await asyncio.sleep(0.2)
-    t1.cancel()
-    t2.cancel()
-    await t1
-    await t2
-
-    assert len(records) == 2
     assert records[0].key == "wow"
     assert records[0].event == WatchEventType.PUT
     assert records[0].value == "123"
@@ -237,7 +233,6 @@ async def test_watch(etcd):
     assert records[1].event == WatchEventType.DELETE
     assert records[1].value == ""
 
-    assert len(records_prefix) == 4
     assert records_prefix[0].key == "wow"
     assert records_prefix[0].event == WatchEventType.PUT
     assert records_prefix[0].value == "123"
@@ -253,49 +248,47 @@ async def test_watch(etcd):
 
 
 @pytest.mark.asyncio
-async def test_watch_once(etcd):
-
+async def test_watch_once(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
     r_ready = asyncio.Event()
     rp_ready = asyncio.Event()
 
     async def _record():
-        try:
-            async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
-                records.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
+            records.append(ev)
+            recv_count += 1
+            if recv_count == 1:
+                return
 
     async def _record_prefix():
-        try:
-            async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
-                records_prefix.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
+            records_prefix.append(ev)
+            recv_count += 1
+            if recv_count == 1:
+                return
 
-    t1 = asyncio.create_task(_record())
-    t2 = asyncio.create_task(_record_prefix())
-    await r_ready.wait()
-    await rp_ready.wait()
+    async with (
+        asyncio.timeout(10),
+        asyncio.TaskGroup() as tg,
+    ):
+        tg.create_task(_record())
+        tg.create_task(_record_prefix())
 
-    await etcd.put("wow/city1", "seoul")
-    await etcd.put("wow/city2", "daejeon")
-    await etcd.put("wow", "korea")
-    await etcd.delete_prefix("wow")
+        await r_ready.wait()
+        await rp_ready.wait()
 
-    await asyncio.sleep(0.2)
-    t1.cancel()
-    t2.cancel()
-    await t1
-    await t2
+        await etcd.put("wow/city1", "seoul")
+        await etcd.put("wow/city2", "daejeon")
+        await etcd.put("wow", "korea")
+        await etcd.delete_prefix("wow")
 
-    assert len(records) == 1
     assert records[0].key == "wow"
     assert records[0].event == WatchEventType.PUT
     assert records[0].value == "korea"
 
-    assert len(records_prefix) == 1
     assert records_prefix[0].key == "wow/city1"
     assert records_prefix[0].event == WatchEventType.PUT
     assert records_prefix[0].value == "seoul"

@@ -1,5 +1,5 @@
-from .base import OnError, WithRepr
-from .regexp import Regexp, RegexpString
+from .base import WithRepr
+from .regexp import RegexpString
 
 Email: WithRepr
 URL: WithRepr

@@ -11,9 +11,10 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
+from ..exception import ConfigurationError
 from ..logging_utils import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "AbstractPlugin",
@@ -117,8 +118,8 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: set[str] = None,
-        blocklist: set[str] = None,
+        allowlist: Optional[set[str]] = None,
+        blocklist: Optional[set[str]] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
         cls_allowlist = set() if cls.allowlist is None else cls.allowlist
         arg_allowlist = set() if allowlist is None else allowlist
@@ -139,6 +140,15 @@ class BasePluginContext(Generic[P]):
         allowlist: Optional[set] = None,
         blocklist: Optional[set] = None,
     ) -> None:
+        if allowlist is not None and blocklist is not None:
+            if union := allowlist & blocklist:
+                raise ConfigurationError(
+                    {
+                        "plugin.BasePluginContext": (
+                            f"allowlist and blocklist has union value '{union}'"
+                        )
+                    }
+                )
         scanned_plugins = self.discover_plugins(
             self.plugin_group,
             allowlist=allowlist,

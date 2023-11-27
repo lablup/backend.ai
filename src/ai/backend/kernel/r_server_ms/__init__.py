@@ -11,7 +11,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     """
     Implements an adaptor to Microsoft R Server API.
     """

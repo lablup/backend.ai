@@ -1,0 +1,326 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/os-preparation.rst:2
+#: 4e96e760c75a4e9ab408455471acc54a
+msgid "Setup OS Environment"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:4
+#: 6aa1110153e348f89101a089e4999bc9
+msgid ""
+"Backend.AI and its associated components share common requirements and "
+"configurations for proper operation. This section explains how to "
+"configure the OS environment."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:8
+#: 7957a5e4a37c40a49243fb933a96756c
+msgid "This section assumes the installation on Ubuntu 20.04 LTS."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:12
+#: 5a5544f0482448b2b7d299aa9f3662ac
+msgid "Create a user account for operation"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:14
+#: b3e5959569024bee9bd1daa36b764b80
+msgid ""
+"We will create a user account ``bai`` to install and operate Backend.AI "
+"services. Set the ``UID`` and ``GID`` to ``1100`` to prevent conflicts "
+"with other users or groups.  ``sudo`` privilege is required so add "
+"``bai`` to ``sudo`` group."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:27
+#: af964dfd544142798cdd266be014e5fd
+msgid ""
+"If you do not want to expose your password in the shell history, remove "
+"the ``--disabled-password`` option and interactively enter your password."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:30
+#: 8a4bbb5b42414ff9a42b3d822dc5bb8f
+msgid "Login as the ``bai`` user and continue the installation."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:34
+#: f8450061890c490e9c74a1827ec1faaf
+msgid "Install Docker engine"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:36
+#: 1d8defe8d1ca4077b7a639c3f855313f
+msgid ""
+"Backend.AI requires Docker Engine to create a compute session with the "
+"Docker container backend. Also, some service components are deployed as "
+"containers. So `installing Docker Engine "
+"<https://docs.docker.com/engine/install/ubuntu/>`_ is required. Ensure "
+"``docker-compose-plugin`` is installed as well to use ``docker compose`` "
+"command."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:42
+#: b1d1a87ae1e241a7b68cb1790f477484
+msgid ""
+"After the installation, add the ``bai`` user to the ``docker`` group not "
+"to issue the ``sudo`` prefix command every time interacting with the "
+"Docker engine."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:49
+#: a342910b93c644f6a6fa494a3ba1a7bc
+msgid "Logout and login again to apply the group membership change."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:53
+#: f9e1f10c8f0c4c26a4925a784add301f
+msgid "Optimize sysctl/ulimit parameters"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:55
+#: 18731db617484de694f5a23efa49d40c
+msgid ""
+"This is not essential but the recommended step to optimize the "
+"performance and stability of operating Backend.AI. Refer to the `guide of"
+" the Manager repiository "
+"<https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md"
+"#kernelsystem-configuration>`_ for the details of the kernel parameters "
+"and the ulimit settings. Depending on the Backend.AI services you "
+"install, the optimal values may vary. Each service installation section "
+"guide with the values, if needed."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:64
+#: e9eeeb82dad34b55ab0cd9e72df67487
+msgid ""
+"Modern systems may have already set the optimal parameters. In that case,"
+" you can skip this step."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:67
+#: 0e17bb915f024966a783ba30f05bca96
+msgid "To cleanly separate the configurations, you may follow the steps below."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:69
+#: d018c2a8129148deaafa93cc624a4278
+msgid ""
+"Save the resource limit parameters in "
+"``/etc/security/limits.d/99-backendai.conf``."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:82
+#: 1a0282d8b28e4f6f81deff956050577e
+msgid "Logout and login again to apply the resource limit changes."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:83
+#: 5e51cefe99a84be3a3b3fa51283693ba
+msgid "Save the kernel parameters in ``/etc/sysctl.d/99-backendai.conf``."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:102
+#: 96ed9772109d4c6e8f65185e920609ca
+msgid ""
+"Apply the kernel parameters with ``sudo sysctl -p "
+"/etc/sysctl.d/99-backendai.conf``."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:108
+#: 822c70298565472d84b2e58d7ee0ce92
+msgid "Prepare required Python versions and virtual environments"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:110
+#: 4c6dacba15ad42508aa589deb43df3c1
+msgid ""
+"Prepare a Python distribution whose version meets the requirements of the"
+" target package. Backend.AI 22.09, for example, requires Python 3.10. The"
+" latest information on the Python version compatibility can be found at "
+"`here <https://github.com/lablup/backend.ai#package-installation-guide"
+"#python-version-compatibility>`_."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:115
+#: c521f4481b314c798079482a33960018
+msgid ""
+"There can be several ways to prepare a specific Python version. Here, we "
+"will be using pyenv and pyenv-virtualenv."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:120
+#: e27c2cecdbd94ee6801be9264d5eb059
+msgid "Use pyenv to manually build and select a specific Python version"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:122
+#: bf1970b23bd8433d81c92db80bb412df
+msgid ""
+"Install `pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv "
+"<https://github.com/pyenv/pyenv-virtualenv>`_. Then, install a Python "
+"version that are needed:"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:132
+#: 901f0b1afaae4147afb97d17c5028942
+msgid ""
+"You may need to install `suggested build environment "
+"<https://github.com/pyenv/pyenv/wiki#suggested-build-environment>`_ to "
+"build Python from pyenv."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:136
+#: 2f1d1c8098da458a844b51cd7a546fb1
+msgid ""
+"Then, you can create multiple virtual environments per service. To create"
+" a virtual environment for Backend.AI Manager 22.09.x and automatically "
+"activate it, for example, you may run:"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:148
+#: 313e0d012894490883f02d8e3321949e
+msgid ""
+"You also need to make ``pip`` available to the Python installation with "
+"the latest ``wheel`` and ``setuptools`` packages, so that any non-binary "
+"extension packages can be compiled and installed on your system."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:154
+#: ba09f174943d49269a46037ce7a7aee0
+msgid "Use a standalone static built Python"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:156
+#: b53babf6023e42088a6a02bca7c35cc1
+msgid ""
+"We can `use a standalone static built Python <https://github.com/indygreg"
+"/python-build-standalone/releases>`_."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:158
+#: 16123835040947d48eee7f7eb86bc13b
+msgid "Details will be added later."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:162
+#: f2e592752205465ab793a1be3b025d10
+msgid "Configure network aliases"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:164
+#: bfa0fa75287a4578b63409066d3c1617
+msgid ""
+"Although not required, using a network aliases instead of IP addresses "
+"can make setup and operation easier. Edit the ``/etc/hosts`` file for "
+"each node and append the contents like example below to access each "
+"server with network aliases."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:177
+#: d91957a6b39f4db49286b7188c54e1ae
+msgid ""
+"Note that the IP addresses should be accessible from other nodes, if you "
+"are installing on multiple servers."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:182
+#: 798a39e8f48645979351d3bf8a19b9b1
+msgid "Mount a shared storage"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:184
+#: 3c42ce66d914455491cf5cd8816882be
+msgid ""
+"Having a shared storage volume makes it easy to save and manage data "
+"inside a Backend.AI compute environment. If you have a dedicated storage,"
+" mount it with the name of your choice under ``/vfroot/`` directory on "
+"each server. You must mount it in the same path in all management and "
+"compute nodes."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:189
+#: c6f85c31721f491e97d734f29339041e
+msgid ""
+"Detailed mount procedures may vary depending on the storage type or "
+"vendor. For a usual NFS, adding the configurations to ``/etc/fstab`` and "
+"executing ``sudo mount -a`` will do the job."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:195
+#: e0bbab3ee311426ea6a59b7ca381b0e2
+msgid ""
+"It is recommended to unify the UID and GID of the Storage Proxy service, "
+"all of the Agent services across nodes, container UID and GID "
+"(configurable in ``agent.toml``), and the NFS volume."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:199
+#: 08cf24b40f9c4aa583544780ca7038c3
+msgid ""
+"If you do not have a dedicated storage or installing on one server, you "
+"can use a local directory. Just create a directory ``/vfroot/local``."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:209
+#: 9cf48a2925a34e9181265100f3aa0baf
+msgid "Setup accelerators"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:211
+#: 5a39216852e2424a8afec8d0c7e43778
+msgid ""
+"If there are accelerators (e.g., GPU) on the server, you have to install "
+"the vendor-specific drivers and libraries to make sure the accelerators "
+"are properly set up and working. Please refer to the vendor documentation"
+" for the details."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:215
+#: 3b8c6a9e216b476f86719ed2524869df
+msgid "To integrate NVIDIA GPUs,"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:217
+#: 43c69d4af1c1446e870ddb3b5b34967d
+msgid "Install the NVIDIA driver and CUDA toolkit."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:218
+#: bb9788f2c42d4c1490c32be20865f7a1
+msgid "Install the NVIDIA container toolkit (nvidia-docker2)."
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:222
+#: a5e2da4821e9417b97394919e7824a5a
+msgid "Pull container images"
+msgstr ""
+
+#: ../../install/install-from-package/os-preparation.rst:224
+#: c57f58e85db64590bfe6ff879cf160c7
+msgid ""
+"For compute nodes, you need to pull some container images that are "
+"required for creating a compute session. Lablup provides a set of open "
+"container images and you may pull the following starter images:"
+msgstr ""
+

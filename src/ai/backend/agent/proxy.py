@@ -3,12 +3,12 @@ from asyncio import Future
 from pathlib import Path
 from typing import Set, Tuple
 
-import attr
+import attrs
 
 from ai.backend.common.utils import current_loop
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class DomainSocketProxy:
     host_sock_path: Path
     host_proxy_path: Path
@@ -18,7 +18,6 @@ class DomainSocketProxy:
 async def proxy_connection(
     upper_sock_path: Path, down_reader: asyncio.StreamReader, down_writer: asyncio.StreamWriter
 ) -> None:
-
     up_reader, up_writer = await asyncio.open_unix_connection(str(upper_sock_path))
 
     async def _downstream():

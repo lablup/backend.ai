@@ -1,6 +1,6 @@
 from typing import Any, Dict, Mapping, Optional
 
-import attr
+import attrs
 
 """This file contains API templates for Python K8s Client.
 Since I don't prefer using templates provided from vanila k8s client,
@@ -15,7 +15,7 @@ class AbstractAPIObject:
     pass
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KubernetesVolumeMount:
     name: str
     mountPath: str
@@ -27,25 +27,25 @@ class KubernetesAbstractVolume:
     name: str
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KubernetesEmptyDirVolume(KubernetesAbstractVolume):
     name: str
     emptyDir: Mapping[str, Any] = {}
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KubernetesPVCVolume(KubernetesAbstractVolume):
     name: str
     persistentVolumeClaim: Mapping[str, str]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KubernetesConfigMapVolume(KubernetesAbstractVolume):
     name: str
     configMap: Mapping[str, str]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KubernetesHostPathVolume(KubernetesAbstractVolume):
     name: str
     hostPath: Mapping[str, str]

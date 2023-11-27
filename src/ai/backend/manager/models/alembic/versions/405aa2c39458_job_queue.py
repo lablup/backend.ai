@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID
 
@@ -58,18 +59,18 @@ def upgrade():
     conn = op.get_bind()
     sessionresult.create(conn)
     sessiontypes.create(conn)
-    conn.execute("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;")
+    conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;"))
     kernelstatus_new.create(conn)
-    conn.execute(
-        textwrap.dedent(
-            """\
+    query = """
     CREATE FUNCTION kernelstatus_new_old_compare(
         new_enum_val kernelstatus, old_enum_val kernelstatus_old
     )
         RETURNS boolean AS $$
             SELECT new_enum_val::text <> old_enum_val::text;
         $$ LANGUAGE SQL IMMUTABLE;
-
+    """
+    conn.execute(text(query))
+    queries = textwrap.dedent("""
     CREATE OPERATOR <> (
         leftarg = kernelstatus,
         rightarg = kernelstatus_old,
@@ -86,9 +87,11 @@ def upgrade():
     ) CASCADE;
 
     DROP TYPE kernelstatus_old;
-    """
-        )
-    )
+    """)
+    for query in queries.split(";"):
+        if len(query.strip()) == 0:
+            continue
+        conn.execute(text(query))
 
     op.add_column("agents", sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True))
 
@@ -141,45 +144,47 @@ def upgrade():
 
 def downgrade():
     conn = op.get_bind()
-    conn.execute("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;")
+    conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;"))
     kernelstatus_old.create(conn)
-    conn.execute(
-        textwrap.dedent(
-            """\
-    CREATE FUNCTION kernelstatus_new_old_compare(
-        old_enum_val kernelstatus, new_enum_val kernelstatus_new
-    )
-        RETURNS boolean AS $$
-            SELECT old_enum_val::text <> new_enum_val::text;
-        $$ LANGUAGE SQL IMMUTABLE;
-
-    CREATE OPERATOR <> (
-        leftarg = kernelstatus,
-        rightarg = kernelstatus_new,
-        procedure = kernelstatus_new_old_compare
-    );
-
-    ALTER TABLE kernels
-        ALTER COLUMN "status" DROP DEFAULT,
-        ALTER COLUMN "status" TYPE kernelstatus USING (
-            CASE "status"::text
-                WHEN 'PULLING' THEN 'PREPARING'
-                WHEN 'PENDING' THEN 'PREPARING'
-                ELSE "status"::text
-            END
-        )::kernelstatus,
-        ALTER COLUMN "status" SET DEFAULT 'PREPARING'::kernelstatus;
-
-    DROP FUNCTION kernelstatus_new_old_compare(
-        old_enum_val kernelstatus, new_enum_val kernelstatus_new
-    ) CASCADE;
-
-    DROP TYPE kernelstatus_new;
-    """
+    query = textwrap.dedent("""
+        CREATE FUNCTION kernelstatus_new_old_compare(
+            old_enum_val kernelstatus, new_enum_val kernelstatus_new
         )
-    )
+            RETURNS boolean AS $$
+                SELECT old_enum_val::text <> new_enum_val::text;
+            $$ LANGUAGE SQL IMMUTABLE;
+    """)
+    conn.execute(text(query))
+    queries = textwrap.dedent("""\
+        CREATE OPERATOR <> (
+            leftarg = kernelstatus,
+            rightarg = kernelstatus_new,
+            procedure = kernelstatus_new_old_compare
+        );
 
-    op.drop_index(op.f("ix_kernels_type"), table_name="kernels")
+        ALTER TABLE kernels
+            ALTER COLUMN "status" DROP DEFAULT,
+            ALTER COLUMN "status" TYPE kernelstatus USING (
+                CASE "status"::text
+                    WHEN 'PULLING' THEN 'PREPARING'
+                    WHEN 'PENDING' THEN 'PREPARING'
+                    ELSE "status"::text
+                END
+            )::kernelstatus,
+            ALTER COLUMN "status" SET DEFAULT 'PREPARING'::kernelstatus;
+
+        DROP FUNCTION kernelstatus_new_old_compare(
+            old_enum_val kernelstatus, new_enum_val kernelstatus_new
+        ) CASCADE;
+
+        DROP TYPE kernelstatus_new;
+    """)
+    for query in queries.split(";"):
+        if len(query.strip()) == 0:
+            continue
+        conn.execute(text(query))
+
+    # op.drop_index(op.f("ix_kernels_type"), table_name="kernels")
     op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=False)
     op.drop_column("kernels", "type")

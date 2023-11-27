@@ -8,7 +8,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 @pytest.mark.asyncio
 async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
-
     enter_count = 0
     done_count = 0
 
@@ -30,8 +29,7 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
 
     async with database_engine.connect() as conn:
         result = await conn.exec_driver_sql(
-            "SELECT objid, granted, pid FROM pg_locks "
-            "WHERE locktype = 'advisory' AND objid = 42;",
+            "SELECT objid, granted, pid FROM pg_locks WHERE locktype = 'advisory' AND objid = 42;",
         )
         rows = result.fetchall()
         print(rows)

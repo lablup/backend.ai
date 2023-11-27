@@ -7,7 +7,6 @@ from jinja2.parser import Parser
 
 
 class TOMLField(Extension):
-
     tags = {"toml_field"}
 
     def parse(self, parser: Parser) -> nodes.Node | List[nodes.Node]:
@@ -18,8 +17,12 @@ class TOMLField(Extension):
         return nodes.Output(
             [
                 nodes.CondExpr(
-                    nodes.Test(field_value, "none", [], [], None, None),
                     # TOML does not have "null" syntax so let's comment out the field.
+                    # We should skip "undefined" field also.
+                    nodes.Or(
+                        nodes.Test(field_value, "none", [], [], None, None),
+                        nodes.Test(field_value, "undefined", [], [], None, None),
+                    ),
                     nodes.Concat(
                         [
                             nodes.TemplateData("# "),
@@ -47,7 +50,6 @@ class TOMLField(Extension):
 
 
 class TOMLStringListField(TOMLField):
-
     tags = {"toml_strlist_field"}
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:

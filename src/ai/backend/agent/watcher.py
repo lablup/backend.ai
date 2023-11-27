@@ -19,11 +19,12 @@ from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import Fstab
 
 from . import __version__ as VERSION
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.watcher"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 shutdown_enabled = False
 
@@ -334,18 +335,23 @@ async def watcher_server(loop, pidx, args):
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False),
     default=None,
     help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="Set the logging level to DEBUG",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(cli_ctx, config_path, debug):
-
+def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> None:
     watcher_config_iv = (
         t.Dict(
             {
@@ -384,7 +390,10 @@ def main(cli_ctx, config_path, debug):
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
     if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)
@@ -422,7 +431,6 @@ def main(cli_ctx, config_path, debug):
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
         log.info("exit.")
-    return 0
 
 
 if __name__ == "__main__":

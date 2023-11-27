@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
@@ -35,7 +36,6 @@ class DummyPlugin(AbstractPlugin):
 
 @dataclass
 class DummyEntrypoint:
-
     name: str
     load_result: Type[AbstractPlugin] | Callable[..., AbstractPlugin]
     value: str = "dummy.mod.DummyPlugin"
@@ -68,8 +68,7 @@ def mock_entrypoints_with_class(
     blocklist: set[str] = None,
     *,
     plugin_cls: list[Type[AbstractPlugin]],
-) -> Iterator[DummyEntrypoint]:
-    ...
+) -> Iterator[DummyEntrypoint]: ...
 
 
 @overload
@@ -79,8 +78,7 @@ def mock_entrypoints_with_class(
     blocklist: set[str] = None,
     *,
     plugin_cls: Type[AbstractPlugin],
-) -> DummyEntrypoint:
-    ...
+) -> DummyEntrypoint: ...
 
 
 def mock_entrypoints_with_class(
@@ -124,6 +122,31 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
     finally:
         await ctx.cleanup()
         ctx.plugins["dummy"].cleanup.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_list):
+    allowlist, blocklist = allow_and_block_list
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    await ctx.init(allowlist=allowlist, blocklist=blocklist)
+
+
+@pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list_has_union(
+    etcd, allow_and_block_list_has_union
+):
+    allowlist, blocklist = allow_and_block_list_has_union
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    with pytest.raises(ConfigurationError):
+        await ctx.init(allowlist=allowlist, blocklist=blocklist)
 
 
 @pytest.mark.asyncio
@@ -175,7 +198,6 @@ async def test_plugin_context_config_autoupdate(etcd, mocker):
 
 
 class DummyHookPassingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-p"
@@ -207,7 +229,6 @@ class DummyHookPassingPlugin(HookPlugin):
 
 
 class DummyHookRejectingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-r"
@@ -239,7 +260,6 @@ class DummyHookRejectingPlugin(HookPlugin):
 
 
 class DummyHookErrorPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-e"

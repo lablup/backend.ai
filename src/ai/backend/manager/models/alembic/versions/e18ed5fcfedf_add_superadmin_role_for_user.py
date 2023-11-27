@@ -8,6 +8,7 @@ Create Date: 2019-05-29 23:17:17.762968
 import textwrap
 
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models import UserRole
 
@@ -28,17 +29,15 @@ def upgrade():
     assert "superadmin" in userrole_choices, "superadmin in UserRole is required!"
 
     conn = op.get_bind()
-    conn.execute("ALTER TYPE userrole RENAME TO userrole__;")
-    conn.execute("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
+    conn.execute(text("ALTER TYPE userrole RENAME TO userrole__;"))
     conn.execute(
-        textwrap.dedent(
-            """\
+        text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
+    )
+    conn.execute(text(textwrap.dedent("""\
         ALTER TABLE users
             ALTER COLUMN role TYPE userrole USING role::text::userrole;
-    """
-        )
-    )
-    conn.execute("DROP TYPE userrole__;")
+    """)))
+    conn.execute(text("DROP TYPE userrole__;"))
 
     # Set admin@lablup.com's role as superadmin.
     # Also, set admin@lablup.com's domain to default.
@@ -48,16 +47,14 @@ def upgrade():
     # So, this policy is changed to simply adopt superadmin role, and superadmin can also have
     # domain and groups as well.
     query = "SELECT uuid FROM users where email = 'admin@lablup.com';"
-    result = conn.execute(query).first()
+    result = conn.execute(text(query)).first()
     uuid = result.uuid if hasattr(result, "uuid") else None
     if uuid is not None:  # update only when admin@lablup.com user exist
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             UPDATE users SET domain_name = 'default', role = 'superadmin'
             WHERE email = 'admin@lablup.com';
-        """
-        )
-        conn.execute(query)
+        """)
+        conn.execute(text(query))
 
 
 def downgrade():
@@ -72,19 +69,15 @@ def downgrade():
 
         # First, change all superadmin role to admin.
         query = textwrap.dedent("UPDATE users SET role = 'admin' WHERE role = 'superadmin';")
-        conn.execute(query)
+        conn.execute(text(query))
 
         # Remove superadmin from user role choices.
-        conn.execute("ALTER TYPE userrole RENAME TO userrole___;")
+        conn.execute(text("ALTER TYPE userrole RENAME TO userrole___;"))
         conn.execute(
-            "CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'")
+            text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
         )
-        conn.execute(
-            textwrap.dedent(
-                """\
+        conn.execute(text(textwrap.dedent("""\
             ALTER TABLE users
                 ALTER COLUMN role TYPE userrole USING role::text::userrole;
-        """
-            )
-        )
-        conn.execute("DROP TYPE userrole___;")
+        """)))
+        conn.execute(text("DROP TYPE userrole___;"))

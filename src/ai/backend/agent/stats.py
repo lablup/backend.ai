@@ -22,9 +22,11 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    cast,
 )
 
-import attr
+import aiodocker
+import attrs
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
@@ -32,6 +34,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    PID,
     ContainerId,
     DeviceId,
     KernelId,
@@ -54,7 +57,7 @@ __all__ = (
     "Measurement",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.stats"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 def check_cgroup_available():
@@ -87,13 +90,13 @@ class MetricTypes(enum.Enum):
     ACCUMULATED = 3  # for accumulated value (e.g., total number of events)
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Measurement:
     value: Decimal
     capacity: Optional[Decimal] = None
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class NodeMeasurement:
     """
     Collection of per-node and per-agent statistics for a specific metric.
@@ -104,13 +107,13 @@ class NodeMeasurement:
     key: str
     type: MetricTypes
     per_node: Measurement
-    per_device: Mapping[DeviceId, Measurement] = attr.Factory(dict)
+    per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
-    stats_filter: FrozenSet[str] = attr.Factory(frozenset)
+    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ContainerMeasurement:
     """
     Collection of per-container statistics for a specific metric.
@@ -118,9 +121,23 @@ class ContainerMeasurement:
 
     key: str
     type: MetricTypes
-    per_container: Mapping[str, Measurement] = attr.Factory(dict)
+    per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
-    stats_filter: FrozenSet[str] = attr.Factory(frozenset)
+    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
+    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class ProcessMeasurement:
+    """
+    Collection of per-process statistics for a specific metric.
+    """
+
+    key: str
+    type: MetricTypes
+    per_process: Mapping[int, Measurement] = attrs.Factory(dict)
+    unit_hint: Optional[str] = None
+    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
@@ -207,7 +224,7 @@ class MovingStatistics:
         }
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Metric:
     key: str
     type: MetricTypes
@@ -243,7 +260,7 @@ class Metric:
                     )
                 )
                 if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
-                else None
+                else "0.00"
             ),
             "unit_hint": self.unit_hint,
             **{
@@ -255,12 +272,14 @@ class Metric:
 
 
 class StatContext:
-
     agent: "AbstractAgent"
     mode: StatModes
     node_metrics: Mapping[MetricKey, Metric]
     device_metrics: Mapping[MetricKey, MutableMapping[DeviceId, Metric]]
     kernel_metrics: MutableMapping[KernelId, MutableMapping[MetricKey, Metric]]
+    process_metrics: MutableMapping[
+        ContainerId, MutableMapping[PID, MutableMapping[MetricKey, Metric]]
+    ]
 
     def __init__(
         self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
@@ -272,6 +291,7 @@ class StatContext:
         self.node_metrics = {}
         self.device_metrics = {}
         self.kernel_metrics = {}
+        self.process_metrics = {}
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
@@ -289,7 +309,7 @@ class StatContext:
         last = self._timestamps.get(timestamp_key, None)
         self._timestamps[timestamp_key] = now
         if last is None:
-            return now, float("NaN")
+            return now, 0.0
         return now, now - last
 
     async def collect_node_stat(self):
@@ -454,3 +474,105 @@ class StatContext:
             return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+
+    async def collect_per_container_process_stat(
+        self,
+        container_ids: Sequence[ContainerId],
+    ) -> None:
+        """
+        Collect the per-container process statistics only,
+
+        Intended to be used by the agent.
+        """
+        # FIXME: support Docker Desktop backend (#1230)
+        if sys.platform == "darwin":
+            return
+
+        async with self._lock:
+            pid_map = {}
+            pids = []
+            async with aiodocker.Docker() as docker:
+                for cid in container_ids:
+                    try:
+                        result = await docker._query_json(f"containers/{cid}/top", method="GET")
+                        procs = result["Processes"]
+                        pids = [PID(int(proc[1])) for proc in procs]
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
+                    except (KeyError, aiodocker.exceptions.DockerError):
+                        log.debug(
+                            "collect_per_container_process_stat(): cannot found container {}", cid
+                        )
+                    else:
+                        for unused_pid in unused_pids:
+                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
+                            self.process_metrics[cid].pop(unused_pid, None)
+                    for pid in pids:
+                        pid_map[pid] = cid
+
+            # Here we use asyncio.gather() instead of aiotools.TaskGroup
+            # to keep methods of other plugins running when a plugin raises an error
+            # instead of cancelling them.
+            _tasks = []
+            for computer in self.agent.computers.values():
+                _tasks.append(
+                    asyncio.create_task(
+                        computer.instance.gather_process_measures(
+                            self, cast(Mapping[int, str], pid_map)
+                        ),
+                    )
+                )
+            results = await asyncio.gather(*_tasks, return_exceptions=True)
+            updated_cids: Set[ContainerId] = set()
+            for result in results:
+                if isinstance(result, Exception):
+                    log.error(
+                        "collect_per_container_process_stat(): gather_process_measures() error",
+                        exc_info=result,
+                    )
+                    continue
+                for proc_measure in result:
+                    metric_key = proc_measure.key
+                    # update per-process metric
+                    for pid, measure in proc_measure.per_process.items():
+                        pid = PID(pid)
+                        cid = pid_map[pid]
+                        updated_cids.add(cid)
+                        if cid not in self.process_metrics:
+                            self.process_metrics[cid] = {}
+                        if pid not in self.process_metrics[cid]:
+                            self.process_metrics[cid][pid] = {}
+                        if metric_key not in self.process_metrics[cid][pid]:
+                            self.process_metrics[cid][pid][metric_key] = Metric(
+                                metric_key,
+                                proc_measure.type,
+                                current=measure.value,
+                                capacity=measure.capacity or measure.value,
+                                unit_hint=proc_measure.unit_hint,
+                                stats=MovingStatistics(measure.value),
+                                stats_filter=frozenset(proc_measure.stats_filter),
+                                current_hook=proc_measure.current_hook,
+                            )
+                        else:
+                            self.process_metrics[cid][pid][metric_key].update(measure)
+
+            async def _pipe_builder(r: Redis) -> Pipeline:
+                pipe = r.pipeline(transaction=False)
+                for cid in updated_cids:
+                    serializable_table = {}
+                    for pid in self.process_metrics[cid].keys():
+                        metrics = self.process_metrics[cid][pid]
+                        serializable_metrics = {
+                            key: obj.to_serializable_dict() for key, obj in metrics.items()
+                        }
+                        serializable_table[pid] = serializable_metrics
+                    if self.agent.local_config["debug"]["log-stats"]:
+                        log.debug(
+                            "stats: process_updates: \ncontainer_id: {}\n{}",
+                            cid,
+                            serializable_table,
+                        )
+                    serialized_metrics = msgpack.packb(serializable_table)
+                    pipe.set(cid, serialized_metrics, ex=8)
+                return pipe
+
+            await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

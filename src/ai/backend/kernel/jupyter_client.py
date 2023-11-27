@@ -1,12 +1,14 @@
-import asyncio
+import inspect
 from time import monotonic
 
 import zmq
+import zmq.asyncio
+from jupyter_client import AsyncKernelClient
 
 
 async def aexecute_interactive(
-    kernel_client,
-    code,
+    kernel_client: AsyncKernelClient,
+    code: str,
     silent=False,
     store_history=True,
     user_expressions=None,
@@ -18,9 +20,15 @@ async def aexecute_interactive(
 ):
     """Async version of jupyter_client's execute_interactive method.
 
-    https://github.com/jupyter/jupyter_client/blob/master/jupyter_client/blocking/client.py#L213
+    https://github.com/jupyter/jupyter_client/blob/9f1c379/jupyter_client/client.py#L415
     """
-    msg_id = kernel_client.execute(
+    if not kernel_client.iopub_channel.is_alive():
+        raise RuntimeError("IOPub channel must be running to receive output")
+    if allow_stdin is None:
+        allow_stdin = kernel_client.allow_stdin
+    if allow_stdin and not kernel_client.stdin_channel.is_alive():
+        raise RuntimeError("stdin channel must be running to allow input")
+    msg_id = kernel_client.execute(  # not async!
         code,
         silent=silent,
         store_history=store_history,
@@ -28,11 +36,10 @@ async def aexecute_interactive(
         allow_stdin=allow_stdin,
         stop_on_error=stop_on_error,
     )
-
     stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default
     output_hook = output_hook if output_hook else kernel_client._output_hook_default
 
-    # Set deadline based on timeout
+    # set deadline based on timeout
     if timeout is not None:
         deadline = monotonic() + timeout
     else:
@@ -55,24 +62,31 @@ async def aexecute_interactive(
         events = dict(await poller.poll(timeout_ms))
         if not events:
             raise TimeoutError("Timeout waiting for output")
-        if iopub_socket in events:
-            msg = kernel_client.iopub_channel.get_msg(timeout=0)
-            if msg["parent_header"].get("msg_id") != msg_id:
-                continue  # not from my request
-            await output_hook(msg)
-
-            # Stop on idle
-            if (
-                msg["header"]["msg_type"] == "status"
-                and msg["content"]["execution_state"] == "idle"
-            ):
-                break
         if stdin_socket in events:
-            req = kernel_client.stdin_channel.get_msg(timeout=0)
-            loop = asyncio.get_event_loop()
-            loop.create_task(stdin_hook(req))
+            req = await kernel_client.stdin_channel.get_msg(timeout=0)
+            if inspect.iscoroutinefunction(stdin_hook):
+                await stdin_hook(req)
+            else:
+                stdin_hook(req)
+            continue
+        if iopub_socket not in events:
+            continue
 
-    # Output is done, get the reply
+        msg = await kernel_client.iopub_channel.get_msg(timeout=0)
+
+        if msg["parent_header"].get("msg_id") != msg_id:
+            # not from my request
+            continue
+        if inspect.iscoroutinefunction(output_hook):
+            await output_hook(msg)
+        else:
+            output_hook(msg)
+
+        # stop on idle
+        if msg["header"]["msg_type"] == "status" and msg["content"]["execution_state"] == "idle":
+            break
+
+    # output is done, get the reply
     if timeout is not None:
         timeout = max(0, deadline - monotonic())
-    return kernel_client._recv_reply(msg_id, timeout=timeout)
+    return await kernel_client._recv_reply(msg_id, timeout=timeout)

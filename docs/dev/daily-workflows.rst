@@ -19,13 +19,7 @@ Key concepts
 
   .. code-block:: console
 
-      $ ./pants [GLOBAL_OPTS] GOAL [GOAL_OPTS] [TARGET ...]
-
-  .. warning::
-
-      If your ``scripts/install-dev.sh`` says that you need to use
-      ``./pants-local`` instead of ``./pants``, replace all ``./pants``
-      in the following command examples with ``./pants-local``.
+      $ pants [GLOBAL_OPTS] GOAL [GOAL_OPTS] [TARGET ...]
 
 * Goal: an action to execute
 
@@ -46,7 +40,7 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants list ::
+      $ pants list ::
 
   - This list includes the full enumeration of individual targets auto-generated
     by collective targets (e.g., ``python_sources()`` generates multiple
@@ -57,14 +51,14 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:src
+      $ pants dependencies --transitive src/ai/backend/common:src
 
 * Display all dependees of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:src
+      $ pants dependees --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -80,15 +74,15 @@ Run lint/check for all targets:
 
 .. code-block:: console
 
-    $ ./pants lint ::
-    $ ./pants check ::
+    $ pants lint ::
+    $ pants check ::
 
 To run lint/check for a specific target or a set of targets:
 
 .. code-block:: console
 
-    $ ./pants lint src/ai/backend/common:: tests/common::
-    $ ./pants check src/ai/backend/manager::
+    $ pants lint src/ai/backend/common:: tests/common::
+    $ pants check src/ai/backend/manager::
 
 Currently running mypy with pants is slow because mypy cannot utilize its own cache as pants invokes mypy per file due to its own dependency management scheme.
 (e.g., Checking all sources takes more than 1 minutes!)
@@ -101,12 +95,17 @@ targets only changed
 Running formatters
 ------------------
 
-If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+If you encounter failure from ``ruff``, you may run the following to automatically fix the import ordering issues.
 
 .. code-block:: console
 
-   $ ./pants fmt ::
-   $ ./pants fmt src/ai/backend/common::
+   $ pants fix ::
+
+If you encounter failure from ``black``, you may run the following to automatically fix the code style issues.
+
+.. code-block:: console
+
+   $ pants fmt ::
 
 Running unit tests
 ------------------
@@ -115,13 +114,13 @@ Here are various methods to run tests:
 
 .. code-block:: console
 
-    $ ./pants test ::
-    $ ./pants test tests/manager/test_scheduler.py::
-    $ ./pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
-    $ ./pants test tests/common::            # Run common/**/test_*.py
-    $ ./pants test tests/common:tests        # Run common/test_*.py
-    $ ./pants test tests/common/redis::      # Run common/redis/**/test_*.py
-    $ ./pants test tests/common/redis:tests  # Run common/redis/test_*.py
+    $ pants test ::
+    $ pants test tests/manager/test_scheduler.py::
+    $ pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
+    $ pants test tests/common::            # Run common/**/test_*.py
+    $ pants test tests/common:tests        # Run common/test_*.py
+    $ pants test tests/common/redis::      # Run common/redis/**/test_*.py
+    $ pants test tests/common/redis:tests  # Run common/redis/test_*.py
 
 You may also try ``--changed-since`` option like ``lint`` and ``check``.
 
@@ -130,7 +129,7 @@ option:
 
 .. code-block:: console
 
-    $ ./pants test \
+    $ pants test \
     >   --test-extra-env-vars=MYVARIABLE=MYVALUE \
     >   tests/common:tests
 
@@ -148,7 +147,7 @@ To build a specific package:
 
 .. code-block:: console
 
-    $ ./pants \
+    $ pants \
     >   --tag="wheel" \
     >   package \
     >   src/ai/backend/common:dist
@@ -158,7 +157,7 @@ If the package content varies by the target platform, use:
 
 .. code-block:: console
 
-    $ ./pants \
+    $ pants \
     >   --tag="wheel" \
     >   --tag="+platform-specific" \
     >   --platform-specific-resources-target=linux_arm64 \
@@ -171,33 +170,53 @@ Using IDEs and editors
 
 Pants has an ``export`` goal to auto-generate a virtualenv that contains all
 external dependencies installed in a single place.
-This is very useful when you work with IDEs and editors.
+This is very useful when you use IDEs and editors.
 
-To (re-)generate the virtualenv, run:
+To (re-)generate the virtualenv(s), run:
 
 .. code-block:: console
 
-    $ ./pants export ::
+    $ pants export --resolve=RESOLVE_NAME  # you may add multiple --resolve options
+
+You may display the available resolve names by (the command works with Python 3.11 or later):
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))'
+
+Similarly, you can export all virtualenvs at once:
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs ./pants export
 
 Then configure your IDEs/editors to use
-``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
-interpreter for your code, where ``VERSION`` is the interpreter version
+``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
+interpreter for your code, where ``PYTHON_VERSION`` is the interpreter version
 specified in ``pants.toml``.
+
+As of Pants 2.16, you must export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option, as all tools are unified to use the same custom resolve subsystem of Pants and the ``::`` target no longer works properly, like:
+
+.. code-block:: console
+
+    $ pants export --resolve=python-default --resolve=mypy
 
 To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
 ``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
 For linters and formatters, configure the tool executable paths to indicate
-``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
-For example, flake8's executable path is
-``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
+``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
+For example, ruff's executable path is
+``dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff``.
 
-Currently we have four Python tools to configure in this way:
+Currently we have the following Python tools to configure in this way:
 
-* ``flake8``: Validates PEP-8 coding style
+* ``ruff``: Provides a fast linting (combining pylint, flake8, and isort)
+  and formatting (auto-fix for some linting rules and isort)
 
-* ``mypy``: Validates the type annotations
+* ``mypy``: Validates the type annotations and performs a static analysis
 
 * ``black``: Validates and reformats all Python codes by reconstructing it from AST,
   just like ``gofmt``.
@@ -214,27 +233,59 @@ Currently we have four Python tools to configure in this way:
      and ``# fmt: on`` comments, though this is strongly discouraged except when
      manual formatting gives better readability, such as numpy matrix declarations.
 
-* ``isort``: Validates and reorders import statements in a fixed order depending on
-  the categories of imported packages (such as bulitins, first-parties, and
-  third-parties), the alphabetical order, and whether it uses ``from`` or not.
+* ``pytest``: The unit test runner framework.
+
+* ``coverage-py``: Generates reports about which source lines were visited during execution of a pytest session.
+
+* ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
 VSCode
 ~~~~~~
 
-Set the following keys in the workspace settings:
+Install the following extensions:
 
-* ``flake8``: ``python.linting.flake8Path``
+   * Python (``ms-python.python``)
+   * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
+   * Black (``ms-python.black-formatter``)
+   * Mypy (``ms-python.mypy-type-checker``)
+   * Ruff (``charliermarsh.ruff``)
 
-* ``mypy``: ``python.linting.mypyPath``
+Set the workspace settings for the Python extension for code navigation and auto-completion:
 
-* ``black``: ``python.formatting.blackPath``
+.. list-table::
+   :header-rows: 1
 
-* ``isort``: ``python.sortImports.path``
+   * - Setting ID
+     - Recommended value
+   * - ``python.analysis.autoSearchPaths``
+     - true
+   * - ``python.analysis.extraPaths``
+     - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+   * - ``python.analysis.importFormat``
+     - ``"relative"``
+   * - ``editor.formatOnSave``
+     - ``true``
 
-.. warning::
+Set the following keys in the workspace settings to configure Python tools:
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export ::``
-   and manually update the Python interpreter path and mypy executable path configurations.
+.. list-table::
+   :header-rows: 1
+
+   * - Setting ID
+     - Example value
+   * - ``{mypy-type-checker,black-formatter}.interpreter``
+     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.4/bin/python"]``
+   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+     - ``"fromEnvironment"``
+   * - ``ruff.interpreter``
+     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/python"]``
+   * - ``ruff.path``
+     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff"]``
+
+.. note:: **Changed in July 2023**
+
+   After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
+   we no longer recommend to configure ``python.linting.*Path`` and ``python.formatting.*Path`` keys.
 
 Vim/NeoVim
 ~~~~~~~~~~
@@ -257,43 +308,66 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
-   let g:ale_fixers = {'python': ['isort', 'black']}
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
+   let g:ale_linters = { "python": ['ruff', 'black', 'mypy'] }
+   let g:ale_fixers = {'python': ['ruff', 'black']}
    let g:ale_fix_on_save = 1
 
-When using CoC, run ``:CocInstall coc-pyright`` and ``:CocLocalConfig`` after opening a file
-in the local working copy to initialize PyRight functionalities.
+When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
+in the local working copy to initialize Pyright functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
-just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_).
 
 .. code-block:: json
 
    {
      "coc.preferences.formatOnType": true,
-     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "coc.preferences.formatOnSaveFiletypes": [],  // Use the autocmd config
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.5/bin/python",
+     "ruff.enabled": true,
+     "ruff.autoFixOnSave": false,  // Use the autocmd config
+     "ruff.useDetectRuffCommand": false,
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
      "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
      "python.linting.mypyEnabled": true,
-     "python.linting.flake8Enabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
    }
 
+To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
+after opening any Python source file to install the ``ruff-lsp`` server.
+
+Unfortunately, CoC does not support applying multiple formatters on save, we should call
+them serially using ``autocmd``.
+To configure it, put the following vimscript as ``.exrc`` in the working copy root:
+
+.. code-block:: vim
+
+   function! OrganizeAndFormat()
+       CocCommand ruff.executeOrganizeImports
+       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
+       sleep 50m  " to avoid races
+       call CocAction('format')
+       sleep 50m
+   endfunction
+
+   augroup autofix
+       autocmd!
+       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | endif
+   augroup END
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export ::``
+When each branch has different external package requirements, you should run ``pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
-In that case, run ``killall -r pantsd`` (``killall pantsd`` in macOS) and it will be fine.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -343,11 +417,11 @@ Though, there are a few key differences:
 - Tests are executed **in parallel** in the unit of test modules.
 
 - Therefore, session-level fixtures may be executed *multiple* times during a
-  single run of ``./pants test``.
+  single run of ``pants test``.
 
 .. warning::
 
-  If you *interrupt* (Ctrl+C, SIGINT) a run of ``./pants test``, it will
+  If you *interrupt* (Ctrl+C, SIGINT) a run of ``pants test``, it will
   immediately kill all pytest processes without fixture cleanup. This may
   accumulate unused Docker containers in your system, so it is a good practice
   to run ``docker ps -a`` periodically and clean up dangling containers.
@@ -398,7 +472,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.9 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -444,8 +518,8 @@ Adding new external dependencies
 
   .. code-block:: console
 
-     $ ./pants generate-lockfiles
-     $ ./pants export ::
+     $ pants generate-lockfiles
+     $ pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -462,7 +536,7 @@ after merging ``requirements.txt`` and ``BUILD`` files.
    $ git merge main
    ... it says a conflict on python.lock ...
    $ git checkout --theirs python.lock
-   $ ./pants generate-lockfiles --resolve=python-default
+   $ pants generate-lockfiles --resolve=python-default
    $ git add python.lock
    $ git commit
 
@@ -473,28 +547,65 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall -r pantsd   # just `killall pantsd` in macOS
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ pgrep pantsd | xargs -r kill
+   $ rm -r /tmp/*-pants/ .pants.d .pids ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'s
+``local_execution_root_dir`` option set by ``install-dev.sh``.
+
+.. warning::
+
+   If you have run ``pants`` or the installation script with ``sudo``, some of the above directories
+   may be owned by root and running ``pants`` as the user privilege would not work.
+   In such cases, remove the directories with ``sudo`` and retry.
+
+Resolving missing directories error when running Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: text
+
+   ValueError: Failed to create temporary directory for immutable inputs: No such file or directory (os error 2) at path "/tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/immutable_inputsvIpaoN"
+
+If you encounter errors like above when running daily Pants commands like ``lint``,
+you may manually create the directory one step higher.
+For the above example, run:
+
+.. code-block:: shell
+
+   mkdir -p /tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/
+
+If this workaround does not work, backup your current working files and
+reinstall by running ``scripts/delete-dev.sh`` and ``scripts/install-dev.sh``
+serially.
+
+Changing or updating the Python runtime for Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``scripts/install-dev.sh``, it automatically creates ``.pants.bootstrap``
+to explicitly set a specific pyenv Python version to run Pants.
+
+If you have removed/upgraded this specific Python version from pyenv, you also need to
+update ``.pants.bootstrap`` accordingly.
 
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When your tests *hang*, you can try adding the ``--debug`` flag to the ``./pants test`` command:
+When your tests *hang*, you can try adding the ``--debug`` flag to the ``pants test`` command:
 
 .. code-block:: console
 
-   $ ./pants test --debug ...
+   $ pants test --debug ...
 
 so that Pants runs the designated test targets **serially and interactively**.
 This means that you can directly observe the console output and Ctrl+C to
 gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
-after target arguments and ``--`` when executing ``./pants test`` command.
+after target arguments and ``--`` when executing ``pants test`` command.
 
 Installing a subset of mono-repo packages in the editable mode for other projects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -508,7 +619,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants --tag=wheel package src/ai/backend/client:dist
+      $ pants --tag=wheel package src/ai/backend/client:dist
 
    This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
 
@@ -522,7 +633,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/client:src \
+      $ pants dependencies --transitive src/ai/backend/client:src \
       >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
       cli
       client
@@ -556,7 +667,7 @@ the ``.tmp`` directory under the working copy root a tmpfs partition:
      tmpfs /path/to/dir/.tmp tmpfs defaults,size=4G 0 0
 
 * The size should be more than 3GB.
-  (Running ``./pants test ::`` consumes about 2GB.)
+  (Running ``pants test ::`` consumes about 2GB.)
 
 * To change the size at runtime, you could simply remount it with a new size option:
 
@@ -574,7 +685,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 

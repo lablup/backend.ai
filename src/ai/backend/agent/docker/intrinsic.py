@@ -2,9 +2,10 @@ import asyncio
 import logging
 import os
 import platform
+from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 import aiohttp
 import async_timeout
@@ -14,7 +15,9 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -24,7 +27,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop, nmget
 
-from .. import __version__
+from .. import __version__  # pants: no-infer-dep
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -37,6 +41,7 @@ from ..stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
     StatModes,
 )
@@ -45,7 +50,27 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def netstat_ns_work(ns_path: Path):
+    with nsenter(ns_path):
+        result = psutil.net_io_counters(pernic=True)
+    return result
+
+
+async def netstat_ns(ns_path: Path):
+    loop = asyncio.get_running_loop()
+    # Linux namespace is per-thread state. Therefore we need to ensure
+    # IO is executed in the same thread where we switched the namespace.
+    # Go provides runtime.LockOSThread() to do this.
+    #
+    # Unfortunately, CPython drops GIL while running IO and does not
+    # provide any similar functionality. Therefore we execute namespace
+    # dependent operation in the new process.
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
+    return result
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -175,12 +200,24 @@ class CPUPlugin(AbstractComputePlugin):
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
         async def sysfs_impl(container_id):
-            cpu_prefix = f"/sys/fs/cgroup/cpuacct/docker/{container_id}/"
+            cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
+            version = ctx.agent.docker_info["CgroupVersion"]
             try:
-                cpu_used = read_sysfs(cpu_prefix + "cpuacct.usage", int) / 1e6
+                match version:
+                    case "1":
+                        cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
+                    case "2":
+                        cpu_stats = {
+                            k: v
+                            for k, v in map(
+                                lambda line: line.split(" "),
+                                (cpu_path / "cpu.stat").read_text().splitlines(),
+                            )
+                        }
+                        cpu_used = int(cpu_stats["usage_usec"]) / 1e3
             except IOError as e:
                 log.warning(
-                    "cannot read stats: sysfs unreadable for container {0}\n{1!r}",
+                    "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
                     e,
                 )
@@ -212,7 +249,7 @@ class CPUPlugin(AbstractComputePlugin):
         per_container_cpu_util = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, cpu_used in zip(container_ids, results):
             if cpu_used is None:
@@ -236,6 +273,73 @@ class CPUPlugin(AbstractComputePlugin):
                 MetricTypes.USAGE,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
+            ),
+        ]
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        async def psutil_impl(pid: int) -> Optional[Decimal]:
+            try:
+                p = psutil.Process(pid)
+            except psutil.NoSuchProcess:
+                log.warning("psutil cannot found process {0}", pid)
+            else:
+                cpu_times = p.cpu_times()
+                cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
+                return cpu_used
+            return None
+
+        async def api_impl(cid: str, pids: List[int]) -> List[Optional[Decimal]]:
+            return []
+
+        per_process_cpu_util = {}
+        per_process_cpu_used = {}
+        results: List[Decimal]
+        q = Decimal("0.000")
+        pid_map_list = list(pid_map.items())
+        match self.local_config["agent"]["docker-mode"]:
+            case "linuxkit":
+                api_tasks = []
+                # group by container ID
+                cid_pids_map: Dict[str, List[int]] = {}
+                for pid, cid in pid_map_list:
+                    if cid_pids_map.get(cid) is None:
+                        cid_pids_map[cid] = []
+                    cid_pids_map[cid].append(pid)
+                for cid, pids in cid_pids_map.items():
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
+                chunked_results = await asyncio.gather(*api_tasks)
+                results = []
+                for chunk in chunked_results:
+                    results.extend(chunk)
+            case _:
+                psutil_tasks = []
+                for pid, _ in pid_map_list:
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
+                results = await asyncio.gather(*psutil_tasks)
+
+        for (pid, cid), cpu_used in zip(pid_map_list, results):
+            if cpu_used is None:
+                continue
+            per_process_cpu_util[pid] = Measurement(
+                Decimal(cpu_used).quantize(q), capacity=Decimal(1000)
+            )
+            per_process_cpu_used[pid] = Measurement(Decimal(cpu_used).quantize(q))
+        return [
+            ProcessMeasurement(
+                MetricKey("cpu_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="percent",
+                current_hook=lambda metric: metric.stats.rate,
+                stats_filter=frozenset({"avg", "max"}),
+                per_process=per_process_cpu_util,
+            ),
+            ProcessMeasurement(
+                MetricKey("cpu_used"),
+                MetricTypes.USAGE,
+                unit_hint="msec",
+                per_process=per_process_cpu_used,
             ),
         ]
 
@@ -316,6 +420,16 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> List[MountInfo]:
         return []
 
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cpu",
+            "description": "CPU",
+            "human_readable_name": "CPU",
+            "display_unit": "Core",
+            "number_format": {"binary": False, "round_length": 0},
+            "display_icon": "cpu",
+        }
+
 
 class MemoryDevice(AbstractComputeDevice):
     pass
@@ -346,17 +460,17 @@ class MemoryPlugin(AbstractComputePlugin):
         pass
 
     async def list_devices(self) -> Collection[MemoryDevice]:
-        # TODO: support NUMA?
         memory_size = psutil.virtual_memory().total
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
-                numa_node=0,
+                numa_node=0,  # the kernel setting will do the job.
                 memory_size=overcommit_factor * memory_size,
                 processing_units=0,
-            )
+            ),
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
@@ -459,38 +573,88 @@ class MemoryPlugin(AbstractComputePlugin):
             # return total_size
 
         async def sysfs_impl(container_id):
-            mem_prefix = f"/sys/fs/cgroup/memory/docker/{container_id}/"
-            io_prefix = f"/sys/fs/cgroup/blkio/docker/{container_id}/"
+            mem_path = ctx.agent.get_cgroup_path("memory", container_id)
+            io_path = ctx.agent.get_cgroup_path("blkio", container_id)
+            version = ctx.agent.docker_info["CgroupVersion"]
+
             try:
-                mem_cur_bytes = read_sysfs(mem_prefix + "memory.usage_in_bytes", int)
-                io_stats = Path(io_prefix + "blkio.throttle.io_service_bytes").read_text()
-                # example data:
-                #   8:0 Read 13918208
-                #   8:0 Write 0
-                #   8:0 Sync 0
-                #   8:0 Async 13918208
-                #   8:0 Total 13918208
-                #   Total 13918208
                 io_read_bytes = 0
                 io_write_bytes = 0
-                for line in io_stats.splitlines():
-                    if line.startswith("Total "):
-                        continue
-                    dev, op, nbytes = line.strip().split()
-                    if op == "Read":
-                        io_read_bytes += int(nbytes)
-                    elif op == "Write":
-                        io_write_bytes += int(nbytes)
+                match version:
+                    case "1":
+                        mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "total_inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
+                        # example data:
+                        #   8:0 Read 13918208
+                        #   8:0 Write 0
+                        #   8:0 Sync 0
+                        #   8:0 Async 13918208
+                        #   8:0 Total 13918208
+                        #   Total 13918208
+                        for line in (
+                            (io_path / "blkio.throttle.io_service_bytes").read_text().splitlines()
+                        ):
+                            if line.startswith("Total "):
+                                continue
+                            dev, op, nbytes = line.strip().split()
+                            if op == "Read":
+                                io_read_bytes += int(nbytes)
+                            elif op == "Write":
+                                io_write_bytes += int(nbytes)
+                    case "2":
+                        mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
+                        # example data:
+                        # 8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
+                        # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
+                        for line in (io_path / "io.stat").read_text().splitlines():
+                            for io_stat in line.split()[1:]:
+                                stat, value = io_stat.split("=")
+                                if stat == "rbytes":
+                                    io_read_bytes += int(value)
+                                if stat == "wbytes":
+                                    io_write_bytes += int(value)
             except IOError as e:
                 log.warning(
-                    "cannot read stats: sysfs unreadable for container {0}\n{1!r}",
+                    "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
                     e,
                 )
                 return None
+            async with closing_async(Docker()) as docker:
+                container = DockerContainer(docker, id=container_id)
+                data = await container.show()
+                sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            net_rx_bytes = 0
+            net_tx_bytes = 0
+            nstat = await netstat_ns(sandbox_key)
+            for name, stat in nstat.items():
+                if name == "lo":
+                    continue
+                net_rx_bytes += stat.bytes_recv
+                net_tx_bytes += stat.bytes_sent
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-            return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+            return (
+                mem_cur_bytes,
+                io_read_bytes,
+                io_write_bytes,
+                net_rx_bytes,
+                net_tx_bytes,
+                scratch_sz,
+            )
 
         async def api_impl(container_id):
             async with closing_async(Docker()) as docker:
@@ -510,9 +674,21 @@ class MemoryPlugin(AbstractComputePlugin):
                         io_read_bytes += item["value"]
                     elif item["op"] == "Write":
                         io_write_bytes += item["value"]
+                net_rx_bytes = 0
+                net_tx_bytes = 0
+                for name, stat in ret["networks"].items():
+                    net_rx_bytes += stat["rx_bytes"]
+                    net_tx_bytes += stat["tx_bytes"]
                 loop = current_loop()
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-                return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+                return (
+                    mem_cur_bytes,
+                    io_read_bytes,
+                    io_write_bytes,
+                    net_rx_bytes,
+                    net_tx_bytes,
+                    scratch_sz,
+                )
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -524,10 +700,12 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_mem_used_bytes = {}
         per_container_io_read_bytes = {}
         per_container_io_write_bytes = {}
+        per_container_net_rx_bytes = {}
+        per_container_net_tx_bytes = {}
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results):
             if result is None:
@@ -535,7 +713,9 @@ class MemoryPlugin(AbstractComputePlugin):
             per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
             per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
             per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
@@ -559,6 +739,20 @@ class MemoryPlugin(AbstractComputePlugin):
                 per_container=per_container_io_write_bytes,
             ),
             ContainerMeasurement(
+                MetricKey("net_rx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_rx_bytes,
+            ),
+            ContainerMeasurement(
+                MetricKey("net_tx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_tx_bytes,
+            ),
+            ContainerMeasurement(
                 MetricKey("io_scratch_size"),
                 MetricTypes.USAGE,
                 unit_hint="bytes",
@@ -567,9 +761,92 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        async def psutil_impl(pid) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+            try:
+                p = psutil.Process(pid)
+            except psutil.NoSuchProcess:
+                log.warning("psutil cannot found process {0}", pid)
+            else:
+                stats = p.as_dict(attrs=["memory_info", "io_counters"])
+                mem_cur_bytes = io_read_bytes = io_write_bytes = None
+                if stats["memory_info"] is not None:
+                    mem_cur_bytes = stats["memory_info"].rss
+                if stats["io_counters"] is not None:
+                    io_read_bytes = stats["io_counters"].read_bytes
+                    io_write_bytes = stats["io_counters"].write_bytes
+                return mem_cur_bytes, io_read_bytes, io_write_bytes
+            return None, None, None
+
+        async def api_impl(
+            cid: str, pids: List[int]
+        ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
+            return []
+
+        per_process_mem_used_bytes = {}
+        per_process_io_read_bytes = {}
+        per_process_io_write_bytes = {}
+        results: List[Tuple[Optional[int], Optional[int], Optional[int]]]
+        pid_map_list = list(pid_map.items())
+        match self.local_config["agent"]["docker-mode"]:
+            case "linuxkit":
+                api_tasks = []
+                # group by container ID
+                cid_pids_map: Dict[str, List[int]] = {}
+                for pid, cid in pid_map_list:
+                    if cid_pids_map.get(cid) is None:
+                        cid_pids_map[cid] = []
+                    cid_pids_map[cid].append(pid)
+                for cid, pids in cid_pids_map.items():
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
+                chunked_results = await asyncio.gather(*api_tasks)
+                results = []
+                for chunk in chunked_results:
+                    results.extend(chunk)
+            case _:
+                psutil_tasks = []
+                for pid, _ in pid_map_list:
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
+                results = await asyncio.gather(*psutil_tasks)
+
+        for (pid, _), result in zip(pid_map_list, results):
+            mem, io_read, io_write = result
+            if mem is not None:
+                per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))
+            if io_read is not None:
+                per_process_io_read_bytes[pid] = Measurement(Decimal(io_read))
+            if io_write is not None:
+                per_process_io_write_bytes[pid] = Measurement(Decimal(io_write))
+        return [
+            ProcessMeasurement(
+                MetricKey("mem"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_process=per_process_mem_used_bytes,
+            ),
+            ProcessMeasurement(
+                MetricKey("io_read"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"rate"}),
+                per_process=per_process_io_read_bytes,
+            ),
+            ProcessMeasurement(
+                MetricKey("io_write"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"rate"}),
+                per_process=per_process_io_write_bytes,
+            ),
+        ]
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
@@ -634,3 +911,13 @@ class MemoryPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "ram",
+            "description": "Memory",
+            "human_readable_name": "RAM",
+            "display_unit": "GiB",
+            "number_format": {"binary": True, "round_length": 0},
+            "display_icon": "ram",
+        }

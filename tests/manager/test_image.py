@@ -2,13 +2,11 @@ import uuid
 from pathlib import Path
 
 import pytest
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-from ai.backend.common.docker import ImageRef
-from ai.backend.manager.models import ImageAliasRow, ImageRow, update_aliases_from_file
+from ai.backend.manager.models import ImageAliasRow, ImageRow
 from ai.backend.manager.models.base import metadata as old_metadata
 from ai.backend.manager.models.utils import regenerate_table
 
@@ -76,23 +74,3 @@ aliases:
     p.write_text(content)
 
     yield p
-
-
-@pytest.mark.asyncio
-async def test_update_aliases_from_file(virtual_image_db, image_aliases):
-    async_session = virtual_image_db
-    async with async_session() as session:
-        created_aliases = await update_aliases_from_file(session, image_aliases)
-        for alias in created_aliases:
-            alias.id = uuid.uuid4()
-        await session.commit()
-        result = await session.execute(
-            sa.select(ImageAliasRow).options(selectinload(ImageAliasRow.image)),
-        )
-        aliases = {}
-        for row in result.scalars().all():
-            aliases[row.alias] = row.image.image_ref
-        assert aliases == {
-            "my-python": ImageRef("lablup/test-python:latest", architecture="x86_64"),
-            "my-python:3.6": ImageRef("lablup/test-python:3.6-debian", architecture="aarch64"),
-        }

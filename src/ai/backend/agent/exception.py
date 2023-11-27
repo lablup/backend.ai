@@ -1,3 +1,10 @@
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Optional
+
+from ..common.types import DeviceId, SlotName
+
+
 class InitializationError(Exception):
     """
     Errors during agent initialization and compute plugin setup
@@ -26,12 +33,47 @@ class NotMultipleOfQuantum(InvalidResourceArgument):
     pass
 
 
+@dataclass
 class InsufficientResource(ResourceError):
-    pass
+    msg: str
+    slot_name: SlotName
+    requested_alloc: Decimal
+    total_allocatable: Decimal | int
+    allocation: dict[SlotName, dict[DeviceId, Decimal]]
+    context_tag: Optional[str] = None
+
+    def __str__(self) -> str:
+        return (
+            f"InsufficientResource: {self.msg} ({self.slot_name}"
+            + (f" (tag: {self.context_tag!r}), " if self.context_tag else ", ")
+            + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
+        )
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.msg,
+                self.slot_name,
+                self.requested_alloc,
+                self.total_allocatable,
+                self.allocation,
+                self.context_tag,
+            ),
+        )
 
 
 class UnsupportedBaseDistroError(RuntimeError):
     pass
+
+
+class ContainerCreationError(Exception):
+    container_id: str
+
+    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.container_id = container_id
+        self.message = message
 
 
 class K8sError(Exception):

@@ -1,0 +1,94 @@
+{
+  "storageInfo": {
+    "local": {
+      "name": "Local Storage",
+      "description": "Local storage is a basic stroage type for Backend.AI. This is usually the case when Backend.AI cluster is using the compute node's storage right away.",
+      "icon": "local.png",
+      "dialects": [
+        "localhost"
+      ]
+    },
+    "nfs": {
+      "name": "Network File System",
+      "description": "NFS is a distributed file system protocol. NFS is an open standard defined in a Request for Comments (RFC), allowing anyone to implement the protocol.",
+      "icon": "local.png",
+      "dialects": [
+        "NFS"
+      ]
+    },
+    "L3": {
+      "name": "L3 (Lablup LargeData Locator)",
+      "description": "L3 is a lablup storage environment specialized in interworking between on-premises and cloud environments. It uses CephFS-based cold storage and a dedicated cache to implement a bottleneck-free data exchange in an inter-node environment.",
+      "icon": "local.png",
+      "dialects": [
+        "l3",
+        "L3FS"
+      ]
+    },
+    "s3": {
+      "name": "Amazon S3 (Simple Storage Service)",
+      "description": "Amazon Simple Storage Service (Amazon S3) is an object storage service that offers industry-leading scalability, data availability, security, and performance.",
+      "icon": "local.png",
+      "dialects": [
+        "s3fs"
+      ]
+    },
+    "azure": {
+      "name": "Azure FileShare",
+      "description": "Azure Files offers fully managed file shares in the cloud that are accessible via the industry standard Server Message Block (SMB) protocol.",
+      "icon": "local.png",
+      "dialects": [
+        "fileshare"
+      ]
+    },
+    "samba": {
+      "name": "SAMBA storage",
+      "description": "Samba is a free software re-implementation of the SMB (Server Message Block) networking protocol.",
+      "icon": "local.png",
+      "dialects": [
+        "smb",
+        "smbfs"
+      ]
+    },
+    "ceph": {
+      "name": "Ceph File System",
+      "description": "The Ceph File System, or CephFS, is a POSIX-compliant file system built on top of Ceph’s distributed object store, RADOS.",
+      "icon": "local.png",
+      "dialects": [
+        "cephfs"
+      ]
+    },
+    "xfs": {
+      "name": "XFS",
+      "description": "XFS is a high-performance 64-bit journaling file system created by Silicon Graphics.",
+      "icon": "local.png",
+      "dialects": [
+        "XFS"
+      ]
+    },
+    "weka": {
+      "name": "WekaIO",
+      "description": "WekaIO is a parallel and scalable file storage system which is optimized for performance and data-intensive workloads.",
+      "icon": "local.png",
+      "dialects": [
+        "WekaIO",
+        "weka.io",
+        "weka"
+      ]
+    },
+    "spectrumscale": {
+      "name": "IBM Spectrum Scale",
+      "description": "IBM Spectrum Scale (formerly known as GPFS) is a high-performance, scalable file storage system.",
+      "icon": "local.png",
+      "dialects": [
+        "SpectrumScale",
+        "GPFS"
+      ]
+    },
+    "auto": {
+      "name": "Auto",
+      "description": "Choose the host with the lowest usage from the available host volumes for users. This ensures that usage is evenly distributed across multiple storage volumes, avoiding over-concentration on any single volume.",
+      "icon": "local.png"
+    }
+  }
+}

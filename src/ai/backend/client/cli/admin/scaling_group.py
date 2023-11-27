@@ -7,8 +7,9 @@ from ai.backend.client.func.scaling_group import _default_detail_fields, _defaul
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
+from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
-from ..params import JSONParamType
+from ..params import BoolExprType, JSONParamType, OptionalType
 from ..types import CLIContext
 from . import admin
 
@@ -69,11 +70,29 @@ def list(ctx: CLIContext) -> None:
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
-@click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "-d",
+    "--description",
+    "--desc",
+    type=str,
+    default="",
+    help="Description of new scaling group.",
+)
+@click.option("--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "--private",
+    is_flag=True,
+    help=(
+        "New scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
-    "--driver-opts", type=JSONParamType(), default="{}", help="Set driver options as a JSON string."
+    "--driver-opts",
+    type=JSONParamType(),
+    default="{}",
+    help="Set driver options as a JSON string.",
 )
 @click.option("--scheduler", type=str, default="fifo", help="Set scheduler.")
 @click.option(
@@ -82,8 +101,26 @@ def list(ctx: CLIContext) -> None:
     default="{}",
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network",
+    is_flag=True,
+    help="If true, run containers on host networking mode.",
+)
+@click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
 def add(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name: str,
+    description: str,
+    inactive: bool,
+    private: bool,
+    driver: str,
+    driver_opts: dict[str, str] | Undefined,
+    scheduler: str,
+    scheduler_opts: dict[str, str] | Undefined,
+    use_host_network: bool,
+    wsproxy_addr: str,
+    wsproxy_api_token: str,
 ):
     """
     Add a new scaling group.
@@ -96,10 +133,14 @@ def add(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
+                wsproxy_addr=wsproxy_addr,
+                wsproxy_api_token=wsproxy_api_token,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -124,21 +165,82 @@ def add(
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
-@click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
-@click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
-    "--driver-opts", type=JSONParamType(), default=None, help="Set driver options as a JSON string."
+    "-d",
+    "--description",
+    "--desc",
+    type=OptionalType(str),
+    default=undefined,
+    help="Description of new scaling group.",
 )
-@click.option("--scheduler", type=str, default="fifo", help="Set scheduler.")
+@click.option(
+    "-a",
+    "--active",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Change the active/inactive status if specified.",
+)
+@click.option(
+    "--private",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Change the private status if specified",
+)
+@click.option(
+    "--driver",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set driver.",
+)
+@click.option(
+    "--driver-opts",
+    type=OptionalType(JSONParamType),
+    default=undefined,
+    help="Set driver options as a JSON string.",
+)
+@click.option(
+    "--scheduler",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set scheduler.",
+)
 @click.option(
     "--scheduler-opts",
-    type=JSONParamType(),
-    default=None,
+    type=OptionalType(JSONParamType),
+    default=undefined,
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Change the host-networking mode if specified.",
+)
+@click.option(
+    "--wsproxy-addr",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set app proxy address.",
+)
+@click.option(
+    "--wsproxy-api-token",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set app proxy API token.",
+)
 def update(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name: str,
+    description: str | Undefined,
+    active: bool | Undefined,
+    private: bool | Undefined,
+    driver: str | Undefined,
+    driver_opts: dict | Undefined,
+    scheduler: str | Undefined,
+    scheduler_opts: dict | Undefined,
+    use_host_network: bool | Undefined,
+    wsproxy_addr: str | Undefined,
+    wsproxy_api_token: str | Undefined,
 ):
     """
     Update existing scaling group.
@@ -150,11 +252,15 @@ def update(
             data = session.ScalingGroup.update(
                 name,
                 description=description,
-                is_active=not inactive,
+                is_active=active,
+                is_public=not private if private is not undefined else undefined,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
+                wsproxy_addr=wsproxy_addr,
+                wsproxy_api_token=wsproxy_api_token,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -244,7 +350,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                "detail_msg": "Scaling group {} is assocatiated with domain {}.".format(
+                "detail_msg": "Scaling group {} is associated with domain {}.".format(
                     scaling_group, domain
                 ),
             },

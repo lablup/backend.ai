@@ -64,10 +64,10 @@ class BackendError(web.HTTPError):
         lines = []
         if self.extra_msg:
             lines.append(
-                f"<{type(self).__name__}({self.status}): " f"{self.error_title} ({self.extra_msg})>"
+                f"<{type(self).__name__}({self.status}): {self.error_title} ({self.extra_msg})>"
             )
         else:
-            lines.append(f"<{type(self).__name__}({self.status}): " f"{self.error_title}>")
+            lines.append(f"<{type(self).__name__}({self.status}): {self.error_title}>")
         if self.extra_data:
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
@@ -173,6 +173,11 @@ class AuthorizationFailed(BackendError, web.HTTPUnauthorized):
     error_title = "Credential/signature mismatch."
 
 
+class PasswordExpired(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/password-expired"
+    error_title = "Password has expired."
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
@@ -205,6 +210,22 @@ class ScalingGroupNotFound(ObjectNotFound):
 
 class SessionNotFound(ObjectNotFound):
     object_name = "session"
+
+
+class MainKernelNotFound(ObjectNotFound):
+    object_name = "main kernel"
+
+
+class EndpointNotFound(ObjectNotFound):
+    object_name = "endpoint"
+
+
+class RoutingNotFound(ObjectNotFound):
+    object_name = "routing"
+
+
+class EndpointTokenNotFound(ObjectNotFound):
+    object_name = "endpoint_token"
 
 
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
@@ -266,6 +287,16 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
 class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
+
+
+class VFolderFilterStatusFailed(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
+    error_title = "Virtual folder status filtering has failed."
+
+
+class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
+    error_title = "There is no available virtual folder to filter its status."
 
 
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):

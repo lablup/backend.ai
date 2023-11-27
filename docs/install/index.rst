@@ -4,6 +4,9 @@ Installation Guides
 .. toctree::
    :maxdepth: 2
 
-   guides
-   supplementary
-   configure-autoscaling
+   install-from-source
+   install-from-package
+   install-on-clouds
+   install-on-premise
+   install-monitoring-and-logging-tools
+   env-wsl2

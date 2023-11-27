@@ -3,7 +3,7 @@ from typing import Sequence
 from ..request import Request
 from .base import BaseFunction, api_function
 
-__all__ = "Resource"
+__all__ = ("Resource",)
 
 
 class Resource(BaseFunction):
@@ -25,7 +25,7 @@ class Resource(BaseFunction):
     @classmethod
     async def check_presets(cls):
         """
-        Lists all resource presets in the current scaling group with additiona
+        Lists all resource presets in the current scaling group with additional
         information.
         """
         rqst = Request("POST", "/resource/check-presets")
@@ -65,7 +65,7 @@ class Resource(BaseFunction):
     @classmethod
     async def usage_per_period(cls, group_id: str, start_date: str, end_date: str):
         """
-        Get usage statistics for a group specified by `group_id` for time betweeen
+        Get usage statistics for a group specified by `group_id` for time between
         `start_date` and `end_date`.
 
         :param start_date: start date in string format (yyyymmdd).

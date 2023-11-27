@@ -32,6 +32,14 @@ def test_match_distro_data():
     assert ret[0] == "ubuntu18.04"
     assert ret[1] == "u2"
 
+    ret = match_distro_data(krunner_volumes, "ubuntu19.10")
+    assert ret[0] == "ubuntu18.04"  # assume least old version
+    assert ret[1] == "u2"
+
+    ret = match_distro_data(krunner_volumes, "ubuntu4.04")
+    assert ret[0] == "ubuntu8.04"  # assume oldest
+    assert ret[1] == "u1"
+
     ret = match_distro_data(krunner_volumes, "ubuntu")
     assert ret[0] == "ubuntu18.04"  # assume latest
     assert ret[1] == "u2"

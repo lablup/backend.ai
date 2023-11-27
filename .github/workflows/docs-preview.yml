@@ -1,0 +1,22 @@
+name: docs-preview
+on:
+  pull_request:
+    types: [opened, reopened, labeled, unlabeled, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  docs-preview-links-:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'area:docs') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make a link to the doc preview build (en)
+        uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "sorna"
+      - name: Make a link to the doc preview build (ko)
+        uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "sorna-ko"
+          project-language: "ko"

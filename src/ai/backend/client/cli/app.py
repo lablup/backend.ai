@@ -116,7 +116,6 @@ class WSProxy:
 
 
 class ProxyRunnerContext:
-
     __slots__ = (
         "session_name",
         "app_name",
@@ -325,7 +324,7 @@ def app(session_name, app, bind, arg, env):
 
 
 @main.command()
-@click.argument("session_name", type=str, metavar="NAME", nargs=1)
+@click.argument("session_name", type=str, metavar="SESSION_ID", nargs=1)
 @click.argument("app_name", type=str, metavar="APP", nargs=-1)
 @click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
 def apps(session_name, app_name, list_names):

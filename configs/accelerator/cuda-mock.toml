@@ -1,8 +1,0 @@
-nvidia_driver = "450.0.0"
-cuda_runtime = "11.0"
-devices = [
-  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d01", model_name = "CUDA GPU", numa_node = 0, smp_count = 108, memory_size = "40G", is_mig_device = false },
-  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d02", model_name = "CUDA GPU", numa_node = 1, smp_count = 108, memory_size = "40G", is_mig_device = false },
-  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d03", model_name = "CUDA GPU", numa_node = 0, smp_count = 108, memory_size = "40G", is_mig_device = false },
-  { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d04", model_name = "CUDA GPU", numa_node = 1, smp_count = 108, memory_size = "40G", is_mig_device = false },
-]

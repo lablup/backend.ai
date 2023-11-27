@@ -1,39 +1,62 @@
 from __future__ import annotations
 
 import enum
+import logging
 import os.path
 import uuid
+from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
 
+import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload
 
-from ai.backend.common.types import VFolderMount
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
+from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
 from ..types import UserScope
 from .base import (
     GUID,
+    Base,
     BigInt,
     EnumValueType,
     IDColumn,
     Item,
     PaginatedList,
+    QuotaScopeIDType,
     batch_multiresult,
     metadata,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
+    from ..api.context import BackgroundTaskManager
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
@@ -42,31 +65,33 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
-    "VFolderUsageMode",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
     "VFolderPermissionValidator",
+    "VFolderOperationStatus",
+    "VFolderAccessStatus",
+    "DEAD_VFOLDER_STATUSES",
+    "VFolderCloneInfo",
+    "VFolderDeletionInfo",
+    "VFolderRow",
+    "QuotaScope",
+    "SetQuotaScope",
+    "UnsetQuotaScope",
     "query_accessible_vfolders",
+    "initiate_vfolder_clone",
+    "initiate_vfolder_purge",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "update_vfolder_status",
+    "filter_host_allowed_permission",
+    "ensure_host_permission_allowed",
 )
 
 
-class VFolderUsageMode(str, enum.Enum):
-    """
-    Usage mode of virtual folder.
-
-    GENERAL: normal virtual folder
-    MODEL: virtual folder which provides shared models
-    DATA: virtual folder which provides shared data
-    """
-
-    GENERAL = "general"
-    MODEL = "model"
-    DATA = "data"
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class VFolderOwnershipType(str, enum.Enum):
@@ -108,12 +133,68 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
+class VFolderOperationStatus(str, enum.Enum):
+    """
+    Introduce virtual folder current status for storage-proxy operations.
+    """
+
+    READY = "ready"
+    PERFORMING = "performing"
+    CLONING = "cloning"
+    MOUNTED = "mounted"
+    ERROR = "error"
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
+    DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
+    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
+
+
+class VFolderAccessStatus(str, enum.Enum):
+    """
+    Introduce virtual folder desired status for storage-proxy operations.
+    Not added to db scheme  and determined only by current vfolder status.
+    """
+
+    READABLE = "readable"
+    UPDATABLE = "updatable"
+    RECOVERABLE = "recoverable"
+    DELETABLE = "deletable"
+    PURGABLE = "purgable"
+
+
+DEAD_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_ONGOING,
+    VFolderOperationStatus.DELETE_COMPLETE,
+    VFolderOperationStatus.PURGE_ONGOING,
+)
+
+
+class VFolderDeletionInfo(NamedTuple):
+    vfolder_id: VFolderID
+    host: str
+
+
+class VFolderCloneInfo(NamedTuple):
+    source_vfolder_id: VFolderID
+    source_host: str
+
+    # Target Vfolder infos
+    target_quota_scope_id: str
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool
+
+
 vfolders = sa.Table(
     "vfolders",
     metadata,
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False),
+    sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
         "usage_mode",
@@ -141,6 +222,21 @@ vfolders = sa.Table(
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
+    sa.Column(
+        "status",
+        EnumValueType(VFolderOperationStatus),
+        default=VFolderOperationStatus.READY,
+        server_default=VFolderOperationStatus.READY.value,
+        nullable=False,
+    ),
+    # status_history records the most recent status changes for each status
+    # e.g)
+    # {
+    #   "ready": "2022-10-22T10:22:30",
+    #   "delete-pending": "2022-10-22T11:40:30",
+    #   "delete-ongoing": "2022-10-25T10:22:30"
+    # }
+    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -212,6 +308,10 @@ vfolder_permissions = sa.Table(
 )
 
 
+class VFolderRow(Base):
+    __table__ = vfolders
+
+
 def verify_vfolder_name(folder: str) -> bool:
     if folder in RESERVED_VFOLDERS:
         return False
@@ -225,11 +325,13 @@ async def query_accessible_vfolders(
     conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
+    # when enabled, skip vfolder ownership check if user role is admin or superadmin
+    allow_privileged_access=False,
     user_role=None,
     domain_name=None,
     allowed_vfolder_types=None,
     extra_vf_conds=None,
-    extra_vfperm_conds=None,
+    extra_invited_vf_conds=None,
     extra_vf_user_conds=None,
     extra_vf_group_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
@@ -243,6 +345,7 @@ async def query_accessible_vfolders(
         vfolders.c.name,
         vfolders.c.id,
         vfolders.c.host,
+        vfolders.c.quota_scope_id,
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
@@ -254,6 +357,8 @@ async def query_accessible_vfolders(
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
+        vfolders.c.status,
+        vfolders.c.cur_size,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -276,6 +381,7 @@ async def query_accessible_vfolders(
                     "name": row.vfolders_name,
                     "id": row.vfolders_id,
                     "host": row.vfolders_host,
+                    "quota_scope_id": row.vfolders_quota_scope_id,
                     "usage_mode": row.vfolders_usage_mode,
                     "created_at": row.vfolders_created_at,
                     "last_used": row.vfolders_last_used,
@@ -291,6 +397,8 @@ async def query_accessible_vfolders(
                     "permission": _perm,
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
+                    "status": row.vfolders_status,
+                    "cur_size": row.vfolders_cur_size,
                 }
             )
 
@@ -299,11 +407,13 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan my owned vfolders.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-            .where(vfolders.c.user == user_uuid)
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
+        if not allow_privileged_access or (
+            user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
+        ):
+            query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
         # Scan vfolders shared with me.
@@ -327,6 +437,8 @@ async def query_accessible_vfolders(
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
             )
         )
+        if extra_invited_vf_conds is not None:
+            query = query.where(extra_invited_vf_conds)
         await _append_entries(query, _is_owner=False)
 
     if "group" in allowed_vfolder_types:
@@ -350,8 +462,10 @@ async def query_accessible_vfolders(
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
         ).select_from(j)
-        if user_role != UserRole.SUPERADMIN:
+        if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
+        if extra_vf_group_conds is not None:
+            query = query.where(extra_vf_group_conds)
         is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
@@ -392,7 +506,7 @@ async def get_allowed_vfolder_hosts_by_group(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
     domain_admin: bool = False,
-) -> Set[str]:
+) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
 
@@ -402,12 +516,12 @@ async def get_allowed_vfolder_hosts_by_group(
     from . import domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts: set[str] = set()
+    allowed_hosts = VFolderHostPermissionMap()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts.update(values)
+        allowed_hosts = allowed_hosts | values
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
@@ -416,26 +530,26 @@ async def get_allowed_vfolder_hosts_by_group(
             & (groups.c.is_active),
         )
         if values := await conn.scalar(query):
-            allowed_hosts.update(values)
+            allowed_hosts = allowed_hosts | values
     elif domain_admin:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
         if rows := (await conn.execute(query)).fetchall():
             for row in rows:
-                allowed_hosts.update(row.allowed_vfolder_hosts)
+                allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
+    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
 
 
 async def get_allowed_vfolder_hosts_by_user(
     conn: SAConnection,
-    resource_policy,
+    resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
     group_id: Optional[uuid.UUID] = None,
-) -> Set[str]:
+) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
 
@@ -444,12 +558,12 @@ async def get_allowed_vfolder_hosts_by_user(
     from . import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts: set[str] = set()
+    allowed_hosts = VFolderHostPermissionMap()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts.update(values)
+        allowed_hosts = allowed_hosts | values
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
@@ -472,14 +586,14 @@ async def get_allowed_vfolder_hosts_by_user(
         sa.select([groups.c.allowed_vfolder_hosts])
         .select_from(j)
         .where(
-            (domains.c.name == domain_name) & (groups.c.is_active),
+            (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
-            allowed_hosts.update(row.allowed_vfolder_hosts)
+            allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
+    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
 
 
@@ -488,13 +602,35 @@ async def prepare_vfolder_mounts(
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
-    requested_mounts: Sequence[str],
-    requested_mount_map: Mapping[str, str],
+    resource_policy: Mapping[str, Any],
+    requested_mount_references: Sequence[str | uuid.UUID],
+    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
+    requested_mounts: list[str] = [
+        name for name in requested_mount_references if isinstance(name, str)
+    ]
+    requested_mount_map: dict[str, str] = {
+        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+
+    vfolder_ids_to_resolve = [
+        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
+    ]
+    query = (
+        sa.select([vfolders.c.id, vfolders.c.name])
+        .select_from(vfolders)
+        .where(vfolders.c.id.in_(vfolder_ids_to_resolve))
+    )
+    result = await conn.execute(query)
+
+    for vfid, name in result.fetchall():
+        requested_mounts.append(name)
+        if path := requested_mount_reference_map.get(vfid):
+            requested_mount_map[name] = path
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -506,8 +642,7 @@ async def prepare_vfolder_mounts(
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate "
-                f"a subdirectory of the vfolder '{name}'.",
+                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
             )
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
@@ -561,20 +696,32 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        await ensure_host_permission_allowed(
+            conn,
+            vfolder["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_scope.user_uuid,
+            resource_policy=resource_policy,
+            domain_name=user_scope.domain_name,
+            group_id=user_scope.group_id,
+            permission=VFolderHostPermission.MOUNT_IN_SESSION,
+        )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
-            # if not belong to the execution kernel.
+            # if they do not belong to the execution kernel.
             continue
         try:
             mount_base_path = PurePosixPath(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
-                    vfolder["id"],
+                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     PurePosixPath(requested_vfolder_subpaths[key]),
                 ),
             )
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
+        if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
+            requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
@@ -583,7 +730,7 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
-                    "vfid": vfolder["id"],
+                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
                     "relpath": str(user_scope.user_uuid.hex),
                     "exist_ok": True,
                 },
@@ -593,11 +740,12 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=vfolder["id"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
         else:
@@ -612,11 +760,12 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=vfolder["id"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
 
@@ -633,11 +782,299 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
+async def update_vfolder_status(
+    engine: ExtendedAsyncSAEngine,
+    vfolder_ids: Sequence[uuid.UUID],
+    update_status: VFolderOperationStatus,
+    do_log: bool = True,
+) -> None:
+    vfolder_info_len = len(vfolder_ids)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return None
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    async def _update() -> None:
+        async with engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(
+                    status=update_status,
+                    status_history=sql_json_merge(
+                        vfolders.c.status_history,
+                        (),
+                        {
+                            update_status.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                )
+                .where(cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update)
+    if do_log:
+        log.debug(
+            "Successfully updated status of VFolder(s) {} to {}",
+            [str(x) for x in vfolder_ids],
+            update_status.name,
+        )
+
+
+async def ensure_host_permission_allowed(
+    db_conn,
+    folder_host: str,
+    *,
+    permission: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> None:
+    allowed_hosts = await filter_host_allowed_permission(
+        db_conn,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        group_id=group_id,
+    )
+    if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+
+
+async def filter_host_allowed_permission(
+    db_conn,
+    *,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    allowed_hosts = VFolderHostPermissionMap()
+    if "user" in allowed_vfolder_types:
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            db_conn, resource_policy, domain_name, user_uuid
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+    if "group" in allowed_vfolder_types and group_id is not None:
+        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+    return allowed_hosts
+
+
+async def initiate_vfolder_clone(
+    db_engine: ExtendedAsyncSAEngine,
+    vfolder_info: VFolderCloneInfo,
+    storage_manager: StorageSessionManager,
+    background_task_manager: BackgroundTaskManager,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
+
+    async def _update_status() -> None:
+        async with db_engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(status=VFolderOperationStatus.CLONING)
+                .where(source_vf_cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update_status)
+
+    target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
+    source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
+
+    # Generate the ID of the destination vfolder.
+    # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
+    #       the actual object (with RETURNING clause).  In that case, we need to temporarily
+    #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
+    #       vfolder.  After done, we need to make another transaction to clear the unusable state.
+    target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
+
+    async def _clone(reporter: ProgressReporter) -> None:
+        async def _insert_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                insert_values = {
+                    "id": target_folder_id.folder_id,
+                    "name": vfolder_info.target_vfolder_name,
+                    "usage_mode": vfolder_info.usage_mode,
+                    "permission": vfolder_info.permission,
+                    "last_used": None,
+                    "host": vfolder_info.target_host,
+                    # TODO: add quota_scope_id
+                    "creator": vfolder_info.email,
+                    "ownership_type": VFolderOwnershipType("user"),
+                    "user": vfolder_info.user_id,
+                    "group": None,
+                    "unmanaged_path": "",
+                    "cloneable": vfolder_info.cloneable,
+                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+                }
+                insert_query = sa.insert(vfolders, insert_values)
+                try:
+                    await db_session.execute(insert_query)
+                except sa.exc.DataError:
+                    # TODO: pass exception info
+                    raise InvalidAPIParameters
+
+        await execute_with_retry(_insert_vfolder)
+
+        try:
+            async with storage_manager.request(
+                source_proxy,
+                "POST",
+                "folder/clone",
+                json={
+                    "src_volume": source_volume,
+                    "src_vfid": str(vfolder_info.source_vfolder_id),
+                    "dst_volume": target_volume,
+                    "dst_vfid": str(target_folder_id),
+                },
+            ):
+                pass
+        except aiohttp.ClientResponseError:
+            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
+
+        async def _update_source_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                query = (
+                    sa.update(vfolders)
+                    .values(status=VFolderOperationStatus.READY)
+                    .where(source_vf_cond)
+                )
+                await db_session.execute(query)
+
+        await execute_with_retry(_update_source_vfolder)
+
+    task_id = await background_task_manager.start(_clone)
+    return task_id, target_folder_id.folder_id
+
+
+async def initiate_vfolder_purge(
+    db_engine: ExtendedAsyncSAEngine,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    storage_manager: StorageSessionManager,
+    storage_ptask_group: aiotools.PersistentTaskGroup,
+) -> int:
+    vfolder_info_len = len(requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
+    vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return 0
+    elif vfolder_info_len == 1:
+        vfolders.c.id == vfolder_ids[0]
+    await update_vfolder_status(
+        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+    )
+
+    row_deletion_infos: list[VFolderDeletionInfo] = []
+    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+
+    async def _delete():
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
+            proxy_name, volume_name = storage_manager.split_host(host_name)
+            try:
+                async with storage_manager.request(
+                    proxy_name,
+                    "POST",
+                    "folder/delete",
+                    json={
+                        "volume": volume_name,
+                        "vfid": str(folder_id),
+                    },
+                ) as (_, resp):
+                    pass
+            except (VFolderOperationFailed, InvalidAPIParameters) as e:
+                if e.status == 404:
+                    row_deletion_infos.append(vfolder_info)
+                else:
+                    failed_deletion.append((vfolder_info, repr(e)))
+            except Exception as e:
+                failed_deletion.append((vfolder_info, repr(e)))
+            else:
+                row_deletion_infos.append(vfolder_info)
+        if row_deletion_infos:
+            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+
+            async def _delete_row() -> None:
+                async with db_engine.begin_session() as db_session:
+                    await db_session.execute(
+                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
+                    )
+
+            await execute_with_retry(_delete_row)
+            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
+        if failed_deletion:
+            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
+            raise VFolderOperationFailed(extra_data=extra_data)
+
+    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
+    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+
+    return vfolder_info_len
+
+
+async def ensure_quota_scope_accessible_by_user(
+    conn: SASession,
+    quota_scope: QuotaScopeID,
+    user: Mapping[str, Any],
+) -> None:
+    from ai.backend.manager.models import GroupRow, UserRow
+    from ai.backend.manager.models import association_groups_users as agus
+
+    # Lookup user table to match if quota is scoped to the user
+    query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
+    quota_scope_user = await conn.scalar(query)
+    if quota_scope_user:
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN:
+                if quota_scope_user.domain == user["domain"]:
+                    return
+            case _:
+                if quota_scope_user.uuid == user["uuid"]:
+                    return
+        raise InvalidAPIParameters
+
+    # Lookup group table to match if quota is scoped to the group
+    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
+    quota_scope_group = await conn.scalar(query)
+    if quota_scope_group:
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN:
+                if quota_scope_group.domain == user["domain"]:
+                    return
+            case _:
+                query = (
+                    sa.select([agus.c.group_id])
+                    .select_from(agus)
+                    .where(
+                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
+                    )
+                )
+                matched_group_id = await conn.scalar(query)
+                if matched_group_id:
+                    return
+
+    raise InvalidAPIParameters
+
+
 class VirtualFolder(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
     host = graphene.String()
+    quota_scope_id = graphene.String()
     name = graphene.String()
     user = graphene.UUID()  # User.id (current owner, null in project vfolders)
     user_email = graphene.String()  # User.email (current owner, null in project vfolders)
@@ -657,19 +1094,22 @@ class VirtualFolder(graphene.ObjectType):
     cur_size = BigInt()
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
+    status = graphene.String()
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
         if row is None:
             return None
+
         return cls(
             id=row["id"],
             host=row["host"],
+            quota_scope_id=row["quota_scope_id"],
             name=row["name"],
             user=row["user"],
-            user_email=row["users_email"],
+            user_email=row["users_email"] if "users_email" in row else None,
             group=row["group"],
-            group_name=row["groups_name"],
+            group_name=row["groups_name"] if "groups_name" in row else None,
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
@@ -681,19 +1121,18 @@ class VirtualFolder(graphene.ObjectType):
             last_used=row["last_used"],
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
+            status=row["status"],
+            cur_size=row["cur_size"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly
         return 0
 
-    async def resolve_cur_size(self, info: graphene.ResolveInfo) -> int:
-        # TODO: measure on-the-fly
-        return 0
-
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
         "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
         "name": ("vfolders_name", None),
         "group": ("vfolders_group", uuid.UUID),
         "group_name": ("groups_name", None),
@@ -701,32 +1140,49 @@ class VirtualFolder(graphene.ObjectType):
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "unmanaged_path": ("vfolders_unmanaged_path", None),
-        "usage_mode": ("vfolders_usage_mode", lambda s: VFolderUsageMode[s]),
-        "permission": ("vfolders_permission", lambda s: VFolderPermission[s]),
-        "ownership_type": ("vfolders_ownership_type", lambda s: VFolderOwnershipType[s]),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            enum_field_getter(VFolderUsageMode),
+        ),
+        "permission": (
+            "vfolders_permission",
+            enum_field_getter(VFolderPermission),
+        ),
+        "ownership_type": (
+            "vfolders_ownership_type",
+            enum_field_getter(VFolderOwnershipType),
+        ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
+        "status": (
+            "vfolders_status",
+            enum_field_getter(VFolderOperationStatus),
+        ),
     }
 
-    _queryorder_colmap = {
-        "id": "vfolders_id",
-        "host": "vfolders_host",
-        "name": "vfolders_name",
-        "group": "vfolders_group",
-        "group_name": "groups_name",
-        "user": "vfolders_user",
-        "user_email": "users_email",
-        "usage_mode": "vfolders_usage_mode",
-        "permission": "vfolders_permission",
-        "ownership_type": "vfolders_ownership_type",
-        "max_files": "vfolders_max_files",
-        "max_size": "vfolders_max_size",
-        "created_at": "vfolders_created_at",
-        "last_used": "vfolders_last_used",
-        "cloneable": "vfolders_cloneable",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("vfolders_id", None),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", None),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", None),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "usage_mode": ("vfolders_usage_mode", None),
+        "permission": ("vfolders_permission", None),
+        "ownership_type": ("vfolders_ownership_type", None),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", None),
+        "last_used": ("vfolders_last_used", None),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
     }
 
     @classmethod
@@ -803,6 +1259,45 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
     @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        ids: list[str],
+        *,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[Sequence[VirtualFolder]]:
+        from .user import UserRow
+
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        query = (
+            sa.select(VFolderRow)
+            .select_from(j)
+            .where(VFolderRow.id.in_(ids))
+            .order_by(sa.desc(VFolderRow.created_at))
+        )
+        if user_id is not None:
+            query = query.where(VFolderRow.user == user_id)
+            if domain_name is not None:
+                query = query.where(UserRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(VFolderRow.group == group_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                ids,
+                lambda row: row["user"],
+            )
+
+    @classmethod
     async def batch_load_by_user(
         cls,
         graph_ctx: GraphQueryContext,
@@ -835,6 +1330,176 @@ class VirtualFolder(graphene.ObjectType):
                 lambda row: row["user"],
             )
 
+    @classmethod
+    async def load_count_invited(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+    ) -> int:
+        from .user import users
+
+        j = vfolders.join(
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+        ).join(
+            users,
+            vfolder_permissions.c.user == users.c.uuid,
+        )
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(j)
+            .where(
+                (vfolder_permissions.c.user == user_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+            )
+        )
+        if domain_name is not None:
+            query = query.where(users.c.domain_name == domain_name)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice_invited(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> list[VirtualFolder]:
+        from .user import users
+
+        j = vfolders.join(
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+        ).join(
+            users,
+            vfolder_permissions.c.user == users.c.uuid,
+        )
+        query = (
+            sa.select([vfolders, users.c.email])
+            .select_from(j)
+            .where(
+                (vfolder_permissions.c.user == user_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        if domain_name is not None:
+            query = query.where(users.c.domain_name == domain_name)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(vfolders.c.created_at.desc())
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(graph_ctx, r)) is not None
+            ]
+
+    @classmethod
+    async def load_count_project(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+    ) -> int:
+        from ai.backend.manager.models import association_groups_users as agus
+
+        from .group import groups
+
+        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+
+        grps = result.fetchall()
+        group_ids = [g.group_id for g in grps]
+        j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
+        query = sa.select([sa.func.count()]).select_from(j).where(vfolders.c.group.in_(group_ids))
+
+        if domain_name is not None:
+            query = query.where(groups.c.domain_name == domain_name)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice_project(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> list[VirtualFolder]:
+        from ai.backend.manager.models import association_groups_users as agus
+
+        from .group import groups
+
+        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+        grps = result.fetchall()
+        group_ids = [g.group_id for g in grps]
+        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+        query = (
+            sa.select(
+                [
+                    vfolders,
+                    groups.c.name.label("groups_name"),
+                ]
+            )
+            .select_from(j)
+            .where(vfolders.c.group.in_(group_ids))
+            .limit(limit)
+            .offset(offset)
+        )
+        if domain_name is not None:
+            query = query.where(groups.c.domain_name == domain_name)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(vfolders.c.created_at.desc())
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(graph_ctx, r)) is not None
+            ]
+
 
 class VirtualFolderList(graphene.ObjectType):
     class Meta:
@@ -865,20 +1530,20 @@ class VirtualFolderPermission(graphene.ObjectType):
             user_email=row["email"],
         )
 
-    _queryfilter_fieldspec = {
-        "permission": ("vfolder_permissions_permission", lambda s: VFolderPermission[s]),
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "permission": ("vfolder_permissions_permission", enum_field_getter(VFolderPermission)),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),
         "user_email": ("users_email", None),
     }
 
-    _queryorder_colmap = {
-        "permission": "vfolder_permissions_permission",
-        "vfolder": "vfolder_permissions_vfolder",
-        "vfolder_name": "vfolders_name",
-        "user": "vfolder_permissions_user",
-        "user_email": "users_email",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "permission": ("vfolder_permissions_permission", None),
+        "vfolder": ("vfolder_permissions_vfolder", None),
+        "vfolder_name": ("vfolders_name", None),
+        "user": ("vfolder_permissions_user", None),
+        "user_email": ("users_email", None),
     }
 
     @classmethod
@@ -914,7 +1579,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
-    ) -> Sequence[VirtualFolderPermission]:
+    ) -> list[VirtualFolderPermission]:
         from .user import users
 
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
@@ -949,3 +1614,186 @@ class VirtualFolderPermissionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolderPermission, required=True)
+
+
+class QuotaDetails(graphene.ObjectType):
+    usage_bytes = BigInt(required=False)
+    usage_count = BigInt(required=False)
+    hard_limit_bytes = BigInt(required=False)
+
+
+class QuotaScope(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+    id = graphene.ID(required=True)
+    quota_scope_id = graphene.String(required=True)
+    storage_host_name = graphene.String(required=True)
+    details = graphene.NonNull(QuotaDetails)
+
+    @classmethod
+    def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> QuotaScope:
+        return QuotaScope(
+            quota_scope_id=str(row.quota_scope_id),
+            storage_host_name=row.host,
+        )
+
+    def resolve_id(self, info: graphene.ResolveInfo) -> str:
+        return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
+
+    async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
+        from ai.backend.manager.models import GroupRow, UserRow
+
+        graph_ctx: GraphQueryContext = info.context
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
+        try:
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "GET",
+                "quota-scope",
+                json={"volume": volume_name, "qsid": self.quota_scope_id},
+                raise_for_status=True,
+            ) as (_, storage_resp):
+                quota_config = await storage_resp.json()
+                usage_bytes = quota_config["used_bytes"]
+                if usage_bytes is not None and usage_bytes < 0:
+                    usage_bytes = None
+                return QuotaDetails(
+                    # FIXME: limit scaning this only for fast scan capable volumes
+                    usage_bytes=usage_bytes,
+                    hard_limit_bytes=quota_config["limit_bytes"] or None,
+                    usage_count=None,  # TODO: Implement
+                )
+        except aiohttp.ClientResponseError:
+            qsid = QuotaScopeID.parse(self.quota_scope_id)
+            async with graph_ctx.db.begin_readonly_session() as sess:
+                await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+                if qsid.scope_type == QuotaScopeType.USER:
+                    query = (
+                        sa.select(UserRow)
+                        .where(UserRow.uuid == qsid.scope_id)
+                        .options(selectinload(UserRow.resource_policy_row))
+                    )
+                else:
+                    query = (
+                        sa.select(GroupRow)
+                        .where(GroupRow.id == qsid.scope_id)
+                        .options(selectinload(GroupRow.resource_policy_row))
+                    )
+                result = await sess.scalar(query)
+                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                if resource_policy_constraint is not None and resource_policy_constraint < 0:
+                    resource_policy_constraint = None
+
+            return QuotaDetails(
+                usage_bytes=None,
+                hard_limit_bytes=resource_policy_constraint,
+                usage_count=None,  # TODO: Implement
+            )
+
+
+class QuotaScopeInput(graphene.InputObjectType):
+    hard_limit_bytes = BigInt(required=False)
+
+
+class SetQuotaScope(graphene.Mutation):
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    class Arguments:
+        quota_scope_id = graphene.String(required=True)
+        storage_host_name = graphene.String(required=True)
+        props = QuotaScopeInput(required=True)
+
+    quota_scope = graphene.Field(lambda: QuotaScope)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        quota_scope_id: str,
+        storage_host_name: str,
+        props: QuotaScopeInput,
+    ) -> SetQuotaScope:
+        qsid = QuotaScopeID.parse(quota_scope_id)
+        graph_ctx: GraphQueryContext = info.context
+        async with graph_ctx.db.begin_readonly_session() as sess:
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+        if props.hard_limit_bytes is Undefined:
+            # Do nothing but just return the quota scope object.
+            return cls(
+                QuotaScope(
+                    quota_scope_id=quota_scope_id,
+                    storage_host_name=storage_host_name,
+                )
+            )
+        max_vfolder_size = props.hard_limit_bytes
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        request_body = {
+            "volume": volume_name,
+            "qsid": str(qsid),
+            "options": {"limit_bytes": max_vfolder_size},
+        }
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "PATCH",
+            "quota-scope",
+            json=request_body,
+            raise_for_status=True,
+        ):
+            pass
+        return cls(
+            QuotaScope(
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
+            )
+        )
+
+
+class UnsetQuotaScope(graphene.Mutation):
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    class Arguments:
+        quota_scope_id = graphene.String(required=True)
+        storage_host_name = graphene.String(required=True)
+
+    quota_scope = graphene.Field(lambda: QuotaScope)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        quota_scope_id: str,
+        storage_host_name: str,
+    ) -> SetQuotaScope:
+        qsid = QuotaScopeID.parse(quota_scope_id)
+        graph_ctx: GraphQueryContext = info.context
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        request_body: dict[str, Any] = {
+            "volume": volume_name,
+            "qsid": str(qsid),
+        }
+        async with graph_ctx.db.begin_readonly_session() as sess:
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "DELETE",
+            "quota-scope/quota",
+            json=request_body,
+            raise_for_status=True,
+        ):
+            pass
+
+        return cls(
+            QuotaScope(
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
+            )
+        )

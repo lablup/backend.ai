@@ -18,7 +18,7 @@ python_distribution(
         license="LGPLv3",
     ),
     entry_points={
-        "backendai_accelerator_v20": {
+        "backendai_accelerator_v21": {
             "cuda": "ai.backend.accelerator.cuda_open.plugin:CUDAPlugin",
         }
     },
@@ -27,7 +27,7 @@ python_distribution(
 )
 
 resource(name="version", source="VERSION")
-
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[

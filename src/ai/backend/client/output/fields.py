@@ -5,6 +5,7 @@ from .formatters import (
     ContainerListFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
@@ -31,6 +32,7 @@ container_fields = FieldSet(
         FieldSpec("container_id"),
         FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("preopen_ports", "Preopen Ports"),
         FieldSpec("live_stat", formatter=KernelStatFormatter()),
         FieldSpec("last_stat", formatter=KernelStatFormatter()),
     ]
@@ -58,6 +60,7 @@ agent_fields = FieldSet(
         FieldSpec(
             "compute_containers", subfields=container_fields, formatter=ContainerListFormatter()
         ),
+        FieldSpec("local_config", formatter=nested_dict_formatter),
         # legacy fields
         FieldSpec("cpu_cur_pct", "CPU Usage (%)"),
         FieldSpec("mem_cur_bytes", "Used Memory (MiB)", formatter=mibytes_output_formatter),
@@ -76,6 +79,7 @@ domain_fields = FieldSet(
         FieldSpec("integration_id"),
     ]
 )
+
 
 group_fields = FieldSet(
     [
@@ -114,6 +118,7 @@ keypair_fields = FieldSet(
             alt_name="full_name",
             formatter=SubFieldOutputFormatter("full_name"),
         ),
+        FieldSpec("projects"),
         FieldSpec("access_key"),
         FieldSpec("secret_key"),
         FieldSpec("is_active"),
@@ -138,8 +143,6 @@ keypair_resource_policy_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("total_resource_slots"),
         FieldSpec("max_concurrent_sessions"),  # formerly concurrency_limit
-        FieldSpec("max_vfolder_count"),
-        FieldSpec("max_vfolder_size", formatter=sizebytes_output_formatter),
         FieldSpec("idle_timeout"),
         FieldSpec("max_containers_per_session"),
         FieldSpec("allowed_vfolder_hosts"),
@@ -152,22 +155,26 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
+        FieldSpec("use_host_network"),
+        FieldSpec("wsproxy_addr"),
+        FieldSpec("wsproxy_api_token"),
     ]
 )
 
 
 session_fields = FieldSet(
     [
-        FieldSpec("id", "Kernel ID", alt_name="kernel_id"),
+        FieldSpec("id", "Session ID", alt_name="session_id"),
+        FieldSpec("main_kernel_id", "Main Kernel ID"),
         FieldSpec("tag"),
         FieldSpec("name"),
         FieldSpec("type"),
-        FieldSpec("session_id", "Session ID"),
         FieldSpec("image"),
         FieldSpec("registry"),
         FieldSpec("cluster_template"),
@@ -176,6 +183,7 @@ session_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("group_name", "Project/Group"),
         FieldSpec("group_id"),
+        FieldSpec("agent_ids"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
@@ -188,13 +196,14 @@ session_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("terminated_at"),
         FieldSpec("starts_at"),
+        FieldSpec("scheduled_at"),
         FieldSpec("startup_command"),
         FieldSpec("result"),
         FieldSpec("resoucre_opts", formatter=nested_dict_formatter),
         FieldSpec("scaling_group"),
         FieldSpec("service_ports", formatter=nested_dict_formatter),
         FieldSpec("mounts"),
-        FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("occupying_slots", formatter=resource_slot_formatter),
         FieldSpec(
             "containers",
             subfields=container_fields,
@@ -204,6 +213,8 @@ session_fields = FieldSet(
             "dependencies { name id }",
             formatter=DependencyListFormatter(),
         ),
+        FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 
@@ -264,6 +275,9 @@ user_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+        FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
+        FieldSpec("sudo_session_enabled"),
     ]
 )
 
@@ -276,8 +290,10 @@ vfolder_fields = FieldSet(
         FieldSpec("user", alt_name="user_id"),
         FieldSpec("group", alt_name="group_id"),
         FieldSpec("creator"),
+        FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
+        FieldSpec("status"),
         FieldSpec("permission"),
         FieldSpec("ownership_type"),
         FieldSpec("max_files"),
@@ -287,5 +303,55 @@ vfolder_fields = FieldSet(
         FieldSpec("num_files"),
         FieldSpec("cur_size"),
         FieldSpec("cloneable"),
+    ]
+)
+
+
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
+    ]
+)
+
+
+service_fields = FieldSet(
+    [
+        FieldSpec("endpoint_id"),
+        FieldSpec("image"),
+        FieldSpec("domain"),
+        FieldSpec("project"),
+        FieldSpec("resource_group"),
+        FieldSpec("resource_slots", formatter=nested_dict_formatter),
+        FieldSpec("url"),
+        FieldSpec("model"),
+        FieldSpec("model_mount_destiation"),
+        FieldSpec("created_user"),
+        FieldSpec("session_owner"),
+        FieldSpec("tag"),
+        FieldSpec("startup_command"),
+        FieldSpec("bootstrap_script"),
+        FieldSpec("callback_url"),
+        FieldSpec("environ", formatter=nested_dict_formatter),
+        FieldSpec("name"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("desired_session_count"),
+        FieldSpec("cluster_mode"),
+        FieldSpec("cluster_size"),
+        FieldSpec("open_to_public"),
+        FieldSpec(
+            "routings { routing_id session status traffic_ratio }",
+            formatter=InlineRoutingFormatter(),
+        ),
+    ]
+)
+
+
+routing_fields = FieldSet(
+    [
+        FieldSpec("routing_id"),
+        FieldSpec("status"),
+        FieldSpec("endpoint"),
+        FieldSpec("session"),
+        FieldSpec("traffic_ratio"),
     ]
 )

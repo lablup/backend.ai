@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models import keypair_resource_policies
@@ -30,7 +31,7 @@ def upgrade():
         sa.PrimaryKeyConstraint("name", name=op.f("pk_resource_presets")),
     )
     # Add initial fixtures for resource presets
-    query = """
+    queries = """
     INSERT INTO resource_presets
     VALUES (
         'small',
@@ -63,14 +64,16 @@ def upgrade():
     );
     """
     connection = op.get_bind()
-    connection.execute(query)
+    for query in queries.split(";"):
+        if len(query.strip()) == 0:
+            continue
+        connection.execute(text(query))
 
     query = """
     SELECT name, total_resource_slots
     FROM keypair_resource_policies
     """
-    connection = op.get_bind()
-    result = connection.execute(query)
+    result = connection.execute(text(query))
     updates = []
     for row in result:
         converted = ResourceSlot(row["total_resource_slots"])

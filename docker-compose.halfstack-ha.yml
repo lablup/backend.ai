@@ -3,107 +3,134 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:13.7-alpine
+    image: postgres:15.1-alpine
     command: postgres -c 'max_connections=256'
     networks:
       - half
     ports:
-      - "8200:5432"
+      - "8100:5432"
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-develove}
       - POSTGRES_DB=${POSTGRES_DBNAME:-backend}
     volumes:
       - "./tmp/backend.ai-halfstack-ha/postgres-data:/var/lib/postgresql/data:rw"
 
-  backendai-half-redis-proxy:
-    image: haproxy:2.4-alpine
-    depends_on:
-      - "backendai-half-redis-node01"
-      - "backendai-half-redis-node02"
-      - "backendai-half-redis-node03"
-    volumes:
-      - ./configs/redis/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    ports:
-      - "8210:6379"
-    networks:
-      - half
-
-  # Initial master is node01.
+  # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:6.2.7-alpine
+    image: redis:7.0.5-alpine
+    hostname: node01
+    networks:
+    - half
+    ports:
+    - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
     command: >
       redis-server
+      --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
+      --replica-announce-ip node01
+      --replica-announce-port ${REDIS_MASTER_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
-
-  backendai-half-redis-sentinel01:
-    build:
-      context: .
-      dockerfile: redis-sentinel.dockerfile
-      cache_from:
-        - redis:5-alpine
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    networks:
-      - half
-    cpu_count: 1
+    # IMPORTANT: We have INTENTIONALLY OMITTED the healthchecks
+    # because it interferes with pause/unpause of container to simulate
+    # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:6.2.7-alpine
+    image: redis:7.0.5-alpine
+    hostname: node02
+    networks:
+    - half
+    ports:
+    - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
     command: >
       redis-server
+      --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof backendai-half-redis-node01 6379
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node02
+      --replica-announce-port ${REDIS_SLAVE1_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
-
-  backendai-half-redis-sentinel02:
-    build:
-      context: .
-      dockerfile: redis-sentinel.dockerfile
-      cache_from:
-        - redis:6.2.7-alpine
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    networks:
-      - half
-    cpu_count: 1
 
   backendai-half-redis-node03:
-    image: redis:6.2.7-alpine
+    image: redis:7.0.5-alpine
+    hostname: node03
+    ports:
+    - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
+    networks:
+    - half
     command: >
       redis-server
+      --port ${REDIS_SLAVE2_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof backendai-half-redis-node01 6379
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node03
+      --replica-announce-port ${REDIS_SLAVE2_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
 
-  backendai-half-redis-sentinel03:
-    build:
-      context: .
-      dockerfile: redis-sentinel.dockerfile
-      cache_from:
-        - redis:6.2.7-alpine
+  backendai-half-redis-sentinel01:
+    image: redis:7.0.5-alpine
+    hostname: sentinel01
+    networks:
+    - half
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-sentinel /config/sentinel01.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+
+  backendai-half-redis-sentinel02:
+    image: redis:7.0.5-alpine
+    hostname: sentinel02
     networks:
-      - half
-    cpu_count: 1
+    - half
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-sentinel /config/sentinel02.conf
+    environment:
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+
+  backendai-half-redis-sentinel03:
+    image: redis:7.0.5-alpine
+    hostname: sentinel03
+    networks:
+    - half
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-sentinel /config/sentinel03.conf
+    environment:
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-etcd-proxy:
     image: quay.io/coreos/etcd:v3.5.4

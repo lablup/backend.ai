@@ -9,200 +9,278 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-09-13 15:33+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../install/development-setup.rst:6 21726f4ce74f4ddbb6c41fe4c68747ca
+#: ../../install/development-setup.rst:6 1b2962a2c4dc4c08bb1b525c537ff619
 msgid "Development Setup"
 msgstr "개발 환경 설치"
 
-#: ../../install/development-setup.rst:8 0f382e89e41042e8894437e83524d0be
+#: ../../install/development-setup.rst:8 d7e12af05b18412dbdcd4c7be27c8606
 msgid ""
-"Currently Backend.AI is developed and tested under only \\*NIX-compatible "
-"platforms (Linux or macOS)."
-msgstr ""
-"현재 Backend.AI는 \\*NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되었습니"
-"다."
+"Currently Backend.AI is developed and tested under only \\*NIX-compatible"
+" platforms (Linux or macOS)."
+msgstr "현재 Backend.AI는 \\*NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되었습니다."
 
-#: ../../install/development-setup.rst:12 617d8b2ffdb44150bda63fcbe194154e
+#: ../../install/development-setup.rst:10 36ee8b98f55d45298143fafbfb8f0719
+msgid ""
+"The development setup uses a mono-repository for the backend stack and a "
+"side-by-side repository checkout of the frontend stack. In contrast, the "
+"production setup uses per-service independent virtual environments and "
+"relies on a separately provisioned app proxy pool."
+msgstr ""
+
+#: ../../install/development-setup.rst:13 29627354616242198ae3df4a8c56db5c
+msgid ""
+"There are three ways to run both the backend and frontend stacks for "
+"development, as demonstrated in :numref:`dev-setup-standard`, :numref"
+":`dev-setup-app`, and :numref:`dev-setup-staticwebui`. The installation "
+"guide in this page using ``scripts/install-dev.sh`` covers all three "
+"cases because the only difference is that how you launch the Web UI from "
+"the mono-repo."
+msgstr ""
+
+#: ../../install/development-setup.rst:22 4b1b80dee0e94398a542fa6b8126670c
+msgid "A standard development setup of Backend.AI open source components"
+msgstr ""
+
+#: ../../install/development-setup.rst:28 e6b1d7f935b14edb8ee54e197f844008
+msgid ""
+"A development setup of Backend.AI open source components for Electron-"
+"based desktop app"
+msgstr ""
+
+#: ../../install/development-setup.rst:35 b6f55301dd6b4278801091737983ed5c
+msgid ""
+"A development setup of Backend.AI open source components with pre-built "
+"web UI from the ``backend.ai-app`` repository"
+msgstr ""
+
+#: ../../install/development-setup.rst:101 1acde67561224931b2d2db32b1c1365d
 msgid "Installation from Source"
 msgstr ""
 
-#: ../../install/development-setup.rst:14 3fda633c33754e60bcee9490f43561fb
+#: ../../install/development-setup.rst:103 fe8264c058f1466ba2dfa6f83a92f799
 msgid ""
-"For the ease of on-boarding developer experience, we provide an automated "
-"script that installs all server-side components in editable states with just "
-"one command."
+"For the ease of on-boarding developer experience, we provide an automated"
+" script that installs all server-side components in editable states with "
+"just one command."
 msgstr ""
 
-#: ../../install/development-setup.rst:19 4a72e8a9bdee4d249fbebaae1a23985f
+#: ../../install/development-setup.rst:108 9aa76967affd4f6cbf44342d571dbb78
 msgid "Prerequisites"
 msgstr "필수 선행 사항"
 
-#: ../../install/development-setup.rst:21 25ba0f43515d4317913abca2ee843629
+#: ../../install/development-setup.rst:110 7d1b8636e8cf424fb4b4cc7ed74ffc37
 msgid "Install the followings accordingly to your host operating system."
 msgstr "사용자 OS에 맞는 설치 방법을 확인 후 진행해주세요."
 
-#: ../../install/development-setup.rst:23 67da258956a143ef9ca070b47db73ad1
-msgid ""
-"`pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://"
-"github.com/pyenv/pyenv-virtualenv>`_"
-msgstr ""
-"`pyenv <https://github.com/pyenv/pyenv>`_ 와 `pyenv-virtualenv <https://"
-"github.com/pyenv/pyenv-virtualenv>`_"
-
-#: ../../install/development-setup.rst:25 d9198306d00040f9b458b1743151b98c
-msgid ""
-"Ensure that you have the Python version specified in ``pants.toml`` on your "
-"``PATH``."
+#: ../../install/development-setup.rst:112 e135e855acd34b72bf7b68e6edd3ffa2
+msgid "`Git LFS <https://git-lfs.github.com/>`_"
 msgstr ""
 
-#: ../../install/development-setup.rst:27 f68be2b565a44ba1ab57be78a3c4c347
-msgid "`docker <https://docs.docker.com/install/>`_"
+#: ../../install/development-setup.rst:114 3849da459d0a470e917f0808e8bc7f14
+msgid ""
+"`pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv "
+"<https://github.com/pyenv/pyenv-virtualenv>`_"
+msgstr ""
+"`pyenv <https://github.com/pyenv/pyenv>`_ 와 `pyenv-virtualenv "
+"<https://github.com/pyenv/pyenv-virtualenv>`_"
+
+#: ../../install/development-setup.rst:116 1274cb76cbb3413e816c94054b6f4a3e
+msgid ""
+"Ensure that you have the Python version specified in ``pants.toml`` on "
+"your ``PATH``."
+msgstr ""
+
+#: ../../install/development-setup.rst:118 3134a12b16464539bffa7d62525e6674
+msgid ""
+"Depending on your Linux Distribution, you may have to additionally "
+"install a sysmte package that enables Python's `pip` command."
+msgstr ""
+
+#: ../../install/development-setup.rst:120 9a012081cd444a4fb642be8c1938d8dd
+msgid "Ubuntu"
+msgstr ""
+
+#: ../../install/development-setup.rst:126 b8d6c265267d4e89affb10bd87a6657f
+msgid "Fedora Core & CentOS"
+msgstr ""
+
+#: ../../install/development-setup.rst:132 f5f35e67bf8240148f7587f13ad1f506
+#, fuzzy
+msgid "`Docker <https://docs.docker.com/install/>`_"
 msgstr "`docker <https://docs.docker.com/install/>`_"
 
-#: ../../install/development-setup.rst:29 82e967bddc8e41608b65fe6fce017214
+#: ../../install/development-setup.rst:134 96da977606074f228ae05aa9524c6ee9
 #, fuzzy
-msgid ""
-"`docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)"
+msgid "`Docker Compose <https://docs.docker.com/compose/install/>`_ (v2 required)"
 msgstr "`docker-compose <https://docs.docker.com/compose/install/>`_"
 
-#: ../../install/development-setup.rst:31 28ce1f09f60e43c98e44e81df877d5ef
-msgid "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
+#: ../../install/development-setup.rst:136 225286fa03024625bcfbabc52a12506c
+msgid "`Rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
 msgstr ""
 
-#: ../../install/development-setup.rst:35 7ce6b014c19e49c1a960d52f95933882
+#: ../../install/development-setup.rst:140 ef926b7ecb2c49ecb12598d3af95632f
 msgid ""
-"In some cases, locale conflicts between the terminal client and the remote "
-"host may cause encoding errors when installing Backend.AI components due to "
-"Unicode characters in README files.  Please keep correct locale "
-"configurations to prevent such errors."
+"In some cases, locale conflicts between the terminal client and the "
+"remote host may cause encoding errors when installing Backend.AI "
+"components due to Unicode characters in README files.  Please keep "
+"correct locale configurations to prevent such errors."
 msgstr ""
-"상황에 따라 터미널 클라이언트와 원격 호스트 사이에 locale 충돌이 발생할 수 있"
-"습니다. 특히 Backend.AI 컴포넌트를 설치할 때에 README 파일의 유니코드 문자로 "
-"인해 이런 충돌이 발생할 수 있습니다. 이런 오류를 미연에 방지하기 위해 올바른 "
+"상황에 따라 터미널 클라이언트와 원격 호스트 사이에 locale 충돌이 발생할 수 있습니다. 특히 Backend.AI 컴포넌트를 "
+"설치할 때에 README 파일의 유니코드 문자로 인해 이런 충돌이 발생할 수 있습니다. 이런 오류를 미연에 방지하기 위해 올바른 "
 "locale 설정을 유지해주세요."
 
-#: ../../install/development-setup.rst:40 15fb3019a14b411f830a224ceb80eeeb
+#: ../../install/development-setup.rst:145 62ae26b4b2924d718f9121ebece3bfd0
 #, fuzzy
 msgid "Running the install-dev script"
 msgstr "스크립트 실행"
 
-#: ../../install/development-setup.rst:50 916fe4cb0b524e1a95471e72939973a3
+#: ../../install/development-setup.rst:155 b182d00d28294043bff62aef33eaf826
 msgid ""
-"The script requires ``sudo`` to check and install several system packages "
-"such as ``build-essential``."
+"The script requires ``sudo`` to check and install several system packages"
+" such as ``build-essential``."
 msgstr ""
 
-#: ../../install/development-setup.rst:53 371c0fc44ccc4ee0a3c2466f7ede9ed4
+#: ../../install/development-setup.rst:158 a47899b3041742a985788915c4de8273
 msgid ""
-"This script will bootstrap `Pants <https://pantsbuild.org>`_ and creates the "
-"halfstack containers using ``docker compose`` with fixture population. At "
-"the end of execution, the script will show several command examples about "
-"launching the service daemons such as manager and agent. You may execute "
-"this script multiple times when you encounter prerequisite errors and "
-"resolve them. Also check out additional options using ``-h`` / ``--help`` "
-"option, such as installing the CUDA mockup plugin together, etc."
+"This script will bootstrap `Pants <https://pantsbuild.org>`_ and creates "
+"the halfstack containers using ``docker compose`` with fixture "
+"population. At the end of execution, the script will show several command"
+" examples about launching the service daemons such as manager and agent. "
+"You may execute this script multiple times when you encounter "
+"prerequisite errors and resolve them. Also check out additional options "
+"using ``-h`` / ``--help`` option, such as installing the CUDA mockup "
+"plugin together, etc."
 msgstr ""
 
-#: ../../install/development-setup.rst:64 a053853eac744efca24c4863647a49ce
+#: ../../install/development-setup.rst:169 05f10ae7f0d74deebd1b7d87c8c0b8ac
 msgid ""
-"We have migrated to per-package repositories to a semi-mono repository that "
-"contains all Python-based components except plugins.  This has changed the "
-"installation instruction completely with introduction of Pants."
+"We have migrated to per-package repositories to a semi-mono repository "
+"that contains all Python-based components except plugins.  This has "
+"changed the installation instruction completely with introduction of "
+"Pants."
 msgstr ""
 
-#: ../../install/development-setup.rst:70 60dc7965a823466a95810ce9962efada
+#: ../../install/development-setup.rst:175 99570bb3c9ae45598ffb8d5fc491c0f8
 msgid ""
 "To install multiple instances/versions of development environments using "
-"this script, just clone the repository in another location and run ``scripts/"
-"install-dev.sh`` inside that directory."
+"this script, just clone the repository in another location and run "
+"``scripts/install-dev.sh`` inside that directory."
 msgstr ""
 
-#: ../../install/development-setup.rst:74 09094a985752436ba336cde256b6069d
+#: ../../install/development-setup.rst:179 7d3fc8d29a914d34b775dd0e48e72e92
 msgid ""
-"It is important to name these working-copy directories *differently* not to "
-"confuse ``docker compose`` so that it can distinguish the containers for "
-"each setup."
+"It is important to name these working-copy directories *differently* not "
+"to confuse ``docker compose`` so that it can distinguish the containers "
+"for each setup."
 msgstr ""
 
-#: ../../install/development-setup.rst:77 559744ea5da54f7084b2958394e44f09
+#: ../../install/development-setup.rst:182 356f7da4be1149008223fd851255a710
 msgid ""
-"Unless you customize all port numbers by the options of ``scripts/install-"
-"dev.sh``, you should ``docker compose -f docker-compose.halfstack.current."
-"yml down`` and ``docker compose -f docker-compose.halfstack.current.yml up -"
-"d`` when switching between multiple working copies."
+"Unless you customize all port numbers by the options of ``scripts"
+"/install-dev.sh``, you should ``docker compose -f docker-"
+"compose.halfstack.current.yml down`` and ``docker compose -f docker-"
+"compose.halfstack.current.yml up -d`` when switching between multiple "
+"working copies."
 msgstr ""
 
-#: ../../install/development-setup.rst:83 8a22f1d61da2416d807c76ea2758656b
+#: ../../install/development-setup.rst:188 1a1db31206d9496f8999623e0cfdb6e6
 msgid ""
 "By default, the script pulls the docker images for our standard Python "
-"kernel and TensorFlow CPU-only kernel.  To try out other images, you have to "
-"pull them manually afterwards."
+"kernel and TensorFlow CPU-only kernel.  To try out other images, you have"
+" to pull them manually afterwards."
 msgstr ""
 
-#: ../../install/development-setup.rst:89 0d9de87b25de425bbb1d1db441265977
+#: ../../install/development-setup.rst:194 731efa1f17b143dfa27fd68ed020ee8e
+msgid ""
+"Currently there are many limitations on running deep learning images on "
+"ARM64 platforms, because users need to rebuild the whole computation "
+"library stack, although more supported images will come in the future."
+msgstr ""
+
+#: ../../install/development-setup.rst:200 6364a7f7131e451f8da90b603e562dad
+msgid ""
+"To install the webui in an editable state, try ``--editable-webui`` flag "
+"option when running ``scripts/install-dev.sh``."
+msgstr ""
+
+#: ../../install/development-setup.rst:204 c33c664f80ce4797a644117f14c29d67
 msgid ""
 "**Using the agent's cgroup-based statistics without the root privilege "
 "(Linux-only)**"
 msgstr ""
 
-#: ../../install/development-setup.rst:91 2aee6f6fb1664e12b2a4ae2431eb1911
+#: ../../install/development-setup.rst:206 202a2fd274684189b6a29318c181d2e5
 msgid ""
-"To allow Backend.AI to collect sysfs/cgroup resource usage statistics, the "
-"Python executable must have the following Linux capabilities: "
+"To allow Backend.AI to collect sysfs/cgroup resource usage statistics, "
+"the Python executable must have the following Linux capabilities: "
 "``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``."
 msgstr ""
 
-#: ../../install/development-setup.rst:101 fda22483a4a4499a845d515f0280e0db
+#: ../../install/development-setup.rst:216 0f7fcbdb18da4afbb80e84cd800a0af8
 msgid "Verifying Installation"
 msgstr ""
 
-#: ../../install/development-setup.rst:103 61c8755e4c454f259d5bc552103a835c
+#: ../../install/development-setup.rst:218 9a9db30aec924b969576f663e400c613
 msgid ""
-"Refer the instructions displayed after running ``scripts/install-dev.sh``. "
-"We recommend to use `tmux <https://github.com/tmux/tmux/wiki>`_ to open "
-"multiple terminals in a single SSH session. Your terminal app may provide a "
-"tab interface, but when using remote servers, tmux is more convenient "
-"because you don't have to setup a new SSH connection whenever adding a new "
-"terminal."
+"Refer the instructions displayed after running ``scripts/install-"
+"dev.sh``. We recommend to use `tmux <https://github.com/tmux/tmux/wiki>`_"
+" to open multiple terminals in a single SSH session. Your terminal app "
+"may provide a tab interface, but when using remote servers, tmux is more "
+"convenient because you don't have to setup a new SSH connection whenever "
+"adding a new terminal."
 msgstr ""
 
-#: ../../install/development-setup.rst:110 20ff8347f6064009b59de59242b232b1
+#: ../../install/development-setup.rst:225 d1522d3930e14f77b8d493664d9a8baf
 msgid "Ensure the halfstack containers are running:"
 msgstr ""
 
-#: ../../install/development-setup.rst:116 1d851cff89e04c06accb8b94b498808d
+#: ../../install/development-setup.rst:231 94ae3ff7f828480fad40ab2501e441df
 msgid "Open a terminal for manager and run:"
 msgstr ""
 
-#: ../../install/development-setup.rst:122 e2804c27c5ef4f55bd1fad5c059c6752
+#: ../../install/development-setup.rst:237 22ac665c3b6b422fade28923bb9c3f71
 msgid "Open another terminal for agent and run:"
 msgstr ""
 
-#: ../../install/development-setup.rst:128 bf8fc9a127fc41b28e3a6779c66cbb9b
+#: ../../install/development-setup.rst:243 746ed199e50e425e9cd7f6b65396397e
 msgid "Open yet another terminal for client and run:"
 msgstr ""
 
-#: ../../install/development-setup.rst:141 6e2cb0d321944fc08fdc3e18bed0e571
+#: ../../install/development-setup.rst:261 1bc47557a583487b9e34c7ca20b3089f
 msgid "Resetting the environment"
 msgstr "환경 다시 설정하기"
 
-#: ../../install/development-setup.rst:143 ea3234f805894eac9d15afae7c4fbf20
+#: ../../install/development-setup.rst:263 80f243b3cdeb4376818f443502172424
 msgid ""
-"Shutdown all docker containers using ``docker compose -f docker-compose."
-"halfstack.current.yml down`` and delete the entire working copy directory.  "
-"That's all."
+"Shutdown all docker containers using ``docker compose -f docker-"
+"compose.halfstack.current.yml down`` and delete the entire working copy "
+"directory.  That's all."
 msgstr ""
 
-#: ../../install/development-setup.rst:145 a7a860d4cd264fcb8658f3fead6da37c
+#: ../../install/development-setup.rst:265 ee92e0d769354d48a90ad362d5ec1326
 msgid ""
 "You may need ``sudo`` to remove the directories mounted as halfstack "
-"container volumes because Docker auto-creates them with the root privilege."
+"container volumes because Docker auto-creates them with the root "
+"privilege."
 msgstr ""
+
+#: ../../install/development-setup.rst:270 3a84ec398d3e4e6eaa32b3152f88429d
+msgid "Daily Workflows"
+msgstr ""
+
+#: ../../install/development-setup.rst:272 d6e6be4734ea4b9e8df740c9ef9184a9
+msgid "Check out :doc:`/dev/daily-workflows` for your reference."
+msgstr ""
+
+#~ msgid "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
+#~ msgstr ""
+

@@ -25,8 +25,8 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         "15",
         "--max-vfolder-size",
         "0",
-        "--allowed-vfolder-hosts",
-        "local:volume1",
+        "--vfolder-host-perms",
+        '{"local:volume1":["create-vfolder","delete-vfolder","mount-in-session","upload-file","download-file"]}',
         "--idle-timeout",
         "1200",
         keypair_resource_policy,
@@ -54,20 +54,23 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         test_krp.get("max_concurrent_sessions") == 20
     ), "Test keypair resource policy max concurrent session mismatch"
     assert (
-        test_krp.get("max_vfolder_count") == 15
-    ), "Test keypair resource policy max vfolder count mismatch"
-    assert (
-        test_krp.get("max_vfolder_size") == "0 Bytes"
-    ), "Test keypair resource policy max vfolder size mismatch"
-    assert (
         test_krp.get("idle_timeout") == 1200
     ), "Test keypair resource policy idle timeout mismatch"
     assert (
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == [
-        "local:volume1"
-    ], "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert test_krp.get("allowed_vfolder_hosts") == {
+        "local:volume1": [
+            "create-vfolder",
+            "modify-vfolder",
+            "delete-vfolder",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
+        ],
+    }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
 def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
@@ -91,8 +94,8 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         "10",
         "--max-vfolder-size",
         "0",
-        "--allowed-vfolder-hosts",
-        "local:volume2",
+        "--vfolder-host-perms",
+        '{"local:volume2":["create-vfolder","delete-vfolder","mount-in-session","upload-file","download-file"]}',
         "--idle-timeout",
         "1800",
         keypair_resource_policy,
@@ -120,20 +123,23 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         test_krp.get("max_concurrent_sessions") == 30
     ), "Test keypair resource policy max concurrent session mismatch"
     assert (
-        test_krp.get("max_vfolder_count") == 10
-    ), "Test keypair resource policy max vfolder count mismatch"
-    assert (
-        test_krp.get("max_vfolder_size") == "0 Bytes"
-    ), "Test keypair resource policy max vfolder size mismatch"
-    assert (
         test_krp.get("idle_timeout") == 1800
     ), "Test keypair resource policy idle timeout mismatch"
     assert (
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == [
-        "local:volume2"
-    ], "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert test_krp.get("allowed_vfolder_hosts") == {
+        "local:volume2": [
+            "create-vfolder",
+            "modify-vfolder",
+            "delete-vfolder",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
+        ],
+    }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
 def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):

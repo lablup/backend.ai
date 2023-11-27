@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import enum
 import hashlib
 import logging
 import secrets
 import socket
 import uuid
 from collections import defaultdict
-from types import TracebackType
 from typing import (
     Any,
-    Awaitable,
     Callable,
     ClassVar,
     Coroutine,
@@ -19,7 +18,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Sequence,
     Type,
     TypedDict,
     TypeVar,
@@ -27,12 +25,13 @@ from typing import (
     cast,
 )
 
-import attr
+import attrs
+from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
+from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
-from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
 from .logging import BraceStyleAdapter
@@ -41,8 +40,11 @@ from .types import (
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    ModelServiceStatus,
+    QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VolumeMountableNodeType,
     aobject,
 )
 
@@ -54,16 +56,11 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.events"))
-
-PTGExceptionHandler: TypeAlias = Callable[
-    [Type[Exception], Exception, TracebackType], Awaitable[None]
-]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
-
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 
@@ -100,16 +97,20 @@ class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
     name = "do_prepare"
 
 
+class DoScaleEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_scale"
+
+
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
 
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib()
+    session_id: SessionId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field()
 
     def serialize(self) -> tuple:
         return (
@@ -125,10 +126,9 @@ class DoTerminateSessionEvent(AbstractEvent):
         )
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class GenericAgentEventArgs:
-
-    reason: str = attr.ib(default="")
+    reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
         return (self.reason,)
@@ -146,15 +146,15 @@ class AgentTerminatedEvent(GenericAgentEventArgs, AbstractEvent):
     name = "agent_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class AgentErrorEvent(AbstractEvent):
     name = "agent_error"
 
-    message: str = attr.ib()
-    traceback: Optional[str] = attr.ib(default=None)
-    user: Optional[Any] = attr.ib(default=None)
-    context_env: Mapping[str, Any] = attr.ib(factory=dict)
-    severity: LogSeverity = attr.ib(default=LogSeverity.ERROR)
+    message: str = attrs.field()
+    traceback: Optional[str] = attrs.field(default=None)
+    user: Optional[Any] = attrs.field(default=None)
+    context_env: Mapping[str, Any] = attrs.field(factory=dict)
+    severity: LogSeverity = attrs.field(default=LogSeverity.ERROR)
 
     def serialize(self) -> tuple:
         return (
@@ -176,11 +176,11 @@ class AgentErrorEvent(AbstractEvent):
         )
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class AgentHeartbeatEvent(AbstractEvent):
     name = "agent_heartbeat"
 
-    agent_info: Mapping[str, Any] = attr.ib()
+    agent_info: Mapping[str, Any] = attrs.field()
 
     def serialize(self) -> tuple:
         return (self.agent_info,)
@@ -190,30 +190,84 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
+class DoAgentResourceCheckEvent(AbstractEvent):
+    name = "do_agent_resource_check"
+
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.agent_id,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            AgentId(value[0]),
+        )
+
+
+class KernelLifecycleEventReason(str, enum.Enum):
+    AGENT_TERMINATION = "agent-termination"
+    ALREADY_TERMINATED = "already-terminated"
+    ANOMALY_DETECTED = "anomaly-detected"
+    EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_CREATE = "failed-to-create"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    HANG_TIMEOUT = "hang-timeout"
+    IDLE_TIMEOUT = "idle-timeout"
+    IDLE_SESSION_LIFETIME = "idle-session-lifetime"
+    IDLE_UTILIZATION = "idle-utilization"
+    KILLED_BY_EVENT = "killed-by-event"
+    SERVICE_SCALED_DOWN = "service-scaled-down"
+    NEW_CONTAINER_STARTED = "new-container-started"
+    PENDING_TIMEOUT = "pending-timeout"
+    RESTARTING = "restarting"
+    RESTART_TIMEOUT = "restart-timeout"
+    RESUMING_AGENT_OPERATION = "resuming-agent-operation"
+    SELF_TERMINATED = "self-terminated"
+    TASK_DONE = "task-done"
+    TASK_FAILED = "task-failed"
+    TASK_TIMEOUT = "task-timeout"
+    TASK_CANCELLED = "task-cancelled"
+    TASK_FINISHED = "task-finished"
+    TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
+    UNKNOWN = "unknown"
+    USER_REQUESTED = "user-requested"
+    NOT_FOUND_IN_MANAGER = "not-found-in-manager"
+
+    @classmethod
+    def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        try:
+            return cls(value)
+        except ValueError:
+            pass
+        return None
+
+
+@attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
-    kernel_id: KernelId = attr.ib()
-    creation_id: str = attr.ib()
-    reason: str = attr.ib(default="")
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    reason: str = attrs.field(default="")
+    creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
-            self.creation_id,
+            str(self.session_id),
             self.reason,
+            self.creation_info,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            creation_id=value[1],
+            session_id=SessionId(uuid.UUID(value[1])),
             reason=value[2],
+            creation_info=value[3],
         )
-
-
-class KernelEnqueuedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_enqueued"
 
 
 class KernelPreparingEvent(KernelCreationEventArgs, AbstractEvent):
@@ -224,13 +278,13 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
-    kernel_id: uuid.UUID = attr.ib()
-    current_progress: float = attr.ib()
-    total_progress: float = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    kernel_id: uuid.UUID = attrs.field()
+    current_progress: float = attrs.field()
+    total_progress: float = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -262,15 +316,46 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
-@attr.s(slots=True, frozen=True)
-class KernelTerminationEventArgs:
-    kernel_id: KernelId = attr.ib()
-    reason: str = attr.ib(default="")
-    exit_code: int = attr.ib(default=-1)
+@attrs.define(slots=True, frozen=True)
+class ModelServiceStatusEventArgs:
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    model_name: str = attrs.field()
+    new_status: ModelServiceStatus = attrs.field()
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
+            self.model_name,
+            self.new_status.value,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            session_id=SessionId(uuid.UUID(value[1])),
+            model_name=value[2],
+            new_status=ModelServiceStatus(value[3]),
+        )
+
+
+class ModelServiceStatusEvent(ModelServiceStatusEventArgs, AbstractEvent):
+    name = "model_service_status_updated"
+
+
+@attrs.define(slots=True, frozen=True)
+class KernelTerminationEventArgs:
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
+    exit_code: int = attrs.field(default=-1)
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.exit_code,
         )
@@ -279,8 +364,9 @@ class KernelTerminationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             KernelId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            exit_code=value[3],
         )
 
 
@@ -292,11 +378,11 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
     name = "kernel_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionCreationEventArgs:
-    session_id: SessionId = attr.ib()
-    creation_id: str = attr.ib()
-    reason: str = attr.ib(default="")
+    session_id: SessionId = attrs.field()
+    creation_id: str = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -334,10 +420,10 @@ class SessionStartedEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_started"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionTerminationEventArgs:
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default="")
+    session_id: SessionId = attrs.field()
+    reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -353,15 +439,19 @@ class SessionTerminationEventArgs:
         )
 
 
+class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
+    name = "session_terminating"
+
+
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
     name = "session_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionResultEventArgs:
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default="")
-    exit_code: int = attr.ib(default=-1)
+    session_id: SessionId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
+    exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
         return (
@@ -387,12 +477,28 @@ class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
     name = "session_failure"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(slots=True, frozen=True)
+class RouteCreationEventArgs:
+    route_id: uuid.UUID = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.route_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]))
+
+
+class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
+    name = "route_created"
+
+
+@attrs.define(auto_attribs=True, slots=True)
 class DoSyncKernelLogsEvent(AbstractEvent):
     name = "do_sync_kernel_logs"
 
-    kernel_id: KernelId = attr.ib()
-    container_id: str = attr.ib()
+    kernel_id: KernelId = attrs.field()
+    container_id: str = attrs.field()
 
     def serialize(self) -> tuple:
         return (
@@ -408,25 +514,9 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
-class DoSyncKernelStatsEvent(AbstractEvent):
-    name = "do_sync_kernel_stats"
-
-    kernel_ids: Sequence[KernelId] = attr.ib()
-
-    def serialize(self) -> tuple:
-        return ([*map(str, self.kernel_ids)],)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
-        )
-
-
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class GenericSessionEventArgs(AbstractEvent):
-    session_id: SessionId = attr.ib()
+    session_id: SessionId = attrs.field()
 
     def serialize(self) -> tuple:
         return (str(self.session_id),)
@@ -454,14 +544,14 @@ class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
     name = "execution_cancelled"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class BgtaskUpdatedEvent(AbstractEvent):
     name = "bgtask_updated"
 
-    task_id: uuid.UUID = attr.ib()
-    current_progress: float = attr.ib()
-    total_progress: float = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    task_id: uuid.UUID = attrs.field()
+    current_progress: float = attrs.field()
+    total_progress: float = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -481,10 +571,10 @@ class BgtaskUpdatedEvent(AbstractEvent):
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
-    task_id: uuid.UUID = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    task_id: uuid.UUID = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -512,11 +602,132 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
 
 
+@attrs.define(slots=True)
+class DoVolumeMountEvent(AbstractEvent):
+    name = "do_volume_mount"
+
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+
+    fs_location: str = attrs.field()
+    fs_type: str = attrs.field(default="nfs")
+    cmd_options: str | None = attrs.field(default=None)
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str = attrs.field(default="/etc/fstab")
+
+    def serialize(self) -> tuple:
+        return (
+            self.dir_name,
+            self.volume_backend_name,
+            str(self.quota_scope_id),
+            self.fs_location,
+            self.fs_type,
+            self.cmd_options,
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            fs_location=value[3],
+            fs_type=value[4],
+            cmd_options=value[5],
+            scaling_group=value[6],
+            edit_fstab=value[7],
+            fstab_path=value[8],
+        )
+
+
+@attrs.define(slots=True)
+class DoVolumeUnmountEvent(AbstractEvent):
+    name = "do_volume_unmount"
+
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.dir_name,
+            self.volume_backend_name,
+            str(self.quota_scope_id),
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            scaling_group=value[3],
+            edit_fstab=value[4],
+            fstab_path=value[5],
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VolumeMountEventArgs(AbstractEvent):
+    node_id: str = attrs.field()
+    node_type: VolumeMountableNodeType = attrs.field()
+    mount_path: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+    err_msg: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.node_id,
+            str(self.node_type),
+            self.mount_path,
+            str(self.quota_scope_id),
+            self.err_msg,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            value[0],
+            VolumeMountableNodeType(value[1]),
+            value[2],
+            QuotaScopeID.parse(value[3]),
+            value[4],
+        )
+
+
+class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_mounted"
+
+
+class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_unmounted"
+
+
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
-    ) -> ConnectionPool:
-        ...
+    ) -> ConnectionPool: ...
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
@@ -529,7 +740,7 @@ EventCallback = Union[
 ]
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
+@attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
 class EventHandler(Generic[TContext, TEvent]):
     event_cls: Type[TEvent]
     name: str
@@ -544,7 +755,7 @@ class CoalescingOptions(TypedDict):
     max_batch_size: int
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class CoalescingState:
     batch_size: int = 0
     last_added: float = 0.0
@@ -633,17 +844,19 @@ class EventDispatcher(aobject):
         db: int = 0,
         log_events: bool = False,
         *,
-        service_name: str = None,
+        consumer_group: str,
+        service_name: str | None = None,
         stream_key: str = "events",
-        consumer_group: str = "manager",
-        node_id: str = None,
-        consumer_exception_handler: PTGExceptionHandler = None,
-        subscriber_exception_handler: PTGExceptionHandler = None,
+        node_id: str | None = None,
+        consumer_exception_handler: AsyncExceptionHandler | None = None,
+        subscriber_exception_handler: AsyncExceptionHandler | None = None,
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config, name="event_dispatcher.stream", db=db
+        )
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -689,7 +902,7 @@ class EventDispatcher(aobject):
         callback: EventCallback[TContext, TEvent],
         coalescing_opts: CoalescingOptions = None,
         *,
-        name: str = None,
+        name: str | None = None,
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
@@ -712,9 +925,9 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: str = None,
+        name: str | None = None,
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
@@ -778,6 +991,7 @@ class EventDispatcher(aobject):
             )
             await asyncio.sleep(0)
 
+    @preserve_termination_log
     async def _consume_loop(self) -> None:
         async with aclosing(
             redis_helper.read_stream_by_group(
@@ -803,6 +1017,7 @@ class EventDispatcher(aobject):
                 except Exception:
                     log.exception("EventDispatcher.consume(): unexpected-error")
 
+    @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         async with aclosing(
             redis_helper.read_stream(
@@ -836,7 +1051,7 @@ class EventProducer(aobject):
         redis_config: EtcdRedisConfig,
         db: int = 0,
         *,
-        service_name: str = None,
+        service_name: str | None = None,
         stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
@@ -844,7 +1059,11 @@ class EventProducer(aobject):
         if service_name:
             _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config,
+            name="event_producer.stream",
+            db=db,
+        )
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -874,7 +1093,7 @@ class EventProducer(aobject):
         )
 
 
-def _generate_consumer_id(node_id: str = None) -> str:
+def _generate_consumer_id(node_id: str | None = None) -> str:
     h = hashlib.sha1()
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()

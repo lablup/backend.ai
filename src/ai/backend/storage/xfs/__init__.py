@@ -1,20 +1,34 @@
 import asyncio
 import logging
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, List
-from uuid import UUID
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+)
+
+import aiofiles
+import aiofiles.os
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import QuotaScopeID
+from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
-from ..exception import ExecutionError, VFolderCreationError
-from ..types import VFolderCreationOptions, VFolderUsage
-from ..vfs import BaseVolume, run
+from ..abc import AbstractQuotaModel
+from ..exception import InvalidQuotaScopeError, NotEmptyError
+from ..subproc import run
+from ..types import (
+    QuotaConfig,
+    QuotaUsage,
+)
+from ..vfs import BaseQuotaModel, BaseVolume
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
 Path(LOCK_FILE).touch()
@@ -24,7 +38,7 @@ class XfsProjectRegistry:
     file_projects: Path = Path("/etc/projects")
     file_projid: Path = Path("/etc/projid")
     backend: BaseVolume
-    name_id_map: Dict[UUID, int] = dict()
+    name_id_map: Dict[str, int] = dict()
     project_id_pool: List[int] = list()
 
     async def init(self, backend: BaseVolume) -> None:
@@ -44,7 +58,7 @@ class XfsProjectRegistry:
             for line in raw_projid.splitlines():
                 proj_name, proj_id = line.split(":")[:2]
                 project_id_pool.append(int(proj_id))
-                self.name_id_map[UUID(proj_name)] = int(proj_id)
+                self.name_id_map[proj_name] = int(proj_id)
             self.project_id_pool = sorted(project_id_pool)
         else:
             await run(["sudo", "touch", self.file_projid])
@@ -53,14 +67,13 @@ class XfsProjectRegistry:
 
     async def add_project_entry(
         self,
+        quota_scope_id: QuotaScopeID,
+        qspath: Path,
         *,
-        vfid: UUID,
-        quota: int,
-        project_id: int = None,
+        project_id: Optional[int] = None,
     ) -> None:
-        vfpath = self.backend.mangle_vfpath(vfid)
         if project_id is None:
-            project_id = self.get_project_id()
+            project_id = self.get_free_project_id()
 
         temp_name_projects = ""
         temp_name_projid = ""
@@ -75,14 +88,14 @@ class XfsProjectRegistry:
                     "\n",
                 ):
                     _projects_content += "\n"
-                _projects_content += f"{project_id}:{vfpath}\n"
+                _projects_content += f"{project_id}:{qspath}\n"
                 _tmp_projects.write(_projects_content.encode("ascii"))
                 temp_name_projects = _tmp_projects.name
 
                 _projid_content = Path(self.file_projid).read_text()
                 if _projid_content.strip() != "" and not _projid_content.endswith("\n"):
                     _projid_content += "\n"
-                _projid_content += f"{str(vfid)}:{project_id}\n"
+                _projid_content += f"{quota_scope_id.pathname}:{project_id}\n"
                 _tmp_projid.write(_projid_content.encode("ascii"))
                 temp_name_projid = _tmp_projid.name
             finally:
@@ -107,11 +120,11 @@ class XfsProjectRegistry:
         finally:
             await loop.run_in_executor(None, _delete_temp_files)
 
-    async def remove_project_entry(self, vfid: UUID) -> None:
-        await run(["sudo", "sed", "-i.bak", f"/{vfid.hex[4:]}/d", self.file_projects])
-        await run(["sudo", "sed", "-i.bak", f"/{vfid}/d", self.file_projid])
+    async def remove_project_entry(self, quota_scope_id: QuotaScopeID) -> None:
+        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id.pathname}/d", self.file_projects])
+        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id.pathname}/d", self.file_projid])
 
-    def get_project_id(self) -> int:
+    def get_free_project_id(self) -> int:
         """
         Get the next project_id, which is the smallest unused integer.
         """
@@ -127,6 +140,129 @@ class XfsProjectRegistry:
         return project_id
 
 
+class XFSProjectQuotaModel(BaseQuotaModel):
+    """
+    Implements the quota scope model using XFS projects.
+    """
+
+    def __init__(
+        self,
+        mount_path: Path,
+        project_registry: XfsProjectRegistry,
+    ) -> None:
+        super().__init__(mount_path)
+        self.project_registry = project_registry
+        stat_vfs = os.statvfs(mount_path)
+        self.block_size = stat_vfs.f_bsize
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        try:
+            if options is None:
+                # Set the limit as the filesystem size
+                vfs_stat = os.statvfs(self.mount_path)
+                options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
+            async with FileLock(LOCK_FILE):
+                log.info(
+                    "creating project quota (qs:{}, q:{})",
+                    quota_scope_id,
+                    (options.limit_bytes if options else None),
+                )
+                await aiofiles.os.makedirs(qspath)
+                await self.project_registry.read_project_info()
+                await self.project_registry.add_project_entry(quota_scope_id, qspath)
+                await self.project_registry.read_project_info()
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            log.exception("quota-scope creation timeout")
+            raise
+        except Exception:
+            log.exception("quota-scope creation error")
+            raise
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
+
+    async def describe_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+        full_report = await run(
+            # -p: project quota only
+            # -b: as number of blocks
+            # -N: without header
+            ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
+        )
+        print(full_report)
+        for line in full_report.splitlines():
+            if quota_scope_id.pathname in line:
+                report = line
+                break
+        else:
+            raise RuntimeError(f"unknown xfs project ID: {quota_scope_id.pathname}")
+        if len(report.split()) != 6:
+            raise ValueError("unexpected format for xfs_quota report")
+        _, used_kbs, _, hard_limit_kbs, _, _ = report.split()
+        # By default, report command displays the sizes in the 1 KiB unit.
+        used_bytes = int(used_kbs) * 1024
+        hard_limit_bytes = int(hard_limit_kbs) * 1024
+        return QuotaUsage(used_bytes, hard_limit_bytes)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        config: QuotaConfig,
+    ) -> None:
+        # This will annotate all entries under the quota scope tree as a part of the project.
+        await run(
+            [
+                "sudo",
+                "xfs_quota",
+                "-x",
+                "-c",
+                f"project -s {quota_scope_id.pathname}",
+                self.mount_path,
+            ],
+        )
+        # bsoft, bhard accepts bytes or binary-prefixed numbers.
+        await run(
+            [
+                "sudo",
+                "xfs_quota",
+                "-x",
+                "-c",
+                (
+                    "limit -p"
+                    f" bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id.pathname}"
+                ),
+                self.mount_path,
+            ],
+        )
+
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        raise InvalidQuotaScopeError(
+            "Unsetting folder limit without removing quota scope is not possible for this backend"
+        )
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        async with FileLock(LOCK_FILE):
+            await self.project_registry.read_project_info()
+            await self.project_registry.remove_project_entry(quota_scope_id)
+            await self.project_registry.read_project_info()
+            await aiofiles.os.rmdir(qspath)
+
+
 class XfsVolume(BaseVolume):
     """
     XFS volume backend. XFS natively supports per-directory quota through
@@ -137,119 +273,20 @@ class XfsVolume(BaseVolume):
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
 
-    registry: XfsProjectRegistry
+    name = "xfs"
 
-    async def init(self, uid: int = None, gid: int = None) -> None:
-        self.uid = uid if uid is not None else os.getuid()
-        self.gid = gid if gid is not None else os.getgid()
-        self.registry = XfsProjectRegistry()
-        await self.registry.init(self)
+    project_registry: XfsProjectRegistry
 
-    # ----- volume opeartions -----
-    async def create_vfolder(
-        self,
-        vfid: UUID,
-        options: VFolderCreationOptions = None,
-        *,
-        exist_ok: bool = False,
-    ) -> None:
-        await super().create_vfolder(vfid, options, exist_ok=exist_ok)
+    async def init(self) -> None:
+        self.project_registry = XfsProjectRegistry()
+        await self.project_registry.init(self)
+        await super().init()
 
-        # NOTE: Do we need to register project ID for a directory without quota?
-        #       Yes, to easily get the file size and used bytes of a directory.
-        if options is None or options.quota is None:  # max quota i.e. the whole fs size
-            fs_usage = await self.get_fs_usage()
-            quota = fs_usage.capacity_bytes
-        else:
-            quota = options.quota
-        # quota = options.quota if options and options.quota else None
-        # if not quota:
-        #     return
-        try:
-            async with FileLock(LOCK_FILE):
-                log.info("setting project quota (f:{}, q:{})", vfid, str(quota))
-                await self.registry.read_project_info()
-                await self.registry.add_project_entry(vfid=vfid, quota=quota)
-                await self.set_quota(vfid, quota)
-                await self.registry.read_project_info()
-        except (asyncio.CancelledError, asyncio.TimeoutError) as e:
-            log.exception("vfolder creation timeout", exc_info=e)
-            await self.delete_vfolder(vfid)
-            raise
-        except Exception as e:
-            log.exception("vfolder creation error", exc_info=e)
-            await self.delete_vfolder(vfid)
-            raise VFolderCreationError("problem in setting vfolder quota")
-
-    async def delete_vfolder(self, vfid: UUID) -> None:
-        async with FileLock(LOCK_FILE):
-            await self.registry.read_project_info()
-            if vfid in self.registry.name_id_map.keys():
-                try:
-                    log.info("removing project quota (f:{})", vfid)
-                    await self.set_quota(vfid, BinarySize(0))
-                except (asyncio.CancelledError, asyncio.TimeoutError) as e:
-                    log.exception("vfolder deletion timeout", exc_info=e)
-                    pass  # Pass to delete the physical directlry anyway.
-                except Exception as e:
-                    log.exception("vfolder deletion error", exc_info=e)
-                    pass  # Pass to delete the physical directlry anyway.
-                finally:
-                    await self.registry.remove_project_entry(vfid)
-            await super().delete_vfolder(vfid)
-            await self.registry.read_project_info()
-
-    async def get_quota(self, vfid: UUID) -> BinarySize:
-        full_report = await run(
-            ["sudo", "xfs_quota", "-x", "-c", "report -h", self.mount_path],
-        )
-        for line in full_report.split("\n"):
-            if str(vfid) in line:
-                report = line
-                break
-        if len(report.split()) != 6:
-            raise ExecutionError("unexpected format for xfs_quota report")
-        proj_name, _, _, quota, _, _ = report.split()
-        if not str(vfid).startswith(proj_name):
-            raise ExecutionError("vfid and project name does not match")
-        return BinarySize.finite_from_str(quota)
-
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
-        if vfid not in self.registry.name_id_map.keys():
-            await run(
-                [
-                    "sudo",
-                    "xfs_quota",
-                    "-x",
-                    "-c",
-                    f"project -s {vfid}",
-                    self.mount_path,
-                ],
-            )
-        await run(
-            [
-                "sudo",
-                "xfs_quota",
-                "-x",
-                "-c",
-                f"limit -p bsoft={int(size_bytes)} bhard={int(size_bytes)} {vfid}",
-                self.mount_path,
-            ],
+    async def create_quota_model(self) -> AbstractQuotaModel:
+        return XFSProjectQuotaModel(
+            self.mount_path,
+            self.project_registry,
         )
 
-    async def get_usage(self, vfid: UUID, relpath: PurePosixPath = PurePosixPath(".")):
-        full_report = await run(
-            ["sudo", "xfs_quota", "-x", "-c", "report -pbih", self.mount_path],
-        )
-        report = ""
-        for line in full_report.split("\n"):
-            if str(vfid) in line:
-                report = line
-                break
-        if len(report.split()) != 11:
-            raise ExecutionError("unexpected format for xfs_quota report")
-        proj_name, used_size, _, _, _, _, inode_used, _, _, _, _ = report.split()
-        used_bytes = int(BinarySize.finite_from_str(used_size))
-        if not str(vfid).startswith(proj_name):
-            raise ExecutionError("vfid and project name does not match")
-        return VFolderUsage(file_count=int(inode_used), used_bytes=used_bytes)
+    async def get_capabilities(self) -> FrozenSet[str]:
+        return frozenset([CAP_VFOLDER, CAP_QUOTA])

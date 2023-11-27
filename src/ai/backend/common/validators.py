@@ -8,6 +8,7 @@ import ipaddress
 import json
 import os
 import pwd
+import random
 import re
 import uuid
 from collections.abc import Iterable
@@ -45,6 +46,9 @@ from trafaret.lib import _empty
 
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
+from .types import QuotaScopeID as _QuotaScopeID
+from .types import RoundRobinState, RoundRobinStates
+from .types import VFolderID as _VFolderID
 
 __all__ = (
     "AliasedKey",
@@ -63,6 +67,8 @@ __all__ = (
     "UserID",
     "GroupID",
     "UUID",
+    "QuotaScopeID",
+    "VFolderID",
     "TimeZone",
     "TimeDuration",
     "Slug",
@@ -204,7 +210,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret):
+class Enum(t.Trafaret, Generic[T_enum]):
     def __init__(self, enum_cls: Type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name
@@ -466,6 +472,33 @@ class UUID(t.Trafaret):
             self._failure("cannot convert value to UUID", value=value)
 
 
+class QuotaScopeID(t.Trafaret):
+    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*:[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
+
+    def check_and_return(self, value: Any) -> _QuotaScopeID:
+        return _QuotaScopeID.parse(t.Regexp(self.regex).check(value))
+
+
+class VFolderID(t.Trafaret):
+    def check_and_return(self, value: Any) -> _VFolderID:
+        tuple_t = t.Tuple(QuotaScopeID(), UUID())
+        match value:
+            case str():
+                pieces = value.partition("/")
+                if len(pieces[2]) == 0:  # for old vFolder ID without quota scope ID
+                    converted = (None, UUID().check(pieces[0]))
+                else:
+                    converted = tuple_t.check((pieces[0], pieces[2]))
+            case tuple():
+                converted = tuple_t.check(value)
+            case _:
+                self._failure("cannot convert value to VFolderID", value=value)
+        return _VFolderID(
+            quota_scope_id=converted[0],
+            folder_id=converted[1],
+        )
+
+
 class TimeZone(t.Trafaret):
     def check_and_return(self, value: Any) -> datetime.tzinfo:
         if not isinstance(value, str):
@@ -491,13 +524,13 @@ class TimeDuration(t.Trafaret):
 
     Example:
     >>> t = datetime(2020, 2, 29)
-    >>> t + check_and_return(years=1)
+    >>> t + check_and_return("1yr")
     datetime.datetime(2021, 2, 28, 0, 0)
-    >>> t + check_and_return(years=2)
+    >>> t + check_and_return("2yr")
     datetime.datetime(2022, 2, 28, 0, 0)
-    >>> t + check_and_return(years=3)
+    >>> t + check_and_return("3yr")
     datetime.datetime(2023, 2, 28, 0, 0)
-    >>> t + check_and_return(years=4)
+    >>> t + check_and_return("4yr")
     datetime.datetime(2024, 2, 29, 0, 0)  # preserves the same day of month
     """
 
@@ -550,7 +583,6 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
-
     _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
     def __init__(
@@ -592,7 +624,6 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
 if jwt_available:
 
     class JsonWebToken(t.Trafaret):
-
         default_algorithms = ["HS256"]
 
         def __init__(
@@ -617,9 +648,6 @@ if jwt_available:
 
 
 class URL(t.Trafaret):
-
-    rx_scheme = re.compile(r"^[-a-z0-9]+://")
-
     def __init__(
         self,
         *,
@@ -628,19 +656,16 @@ class URL(t.Trafaret):
         self.scheme_required = scheme_required
 
     def check_and_return(self, value: Any) -> yarl.URL:
-        if not isinstance(value, (str, bytes)):
-            self._failure("A URL must be a unicode string or a byte sequence", value=value)
         if isinstance(value, bytes):
             value = value.decode("utf-8")
-        if self.scheme_required:
-            if not self.rx_scheme.match(value):
-                self._failure(
-                    "The given value does not have the scheme (protocol) part", value=value
-                )
         try:
-            return yarl.URL(value)
-        except ValueError as e:
-            self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+            parsed_url = yarl.URL(value)
+            if self.scheme_required:
+                parsed_url.origin()
+        except (ValueError, TypeError) as e:
+            self._failure(repr(e), value=value)
+        else:
+            return parsed_url
 
 
 class ToSet(t.Trafaret):
@@ -649,3 +674,43 @@ class ToSet(t.Trafaret):
             return set(value)
         else:
             self._failure("value must be Iterable")
+
+
+class Delay(t.Trafaret):
+    """
+    Convert a float or a tuple of 2 floats into a random generated float value
+    to use in time.sleep() or asyncio.sleep()
+    """
+
+    def check_and_return(self, value: Any) -> float:
+        match value:
+            case float() | int():
+                return float(value)
+            case (a, b):
+                return random.uniform(a, b)
+            case None:
+                return 0
+            case _:
+                self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+
+
+class RoundRobinStatesJSONString(t.Trafaret):
+    def check_and_return(self, value: Any) -> RoundRobinStates:
+        try:
+            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
+        except (KeyError, ValueError, json.decoder.JSONDecodeError):
+            self._failure(
+                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
+                " be a valid JSON string",
+                value=value,
+            )
+
+        rr_states: RoundRobinStates = {}
+        for resource_group, arch_rr_states_dict in rr_states_dict.items():
+            rr_states[resource_group] = {}
+            for arch, rr_state_dict in arch_rr_states_dict.items():
+                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
+                    self._failure("Invalid roundrobin states")
+                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
+
+        return rr_states

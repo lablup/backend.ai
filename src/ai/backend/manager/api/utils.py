@@ -32,13 +32,17 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
 
-from ..models import UserRole, keypairs, users
+from ..models import UserRole, users
+from ..utils import (
+    check_if_requester_is_eligible_to_act_as_target_access_key,
+    check_if_requester_is_eligible_to_act_as_target_user_uuid,
+)
 from .exceptions import GenericForbidden, InvalidAPIParameters, QueryNotImplemented
 
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
@@ -56,43 +60,46 @@ async def get_access_key_scopes(
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
-    requester_access_key: AccessKey = request["keypair"]["access_key"]
-    if (
-        params is not None
-        and (owner_access_key := params.get("owner_access_key", None)) is not None
-        and owner_access_key != requester_access_key
-    ):
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([users.c.domain_name, users.c.role])
-                .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
-                .where(keypairs.c.access_key == owner_access_key)
+    owner_access_key: Optional[AccessKey] = (params or {}).get("owner_access_key", None)
+    if owner_access_key is None or owner_access_key == request["keypair"]["access_key"]:
+        return request["keypair"]["access_key"], request["keypair"]["access_key"]
+    async with root_ctx.db.begin_readonly() as conn:
+        try:
+            await check_if_requester_is_eligible_to_act_as_target_access_key(
+                conn,
+                request["user"]["role"],
+                request["user"]["domain_name"],
+                owner_access_key,
             )
-            result = await conn.execute(query)
-            row = result.first()
-            if row is None:
-                raise InvalidAPIParameters("Unknown owner access key")
-            owner_domain = row["domain_name"]
-            owner_role = row["role"]
-        if request["is_superadmin"]:
-            pass
-        elif request["is_admin"]:
-            if request["user"]["domain_name"] != owner_domain:
-                raise GenericForbidden(
-                    "Domain-admins can perform operations on behalf of "
-                    "other users in the same domain only.",
-                )
-            if owner_role == UserRole.SUPERADMIN:
-                raise GenericForbidden(
-                    "Domain-admins cannot perform operations on behalf of super-admins.",
-                )
-            pass
-        else:
-            raise GenericForbidden(
-                "Only admins can perform operations on behalf of other users.",
+            return request["keypair"]["access_key"], owner_access_key
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e))
+        except RuntimeError as e:
+            raise GenericForbidden(str(e))
+
+
+async def get_user_uuid_scopes(
+    request: web.Request, params: Any = None
+) -> Tuple[uuid.UUID, uuid.UUID]:
+    if not request["is_authorized"]:
+        raise GenericForbidden("Only authorized requests may have access key scopes.")
+    root_ctx: RootContext = request.app["_root.context"]
+    owner_uuid: Optional[uuid.UUID] = (params or {}).get("owner_uuid", None)
+    if owner_uuid is None or owner_uuid == request["user"]["uuid"]:
+        return request["user"]["uuid"], request["user"]["uuid"]
+    async with root_ctx.db.begin_readonly() as conn:
+        try:
+            await check_if_requester_is_eligible_to_act_as_target_user_uuid(
+                conn,
+                request["user"]["role"],
+                request["user"]["domain_name"],
+                owner_uuid,
             )
-        return requester_access_key, owner_access_key
-    return requester_access_key, requester_access_key
+            return request["user"]["uuid"], owner_uuid
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e))
+        except RuntimeError as e:
+            raise GenericForbidden(str(e))
 
 
 async def get_user_scopes(
@@ -175,6 +182,8 @@ def check_api_params(
             except t.DataError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
             return await handler(request, checked_params, *args, **kwargs)
+
+        set_handler_attr(wrapped, "request_scheme", checker)
 
         return wrapped
 
@@ -315,7 +324,7 @@ async def call_non_bursty(
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
     """
-    global _burst_last_call, _burst_calls, _burst_counts
+    global _burst_last_call, _burst_times, _burst_counts
     if inspect.iscoroutine(coro):
         # Coroutine objects may not be called before garbage-collected
         # as this function throttles the frequency of invocation.

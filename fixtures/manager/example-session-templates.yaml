@@ -1,0 +1,54 @@
+---
+id: c1b8441a-ba46-4a83-8727-de6645f521b4
+is_active: true
+domain_name: default
+group_id: 2de2b969-1d04-48a6-af16-0bc8adb3c831
+user_uuid: f38dea23-50fa-42a0-b5ae-338f5f4693f4
+type: TASK
+name: python_x86
+template:
+  api_version: '6'
+  kind: task_template
+  metadata:
+    name: cr.backend.ai/multiarch/python
+    tag: 3.10-ubuntu20.04
+  spec:
+    session_type: interactive
+    kernel:
+      image: cr.backend.ai/multiarch/python:3.10-ubuntu20.04
+      environ: {}
+      architecture: x86_64
+      run: null
+      git: null
+    scaling_group: default
+    mounts: {}
+    resources:
+      cpu: '2'
+      mem: 4g
+---
+id: 59062449-4f57-4434-975d-add2a593438c
+is_active: true
+domain_name: default
+group_id: 2de2b969-1d04-48a6-af16-0bc8adb3c831
+user_uuid: f38dea23-50fa-42a0-b5ae-338f5f4693f4
+type: TASK
+name: python_aarch64
+template:
+  api_version: '6'
+  kind: task_template
+  metadata:
+    name: cr.backend.ai/multiarch/python
+    tag: 3.10-ubuntu20.04
+  spec:
+    session_type: interactive
+    kernel:
+      image: cr.backend.ai/multiarch/python:3.10-ubuntu20.04
+      environ: {}
+      architecture: aarch64
+      run: null
+      git: null
+    scaling_group: default
+    mounts: {}
+    resources:
+      cpu: '2'
+      mem: 4g

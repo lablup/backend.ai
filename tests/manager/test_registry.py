@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import zlib
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import snappy
 from sqlalchemy.sql.dml import Insert, Update
 
 from ai.backend.common import msgpack
@@ -16,7 +16,9 @@ from ai.backend.manager.registry import AgentRegistry
 
 @pytest.mark.asyncio
 async def test_handle_heartbeat(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
     mocker,
 ) -> None:
     mock_get_known_registries = AsyncMock(
@@ -34,8 +36,8 @@ async def test_handle_heartbeat(
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
-    registry, mock_dbconn, mock_dbresult, mock_shared_config, _, _ = registry_ctx
-    image_data = snappy.compress(
+    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
+    image_data = zlib.compress(
         msgpack.packb(
             [
                 ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
@@ -57,10 +59,13 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _1g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -74,11 +79,14 @@ async def test_handle_heartbeat(
         return_value={
             "status": AgentStatus.ALIVE,
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
+            "auto_terminate_abusing_kernel": False,
         }
     )
     await registry.handle_heartbeat(
@@ -88,10 +96,13 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
+            "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -109,11 +120,14 @@ async def test_handle_heartbeat(
         return_value={
             "status": AgentStatus.LOST,
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
+            "auto_terminate_abusing_kernel": False,
         }
     )
     await registry.handle_heartbeat(
@@ -123,10 +137,13 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _4), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
+            "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -144,9 +161,11 @@ async def test_handle_heartbeat(
 
 @pytest.mark.asyncio
 async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
 ):
-    registry, _, _, _, _, _ = registry_ctx
+    registry, _, _, _, _, _, _ = registry_ctx
     allocations = {
         "cuda": {
             SlotName("cuda.shares"): {
