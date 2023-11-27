@@ -237,7 +237,17 @@
       "preopen": "предварительное открытие",
       "Network": "Сеть",
       "Enable": "Давать возможность",
-      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-)."
+      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
+      "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
+      "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -305,7 +315,7 @@
       "SessionNameAlreadyExist": "Имя сессии уже существует",
       "SluggedStrings": "Строки с засечками (>3 символов)",
       "SessionNameTooLong64": "Введите не более 64 символов.",
-      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 3 букв, цифр, «.», «_» и «-»."
+      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 4 букв, цифр, «.», «_» и «-»."
     },
     "AlreadyTerminatingSession": "Уже завершаю сессию.",
     "NoSessionToDisplay": "Нет сеансов для отображения",
@@ -428,7 +438,9 @@
     "Control": "Контроль",
     "NewPassword": "Новый пароль",
     "Enabled": "Включено",
-    "StorageProxies": "Хранилища данных"
+    "StorageProxies": "Хранилища данных",
+    "None": "Нет",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -763,7 +775,8 @@
     "RAM": "RAM (ГБ)",
     "SharedMemory": "Общая память (ГБ)",
     "Deleted": "Предварительная настройка ресурса успешно удалена.",
-    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов"
+    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов",
+    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти"
   },
   "usersettings": {
     "General": "Общий",

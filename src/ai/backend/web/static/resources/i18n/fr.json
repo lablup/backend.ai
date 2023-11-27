@@ -237,7 +237,15 @@
       "preopen": "préouverture",
       "Network": "Réseau",
       "Enable": "Activer",
-      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés."
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
+      "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
+      "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -305,7 +313,7 @@
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
       "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
       "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
-      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 3 lettres, chiffres, '.', '_' et '-'."
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -428,7 +436,9 @@
     "Control": "Contrôler",
     "NewPassword": "nouveau mot de passe",
     "Enabled": "Activée",
-    "StorageProxies": "Stockages"
+    "StorageProxies": "Stockages",
+    "None": "Aucun",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -763,7 +773,8 @@
     "RAM": "RAM (Go)",
     "SharedMemory": "Mémoire partagée (Go)",
     "Deleted": "Le préréglage des ressources a été supprimé avec succès.",
-    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher"
+    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher",
+    "SHMEMShouldBeSmallerThanMemory": "La mémoire partagée doit être plus petite que la mémoire"
   },
   "usersettings": {
     "General": "Général",

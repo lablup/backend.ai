@@ -474,7 +474,9 @@
     "SecretKey": "Salainen avain",
     "StorageProxies": "Varastot",
     "Username": "Käyttäjätunnus",
-    "cores": "ytimet"
+    "cores": "ytimet",
+    "None": "Ei ole",
+    "Image": "__NOT_TRANSLATED__"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -867,7 +869,8 @@
     "ResourcePresets": "Resurssien esiasetukset",
     "Resources": "Resurssit",
     "SharedMemory": "Jaettu muisti (GB)",
-    "Updated": "Resurssien esiasetus päivitetty"
+    "Updated": "Resurssien esiasetus päivitetty",
+    "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin"
   },
   "session": {
     "Agent": "Agentti",
@@ -968,7 +971,7 @@
       "SessionNameRequired": "Istunnon nimi vaaditaan",
       "SluggedStrings": "Slugged-merkkijonot (>3 merkkiä)",
       "SessionNameTooLong64": "Anna enintään 64 merkkiä.",
-      "PleaseFollowSessionNameRule": "Anna vähintään kolmen kirjaimen, numeron, '.', '_' ja '-' yhdistelmä."
+      "PleaseFollowSessionNameRule": "Kirjoita vähintään 4 kirjaimen, numeroiden, '.', '_' ja '-' yhdistelmä."
     },
     "XRDPconnection": "RDP-yhteys",
     "applauncher": {
@@ -1102,11 +1105,19 @@
       "UserResourceLimit": "Käyttäjän resurssirajoitus",
       "Version": "Versio",
       "sessionStillPreparing": "Istuntoa valmistellaan edelleen. Kun istunto on alkanut, käynnistä sovellus napauttamalla sovelluskuvaketta.",
+      "PreOpenPortMaxCountLimit": "Voit määrittää enintään {{count}} ennalta avattuja portteja.",
       "PreOpenPortRangeGuide": "Syötä useita arvoja joko pilkulla (,) tai välilyönnillä erotettuina.",
       "preopen": "avataan etukäteen",
       "FolderAliasInvalid": "Vain aakkosnumeeriset merkit, alaviiva (_), kauttaviiva (/) ja viiva (-) ovat sallittuja.",
       "Network": "Verkko",
-      "Enable": "ota käyttöön"
+      "Enable": "ota käyttöön",
+      "StartTimeMustBeInTheFuture": "Alkamisajan on oltava nykyisen kellonajan jälkeen.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",

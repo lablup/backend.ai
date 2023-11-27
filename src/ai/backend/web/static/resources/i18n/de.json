@@ -237,7 +237,15 @@
       "preopen": "Voreröffnet",
       "Network": "Netzwerk",
       "Enable": "Aktivieren",
-      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig."
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
+      "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -295,7 +303,7 @@
       "SluggedStrings": "Geschliffene Zeichenfolgen (>3 Zeichen)",
       "SessionNameAlreadyExist": "Sitzungsname existiert bereits",
       "SessionNameTooLong64": "Bitte geben Sie maximal 64 Zeichen ein.",
-      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 3 Buchstaben, Zahlen, „.“, „_“ und „-“ ein."
+      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein."
     },
     "Interactive": "Interaktiv",
     "Batch": "Stapel",
@@ -428,7 +436,9 @@
     "Control": "Steuerung",
     "NewPassword": "Neues Kennwort",
     "Enabled": "aktiviert",
-    "StorageProxies": "Speicher"
+    "StorageProxies": "Speicher",
+    "None": "Keine",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -763,7 +773,8 @@
     "RAM": "Arbeitsspeicher (GB)",
     "SharedMemory": "Gemeinsamer Speicher (GB)",
     "NoResourcePresetToDisplay": "Keine Ressourcenvoreinstellungen anzeigen",
-    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht."
+    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht.",
+    "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher"
   },
   "usersettings": {
     "General": "Allgemeines",

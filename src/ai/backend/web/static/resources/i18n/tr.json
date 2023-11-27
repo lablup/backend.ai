@@ -237,7 +237,15 @@
       "preopen": "önceden açılmak",
       "Network": "Ağ",
       "Enable": "Olanak vermek",
-      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir."
+      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir.",
+      "PreOpenPortMaxCountLimit": "En fazla {{sayı}} ön açık bağlantı noktası ayarlayabilirsiniz.",
+      "StartTimeMustBeInTheFuture": "Başlangıç zamanı geçerli saatten sonra olmalıdır.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -295,7 +303,7 @@
       "SluggedStrings": "Kesikli dizeler (>3 karakter)",
       "SessionNameAlreadyExist": "Oturum adı zaten mevcut",
       "SessionNameTooLong64": "Lütfen 64 veya daha az karakter girin.",
-      "PleaseFollowSessionNameRule": "Lütfen en az 3 harf, rakam, '.', '_' ve '-' kombinasyonunu girin."
+      "PleaseFollowSessionNameRule": "Lütfen en az 4 harf, rakam, '.', '_' ve '-' kombinasyonunu girin."
     },
     "Interactive": "İnteraktif",
     "Batch": "Toplu İş",
@@ -428,7 +436,9 @@
     "Control": "Kontrol",
     "NewPassword": "Yeni Şifre",
     "Enabled": "Etkin",
-    "StorageProxies": "Depolar"
+    "StorageProxies": "Depolar",
+    "None": "Hiçbiri",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "izin",
@@ -763,7 +773,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Paylaşılan bellek (GB)",
     "NoResourcePresetToDisplay": "Görüntülenecek Kaynak Ön Ayarı yok",
-    "Deleted": "Kaynak ön ayarı başarıyla silindi."
+    "Deleted": "Kaynak ön ayarı başarıyla silindi.",
+    "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır"
   },
   "usersettings": {
     "General": "Genel",

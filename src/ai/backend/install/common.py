@@ -4,19 +4,16 @@ import asyncio
 import platform
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from rich.text import Text
+from ai.backend.common.arch import arch_name_aliases
+from ai.backend.common.identity import get_root_fs_type, get_wsl_version
 
-from .types import OSInfo, Platform
-
-if TYPE_CHECKING:
-    from .context import Context
+from .types import OSInfo, Platform, PrerequisiteError
 
 
-async def detect_os(ctx: Context) -> OSInfo:
+async def detect_os() -> OSInfo:
     platform_kernel = sys.platform
-    platform_arch = platform.machine()
+    platform_arch = arch_name_aliases.get(platform.machine(), platform.machine())
     distro: str | None = None
     uname_s_output = b""
     try:
@@ -26,7 +23,7 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        uname_s_output = await p.stdout.read()
+        uname_s_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
@@ -38,17 +35,18 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        lsb_release_output = await p.stdout.read()
+        lsb_release_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
     try:
-        issue_output = Path("/etc/issue").read_bytes()
+        issue_output = Path("/etc/issue").read_bytes().strip()
     except IOError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
-    if uname_s_output == "Darwin":
+    if uname_s_output == b"Darwin":
         assert platform_kernel == "darwin"
+        platform_kernel = "macos"
         distro = "Darwin"
     elif (
         Path("/etc/debian_version").exists()
@@ -70,15 +68,25 @@ async def detect_os(ctx: Context) -> OSInfo:
         assert platform_kernel == "linux"
         distro = "SUSE"
     else:
-        raise RuntimeError("Unsupported host linux distribution")
-    os_info = OSInfo(
+        raise PrerequisiteError(
+            "Unsupported host linux distribution: "
+            f"{uname_s_output.decode()!r}, {release_metadata.decode()!r}"
+        )
+    distro_variants = set()
+    root_fs_dev, root_fs_type = get_root_fs_type()
+    if root_fs_type is not None and not root_fs_dev.is_block_device():
+        distro_variants.add("LiveCD")
+    wsl_version = get_wsl_version()
+    if wsl_version > 0:
+        distro_variants.add("WSL")
+    if wsl_version == 1:
+        raise PrerequisiteError(f"Unsupported WSL version: {wsl_version}")
+    return OSInfo(
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
         distro=distro,
+        distro_variants=distro_variants,
     )
-    ctx.log.write(Text.from_markup("Detected OS info: ", end=""))
-    ctx.log.write(os_info)
-    return os_info
 
 
-async def detect_cuda(ctx: Context) -> None:
-    pass
+async def detect_cuda() -> str:
+    return "(none)"

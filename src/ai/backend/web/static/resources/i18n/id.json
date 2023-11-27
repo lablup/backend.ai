@@ -237,7 +237,15 @@
       "preopen": "pra-buka",
       "Network": "Jaringan",
       "Enable": "Memungkinkan",
-      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan."
+      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
+      "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
+      "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -305,7 +313,7 @@
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
       "SluggedStrings": "String yang disumbat (>3 karakter)",
       "SessionNameTooLong64": "Silakan masukkan 64 karakter atau kurang.",
-      "PleaseFollowSessionNameRule": "Silakan masukkan kombinasi minimal 3 huruf, angka, '.', '_', dan '-'."
+      "PleaseFollowSessionNameRule": "Silakan masukkan kombinasi minimal 4 huruf, angka, '.', '_', dan '-'."
     },
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
     "NoSessionToDisplay": "Tidak ada sesi yang ditampilkan",
@@ -428,7 +436,9 @@
     "Control": "Kontrol",
     "NewPassword": "Kata Sandi Baru",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Penyimpanan"
+    "StorageProxies": "Penyimpanan",
+    "None": "Tidak ada",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Izin",
@@ -763,7 +773,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "Deleted": "Preset sumber daya berhasil dihapus.",
-    "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan"
+    "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan",
+    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori"
   },
   "usersettings": {
     "General": "Umum",

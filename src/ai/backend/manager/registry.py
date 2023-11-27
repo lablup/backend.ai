@@ -2695,7 +2695,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
-        auto_terminate_abusing_kernel = agent_info["auto_terminate_abusing_kernel"]
+        auto_terminate_abusing_kernel = agent_info.get("auto_terminate_abusing_kernel", False)
         async with self.heartbeat_lock:
             instance_rejoin = False
 

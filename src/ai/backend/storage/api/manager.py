@@ -97,10 +97,17 @@ def handle_fs_errors(
     except OSError as e:
         related_paths = []
         msg = str(e) if e.strerror is None else e.strerror
+
+        def _append_fpath(fname: Any) -> None:
+            try:
+                related_paths.append(str(volume.strip_vfpath(vfid, Path(fname))))
+            except (ValueError, OSError):
+                related_paths.append(fname)
+
         if e.filename:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename))))
+            _append_fpath(e.filename)
         if e.filename2:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename2))))
+            _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
             body=json.dumps(
                 {
