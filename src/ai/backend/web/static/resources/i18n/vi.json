@@ -237,7 +237,19 @@
       "preopen": "mở trước",
       "Network": "Mạng",
       "Enable": "Cho phép",
-      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-)."
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
+      "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Phân bổ tài nguyên trên mỗi vùng chứa",
+      "NumberOfContainer": "Số lượng thùng chứa",
+      "EnterEnvironmentVariable": "Nhập tên biến",
+      "EnvironmentVariableNamePatternError": "Tên biến phải bắt đầu bằng một chữ cái hoặc dấu gạch dưới và chỉ có thể chứa các chữ cái, số và dấu gạch dưới.",
+      "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -295,7 +307,7 @@
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
       "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
       "SessionNameTooLong64": "Vui lòng nhập 64 ký tự trở xuống.",
-      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 3 chữ cái, số, '.', '_' và '-'."
+      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 4 chữ cái, số, '.', '_' và '-'."
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -428,7 +440,9 @@
     "Control": "Điều khiển",
     "NewPassword": "mật khẩu mới",
     "Enabled": "Đã bật",
-    "StorageProxies": "Kho lưu trữ"
+    "StorageProxies": "Kho lưu trữ",
+    "None": "Không có",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -763,7 +777,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
-    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công."
+    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Chung",

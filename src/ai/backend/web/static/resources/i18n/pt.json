@@ -237,7 +237,20 @@
       "preopen": "pré-abrir",
       "Network": "Rede",
       "Enable": "Habilitar",
-      "FolderAliasInvalid": "Somente caracteres alfanuméricos, sublinhado (_), barra (/) e traço (-) são permitidos."
+      "FolderAliasInvalid": "Somente caracteres alfanuméricos, sublinhado (_), barra (/) e traço (-) são permitidos.",
+      "PreOpenPortMaxCountLimit": "Pode definir até {{count}} portas pré-abertas.",
+      "StartTimeMustBeInTheFuture": "A hora de início deve ser posterior à hora atual.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Atribuição de recursos por contentor",
+      "NumberOfContainer": "Número de contentores",
+      "EnterEnvironmentVariable": "Introduzir o nome da variável",
+      "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
+      "EnvironmentVariableDuplicateName": "Um nome de variável que já existe."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -295,7 +308,7 @@
       "SluggedStrings": "Cadeias de caracteres com slugged (>3 caracteres)",
       "SessionNameAlreadyExist": "O nome da sessão já existe",
       "SessionNameTooLong64": "Insira 64 caracteres ou menos.",
-      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 3 letras, números, '.', '_' e '-'."
+      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 4 letras, números, '.', '_' e '-'."
     },
     "Interactive": "Interativo",
     "Batch": "Lote",
@@ -428,7 +441,9 @@
     "Control": "Ao controle",
     "NewPassword": "Nova Senha",
     "Enabled": "Habilitado",
-    "StorageProxies": "Armazéns"
+    "StorageProxies": "Armazéns",
+    "None": "Nenhum",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Permissão",
@@ -763,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memória compartilhada (GB)",
     "NoResourcePresetToDisplay": "Não há predefinições de recursos a apresentar",
-    "Deleted": "A predefinição de recurso foi eliminada com êxito."
+    "Deleted": "A predefinição de recurso foi eliminada com êxito.",
+    "SHMEMShouldBeSmallerThanMemory": "A memória partilhada deve ser mais pequena do que a memória"
   },
   "usersettings": {
     "General": "Em geral",
