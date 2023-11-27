@@ -12,12 +12,12 @@ import click
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import RedisConnectionInfo
-from ai.backend.manager.config import SharedConfig
 
-from ..config import LocalConfig
+from ..config import LocalConfig, SharedConfig
 from ..config import load as load_config
 
 
@@ -59,6 +59,50 @@ class CLIContext:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()
+
+
+@contextlib.asynccontextmanager
+async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
+    local_config = cli_ctx.local_config
+    creds = None
+    if local_config["etcd"]["user"]:
+        creds = {
+            "user": local_config["etcd"]["user"],
+            "password": local_config["etcd"]["password"],
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        # TODO: provide a way to specify other scope prefixes
+    }
+    etcd = AsyncEtcd(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["namespace"],
+        scope_prefix_map,
+        credentials=creds,
+    )
+    try:
+        yield etcd
+    finally:
+        await etcd.close()
+
+
+@contextlib.asynccontextmanager
+async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedConfig]:
+    local_config = cli_ctx.local_config
+    # scope_prefix_map is created inside ConfigServer
+    shared_config = SharedConfig(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["user"],
+        local_config["etcd"]["password"],
+        local_config["etcd"]["namespace"],
+    )
+    await shared_config.reload()
+    raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
+    local_config["redis"] = redis_config_iv.check(raw_redis_config)
+    try:
+        yield shared_config
+    finally:
+        await shared_config.close()
 
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)

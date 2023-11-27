@@ -7,7 +7,8 @@
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
             "allowed_docker_registries": [
-                "cr.backend.ai"
+                "cr.backend.ai",
+                "index.docker.io"
             ]
         }
     ],

@@ -8,6 +8,7 @@ from enum import Enum
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Dependencies,
     DictStringToStringField,
     NestedDictStringToStringField,
@@ -21,23 +22,19 @@ from pants.util.strutil import softwrap
 class ScieDependenciesField(Dependencies):
     required = True
     supports_transitive_excludes = True
-    help = softwrap(
-        """
+    help = softwrap("""
         The address of a single `pex_binary` target to include in the binary, e.g.
         `['src/python/project:pex']`.
-        """
-    )
+        """)
 
 
 class ScieBinaryNameField(OutputPathField):
     alias = "binary_name"
     default = None
-    help = softwrap(
-        """
+    help = softwrap("""
         The name of the binary that will be output by `scie-jump`. If not set, this will default
         to the name of this target.
-        """
-    )
+        """)
 
 
 class SciePlatform(Enum):
@@ -47,26 +44,31 @@ class SciePlatform(Enum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+class ScieFatFlagField(BoolField):
+    alias = "fat"
+    default = False
+    help = softwrap("""
+        A field to enable fat builds.
+        """)
+
+
 class SciePlatformField(StringSequenceField):
     alias = "platforms"
     default = None
     valid_choices = SciePlatform
-    help = softwrap(
-        """
+    help = softwrap("""
         A field to indicate what what platform(s) to build for.
 
         The default selection is `None`, in which case we will default to the current platform.
         Possible values are: `linux-aarch64`, `linux-x86_64`, `macos-aarch64`, `macos-x86_64`.
-        """
-    )
+        """)
 
 
 class ScieLiftSourceField(OptionalSingleSourceField):
     alias = "lift"
     expected_file_extensions = (".toml",)
     default = None
-    help = softwrap(
-        """
+    help = softwrap("""
         If set, the specified toml file will be used to configure the `scie` and all other
         fields will be ignored.
 
@@ -83,8 +85,7 @@ class ScieLiftSourceField(OptionalSingleSourceField):
         Example:
         [[lift.files]]
             name = ":helloworld-pex"
-        """
-    )
+        """)
 
 
 # class ScieCommandField(NestedDictStringToStringField):
@@ -129,13 +130,12 @@ class ScieTarget(Target):
         ScieBinaryNameField,
         SciePlatformField,
         ScieLiftSourceField,
+        ScieFatFlagField,
     )
-    help = softwrap(
-        """
+    help = softwrap("""
         A single-file Python executable with a Python interpreter embedded, built via scie-jump.
 
         To use this target, first create a `pex_binary` target with the code you want included
         in your binary, per {doc_url('pex-files')}. Then add this `pex_binary` target to the
         `dependencies` field. See the `help` for `dependencies` for more information.
-        """
-    )
+        """)

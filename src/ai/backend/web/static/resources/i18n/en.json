@@ -248,7 +248,20 @@
       "Network": "Network",
       "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
       "preopen": "preopen",
-      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed."
+      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed.",
+      "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open ports.",
+      "EnqueueComputeSessionWarning": "If you set it larger than the currently available resources, the session creation will be delayed in the queue until it becomes available.",
+      "TemplateAndHistory": "Templates & history",
+      "StartTimeMustBeInTheFuture": "The start time must be after the current time.",
+      "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit",
+      "SessionName": "SessionName",
+      "ResetFormConfirm": "ResetFormConfirm",
+      "ScheduleTimeSimple": "ScheduleTimeSimple",
+      "ResourceAllocationPerContainer": "Resource Allocation Per Container",
+      "NumberOfContainer": "Number of container",
+      "EnterEnvironmentVariable": "Enter Variable name",
+      "EnvironmentVariableNamePatternError": "Variable name must start with a letter or underscore, and can only contain letters, numbers, and underscores.",
+      "EnvironmentVariableDuplicateName": "A variable name that already exists."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -327,7 +340,7 @@
       "EnterValidSessionName": "Enter valid session name",
       "SessionNameAlreadyExist": "Session name already exists",
       "SessionNameTooLong64": "Please enter 64 characters or less.",
-      "PleaseFollowSessionNameRule": "Please enter a combination of at least 3 letters, numbers, '.', '_', and '-'."
+      "PleaseFollowSessionNameRule": "Please enter a combination of at least 4 letters, numbers, '.', '_', and '-'."
     },
     "EnvironmentInfo": "Environment Info",
     "DownloadingSessionLogs": "Downloading session logs.",
@@ -520,7 +533,9 @@
     "Control": "Control",
     "NewPassword": "New Password",
     "Enabled": "Enabled",
-    "StorageProxies": "Storages"
+    "StorageProxies": "Storages",
+    "None": "None",
+    "Image": "Image"
   },
   "credential": {
     "Permission": "Permission",
@@ -855,7 +870,8 @@
     "MinimumMemUnit": "Memory starts with 1 GB",
     "MinimumShmemUnit": "The minimum unit for shared memory is 0.01 GB.",
     "RAM": "RAM (GB)",
-    "SharedMemory": "Shared memory (GB)"
+    "SharedMemory": "Shared memory (GB)",
+    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory"
   },
   "usersettings": {
     "General": "General",

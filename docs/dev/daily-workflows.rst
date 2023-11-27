@@ -316,19 +316,18 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
    let g:ale_fix_on_save = 1
 
 When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
-in the local working copy to initialize PyRight functionalities.
+in the local working copy to initialize Pyright functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
-just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
-To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``.
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_).
 
 .. code-block:: json
 
    {
      "coc.preferences.formatOnType": true,
-     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "coc.preferences.formatOnSaveFiletypes": [],  // Use the autocmd config
      "coc.preferences.willSaveHandlerTimeout": 5000,
      "ruff.enabled": true,
-     "ruff.autoFixOnSave": false,  # Use code actions to fix individual errors
+     "ruff.autoFixOnSave": false,  // Use the autocmd config
      "ruff.useDetectRuffCommand": false,
      "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
      "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
@@ -339,6 +338,27 @@ To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.ins
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
    }
 
+To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
+after opening any Python source file to install the ``ruff-lsp`` server.
+
+Unfortunately, CoC does not support applying multiple formatters on save, we should call
+them serially using ``autocmd``.
+To configure it, put the following vimscript as ``.exrc`` in the working copy root:
+
+.. code-block:: vim
+
+   function! OrganizeAndFormat()
+       CocCommand ruff.executeOrganizeImports
+       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
+       sleep 50m  " to avoid races
+       call CocAction('format')
+       sleep 50m
+   endfunction
+
+   augroup autofix
+       autocmd!
+       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | endif
+   augroup END
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

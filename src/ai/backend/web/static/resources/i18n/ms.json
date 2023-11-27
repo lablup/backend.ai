@@ -237,7 +237,19 @@
       "preopen": "prabuka",
       "Network": "Rangkaian",
       "Enable": "Dayakan",
-      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan."
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Peruntukan Sumber Setiap Bekas",
+      "NumberOfContainer": "Bilangan bekas",
+      "EnterEnvironmentVariable": "Masukkan nama Pembolehubah",
+      "EnvironmentVariableNamePatternError": "Nama pembolehubah mesti bermula dengan huruf atau garis bawah, dan hanya boleh mengandungi huruf, nombor dan garis bawah.",
+      "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -295,7 +307,7 @@
       "SluggedStrings": "Rentetan slugged (>3 aksara)",
       "SessionNameAlreadyExist": "Nama sesi sudah wujud",
       "SessionNameTooLong64": "Sila masukkan 64 aksara atau kurang.",
-      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 3 huruf, nombor, '.', '_' dan '-'."
+      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 4 huruf, nombor, '.', '_' dan '-'."
     },
     "Interactive": "Interaktif",
     "Batch": "Kumpulan",
@@ -428,7 +440,9 @@
     "Control": "Kawal",
     "NewPassword": "Kata laluan baharu",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Stor"
+    "StorageProxies": "Stor",
+    "None": "tiada",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -763,7 +777,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
-    "Deleted": "Pratetap sumber berjaya dipadamkan."
+    "Deleted": "Pratetap sumber berjaya dipadamkan.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Am",

@@ -248,6 +248,9 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
 
+    - name: Install coreutils for macOS
+      if: ${{ startsWith(matrix.os, 'macos') }}
+      run: brew install coreutils
     - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
       uses: actions/setup-python@v4
       with:
@@ -262,24 +265,32 @@ jobs:
         SYSTEM="$OS_TYPE $CPU_ARCH"
         case "$SYSTEM" in
           "Linux x86_64" )
-            PLATFORM="linux_x64"
+            SRC_PLATFORM="linux-x64"
+            DST_PLATFORM="linux-x86_64"
+            CHECKSUM_CMD="sha256sum"
             ;;
           "Linux aarch64" )
-            PLATFORM="linux_arm64"
+            SRC_PLATFORM="linux-arm64"
+            DST_PLATFORM="linux-aarch64"
+            CHECKSUM_CMD="sha256sum"
             ;;
           "Darwin x86_64" )
-            PLATFORM="mac_x64"
-            npm rebuild
+            SRC_PLATFORM="macos-x64"
+            DST_PLATFORM="macos-x86_64"
+            CHECKSUM_CMD="shasum -a 256"
             ;;
           "Darwin arm64" )
-            PLATFORM="mac_arm64"
-            npm rebuild
+            SRC_PLATFORM="macos-arm64"
+            DST_PLATFORM="macos-aarch64"
+            CHECKSUM_CMD="shasum -a 256"
             ;;
         esac
         mkdir dist-local-proxy
         # Normalize the package naming
-        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$PLATFORM.zip"
-        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$PLATFORM"
+        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
+        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$DST_PLATFORM"
+        cd dist-local-proxy
+        ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
       uses: actions/upload-artifact@v3
       with:
@@ -290,10 +301,14 @@ jobs:
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Build packages
+        cache-lmdb-store: 'false'
+    - name: Build fat packages
       run: |
-        pants --tag="-wheel" package '::'
+        pants --tag="scie" package '::'
+        # 'pants run' does not support parallelization
+        pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
+    - name: Clean up intermediate pex files
+      run: |
         rm -rf dist/src.*/
     - name: Upload scies
       uses: actions/upload-artifact@v3
@@ -312,7 +327,6 @@ jobs:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
     - name: Fetch remote tags
@@ -337,16 +351,16 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
-    - name: Build packages
+        cache-lmdb-store: 'false'
+    - name: Build wheel packages
       run: |
         # Normalize the package version
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
@@ -370,19 +384,16 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
     - name: Upload wheels
       uses: actions/upload-artifact@v3
       with:
         name: wheels
         path: dist/*.whl
+    - name: Upload source tarballs
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist/*.tar.gz
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -390,9 +401,11 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
+  build-sbom:
+    uses: ./.github/workflows/sbom.yml
 
-  make-github-release:
-    needs: [build-scies, build-wheels]
+  make-final-release:
+    needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: deploy-to-pypi
@@ -409,6 +422,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Install towncrier requirements
+      run: |
+        pip install -U -r tools/towncrier-requirements.txt
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -428,6 +447,11 @@ jobs:
       with:
         name: local-proxy
         path: dist
+    - name: Download SBOM report
+      uses: actions/download-artifact@v3
+      with:
+        name: SBOM report
+        path: dist
     - name: Release to GitHub
       uses: softprops/action-gh-release@v1
       with:
@@ -438,7 +462,7 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels]
+    needs: [build-wheels, make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:

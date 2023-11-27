@@ -114,7 +114,7 @@ class AsyncEtcd:
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
-        credentials: dict[str, str] = None,
+        credentials: dict[str, str] | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:

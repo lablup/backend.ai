@@ -1,9 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+
 /* --Reset CSS Start-- */
-html, body, div, span, 
-h1, h2, h3, h4, h5, h6, 
-p, a, img, strong, 
-dl, dt, dd, ol, ul, li, 
-table, article, aside, canvas, 
+html, body, div, span,
+h1, h2, h3, h4, h5, h6,
+p, a, img, strong,
+dl, dt, dd, ol, ul, li,
+table, article, aside, canvas,
 footer, header, menu, nav, section, mark, code {
   margin: 0;
 	padding: 0;
@@ -25,44 +27,6 @@ ol, ul {
   font-weight: 400;
   unicode-range: U+0041-005A, U+0061-007A, U+AC00-D7A3, U+0030-0039, U+0020-002F, U+003A-0040, U+005B-0060, U+007B-007E
 }
-
-/* 보조 폰트 */
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-Regular.woff') format('woff');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-RegularItalic.woff2') format('woff2');
-  font-weight: 400;
-  font-style: italic;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-/* 폰트 변경을 대비한 Poppins */
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-Regular.ttf') format('truetype');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/fonts/Poppins-Medium.ttf') format('truetype');
-  font-weight: 500;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
 /* --Font End-- */
 
 /* --Custom Global Theme Start-- */
@@ -70,7 +34,7 @@ ol, ul {
   -webkit-box-sizing: border-box !important;
   -moz-box-sizing: border-box !important;
   -ms-box-sizing: border-box !important;
-  box-sizing: border-box !important;  
+  box-sizing: border-box !important;
 }
 
 html {
@@ -80,7 +44,7 @@ html {
 }
 
 body {
-  font-family: Pretendard, WhyteABCInktrap, Poppins, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-size: 4.103vw;
   word-break: keep-all;
 }
@@ -446,7 +410,7 @@ input {
 }
 
 input::placeholder {
-  font-family: Pretendard, Poppins, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-size: 3.59vw;
   line-height: 160%;
 }
@@ -466,7 +430,7 @@ input::placeholder {
     font-size: 1.4rem;
     padding: .8rem 1.2rem;
   }
-  
+
   input::placeholder {
     font-size: 1.4rem;
   }
@@ -3499,7 +3463,7 @@ input::placeholder {
     height: 9rem;
     border-bottom: 1px solid #000;
   }
-  
+
   #backend-ai-header a div {
     width: 18rem;
   }
@@ -4639,7 +4603,7 @@ body,html {
 }
 
 body {
-  font-family: Pretendard, Poppins, ABCWhyteInktrap, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-weight: 400;
   color: #000;
   min-height: 100%;
@@ -5065,7 +5029,7 @@ hr {
   .breadcrumb-item a {
     font-size: 2.308rem;
   }
-  
+
   .breadcrumb-item:before, .breadcrumb-item:after {
     font-size: 2.308rem;
     padding: 0 .923rem 0 0;
@@ -5085,7 +5049,7 @@ hr {
   .breadcrumb-item a {
     font-size: 1.8rem;
   }
-  
+
   .breadcrumb-item:before, .breadcrumb-item:after {
     font-size: 1.8rem;
     padding: 0 1rem;
@@ -5622,7 +5586,7 @@ hr {
 }
 
 .wy-nav-top a {
-  font-family: ABCWhyteInktrap, Pretendard, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-style: italic;
   display: -webkit-box;
     -webkit-line-clamp: 1;
@@ -5674,7 +5638,7 @@ hr {
 .wy-nav-content {
   height: 100%;
   max-width: 1199px;
-  margin: auto
+  margin: auto;
 }
 
 .wy-body-mask {
@@ -5950,16 +5914,16 @@ img.search-icon {
   .customized-search-bar {
     margin-top: 3.072rem;
   }
-  
+
   .customized-search-bar input:first-child {
     padding-right: 5rem;
     height: 6.142rem;
   }
-  
+
   .customized-search-bar input:first-child::placeholder {
     font-size: 2.3rem;
   }
-  
+
   #search-icon-wrapper {
     position: absolute;
     width: 3.69rem;
@@ -5979,21 +5943,25 @@ img.search-icon {
     padding-top: 8rem;
   }
 
+  html {
+    scroll-padding-top: 10rem;
+  }
+
   .customized-search-bar {
     display: none;
     margin-top: 1.5rem;
   }
-  
+
   .customized-search-bar input:first-child {
     width: 29rem;
     padding-right: 3.5rem;
     height: 4rem;
   }
-  
+
   .customized-search-bar input:first-child::placeholder {
     font-size: 1.4rem;
   }
-  
+
   #search-icon-wrapper {
     position: absolute;
     width: 2.4rem;
@@ -6401,14 +6369,14 @@ div.rst-other-versions small a {
   .rst-content .admonition-title:before {
     font-size: 2.918rem;
     margin-right: 1.536rem;
-  } 
+  }
 }
 
 @media (min-width: 1200px) {
   .rst-content .admonition-title:before {
     font-size: 1.9rem;
     margin-right: 1rem;
-  } 
+  }
 }
 
 .rst-content .admonition.warning p {
@@ -6432,7 +6400,7 @@ div.rst-other-versions small a {
   .rst-content .admonition.warning .admonition-title:before {
     font-size: 1.9rem;
     margin-right: 1rem;
-  } 
+  }
 }
 
 .rst-content .admonition.danger .admonition-title:before {
@@ -6445,14 +6413,14 @@ div.rst-other-versions small a {
   .rst-content .admonition.danger .admonition-title:before {
     font-size: 2.918rem;
     margin-right: 1.536rem;
-  } 
+  }
 }
 
 @media (min-width: 1200px) {
   .rst-content .admonition.danger .admonition-title:before {
     font-size: 1.9rem;
     margin-right: 1rem;
-  } 
+  }
 }
 
 .rst-content .admonition.tip .admonition-title:before {
@@ -6465,14 +6433,14 @@ div.rst-other-versions small a {
   .rst-content .admonition.tip .admonition-title:before {
     font-size: 2.918rem;
     margin-right: 1.536rem;
-  } 
+  }
 }
 
 @media (min-width: 1200px) {
   .rst-content .admonition.tip .admonition-title:before {
     font-size: 1.9rem;
     margin-right: 1rem;
-  } 
+  }
 }
 
 .rst-content .admonition.hint .admonition-title:before {
@@ -7115,7 +7083,7 @@ tbody tr td .admonition.warning p, tbody tr td .admonition.note p {
   div.versionchanged, div.versionchanged p {
     font-size: 1.536rem;
   }
-  
+
   tbody tr td div.versionchanged .versionmodified, tbody tr td div.versionadded .versionmodified {
     font-size: 1.536rem;
   }
@@ -7269,7 +7237,7 @@ div.rst-footer-buttons a:last-child {
   div.rst-footer-buttons a:last-child {
     padding-right: 0;
     border-left: none;
-  }  
+  }
 }
 
 @media (min-width: 600px) {
@@ -7296,11 +7264,11 @@ div.rst-footer-buttons a:last-child {
 
   div.rst-footer-buttons a:last-child {
     padding-left: 8.063rem;
-  
+
     ::after {
       margin-left: 1.229rem;
     }
-  
+
   }
 }
 
@@ -7343,7 +7311,7 @@ div.rst-footer-buttons a:last-child {
 
   div.rst-footer-buttons a:first-child {
     padding-right: 0;
-  
+
     ::before {
       margin-right: .2rem;
     }
@@ -7491,8 +7459,8 @@ span.linenos { color: inherit; background-color: transparent; padding-left: 5px;
 td.linenos .special { color: #767676; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
 span.linenos.special { color: #767676; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
 .highlight .hll { background-color: #ffffcc }
-.highlight { 
-  background: #1E1E1E; 
+.highlight {
+  background: #1E1E1E;
   color: #FFF;
 }
 .highlight .c { color: #8f5902; font-style: italic } /* Comment */
