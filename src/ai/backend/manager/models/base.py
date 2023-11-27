@@ -5,6 +5,7 @@ import collections
 import enum
 import functools
 import logging
+import re
 import sys
 import uuid
 from typing import (
@@ -659,6 +660,37 @@ class _SQLBasedGQLObject(Protocol):
         ctx: GraphQueryContext,
         row: Row,
     ) -> _GenericSQLBasedGQLObject: ...
+
+
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for allowing unicode
+    """
+
+    impl = sa.types.Unicode
+    cache_ok = True
+
+    def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
+        self._allow_unicode = allow_unicode
+        self._length = length
+        self._rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: Any, dialect):
+        if self._length is not None and len(value) > self._length:
+            raise ValueError(f"value is too long (max length {self._length}")
+        if not self._allow_unicode:
+            if self._rx_slug.search(value) is None:
+                return ValueError("invalid name format. slug format required.", value)
+        return value
+
+    def process_result_value(self, value: Any, dialect):
+        if not self._allow_unicode:
+            if self._rx_slug.search(value) is None:
+                return ValueError("invalid name format. slug format required.", value)
+        return value
 
 
 async def batch_result(
