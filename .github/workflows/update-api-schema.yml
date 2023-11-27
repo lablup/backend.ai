@@ -62,3 +62,16 @@ jobs:
       with:
         commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
         commit_message: 'chore: update GraphQL schema dump'
+
+  graphql-inspector:
+    needs: graphql-updated
+    name: Check Schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kamilkisiela/graphql-inspector@release-1689086705050
+        with:
+          schema: 'main:src/ai/backend/manager/api/schema.graphql'
+          rules: |
+            custom-rule.js
