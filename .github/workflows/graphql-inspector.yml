@@ -1,0 +1,16 @@
+name: GraphQL Inspector
+
+on: [push]
+
+jobs:
+  graphql-inspector:
+    name: Check Schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kamilkisiela/graphql-inspector@release-1689086705050
+        with:
+          schema: 'main:src/ai/backend/manager/api/schema.graphql'
+          rules: |
+            custom-rule.js
