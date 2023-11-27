@@ -16,6 +16,47 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.6 (2023-11-27)
+
+### Features
+* Detailed Docker container creation failure log. ([#1649](https://github.com/lablup/backend.ai/issues/1649))
+* Allow explicit `null` and empty string to ContainerRegistry mutations. ([#1670](https://github.com/lablup/backend.ai/issues/1670))
+* Add pex + scie based single-file self-contained self-bootstrapping bindary distributions that can be executed on any modern Linux/macOS machines using the standalone Python builds (thanks to @sureshjoshi) ([#1680](https://github.com/lablup/backend.ai/issues/1680))
+* Add `pipeline.frontend-endpoint` and `pipeline.hide-side-menu-button` configs to webserver. ([#1692](https://github.com/lablup/backend.ai/issues/1692))
+* Add a community installer to replace and upgrade `install-dev.sh`, providing a full GUI experience in terminals ([#1694](https://github.com/lablup/backend.ai/issues/1694))
+* Add option to control maximum number of NPU per session ([#1696](https://github.com/lablup/backend.ai/issues/1696))
+* Limit the size of the scratch directory by using loop mounted sparse file ([#1704](https://github.com/lablup/backend.ai/issues/1704))
+* webserver: Include the feature flag `service.is_directory_size_visible` in `/config.toml` which provides an option whether to show/hide directory size in folder explorer ([#1710](https://github.com/lablup/backend.ai/issues/1710))
+* Implement per-image metadata sync in the `mgr image rescan` command and deprecate scanning a whole Docker Hub account to avoid the API rate limit ([#1712](https://github.com/lablup/backend.ai/issues/1712))
+* Add a `edu_appname_prefix` config on webserver to easily parse image name from app name. ([#1735](https://github.com/lablup/backend.ai/issues/1735))
+
+### Fixes
+* To resolve the type mismatch between DB and schema, changed all schema types of `max_vfolder_count` to int. ([#1643](https://github.com/lablup/backend.ai/issues/1643))
+* Fix infinite loop when malformed symbolic link exists in container ([#1673](https://github.com/lablup/backend.ai/issues/1673))
+* Restore removed graphene fields of resource policies and set them deprecated. ([#1677](https://github.com/lablup/backend.ai/issues/1677))
+* Allow running manager CLI commands without having `manager.toml` when they do not need it ([#1686](https://github.com/lablup/backend.ai/issues/1686))
+* Update all functional wrappers of the Client SDK, CLI commands, and the counterpart Manager GraphQL mutations to distinguish undefined fields and deliberately-set-to-null fields ([#1688](https://github.com/lablup/backend.ai/issues/1688))
+* Allow `Undefined` value of `ModifyGroupInput.user_update_mode` field to enable client-py updates group. ([#1698](https://github.com/lablup/backend.ai/issues/1698))
+* Handle error in storage proxy's API error handler. ([#1701](https://github.com/lablup/backend.ai/issues/1701))
+* Allow empty `auto_terminate_abusing_kernel` field from agent heartbeat. ([#1715](https://github.com/lablup/backend.ai/issues/1715))
+* Improve the installer to use a new default wsproxy port for better compatibility with WSL ([#1722](https://github.com/lablup/backend.ai/issues/1722))
+* Fix the installer to use the refactored `common.docker.get_docker_connector()` for system docker detection which now also detects the active docker context if configured ([#1724](https://github.com/lablup/backend.ai/issues/1724))
+* Make root partition filesystem type detection compatible with macOS using psutil ([#1728](https://github.com/lablup/backend.ai/issues/1728))
+* Fix additional installer issues found in a relatively fresher macOS instance ([#1731](https://github.com/lablup/backend.ai/issues/1731))
+* Fix an installer regression in #1724 to inappropriately cache an aiohttp connector instance used to access the local Docker API ([#1732](https://github.com/lablup/backend.ai/issues/1732))
+* Do null-check `rate_limit` value when validate user's rate limit. ([#1738](https://github.com/lablup/backend.ai/issues/1738))
+* Fix some trafaret type checkers of redis config from `Float()` to `ToFloat()`. ([#1741](https://github.com/lablup/backend.ai/issues/1741))
+
+### Documentation Updates
+* Refine and elaborate the Concepts section to reflect all the new features and concepts added in last 3 years ([#1468](https://github.com/lablup/backend.ai/issues/1468))
+* Append new design aligns with revamped backend.ai webpage ([#1690](https://github.com/lablup/backend.ai/issues/1690))
+* Append Heading hierarchy font sizes & flyout menu for selecting en and kr. ([#1702](https://github.com/lablup/backend.ai/issues/1702))
+* Change fonts to webfonts and erase local font files. ([#1714](https://github.com/lablup/backend.ai/issues/1714))
+
+### Miscellaneous
+* Include `HOME` env-var when running tests via pants ([#1676](https://github.com/lablup/backend.ai/issues/1676))
+
+
 ## 23.09.5 (2023-11-02)
 
 ### Fixes
