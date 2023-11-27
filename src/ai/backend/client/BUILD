@@ -16,14 +16,6 @@ visibility_private_component(
     ],
 )
 
-pex_binary(
-    name="cli",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="cli/__main__.py",
-)
-
 python_distribution(
     name="dist",
     dependencies=[
@@ -44,8 +36,46 @@ python_distribution(
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-client",
+    fat=False,
+    dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-client-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+run_shell_command(
+    name="checksum",
+    command=(
+        "find . -name 'backendai-client-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
+    workdir="/dist",
+    execution_dependencies=[
+        ":backendai-client",
+        ":backendai-client-fat",
+    ],
+    tags=["checksum"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[

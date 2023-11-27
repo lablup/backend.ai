@@ -234,8 +234,10 @@ def etcd_fixture(
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
             "volumes": {
@@ -385,8 +387,10 @@ def database(request, local_config, test_db):
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(

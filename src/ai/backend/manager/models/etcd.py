@@ -36,8 +36,8 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
-    url = graphene.String(required=True)
-    type = graphene.String(required=True)
+    url = graphene.String()
+    type = graphene.String()
     project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
@@ -159,7 +159,9 @@ class ModifyContainerRegistry(graphene.Mutation):
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        input_config: Dict[str, Any] = {"": props.url, "type": props.type}
+        input_config: Dict[str, Any] = {}
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "type")
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")

@@ -55,7 +55,13 @@ logging_config_iv = t.Dict(
         t.Key("level", default="INFO"): loglevel_iv,
         t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
         t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
-        t.Key("console", default=None): t.Null | t.Dict(
+        t.Key(
+            "console",
+            default={
+                "colored": None,
+                "format": "verbose",
+            },
+        ): t.Dict(
             {
                 t.Key("colored", default=None): t.Null | t.Bool,
                 t.Key("format", default="verbose"): logformat_iv,

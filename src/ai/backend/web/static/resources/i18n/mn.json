@@ -233,10 +233,19 @@
       "PreOpenPortRange": "Урьдчилан нээх портуудыг зөвхөн 1024-ээс 65535 хүртэл ашиглах боломжтой.",
       "MinMemory": "Одоогоор сонгогдсон ажиллах орчны орчны хамгийн бага санах ойн багтаамж нь {{size}}iB байна.",
       "ModelStorage": "Загвар хадгалах",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Таслал (,) эсвэл хоосон зайгаар тусгаарласан олон утгыг оруулна уу.",
+      "preopen": "урьдчилан нээх",
+      "Network": "Сүлжээ",
+      "Enable": "Идэвхжүүлэх",
+      "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө.",
+      "StartTimeMustBeInTheFuture": "Эхлэх цаг нь одоогийн цагаас хойш байх ёстой.",
+      "PreOpenPortMaxCountLimit": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -303,8 +312,8 @@
       "EnterValidSessionName": "Хүчинтэй сессийн нэрийг оруулна уу",
       "SessionNameAlreadyExist": "Сешн нэр аль хэдийн байна",
       "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "64 ба түүнээс бага тэмдэгт оруулна уу.",
+      "PleaseFollowSessionNameRule": "Дор хаяж 4 үсэг, тоо, '.', '_', '-' гэсэн хослолыг оруулна уу."
     },
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "NoSessionToDisplay": "Харуулах сесс алга",
@@ -427,7 +436,9 @@
     "Control": "Хяналт",
     "NewPassword": "Шинэ нууц үг",
     "Enabled": "Идэвхжсэн",
-    "StorageProxies": "Хадгалах сан"
+    "StorageProxies": "Хадгалах сан",
+    "None": "Байхгүй",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -504,7 +515,8 @@
     "AdminCanOnlyRemoveTotp": "Зөвхөн бусад хэрэглэгчдийн 2FA-г идэвхгүй болгох боломжтой.",
     "KeySeccessfullyDeleted": "KeyPair амжилттай устгагдсан.",
     "SignoutSeccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
-    "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх"
+    "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Фолдерууд",
@@ -670,7 +682,7 @@
     "Used": "Ашигласан",
     "Pipeline": "Дамжуулах хоолойн хавтас",
     "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Нэрээр нь хайх"
   },
   "dialog": {
     "warning": {
@@ -761,7 +773,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Хуваалцсан санах ой (GB)",
     "Deleted": "Нөөцийн урьдчилсан тохируулгыг амжилттай устгалаа.",
-    "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй"
+    "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Ерөнхий",
@@ -897,7 +910,8 @@
     "PleaseSelectOption": "Нэг сонголтыг сонгоно уу.",
     "RegistrySuccessfullyModified": "Бүртгэл амжилттай өөрчлөгдсөн.",
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
-    "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй"
+    "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -1410,7 +1424,7 @@
     "TokenExpiredDateHelp": "Өгөгдмөл токен дуусах хугацаа нь 24 цагийн дараа байна.",
     "TokenExpiredDateError": "Токен дуусах хугацаа нь одоогийн цагаас хойш байх ёстой",
     "FormValidationFailed": "Маягтын баталгаажуулалт амжилтгүй боллоо",
-    "ServiceNameRule": "Зөвхөн 4-64 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
+    "ServiceNameRule": "Зөвхөн 4-24 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
     "resources": "Нөөц",
     "Image": "Зураг"
   },

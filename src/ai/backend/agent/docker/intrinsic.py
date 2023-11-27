@@ -27,7 +27,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop, nmget
 
-from .. import __version__
+from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,

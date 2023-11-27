@@ -877,8 +877,17 @@ def main(
     log_level: str,
     debug: bool = False,
 ) -> int:
+    """Start the agent service as a foreground process."""
     # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+    try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     # Override the read config with environment variables (for legacy).
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
@@ -942,6 +951,13 @@ def main(
     if os.getuid() != 0 and cfg["container"]["stats-type"] == "cgroup":
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
+            file=sys.stderr,
+        )
+        raise click.Abort()
+
+    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+        print(
+            "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()

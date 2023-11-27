@@ -233,10 +233,21 @@
       "PreOpenPortRange": "Предварительно открытые порты доступны только в диапазоне от 1024 до 65535.",
       "MinMemory": "Минимальный объем памяти для выбранной в данный момент среды выполнения составляет {{size}}iB.",
       "ModelStorage": "Модельное хранилище",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Введите несколько значений, разделенных запятой (,) или пробелом.",
+      "preopen": "предварительное открытие",
+      "Network": "Сеть",
+      "Enable": "Давать возможность",
+      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
+      "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
+      "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -303,8 +314,8 @@
       "EnterValidSessionName": "Введите действительное имя сессии",
       "SessionNameAlreadyExist": "Имя сессии уже существует",
       "SluggedStrings": "Строки с засечками (>3 символов)",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Введите не более 64 символов.",
+      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 4 букв, цифр, «.», «_» и «-»."
     },
     "AlreadyTerminatingSession": "Уже завершаю сессию.",
     "NoSessionToDisplay": "Нет сеансов для отображения",
@@ -427,7 +438,9 @@
     "Control": "Контроль",
     "NewPassword": "Новый пароль",
     "Enabled": "Включено",
-    "StorageProxies": "Хранилища данных"
+    "StorageProxies": "Хранилища данных",
+    "None": "Нет",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -504,7 +517,8 @@
     "AdminCanOnlyRemoveTotp": "Возможно только отключение 2FA для других пользователей.",
     "KeySeccessfullyDeleted": "Пара ключей удалена без последствий.",
     "SignoutSeccessfullyFinished": "Выход из системы завершен",
-    "ModifyUserDetail": "Изменение сведений о пользователе"
+    "ModifyUserDetail": "Изменение сведений о пользователе",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Папки",
@@ -670,7 +684,7 @@
     "Used": "Используется",
     "Pipeline": "Трубопроводные папки",
     "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Поиск по имени"
   },
   "dialog": {
     "warning": {
@@ -761,7 +775,8 @@
     "RAM": "RAM (ГБ)",
     "SharedMemory": "Общая память (ГБ)",
     "Deleted": "Предварительная настройка ресурса успешно удалена.",
-    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов"
+    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов",
+    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти"
   },
   "usersettings": {
     "General": "Общий",
@@ -897,7 +912,8 @@
     "PleaseSelectOption": "Пожалуйста, выберите один вариант.",
     "RegistrySuccessfullyModified": "Реестр успешно модифицирован.",
     "ModifyRegistry": "Изменение реестра",
-    "NoRegistryToDisplay": "Отсутствие отображаемых реестров"
+    "NoRegistryToDisplay": "Отсутствие отображаемых реестров",
+    "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",
@@ -1410,7 +1426,7 @@
     "TokenExpiredDateHelp": "По умолчанию время истечения срока действия токена составляет 24 часа.",
     "TokenExpiredDateError": "Время истечения срока действия токена должно быть после текущего времени",
     "FormValidationFailed": "Не удалось выполнить валидацию формы",
-    "ServiceNameRule": "Допускается только от 4 до 64 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
+    "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
     "Image": "Изображение"
   },

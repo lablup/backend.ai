@@ -126,6 +126,7 @@
       "InteractiveMode": "Interactive",
       "BatchModeConfig": "Batch 모드 설정",
       "ScheduleTime": "시작 시간 설정 (옵션)",
+      "ScheduleTimeSimple": "시작 시간 설정",
       "StartUpCommand": "세션 시작시 실행할 명령",
       "SessionStartTime": "세션 시작 시간: ",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
@@ -137,6 +138,7 @@
       "Base": "기본환경",
       "Requirements": "요구사항",
       "SessionNameOptional": "세션 이름 (옵션)",
+      "SessionName": "세션 이름",
       "Environments": "실행 환경",
       "Start": "시작",
       "FolderToMount": "마운트할 폴더",
@@ -234,10 +236,17 @@
       "PreOpenPortPanelTitle": "추가될 사전 개방 포트값 (옵션)",
       "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다.",
       "PreOpenPortRangeGuide": "여러 값을 콤마(,) 또는 스페이스로 구분하여 입력할 수 있습니다.",
+      "PreOpenPortMaxCountLimit": "사전 개방 포트는 최대 {{count}}개까지 설정할 수 있습니다.",
       "MinMemory": "현재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다.",
       "Enable": "활성화",
       "Network": "네트워크",
-      "preopen": "사전 개방 포트"
+      "preopen": "사전 개방 포트",
+      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
+      "Template": "세션 템플릿",
+      "TemplateAndHistory": "템플릿 및 최근기록",
+      "ResetFormConfirm": "입력한 사항을 모두 초기화하시겠습니까?",
+      "StartTimeMustBeInTheFuture": "시작 시간은 현재 시간 이후여야 합니다.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -264,7 +273,7 @@
     "AllowedClientIps": "허용된 클라이언트 IP",
     "CommaSeparated": "콤마로 구분",
     "TryPreferredPort": "선호 포트",
-    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
+    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH 키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
     "ConnectionInformation": "연결 정보",
     "VNCconnection": "VNC 연결",
     "CheckAgainDialog": "이 선택은 취소할 수 없습니다. 정말 진행하시겠습니까?",
@@ -307,7 +316,7 @@
       "EnterValidSessionName": "올바른 세션 이름을 입력해주세요",
       "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다",
       "SessionNameTooLong64": "64자 이하로 입력해주세요.",
-      "PleaseFollowSessionNameRule": "최소 3자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요."
+      "PleaseFollowSessionNameRule": "최소 4자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요."
     },
     "AlreadyTerminatingSession": "이미 종료중인 세션입니다",
     "CommitSession": "세션을 이미지로 커밋하기",
@@ -399,7 +408,7 @@
     "ExpiredDate": "토큰 만료 시각",
     "TokenExpiredDateHelp": "토큰 만료 시각 기본 값은 24시간 뒤입니다.",
     "TokenExpiredDateError": "토큰 만료 시간은 현재 시간 이후여야 합니다.",
-    "ServiceNameRule": "4~64자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
+    "ServiceNameRule": "4~24자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
     "FormValidationFailed": "양식 유효성 검사 실패",
     "resources": "자원",
     "Image": "이미지"
@@ -509,7 +518,9 @@
     "Control": "제어",
     "NewPassword": "새 비밀번호",
     "Enabled": "활성화됨",
-    "StorageProxies": "스토리지"
+    "StorageProxies": "스토리지",
+    "None": "없음",
+    "Image": "이미지"
   },
   "credential": {
     "Permission": "권한",
@@ -586,7 +597,8 @@
     "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
     "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
     "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
-    "ModifyUserDetail": "사용자 상세 정보 수정"
+    "ModifyUserDetail": "사용자 상세 정보 수정",
+    "EnableSudoSession": "sudo 세션 허용"
   },
   "data": {
     "Folders": "폴더",
@@ -836,6 +848,7 @@
     "NoPresetName": "자원 프리셋의 이름을 입력하십시오",
     "NoResourcePresetToDisplay": "자원 프리셋 정보가 없습니다.",
     "MemoryShouldBeLargerThanSHMEM": "메모리는 공유메모리보다 커야 합니다",
+    "SHMEMShouldBeSmallerThanMemory": "공유메모리는 메모리보다 작아야 합니다",
     "Created": "자원 프리셋이 생성되었습니다",
     "Updated": "자원 프리셋에 수정되었습니다",
     "MinimumCPUUnit": "CPU 최소 단위: 1 코어",
@@ -979,7 +992,8 @@
     "RescanFailed": "리스캔 작업이 실패하였습니다.",
     "NoRegistryToDisplay": "레지스트리 정보가 없습니다.",
     "RegistrySuccessfullyModified": "레지스트리가 성공적으로 수정되었습니다.",
-    "PleaseSelectOption": "옵션을 선택하세요"
+    "PleaseSelectOption": "옵션을 선택하세요",
+    "ConfirmNoUserName": "사용자 및 비밀번호가 지정되지 않았습니다. 저장하시겠습니까?"
   },
   "resourceGroup": {
     "ResourceGroups": "자원 그룹",

@@ -165,6 +165,7 @@ from .models import (
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
+    is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
     sql_json_merge,
@@ -2694,7 +2695,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
-        auto_terminate_abusing_kernel = agent_info["auto_terminate_abusing_kernel"]
+        auto_terminate_abusing_kernel = agent_info.get("auto_terminate_abusing_kernel", False)
         async with self.heartbeat_lock:
             instance_rejoin = False
 
@@ -3432,7 +3433,9 @@ async def handle_model_service_status_update(
                 await context.update_appproxy_endpoint_routes(
                     db_sess, route.endpoint_row, latest_routes
                 )
-            except Exception:
+            except Exception as e:
+                if is_db_retry_error(e):
+                    raise
                 log.exception("failed to communicate with AppProxy endpoint:")
 
     await execute_with_retry(_update)
@@ -3513,6 +3516,8 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
+                                if is_db_retry_error(e):
+                                    raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
@@ -3540,6 +3545,8 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
+                                if is_db_retry_error(e):
+                                    raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
 
@@ -3689,7 +3696,7 @@ async def handle_route_creation(
             )
 
             await context.create_session(
-                f"{endpoint.name}-{uuid.uuid4()}",
+                f"{endpoint.name}-{str(event.route_id)}",
                 endpoint.image_row.name,
                 endpoint.image_row.architecture,
                 UserScope(

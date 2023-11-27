@@ -3,7 +3,7 @@ from typing import Sequence
 from ..request import Request
 from .base import BaseFunction, api_function
 
-__all__ = "Resource"
+__all__ = ("Resource",)
 
 
 class Resource(BaseFunction):

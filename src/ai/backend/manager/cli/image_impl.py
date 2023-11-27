@@ -1,7 +1,7 @@
-import contextlib
+from __future__ import annotations
+
 import logging
 from pprint import pformat, pprint
-from typing import AsyncIterator
 
 import click
 import sqlalchemy as sa
@@ -10,40 +10,15 @@ from tabulate import tabulate
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.manager.cli.context import CLIContext, redis_ctx
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image import rescan_images as rescan_images_func
-from ai.backend.manager.models.utils import connect_database
+
+from ..models.image import ImageAliasRow, ImageRow
+from ..models.image import rescan_images as rescan_images_func
+from ..models.utils import connect_database
+from .context import CLIContext, etcd_ctx, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-@contextlib.asynccontextmanager
-async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    local_config = cli_ctx.local_config
-    creds = None
-    if local_config["etcd"]["user"]:
-        creds = {
-            "user": local_config["etcd"]["user"],
-            "password": local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    etcd = AsyncEtcd(
-        local_config["etcd"]["addr"],
-        local_config["etcd"]["namespace"],
-        scope_prefix_map,
-        credentials=creds,
-    )
-    try:
-        yield etcd
-    finally:
-        await etcd.close()
 
 
 async def list_images(cli_ctx, short, installed_only):
@@ -175,15 +150,15 @@ async def set_image_resource_limit(
             log.exception("An error occurred.")
 
 
-async def rescan_images(cli_ctx: CLIContext, registry: str, local: bool) -> None:
-    if not registry and not local:
-        raise click.BadArgumentUsage("Please specify a valid registry name.")
+async def rescan_images(cli_ctx: CLIContext, registry_or_image: str, local: bool) -> None:
+    if not registry_or_image and not local:
+        raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
         etcd_ctx(cli_ctx) as etcd,
     ):
         try:
-            await rescan_images_func(etcd, db, registry=registry, local=local)
+            await rescan_images_func(etcd, db, registry_or_image, local=local)
         except Exception:
             log.exception("An error occurred.")
 

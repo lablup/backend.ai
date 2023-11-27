@@ -233,10 +233,21 @@
       "PortsTitleWithRange": "Wartość portu (między 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Wszystkie niezapisane wcześniej otwarte porty zostaną usunięte.",
       "StartModelServing": "Rozpoczęcie obsługi modelu",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Wprowadź wiele wartości oddzielonych przecinkiem (,) lub spacją.",
+      "preopen": "wstępnie otwarte",
+      "Network": "Sieć",
+      "Enable": "Włączać",
+      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
+      "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
+      "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -293,8 +304,8 @@
       "SessionNameRequired": "Nazwa sesji jest wymagana",
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
       "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Wprowadź maksymalnie 64 znaki.",
+      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 4 liter, cyfr, „.”, „_” i „-”."
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -427,7 +438,9 @@
     "Control": "Kontrola",
     "NewPassword": "nowe hasło",
     "Enabled": "Włączone",
-    "StorageProxies": "Magazyny"
+    "StorageProxies": "Magazyny",
+    "None": "Brak",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -504,7 +517,8 @@
     "KeypairDetail": "Szczegóły pary kluczy",
     "SignoutSeccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
     "Status": "Status",
-    "NoUserToDisplay": "Brak użytkowników do wyświetlenia"
+    "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -670,7 +684,7 @@
     "Pipeline": "Foldery rurociągów",
     "DialogDataFolder": "Dedykowane potokom foldery, które są automatycznie tworzone podczas tworzenia potoków w FastTrack.",
     "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Szukaj według nazwy"
   },
   "dialog": {
     "warning": {
@@ -761,7 +775,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Pamięć współdzielona (GB)",
     "NoResourcePresetToDisplay": "Brak ustawień wstępnych zasobów do wyświetlenia",
-    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte."
+    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte.",
+    "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć"
   },
   "usersettings": {
     "General": "Generał",
@@ -897,7 +912,8 @@
     "PleaseSelectOption": "Proszę wybrać jedną opcję.",
     "RegistrySuccessfullyModified": "Rejestr został pomyślnie zmodyfikowany.",
     "NoRegistryToDisplay": "Brak rejestrów do wyświetlenia",
-    "ModifyRegistry": "Modyfikacja rejestru"
+    "ModifyRegistry": "Modyfikacja rejestru",
+    "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",
@@ -1335,7 +1351,7 @@
     "FormValidationFailed": "Walidacja formularza nie powiodła się",
     "StartNewServing": "Rozpocznij nową porcję",
     "ServiceName": "Nazwa usługi",
-    "ServiceNameRule": "Dozwolone są tylko 4 do 64 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
+    "ServiceNameRule": "Dozwolone są tylko 4 do 24 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
     "OpenToPublic": "Otwarte dla publiczności",
     "DesiredRoutingCount": "Pożądana liczba tras",
     "ServingRouteErrorModalTitle": "Błąd trasy serwowania",

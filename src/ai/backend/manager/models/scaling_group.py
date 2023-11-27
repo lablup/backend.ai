@@ -482,16 +482,16 @@ class ScalingGroup(graphene.ObjectType):
 
 
 class CreateScalingGroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False, default="")
-    is_active = graphene.Boolean(required=False, default=True)
-    is_public = graphene.Boolean(required=False, default=True)
-    wsproxy_addr = graphene.String(required=False)
-    wsproxy_api_token = graphene.String(required=False)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_public = graphene.Boolean(required=False, default_value=True)
+    wsproxy_addr = graphene.String(required=False, default_value=None)
+    wsproxy_api_token = graphene.String(required=False, default_value=None)
     driver = graphene.String(required=True)
-    driver_opts = graphene.JSONString(required=False, default={})
+    driver_opts = graphene.JSONString(required=False, default_value={})
     scheduler = graphene.String(required=True)
-    scheduler_opts = graphene.JSONString(required=False, default={})
-    use_host_network = graphene.Boolean(required=False, default=False)
+    scheduler_opts = graphene.JSONString(required=False, default_value={})
+    use_host_network = graphene.Boolean(required=False, default_value=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
@@ -570,9 +570,9 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_public")
-        set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
         set_if_set(props, data, "wsproxy_api_token")
+        set_if_set(props, data, "driver")
         set_if_set(props, data, "driver_opts")
         set_if_set(props, data, "scheduler")
         set_if_set(

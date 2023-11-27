@@ -166,7 +166,7 @@ async def get_info(request: web.Request) -> web.Response:
     t.Dict(
         {
             tx.AliasedKey(["name", "service_name", "clientSessionToken"])
-            >> "service_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+            >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
             tx.AliasedKey(["image", "lang"]): t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)

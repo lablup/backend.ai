@@ -19,7 +19,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
-from ..config import load as load_config
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -60,9 +59,8 @@ def main(
     """
     Manager Administration CLI
     """
-    local_config = load_config(config_path, "DEBUG" if debug else log_level)
-    setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
-    ctx.obj = ctx.with_resource(CLIContext(local_config=local_config))
+    setproctitle("backend.ai: manager.cli")
+    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
 @main.command(
@@ -342,9 +340,15 @@ def fixture():
     """Command set for managing fixtures."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
+def api():
+    """Command set for API schema inspection and manipulation."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
 def gql():
     """Command set for GraphQL schema."""
+    # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")

@@ -233,10 +233,19 @@
       "PortsTitleWithRange": "Port-Wert (zwischen 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Alle nicht gespeicherten, bereits geöffneten Ports werden gelöscht.",
       "StartModelServing": "Start Model Serving",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Geben Sie mehrere Werte ein, getrennt durch ein Komma (,) oder ein Leerzeichen.",
+      "preopen": "Voreröffnet",
+      "Network": "Netzwerk",
+      "Enable": "Aktivieren",
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
+      "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -293,8 +302,8 @@
       "SessionNameRequired": "Sitzungsname ist erforderlich",
       "SluggedStrings": "Geschliffene Zeichenfolgen (>3 Zeichen)",
       "SessionNameAlreadyExist": "Sitzungsname existiert bereits",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Bitte geben Sie maximal 64 Zeichen ein.",
+      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein."
     },
     "Interactive": "Interaktiv",
     "Batch": "Stapel",
@@ -427,7 +436,9 @@
     "Control": "Steuerung",
     "NewPassword": "Neues Kennwort",
     "Enabled": "aktiviert",
-    "StorageProxies": "Speicher"
+    "StorageProxies": "Speicher",
+    "None": "Keine",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -504,7 +515,8 @@
     "KeypairDetail": "Schlüsselpaar Detail",
     "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
-    "NoUserToDisplay": "Keine Benutzer zum Anzeigen"
+    "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Ordner",
@@ -670,7 +682,7 @@
     "Pipeline": "Pipeline-Ordner",
     "DialogDataFolder": "Pipeline-spezifische Ordner, die bei der Erstellung von Pipelines in FastTrack automatisch erstellt werden.",
     "DialogModelFolder": "Sie können Modelle bedienen und verwalten.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Suche mit Name"
   },
   "dialog": {
     "warning": {
@@ -761,7 +773,8 @@
     "RAM": "Arbeitsspeicher (GB)",
     "SharedMemory": "Gemeinsamer Speicher (GB)",
     "NoResourcePresetToDisplay": "Keine Ressourcenvoreinstellungen anzeigen",
-    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht."
+    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht.",
+    "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher"
   },
   "usersettings": {
     "General": "Allgemeines",
@@ -897,7 +910,8 @@
     "PleaseSelectOption": "Bitte wählen Sie eine Option.",
     "RegistrySuccessfullyModified": "Registry erfolgreich geändert.",
     "NoRegistryToDisplay": "Keine Registrierungen anzeigen",
-    "ModifyRegistry": "Registry ändern"
+    "ModifyRegistry": "Registry ändern",
+    "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -1335,7 +1349,7 @@
     "FormValidationFailed": "Formularüberprüfung fehlgeschlagen",
     "StartNewServing": "Neue Portion starten",
     "ServiceName": "Dienst Name",
-    "ServiceNameRule": "Erlaubt sind nur 4 bis 64 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
+    "ServiceNameRule": "Erlaubt sind nur 4 bis 24 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
     "OpenToPublic": "Offen für die Öffentlichkeit",
     "DesiredRoutingCount": "Gewünschte Routinganzahl",
     "ServingRouteErrorModalTitle": "Serving Route Fehler",

@@ -20,6 +20,8 @@ license_defs = {
 _config_defaults: Mapping[str, Any] = {
     "pipeline": {
         "endpoint": yarl.URL("http://127.0.0.1:9500"),
+        "frontend-endpoint": yarl.URL("http://127.0.0.1:3000"),
+        "hide-side-menu-button": False,
         "jwt": {
             "secret": "7<:~[X,^Z1XM!*,Pe:PHR!bv,H~Q#l177<7gf_XHD6.<*<.t<[o|V5W(=0x:jTh-",
         },
@@ -66,10 +68,13 @@ config_iv = t.Dict(
                 t.Key("enable_container_commit", default=False): t.ToBool,
                 t.Key("hide_agents", default=True): t.ToBool,
                 t.Key("app_download_url", default=""): t.String(allow_blank=True),
+                t.Key("allow_app_download_panel", default=True): t.ToBool,
                 t.Key("enable_2FA", default=False): t.ToBool(),
                 t.Key("force_2FA", default=False): t.ToBool(),
                 t.Key("system_SSH_image", default=""): t.String(allow_blank=True),
                 t.Key("directory_based_usage", default=False): t.ToBool(),
+                t.Key("allow_custom_resource_allocation", default=True): t.ToBool(),
+                t.Key("edu_appname_prefix", default=""): t.String(allow_blank=True),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
@@ -79,8 +84,12 @@ config_iv = t.Dict(
                 t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
                 t.Key("max_memory_per_container", default=64): t.ToInt,
                 t.Key("max_cuda_devices_per_container", default=16): t.ToInt,
-                t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
                 t.Key("max_cuda_shares_per_container", default=16): t.ToInt,
+                t.Key("max_rocm_devices_per_container", default=10): t.ToInt,
+                t.Key("max_tpu_devices_per_container", default=8): t.ToInt,
+                t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
+                t.Key("max_atom_devices_per_container", default=8): t.ToInt,
+                t.Key("max_warboy_devices_per_container", default=8): t.ToInt,
                 t.Key("max_shm_per_container", default=2): t.ToFloat,
                 t.Key("max_file_upload_size", default=4294967296): t.ToInt,
             }
@@ -100,6 +109,14 @@ config_iv = t.Dict(
         t.Key("pipeline", default=_config_defaults["pipeline"]): t.Dict(
             {
                 t.Key("endpoint", default=_config_defaults["pipeline"]["endpoint"]): tx.URL,
+                tx.AliasedKey(
+                    ["frontend_endpoint", "frontend-endpoint"],
+                    default=_config_defaults["pipeline"]["frontend-endpoint"],
+                ): tx.URL,
+                tx.AliasedKey(
+                    ["hide_side_menu_button", "hide-side-menu-button"],
+                    default=_config_defaults["pipeline"]["hide-side-menu-button"],
+                ): t.ToBool,
                 t.Key("jwt", default=_config_defaults["pipeline"]["jwt"]): t.Dict(
                     {
                         t.Key(

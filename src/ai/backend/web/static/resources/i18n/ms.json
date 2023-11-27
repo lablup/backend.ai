@@ -233,10 +233,18 @@
       "PortsTitleWithRange": "Nilai port (antara 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mana-mana port prabuka yang belum disimpan akan hilang.",
       "StartModelServing": "Mulakan Penyajian Model",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Masukkan berbilang nilai yang dipisahkan dengan sama ada koma (,) atau ruang.",
+      "preopen": "prabuka",
+      "Network": "Rangkaian",
+      "Enable": "Dayakan",
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -293,8 +301,8 @@
       "SessionNameRequired": "Nama sesi diperlukan",
       "SluggedStrings": "Rentetan slugged (>3 aksara)",
       "SessionNameAlreadyExist": "Nama sesi sudah wujud",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Sila masukkan 64 aksara atau kurang.",
+      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 4 huruf, nombor, '.', '_' dan '-'."
     },
     "Interactive": "Interaktif",
     "Batch": "Kumpulan",
@@ -427,7 +435,9 @@
     "Control": "Kawal",
     "NewPassword": "Kata laluan baharu",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Stor"
+    "StorageProxies": "Stor",
+    "None": "tiada",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -504,7 +514,8 @@
     "KeypairDetail": "Butiran pasangan kekunci",
     "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
-    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan"
+    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Folder",
@@ -670,7 +681,7 @@
     "Pipeline": "Folder Saluran Paip",
     "DialogDataFolder": "Folder khusus saluran paip yang dibuat secara automatik apabila membuat saluran paip dalam FastTrack.",
     "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Cari mengikut nama"
   },
   "dialog": {
     "warning": {
@@ -761,7 +772,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
-    "Deleted": "Pratetap sumber berjaya dipadamkan."
+    "Deleted": "Pratetap sumber berjaya dipadamkan.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Am",
@@ -897,7 +909,8 @@
     "PleaseSelectOption": "Sila pilih satu pilihan.",
     "RegistrySuccessfullyModified": "Pendaftaran berjaya diubah suai.",
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
-    "ModifyRegistry": "Ubah suai Pendaftaran"
+    "ModifyRegistry": "Ubah suai Pendaftaran",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1375,7 +1388,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 64 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",

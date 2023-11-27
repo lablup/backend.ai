@@ -233,10 +233,19 @@
       "PreOpenPortRange": "Les ports préouverts sont uniquement disponibles entre 1024 et 65535.",
       "MinMemory": "La capacité de mémoire minimale pour l'environnement d'exécution actuellement sélectionné est de {{taille}}iB.",
       "ModelStorage": "Stockage de modèles",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Entrez plusieurs valeurs séparées par une virgule (,) ou un espace.",
+      "preopen": "préouverture",
+      "Network": "Réseau",
+      "Enable": "Activer",
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
+      "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
+      "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -303,8 +312,8 @@
       "EnterValidSessionName": "Saisir un nom de session valide",
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
       "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -427,7 +436,9 @@
     "Control": "Contrôler",
     "NewPassword": "nouveau mot de passe",
     "Enabled": "Activée",
-    "StorageProxies": "Stockages"
+    "StorageProxies": "Stockages",
+    "None": "Aucun",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -504,7 +515,8 @@
     "AdminCanOnlyRemoveTotp": "Seule la désactivation du 2FA des autres utilisateurs est possible.",
     "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
     "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
-    "ModifyUserDetail": "Modifier les détails de l'utilisateur"
+    "ModifyUserDetail": "Modifier les détails de l'utilisateur",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Dossiers",
@@ -670,7 +682,7 @@
     "Used": "Utilisé",
     "Pipeline": "Dossiers du pipeline",
     "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Rechercher par nom"
   },
   "dialog": {
     "warning": {
@@ -761,7 +773,8 @@
     "RAM": "RAM (Go)",
     "SharedMemory": "Mémoire partagée (Go)",
     "Deleted": "Le préréglage des ressources a été supprimé avec succès.",
-    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher"
+    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher",
+    "SHMEMShouldBeSmallerThanMemory": "La mémoire partagée doit être plus petite que la mémoire"
   },
   "usersettings": {
     "General": "Général",
@@ -897,7 +910,8 @@
     "PleaseSelectOption": "Veuillez sélectionner une option.",
     "RegistrySuccessfullyModified": "Registre modifié avec succès.",
     "ModifyRegistry": "Modifier le registre",
-    "NoRegistryToDisplay": "Aucun registre à afficher"
+    "NoRegistryToDisplay": "Aucun registre à afficher",
+    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -1410,7 +1424,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 64 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image"
   },

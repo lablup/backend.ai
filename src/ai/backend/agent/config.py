@@ -81,7 +81,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
                     t.Key("jail-args", default=[]): t.List(t.String),
-                    t.Key("scratch-type"): t.Enum("hostdir", "memory", "k8s-nfs"),
+                    t.Key("scratch-type"): t.Enum("hostdir", "hostfile", "memory", "k8s-nfs"),
                     t.Key("scratch-root", default="./scratches"): tx.Path(
                         type="dir", auto_create=True
                     ),
