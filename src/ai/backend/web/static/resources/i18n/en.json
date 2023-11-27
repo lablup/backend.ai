@@ -256,7 +256,12 @@
       "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit",
       "SessionName": "SessionName",
       "ResetFormConfirm": "ResetFormConfirm",
-      "ScheduleTimeSimple": "ScheduleTimeSimple"
+      "ScheduleTimeSimple": "ScheduleTimeSimple",
+      "ResourceAllocationPerContainer": "Resource Allocation Per Container",
+      "NumberOfContainer": "Number of container",
+      "EnterEnvironmentVariable": "Enter Variable name",
+      "EnvironmentVariableNamePatternError": "Variable name must start with a letter or underscore, and can only contain letters, numbers, and underscores.",
+      "EnvironmentVariableDuplicateName": "A variable name that already exists."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
