@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import uuid
 from typing import (
     TYPE_CHECKING,
@@ -75,10 +74,8 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-# Allow any character(include unicode) except whitespace
-_rx_slug = re.compile(
-    r"^\S*$"
-)  # former regex: re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+# _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
@@ -424,8 +421,8 @@ class CreateGroup(graphene.Mutation):
         name: str,
         props: GroupInput,
     ) -> CreateGroup:
-        if _rx_slug.search(name) is None:
-            raise ValueError("invalid name format. slug format required.")
+        # if _rx_slug.search(name) is None:
+        #     raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -480,8 +477,8 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "integration_id")
         set_if_set(props, data, "resource_policy")
 
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
+        # if "name" in data and _rx_slug.search(data["name"]) is None:
+        #     raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
