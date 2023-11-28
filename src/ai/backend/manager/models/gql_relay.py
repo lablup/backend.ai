@@ -205,7 +205,9 @@ class ConnectionResolverResult(NamedTuple):
 
 class AsyncListConnectionField(IterableConnectionField):
     """
-    This GraphQL Relay Connection field extension is for getting paginated data from asynchronous resolvers.
+    This GraphQL Relay Connection field extension is for getting paginated list data from asynchronous resolvers.
+    The resolver function of graphene.relay.Connection is implemented
+    to accept only one complete array (Iterable values) without considering pagination, which is a huge performance issue.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
     """
 
