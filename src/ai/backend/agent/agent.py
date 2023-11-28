@@ -1238,7 +1238,7 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
+                            "rescan_resource_usage(k:{}): "
                             "failed to read kernel resource info; "
                             "maybe already terminated",
                             kernel_id,
