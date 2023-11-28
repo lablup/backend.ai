@@ -2147,6 +2147,14 @@ class AgentRegistry:
                     await self.event_producer.produce_event(
                         SessionTerminatingEvent(session_id, reason),
                     )
+                case SessionStatus.TERMINATED:
+                    raise GenericForbidden(
+                        "Cannot destroy sessions that has already been already terminated"
+                    )
+                case SessionStatus.CANCELLED:
+                    raise GenericForbidden(
+                        "Cannot destroy sessions that has already been already cancelled"
+                    )
                 case _:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
