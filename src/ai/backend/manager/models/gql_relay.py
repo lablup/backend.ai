@@ -75,6 +75,11 @@ class AsyncNodeField(NodeField):
 
 
 class AsyncNode(Node):
+    """
+    This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
+    Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/node.py
+    """
+
     class Meta:
         name = "AsyncNode"
 
@@ -119,6 +124,11 @@ class AsyncNode(Node):
 
 
 class Connection(graphene.ObjectType):
+    """
+    This GraphQL Relay Connection has been implemented to have additional fields, such as `count`.
+    Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
+    """
+
     class Meta:
         abstract = True
 
@@ -194,6 +204,11 @@ class ConnectionResolverResult(NamedTuple):
 
 
 class AsyncListConnectionField(IterableConnectionField):
+    """
+    This GraphQL Relay Connection field extension is for getting paginated data from asynchronous resolvers.
+    Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
+    """
+
     @property
     def type(self):
         type_ = super(IterableConnectionField, self).type

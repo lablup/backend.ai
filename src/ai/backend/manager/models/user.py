@@ -1252,25 +1252,36 @@ class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    username = graphene.String()
-    email = graphene.String()
-    need_password_change = graphene.Boolean()
-    full_name = graphene.String()
-    description = graphene.String()
+    username = graphene.String(description="Added in 24.03.0. Unique username of the user.")
+    email = graphene.String(description="Added in 24.03.0. Unique email of the user.")
+    need_password_change = graphene.Boolean(description="Added in 24.03.0")
+    full_name = graphene.String(description="Added in 24.03.0")
+    description = graphene.String(description="Added in 24.03.0")
     is_active = graphene.Boolean(
         deprecation_reason="Deprecated since 24.03.0. Recommend to use `status` field."
     )
-    status = graphene.String()
-    status_info = graphene.String()
-    created_at = GQLDateTime()
-    modified_at = GQLDateTime()
-    domain_name = graphene.String()
-    role = graphene.String()
-    resource_policy = graphene.String()
-    allowed_client_ip = graphene.List(lambda: graphene.String)
-    totp_activated = graphene.Boolean()
-    totp_activated_at = GQLDateTime()
-    sudo_session_enabled = graphene.Boolean()
+    status = graphene.String(
+        description=(
+            "Added in 24.03.0. The status is one of `active`, `inactive`, `deleted` or"
+            " `before-verification`."
+        )
+    )
+    status_info = graphene.String(
+        description="Added in 24.03.0. Additional information of user status."
+    )
+    created_at = GQLDateTime(description="Added in 24.03.0.")
+    modified_at = GQLDateTime(description="Added in 24.03.0.")
+    domain_name = graphene.String(description="Added in 24.03.0.")
+    role = graphene.String(
+        description=(
+            "Added in 24.03.0. The role is one of `user`, `admin`, `superadmin` or `monitor`."
+        )
+    )
+    resource_policy = graphene.String(description="Added in 24.03.0.")
+    allowed_client_ip = graphene.List(lambda: graphene.String, description="Added in 24.03.0.")
+    totp_activated = graphene.Boolean(description="Added in 24.03.0.")
+    totp_activated_at = GQLDateTime(description="Added in 24.03.0.")
+    sudo_session_enabled = graphene.Boolean(description="Added in 24.03.0.")
 
     @classmethod
     def from_row(cls, row: UserRow) -> UserNode:

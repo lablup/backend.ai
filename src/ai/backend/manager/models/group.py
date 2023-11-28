@@ -747,19 +747,19 @@ class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    name = graphene.String()
-    description = graphene.String()
-    is_active = graphene.Boolean()
-    created_at = GQLDateTime()
-    modified_at = GQLDateTime()
-    domain_name = graphene.String()
-    total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.JSONString()
-    integration_id = graphene.String()
-    resource_policy = graphene.String()
-    scaling_groups = graphene.List(lambda: graphene.String)
+    name = graphene.String(description="Added in 24.03.0.")
+    description = graphene.String(description="Added in 24.03.0.")
+    is_active = graphene.Boolean(description="Added in 24.03.0.")
+    created_at = GQLDateTime(description="Added in 24.03.0.")
+    modified_at = GQLDateTime(description="Added in 24.03.0.")
+    domain_name = graphene.String(description="Added in 24.03.0.")
+    total_resource_slots = graphene.JSONString(description="Added in 24.03.0.")
+    allowed_vfolder_hosts = graphene.JSONString(description="Added in 24.03.0.")
+    integration_id = graphene.String(description="Added in 24.03.0.")
+    resource_policy = graphene.String(description="Added in 24.03.0.")
+    scaling_groups = graphene.List(lambda: graphene.String, description="Added in 24.03.0.")
 
-    user_nodes = PaginatedConnectionField(UserConnection)
+    user_nodes = PaginatedConnectionField(UserConnection, description="Added in 24.03.0.")
 
     @classmethod
     def from_row(cls, row: GroupRow) -> GroupNode:
@@ -771,8 +771,8 @@ class GroupNode(graphene.ObjectType):
             created_at=row.created_at,
             modified_at=row.modified_at,
             domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots,
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            total_resource_slots=row.total_resource_slots or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts or {},
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
         )
