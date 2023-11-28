@@ -1206,26 +1206,8 @@ class AgentRegistry:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
-                    if sudo_session_enabled:
-                        environ["SUDO_SESSION_ENABLED"] = "1"
-
-                    session_data["environ"] = environ
-                    session_data["requested_slots"] = session_requested_slots
-                    session = SessionRow(**session_data)
-                    kernels = [KernelRow(**kernel) for kernel in kernel_data]
-                    db_sess.add(session)
-                    db_sess.add_all(kernels)
-
-            await execute_with_retry(_enqueue)
-
-            async def _post_enqueue() -> None:
-                async with self.db.begin_session() as db_sess:
-                    if route_id:
-                        routing_row = await RoutingRow.get(db_sess, route_id)
-                        routing_row.session = session_id
-
+                    matched_dependency_session_ids = []
                     if dependency_sessions:
-                        matched_dependency_session_ids = []
                         for dependency_id in dependency_sessions:
                             try:
                                 match_info = await SessionRow.get_session(
@@ -1242,11 +1224,32 @@ class AgentRegistry:
                             else:
                                 matched_dependency_session_ids.append(match_info.id)
 
+                    if sudo_session_enabled:
+                        environ["SUDO_SESSION_ENABLED"] = "1"
+
+                    session_data["environ"] = environ
+                    session_data["requested_slots"] = session_requested_slots
+                    session = SessionRow(**session_data)
+                    kernels = [KernelRow(**kernel) for kernel in kernel_data]
+                    db_sess.add(session)
+                    db_sess.add_all(kernels)
+                    await db_sess.flush()
+
+                    if matched_dependency_session_ids:
                         dependency_rows = [
                             SessionDependencyRow(session_id=session_id, depends_on=depend_id)
                             for depend_id in matched_dependency_session_ids
                         ]
                         db_sess.add_all(dependency_rows)
+
+            await execute_with_retry(_enqueue)
+
+            async def _post_enqueue() -> None:
+                async with self.db.begin_session() as db_sess:
+                    if route_id:
+                        routing_row = await RoutingRow.get(db_sess, route_id)
+                        routing_row.session = session_id
+
                     await db_sess.commit()
 
             await execute_with_retry(_post_enqueue)
