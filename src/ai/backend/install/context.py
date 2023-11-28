@@ -255,6 +255,7 @@ class Context(metaclass=ABCMeta):
         sudo = " ".join(self.docker_sudo)
         await self.run_shell(
             f"""
+        {sudo} docker compose pull && \\
         {sudo} docker compose up -d && \\
         {sudo} docker compose ps
         """,
@@ -303,7 +304,7 @@ class Context(metaclass=ABCMeta):
                 )
             )
             await self.log.wait_continue()
-        if determine_docker_sudo():
+        if await determine_docker_sudo():
             self.docker_sudo = ["sudo"]
             self.log.write(
                 Text.from_markup(
@@ -478,7 +479,7 @@ class Context(metaclass=ABCMeta):
             data = tomlkit.load(fp)
             wsproxy_itable = tomlkit.inline_table()
             wsproxy_itable["url"] = (
-                "http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
             )
             data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
@@ -861,7 +862,7 @@ class PackageContext(Context):
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
-            *["sha256sum", "-c", csum_path.name],
+            *["shasum", "-a", "256", "-c", csum_path.name],
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
             cwd=csum_path.parent,
