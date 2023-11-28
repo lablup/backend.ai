@@ -1270,7 +1270,7 @@ def _build_sql_stmt_from_sql_arg(
     return stmt, conditions
 
 
-class SQLInfoForGQLConn(NamedTuple):
+class GraphQLConnectionSQLInfo(NamedTuple):
     sql_stmt: sa.sql.Select
     sql_conditions: list[WhereClauseType]
     cursor: str | None
@@ -1289,7 +1289,7 @@ def generate_sql_info_for_gql_connection(
     first: int | None = None,
     before: str | None = None,
     last: int | None = None,
-) -> SQLInfoForGQLConn:
+) -> GraphQLConnectionSQLInfo:
     """
     Get GraphQL arguments and generate SQL query statement, cursor that points an id of a node, pagination order, and page size.
     If `offset` is None, return SQL query parsed from GraphQL Connection spec arguments.
@@ -1308,7 +1308,7 @@ def generate_sql_info_for_gql_connection(
             order_expr,
             connection_arg=connection_arg,
         )
-        return SQLInfoForGQLConn(
+        return GraphQLConnectionSQLInfo(
             stmt,
             conditions,
             connection_arg.cursor,
@@ -1326,4 +1326,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return SQLInfoForGQLConn(stmt, conditions, None, None, page_size)
+        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
