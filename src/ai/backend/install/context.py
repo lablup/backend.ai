@@ -509,6 +509,7 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             data["session"]["redis"] = redis_table  # type: ignore
+            data["ui"]["menu_blocklist"] = "statistics,pipeline"  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
