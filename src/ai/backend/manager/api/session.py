@@ -69,7 +69,7 @@ from ..models import (
     groups,
     kernels,
     keypairs,
-    query_accessible_vfolders,
+    query_mountable_vfolders,
     scaling_groups,
     session_templates,
     vfolders,
@@ -1963,7 +1963,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     user_uuid = request["user"]["uuid"]
     kernel_id_str = params["kernel_id"].hex
     async with root_ctx.db.begin_readonly() as conn:
-        matched_vfolders = await query_accessible_vfolders(
+        matched_vfolders = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,

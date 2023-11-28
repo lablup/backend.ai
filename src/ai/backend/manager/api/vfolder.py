@@ -79,7 +79,7 @@ from ..models import (
     kernels,
     keypair_resource_policies,
     keypairs,
-    query_accessible_vfolders,
+    query_mountable_vfolders,
     query_owned_dotfiles,
     update_vfolder_status,
     users,
@@ -174,7 +174,7 @@ async def ensure_vfolder_status(
         case _:
             raise VFolderFilterStatusNotAvailable()
     async with root_ctx.db.begin_readonly() as conn:
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -261,7 +261,7 @@ def vfolder_permission_required(
                 if not request["is_admin"]:
                     vf_group_cond = vfolders.c.permission == perm
             async with root_ctx.db.begin_readonly() as conn:
-                entries = await query_accessible_vfolders(
+                entries = await query_mountable_vfolders(
                     conn,
                     user_uuid,
                     user_role=user_role,
@@ -495,7 +495,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["name"]]
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -624,7 +624,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 extra_vf_conds = (vfolders.c.group == params["group_id"]) | (
                     vfolders.c.user.isnot(None)
                 )
-            entries = await query_accessible_vfolders(
+            entries = await query_mountable_vfolders(
                 conn,
                 owner_user_uuid,
                 user_role=owner_user_role,
@@ -944,7 +944,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         async with root_ctx.db.begin_readonly() as conn:
             extra_vf_conds = [vfolders.c.id == params["id"]]
-            entries = await query_accessible_vfolders(
+            entries = await query_mountable_vfolders(
                 conn,
                 user_uuid,
                 user_role=user_role,
@@ -1014,7 +1014,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
                 permission=VFolderHostPermission.MODIFY,
             )
             extra_vf_conds = [vfolders.c.id == params["id"]]
-            entries = await query_accessible_vfolders(
+            entries = await query_mountable_vfolders(
                 conn,
                 user_uuid,
                 user_role=user_role,
@@ -1145,7 +1145,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         new_name,
     )
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -2202,7 +2202,7 @@ async def _delete(
     resource_policy: Mapping[str, Any],
 ) -> None:
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -2349,7 +2349,7 @@ async def purge(request: web.Request) -> web.Response:
         folder_name,
     )
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -2413,7 +2413,7 @@ async def recover(request: web.Request) -> web.Response:
         folder_name,
     )
     async with root_ctx.db.begin() as conn:
-        recover_targets = await query_accessible_vfolders(
+        recover_targets = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -2634,7 +2634,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
         # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["target_name"]]
-        entries = await query_accessible_vfolders(
+        entries = await query_mountable_vfolders(
             conn,
             user_uuid,
             user_role=user_role,

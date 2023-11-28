@@ -12,8 +12,8 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
     keypairs,
-    query_accessible_vfolders,
     query_bootstrap_script,
+    query_mountable_vfolders,
     query_owned_dotfiles,
     verify_dotfile_name,
     vfolders,
@@ -65,7 +65,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise DotfileCreationFailed("Dotfile creation limit reached")
         if not verify_dotfile_name(path):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        duplicate_vfolder = await query_accessible_vfolders(
+        duplicate_vfolder = await query_mountable_vfolders(
             conn, user_uuid, extra_vf_conds=(vfolders.c.name == path)
         )
         if len(duplicate_vfolder) > 0:

@@ -78,7 +78,7 @@ __all__: Sequence[str] = (
     "QuotaScope",
     "SetQuotaScope",
     "UnsetQuotaScope",
-    "query_accessible_vfolders",
+    "query_mountable_vfolders",
     "initiate_vfolder_clone",
     "initiate_vfolder_purge",
     "get_allowed_vfolder_hosts_by_group",
@@ -321,7 +321,7 @@ def verify_vfolder_name(folder: str) -> bool:
     return True
 
 
-async def query_accessible_vfolders(
+async def query_mountable_vfolders(
     conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
@@ -668,7 +668,7 @@ async def prepare_vfolder_mounts(
         ) | vfolders.c.name.startswith(".")
     else:
         extra_vf_conds = vfolders.c.name.startswith(".")
-    accessible_vfolders = await query_accessible_vfolders(
+    accessible_vfolders = await query_mountable_vfolders(
         conn,
         user_scope.user_uuid,
         user_role=user_scope.user_role,
