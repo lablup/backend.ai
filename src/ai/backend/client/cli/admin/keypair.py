@@ -4,7 +4,7 @@ import click
 
 from ai.backend.cli.types import ExitCode
 
-from ...cli.params import OptionalType
+from ...cli.params import BoolExprType, OptionalType
 from ...output.fields import keypair_fields
 from ...session import Session
 from ...types import Undefined, undefined
@@ -186,13 +186,13 @@ def add(
 )
 @click.option(
     "--is-admin",
-    type=OptionalType(bool),
+    type=OptionalType(BoolExprType),
     default=undefined,
     help="Set admin privilege.",
 )
 @click.option(
     "--is-active",
-    type=OptionalType(bool),
+    type=OptionalType(BoolExprType),
     default=undefined,
     help="Set key pair active or not.",
 )
