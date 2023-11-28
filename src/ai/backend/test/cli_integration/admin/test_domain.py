@@ -39,7 +39,7 @@ def test_add_domain(run: ClientRunnerFunc):
 
     test_domain = get_domain_from_list(domain_list, "test")
 
-    allowed_vfolder_hosts_str = test_domain.get("allowed_vfolder_hosts")
+    allowed_vfolder_hosts_str = str(test_domain.get("allowed_vfolder_hosts"))
     allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_domain), "Test domain doesn't exist"
@@ -97,7 +97,7 @@ def test_update_domain(run: ClientRunnerFunc):
 
     test_domain = get_domain_from_list(domain_list, "test123")
 
-    allowed_vfolder_hosts_str = test_domain.get("allowed_vfolder_hosts")
+    allowed_vfolder_hosts_str = str(test_domain.get("allowed_vfolder_hosts"))
     allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_domain), "Test domain doesn't exist"

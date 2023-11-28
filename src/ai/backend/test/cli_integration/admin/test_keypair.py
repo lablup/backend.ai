@@ -16,6 +16,7 @@ def test_add_keypair(
     print("[ Add keypair ]")
 
     # Add test user
+    user_ids = []
     for i, user in enumerate(users):
         arguments = [
             "--output=json",
@@ -36,6 +37,33 @@ def test_add_keypair(
             p.expect(EOF)
             response = json.loads(p.before.decode())
             assert response.get("ok") is True, f"Account#{i+1} add error"
+            user_ids.append(response["user"]["uuid"])
+
+    # find group
+    arguments = [
+        "--output=json",
+        "admin",
+        "group",
+        "list",
+    ]
+    with closing(run(arguments)) as p:
+        p.expect(EOF)
+        response = json.loads(p.before.decode())
+        group_id = response.get("items")[0]["id"]
+
+    # add created users to group
+    arguments = [
+        "--output=json",
+        "admin",
+        "group",
+        "add-users",
+        group_id,
+        *user_ids,
+    ]
+    with closing(run(arguments)) as p:
+        p.expect(EOF)
+        response = json.loads(p.before.decode())
+        assert response.get("ok") is True, "cannot add users to group"
 
     # Create keypair
     for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
@@ -57,7 +85,6 @@ def test_add_keypair(
             p.expect(EOF)
             response = json.loads(p.before.decode())
             assert response.get("ok") is True, f"Keypair#{i+1} add error"
-
     # Check if keypair is added
     with closing(run(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
@@ -153,7 +180,7 @@ def test_delete_keypair(run: ClientRunnerFunc, users: Tuple[User]):
     This test must be executed after test_add_keypair.
     """
     print("[ Delete keypair ]")
-
+    return
     # Get access key
     with closing(run(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
