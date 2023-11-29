@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
@@ -17,11 +19,19 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import validators as tx
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventHandler,
+    KernelLifecycleEventReason,
+    ModelServiceStatusEvent,
+    SessionCancelledEvent,
+    SessionStartedEvent,
+    SessionTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
+from ai.backend.common.types import AgentId, ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
@@ -30,8 +40,10 @@ from ..models import (
     EndpointRow,
     EndpointTokenRow,
     ImageRow,
+    KernelLoadingStrategy,
     RouteStatus,
     RoutingRow,
+    SessionRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
@@ -52,6 +64,48 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
+creation_config_v1 = t.Dict(
+    {
+        tx.AliasedKey(["name", "service_name", "clientSessionToken"])
+        >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
+        tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
+        tx.AliasedKey(["image", "lang"]): t.String,
+        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
+        >> "architecture": t.String,
+        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+        tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+            ClusterMode
+        ),  # new in APIv6
+        t.Key("tag", default=None): t.Null | t.String,
+        tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
+        tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
+        tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+            t.Null | tx.URL
+        ),
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+        t.Key("open_to_public", default=False): t.Bool,
+        t.Key("config"): t.Dict(
+            {
+                t.Key("model"): t.String,
+                tx.AliasedKey(["model_version", "modelVersion"], default=None): t.Null | t.String,
+                tx.AliasedKey(
+                    ["model_mount_destination", "modelMountDestination"], default="/models"
+                ): t.String,
+                t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+                # cluster_size is moved to the root-level parameters
+                tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+                t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+                tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
+                    t.String, t.Any
+                ),
+            }
+        ),
+    }
+)
+
+
 class UndefChecker(t.Trafaret):
     def check_and_return(self, value: Any) -> object:
         if value == undefined:
@@ -59,6 +113,17 @@ class UndefChecker(t.Trafaret):
         else:
             self._failure("Invalid Undef format", value=value)
             return None
+
+
+@dataclass
+class ValidationResult:
+    model_id: str
+    requester_access_key: str
+    owner_access_key: str
+    owner_uuid: uuid.UUID
+    group_id: uuid.UUID
+    resource_policy: dict
+    scaling_group: str
 
 
 async def is_user_allowed_to_access_resource(
@@ -77,144 +142,14 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("name", default=None): t.Null | t.String,
-        }
-    )
-)
-async def list_serve(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    access_key = request["keypair"]["access_key"]
-
-    log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
-    query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
-        EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
-    )
-    if params["name"]:
-        query_conds &= EndpointRow.name == params["name"]
-
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        query = (
-            sa.select(EndpointRow).where(query_conds).options(selectinload(EndpointRow.routings))
-        )
-        result = await db_sess.execute(query)
-        rows = result.scalars().all()
-
-    return web.json_response(
-        [
-            {
-                "id": str(endpoint.id),
-                "name": endpoint.name,
-                "desired_session_count": endpoint.desired_session_count,
-                "active_route_count": len(
-                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-                ),
-                "service_endpoint": endpoint.url,
-                "is_public": endpoint.open_to_public,
-            }
-            for endpoint in rows
-        ],
-        status=200,
-    )
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-async def get_info(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    access_key = request["keypair"]["access_key"]
-    service_id = uuid.UUID(request.match_info["service_id"])
-
-    log.info(
-        "SERVE.GET_INFO (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
-    )
-
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        try:
-            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
-        except NoResultFound:
-            raise ObjectNotFound
-
-    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
-    resp = {
-        "endpoint_id": str(endpoint.id),
-        "name": endpoint.name,
-        "desired_session_count": endpoint.desired_session_count,
-        "active_routes": [
-            {
-                "route_id": str(r.id),
-                "session_id": str(r.session),
-                "traffic_ratio": r.traffic_ratio,
-            }
-            for r in endpoint.routings
-            if r.status == RouteStatus.HEALTHY
-        ],
-        "service_endpoint": endpoint.url,
-        "is_public": endpoint.open_to_public,
-    }
-
-    return web.json_response(resp, status=200)
-
-
-@auth_required
-@server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "service_name", "clientSessionToken"])
-            >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
-            tx.AliasedKey(["image", "lang"]): t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("tag", default=None): t.Null | t.String,
-            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-            t.Key("open_to_public", default=False): t.Bool,
-            t.Key("config"): t.Dict(
-                {
-                    t.Key("model"): t.String,
-                    tx.AliasedKey(["model_version", "modelVersion"], default=None): (
-                        t.Null | t.String
-                    ),
-                    tx.AliasedKey(
-                        ["model_mount_destination", "modelMountDestination"], default="/models"
-                    ): t.String,
-                    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-                    # cluster_size is moved to the root-level parameters
-                    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): (
-                        t.Null | t.String
-                    ),
-                    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-                    tx.AliasedKey(
-                        ["resource_opts", "resourceOpts"], default=None
-                    ): t.Null | t.Mapping(t.String, t.Any),
-                }
-            ),
-        }
-    ),
-)
-async def create(request: web.Request, params: Any) -> web.Response:
+async def _validate(request: web.Request, params: Any):
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
         "owner_access_key": (
             None if params["owner_access_key"] is undefined else params["owner_access_key"]
         ),
     }
+
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -334,6 +269,108 @@ async def create(request: web.Request, params: Any) -> web.Response:
     except yaml.error.YAMLError as e:
         raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
+    return ValidationResult(
+        model_id,
+        requester_access_key,
+        owner_access_key,
+        owner_uuid,
+        group_id,
+        resource_policy,
+        checked_scaling_group,
+    )
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("name", default=None): t.Null | t.String,
+        }
+    )
+)
+async def list_serve(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+
+    log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
+    query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
+        EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
+    )
+    if params["name"]:
+        query_conds &= EndpointRow.name == params["name"]
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        query = (
+            sa.select(EndpointRow).where(query_conds).options(selectinload(EndpointRow.routings))
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+
+    return web.json_response(
+        [
+            {
+                "id": str(endpoint.id),
+                "name": endpoint.name,
+                "desired_session_count": endpoint.desired_session_count,
+                "active_route_count": len(
+                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+                ),
+                "service_endpoint": endpoint.url,
+                "is_public": endpoint.open_to_public,
+            }
+            for endpoint in rows
+        ],
+        status=200,
+    )
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def get_info(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.GET_INFO (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+    resp = {
+        "endpoint_id": str(endpoint.id),
+        "name": endpoint.name,
+        "desired_session_count": endpoint.desired_session_count,
+        "active_routes": [
+            {
+                "route_id": str(r.id),
+                "session_id": str(r.session),
+                "traffic_ratio": r.traffic_ratio,
+            }
+            for r in endpoint.routings
+            if r.status == RouteStatus.HEALTHY
+        ],
+        "service_endpoint": endpoint.url,
+        "is_public": endpoint.open_to_public,
+    }
+
+    return web.json_response(resp, status=200)
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(creation_config_v1)
+async def create(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+
+    validation_result = await _validate(request, params)
+
     async with root_ctx.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
             session,
@@ -343,7 +380,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             ],
         )
 
-    params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
+    params["config"]["mount_map"] = {
+        validation_result.model_id: params["config"]["model_mount_destination"]
+    }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
@@ -353,12 +392,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
         params["architecture"],
         UserScope(
             domain_name=params["domain"],
-            group_id=group_id,
+            group_id=validation_result.group_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),
-        owner_access_key,
-        resource_policy,
+        validation_result.owner_access_key,
+        validation_result.resource_policy,
         SessionTypes.INFERENCE,
         params["config"],
         params["cluster_mode"],
@@ -389,13 +428,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
         endpoint = EndpointRow(
             params["service_name"],
             request["user"]["uuid"],
-            owner_uuid,
+            validation_result.owner_uuid,
             params["desired_session_count"],
             image_row,
-            model_id,
+            validation_result.model_id,
             params["domain"],
             project_id,
-            checked_scaling_group,
+            validation_result.scaling_group,
             params["config"]["resources"],
             params["cluster_mode"],
             params["cluster_size"],
@@ -412,6 +451,115 @@ async def create(request: web.Request, params: Any) -> web.Response:
         await db_sess.commit()
 
     return web.json_response({"endpoint_id": str(endpoint.id)})
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(creation_config_v1)
+async def try_start(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    background_task_manager = root_ctx.background_task_manager
+
+    validation_result = await _validate(request, params)
+
+    params["config"]["mount_map"] = {
+        validation_result.model_id: params["config"]["model_mount_destination"]
+    }
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
+    async def _task(reporter: ProgressReporter) -> None:
+        terminated_event = asyncio.Event()
+
+        result = await root_ctx.registry.create_session(
+            "",
+            params["image"],
+            params["architecture"],
+            UserScope(
+                domain_name=params["domain"],
+                group_id=validation_result.group_id,
+                user_uuid=request["user"]["uuid"],
+                user_role=request["user"]["role"],
+            ),
+            validation_result.owner_access_key,
+            validation_result.resource_policy,
+            SessionTypes.INFERENCE,
+            params["config"],
+            params["cluster_mode"],
+            params["cluster_size"],
+            bootstrap_script=params["bootstrap_script"],
+            startup_command=params["startup_command"],
+            tag=params["tag"],
+            callback_url=params["callback_url"],
+            sudo_session_enabled=sudo_session_enabled,
+        )
+
+        async def _handle_event(
+            context: None,
+            source: AgentId,
+            event: SessionStartedEvent
+            | SessionCancelledEvent
+            | SessionTerminatedEvent
+            | ModelServiceStatusEvent,
+        ) -> None:
+            log.debug("_handle_event(): {}", event.name)
+            await reporter.update(message=event.name)
+
+            if isinstance(event, SessionTerminatedEvent) or isinstance(
+                event, SessionCancelledEvent
+            ):
+                terminated_event.set()
+            elif isinstance(event, ModelServiceStatusEvent):
+                await reporter.update(message=event.new_status.value)
+                async with root_ctx.db.begin_readonly_session() as db_sess:
+                    session = await SessionRow.get_session(
+                        db_sess,
+                        result["sessionId"],
+                        None,
+                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                    )
+                await root_ctx.registry.destroy_session(
+                    session,
+                    forced=True,
+                )
+
+        session_event_matcher = lambda args: args[0] == result["sessionId"]
+        model_service_event_matcher = lambda args: args[1] == result["sessionId"]
+
+        handlers: list[EventHandler] = [
+            root_ctx.event_dispatcher.subscribe(
+                SessionStartedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionCancelledEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.consume(
+                SessionTerminatedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.consume(
+                ModelServiceStatusEvent,
+                None,
+                _handle_event,
+                args_matcher=model_service_event_matcher,
+            ),
+        ]
+
+        try:
+            await terminated_event.wait()
+        finally:
+            for handler in handlers:
+                root_ctx.event_dispatcher.unsubscribe(handler)
+
+    task_id = await background_task_manager.start(_task)
+    return web.json_response({"taskId": task_id})
 
 
 @auth_required
@@ -775,6 +923,7 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))
