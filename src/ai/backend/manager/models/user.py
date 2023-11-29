@@ -37,11 +37,13 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
+    generate_sql_info_for_gql_connection,
     mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
@@ -1304,6 +1306,110 @@ class PurgeUser(graphene.Mutation):
         if result.rowcount > 0:
             log.info("deleted {0} user's keypairs ({1})", result.rowcount, user_uuid)
         return result.rowcount
+
+
+class UserNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    username = graphene.String(description="Unique username of the user.")
+    email = graphene.String(description="Unique email of the user.")
+    need_password_change = graphene.Boolean()
+    full_name = graphene.String()
+    description = graphene.String()
+    is_active = graphene.Boolean(
+        deprecation_reason="Deprecated since 24.03.0. Recommend to use `status` field."
+    )
+    status = graphene.String(
+        description="The status is one of `active`, `inactive`, `deleted` or `before-verification`."
+    )
+    status_info = graphene.String(description="Additional information of user status.")
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    domain_name = graphene.String()
+    role = graphene.String(
+        description="The role is one of `user`, `admin`, `superadmin` or `monitor`."
+    )
+    resource_policy = graphene.String()
+    allowed_client_ip = graphene.List(lambda: graphene.String)
+    totp_activated = graphene.Boolean()
+    totp_activated_at = GQLDateTime()
+    sudo_session_enabled = graphene.Boolean()
+
+    @classmethod
+    def from_row(cls, row: UserRow) -> UserNode:
+        return cls(
+            id=row.uuid,
+            username=row.username,
+            email=row.email,
+            need_password_change=row.need_password_change,
+            full_name=row.full_name,
+            description=row.description,
+            is_active=(row.status == UserStatus.ACTIVE),
+            status=row.status,
+            status_info=row.status_info,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            role=row.role,
+            resource_policy=row.resource_policy,
+            allowed_client_ip=row.allowed_client_ip,
+            totp_activated=row.totp_activated,
+            totp_activated_at=row.totp_activated_at,
+            sudo_session_enabled=row.sudo_session_enabled,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> UserNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, user_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(UserRow).where(UserRow.uuid == user_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_row = (await db_session.scalars(query)).first()
+            return cls.from_row(user_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        query, conditions, cursor, pagination_order, page_size = (
+            generate_sql_info_for_gql_connection(
+                info,
+                UserRow,
+                UserRow.uuid,
+                filter_expr,
+                order_expr,
+                offset,
+                after=after,
+                first=first,
+                before=before,
+                last=last,
+            )
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(row) for row in user_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class UserConnection(Connection):
+    class Meta:
+        node = UserNode
 
 
 def _hash_password(password):
