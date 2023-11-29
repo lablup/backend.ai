@@ -179,6 +179,101 @@ class Service(BaseFunction):
                 "is_public": expose_to_public,
             }
 
+    @api_function
+    @classmethod
+    async def try_start(
+        cls,
+        image: str,
+        model_id_or_name: str,
+        initial_session_count: int,
+        *,
+        service_name: Optional[str] = None,
+        model_version: Optional[str] = None,
+        dependencies: Optional[Sequence[str]] = None,
+        model_mount_destination: Optional[str] = None,
+        envs: Optional[Mapping[str, str]] = None,
+        startup_command: Optional[str] = None,
+        resources: Optional[Mapping[str, str | int]] = None,
+        resource_opts: Optional[Mapping[str, str | int]] = None,
+        cluster_size: int = 1,
+        cluster_mode: Literal["single-node", "multi-node"] = "single-node",
+        domain_name: Optional[str] = None,
+        group_name: Optional[str] = None,
+        bootstrap_script: Optional[str] = None,
+        tag: Optional[str] = None,
+        architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
+        scaling_group: Optional[str] = None,
+        owner_access_key: Optional[str] = None,
+        expose_to_public=False,
+    ) -> Any:
+        """
+        Tries to start an inference session and terminates immediately.
+
+        :param image: The image name and tag for the infernence session.
+            Example: ``python:3.6-ubuntu``.
+            Check out the full list of available images in your server using (TODO:
+            new API).
+        :param service_name: A client-side (user-defined) identifier to distinguish the session among currently
+            running sessions.
+            It may be used to seamlessly reuse the session already created.
+        :param initial_session_count: Number of sessions to be started along with
+            service initiation.
+        :param mounts: The ID of model type vFolder which contains model files required
+            to start inference session.
+        :param model_mount_destination: Path inside the container to mount model vFolder,
+            defaults to /models
+        :param envs: The environment variables which always bypasses the jail policy.
+        :param resources: The resource specification. (TODO: details)
+        :param cluster_size: The number of containers in this compute session.
+            Must be at least 1.
+        :param cluster_mode: Set the clustering mode whether to use distributed
+            nodes or a single node to spawn multiple containers for the new session.
+        :param tag: An optional string to annotate extra information.
+        :param owner: An optional access key that owns the created session. (Only
+            available to administrators)
+        :param expose_to_public: Visibility of API Endpoint which serves inference workload.
+            If set to true, no authentication will be required to access the endpoint.
+
+        :returns: The :class:`ComputeSession` instance.
+        """
+        if service_name is None:
+            faker = Faker()
+            service_name = f"bai-serve-{faker.user_name()}"
+
+        rqst = Request("POST", "/services/_/try")
+        rqst.set_json(
+            {
+                "name": service_name,
+                "desired_session_count": initial_session_count,
+                "image": image,
+                "arch": architecture,
+                "group": group_name,
+                "domain": domain_name,
+                "cluster_size": cluster_size,
+                "cluster_mode": cluster_mode,
+                "tag": tag,
+                "startup_command": startup_command,
+                "bootstrap_script": bootstrap_script,
+                "owner_access_key": owner_access_key,
+                "open_to_public": expose_to_public,
+                "config": {
+                    "model": model_id_or_name,
+                    "model_version": model_version,
+                    "model_mount_destination": model_mount_destination,
+                    "environ": envs,
+                    "scaling_group": scaling_group,
+                    "resources": resources,
+                    "resource_opts": resource_opts,
+                },
+            }
+        )
+        async with rqst.fetch() as resp:
+            body = await resp.json()
+            return {
+                "task_id": body["task_id"],
+                "name": service_name,
+            }
+
     def __init__(self, id: str | UUID) -> None:
         super().__init__()
         self.id = id if isinstance(id, UUID) else UUID(id)

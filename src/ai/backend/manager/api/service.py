@@ -559,7 +559,7 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
                 root_ctx.event_dispatcher.unsubscribe(handler)
 
     task_id = await background_task_manager.start(_task)
-    return web.json_response({"taskId": task_id})
+    return web.json_response({"task_id": task_id})
 
 
 @auth_required

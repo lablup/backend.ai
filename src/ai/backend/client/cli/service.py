@@ -1,3 +1,4 @@
+import json
 import sys
 from typing import Literal, Optional, Sequence
 from uuid import UUID
@@ -7,13 +8,14 @@ import click
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
-from ai.backend.client.session import Session
+from ai.backend.client.compat import asyncio_run
+from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..output.fields import routing_fields, service_fields
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .pretty import print_done
+from .pretty import ProgressViewer, print_done, print_fail, print_warn
 from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
@@ -304,6 +306,228 @@ def create(
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+@service.command()
+@pass_ctx_obj
+@click.argument("image", metavar="IMAGE", type=str)
+@click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
+@click.argument("initial_session_count", metavar="COUNT", type=int)
+@click.option("-t", "--name", metavar="NAME", type=str, default=None)
+@click.option("--model-version", metavar="VERSION", type=str, default=None)
+@click.option("--model-mount-destination", metavar="PATH", type=str, default="/models")
+# execution environment
+@click.option(
+    "-e",
+    "--env",
+    metavar="KEY=VAL",
+    type=str,
+    multiple=True,
+    help="Environment variable (may appear multiple times)",
+)
+# extra options
+@click.option(
+    "--bootstrap-script",
+    metavar="PATH",
+    type=click.File("r"),
+    default=None,
+    help="A user-defined script to execute on startup.",
+)
+@click.option(
+    "-c",
+    "--startup-command",
+    metavar="COMMAND",
+    default=None,
+    help="Set the command to execute for batch-type sessions.",
+)
+@click.option(
+    "-r",
+    "--resources",
+    metavar="KEY=VAL",
+    type=str,
+    multiple=True,
+    help=(
+        "Set computation resources used by the session "
+        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
+        "1 slot of cpu/gpu represents 1 core. "
+        "The unit of mem(ory) is MiB."
+    ),
+)
+@click.option(
+    "--resource-opts",
+    metavar="KEY=VAL",
+    type=str,
+    multiple=True,
+    help="Resource options for creating compute session (e.g: shmem=64m)",
+)
+@click.option(
+    "--cluster-size",
+    metavar="NUMBER",
+    type=int,
+    default=1,
+    help="The size of cluster in number of containers.",
+)
+@click.option(
+    "--cluster-mode",
+    metavar="MODE",
+    type=click.Choice(["single-node", "multi-node"]),
+    default="single-node",
+    help="The mode of clustering.",
+)
+@click.option("-d", "--domain", type=str, default="default")
+@click.option("-p", "--project", type=str, default="default")
+# extra options
+@click.option(
+    "--bootstrap-script",
+    metavar="PATH",
+    type=click.File("r"),
+    default=None,
+    help="A user-defined script to execute on startup.",
+)
+# extra options
+@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
+@click.option(
+    "--arch",
+    "--architecture",
+    "architecture",
+    metavar="ARCH_NAME",
+    type=str,
+    default=DEFAULT_IMAGE_ARCH,
+    help="Architecture of the image to use.",
+)
+@click.option(
+    "--scaling-group",
+    "--sgroup",
+    type=str,
+    default="default",
+    help=(
+        "The scaling group to execute session. If not specified, "
+        "all available scaling groups are included in the scheduling."
+    ),
+)
+@click.option(
+    "-o",
+    "--owner",
+    "--owner-access-key",
+    metavar="ACCESS_KEY",
+    default=None,
+    help="Set the owner of the target session explicitly.",
+)
+@click.option(
+    "--public",
+    "--expose-to-public",
+    is_flag=True,
+    help=(
+        "Visibility of API Endpoint which serves inference workload."
+        "If set to true, no authentication will be required to access the endpoint."
+    ),
+)
+def try_start(
+    ctx: CLIContext,
+    image: str,
+    model_name_or_id: str,
+    initial_session_count: int,
+    *,
+    name: Optional[str],
+    model_version: Optional[str],
+    model_mount_destination: Optional[str],
+    env: Sequence[str],
+    startup_command: Optional[str],
+    resources: Sequence[str],
+    resource_opts: Sequence[str],
+    cluster_size: int,
+    cluster_mode: Literal["single-node", "multi-node"],
+    domain: Optional[str],
+    project: Optional[str],
+    bootstrap_script: Optional[str],
+    tag: Optional[str],
+    architecture: Optional[str],
+    scaling_group: Optional[str],
+    owner: Optional[str],
+    public: bool,
+):
+    """
+    Tries to create a model service session and return whether the server has successfully started or not.
+
+    \b
+    MODEL_ID: The model ID
+
+    """
+    envs = prepare_env_arg(env)
+    parsed_resources = prepare_resource_arg(resources)
+    parsed_resource_opts = prepare_resource_arg(resource_opts)
+    body = {
+        "service_name": name,
+        "model_version": model_version,
+        "envs": envs,
+        "startup_command": startup_command,
+        "resources": parsed_resources,
+        "resource_opts": parsed_resource_opts,
+        "cluster_size": cluster_size,
+        "cluster_mode": cluster_mode,
+        "bootstrap_script": bootstrap_script,
+        "tag": tag,
+        "architecture": architecture,
+        "scaling_group": scaling_group,
+        "expose_to_public": public,
+    }
+    if model_mount_destination:
+        body["model_mount_destination"] = model_mount_destination
+    if domain:
+        body["domain_name"] = domain
+    if project:
+        body["group_name"] = project
+    if owner:
+        body["owner_access_key"] = owner
+
+    with Session() as session:
+        try:
+            result = session.Service.try_start(
+                image,
+                model_name_or_id,
+                initial_session_count,
+                **body,
+            )
+            ctx.output.print_item(
+                result,
+                [*service_fields.values()],
+            )
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+    async def try_start_tracker(bgtask_id):
+        async with AsyncSession() as session:
+            try:
+                bgtask = session.BackgroundTask(bgtask_id)
+                completion_msg_func = lambda: print_done("Model service validation completed.")
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer("Starting the session...") as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+                            else:
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(
+                                f"Error during the operation: {error_msg}",
+                            )
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                "The operation has been cancelled in the middle. "
+                                "(This may be due to server shutdown.)",
+                            )
+            finally:
+                completion_msg_func()
+
+    asyncio_run(try_start_tracker(result["task_id"]))
 
 
 @service.command()
