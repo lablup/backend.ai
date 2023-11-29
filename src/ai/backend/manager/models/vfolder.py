@@ -1831,7 +1831,10 @@ class ModelInfo(graphene.ObjectType):
     min_resource = graphene.JSONString()
     # readme
 
-    def resolve_created_at(self, info: graphene.ResolveInfo) -> datetime:
+    def resolve_created_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
         try:
             return dtparse(self.created_at)
         except ParserError:
@@ -1845,6 +1848,13 @@ class ModelInfo(graphene.ObjectType):
             return dtparse(self.modified_at)
         except ParserError:
             return self.modified_at
+
+    def resolve_label(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> list[str]:
+        # filter out empty string
+        return [label for label in self.label if label]
 
     @classmethod
     def from_model_def(
@@ -1863,6 +1873,7 @@ class ModelInfo(graphene.ObjectType):
             description=info["description"],
             task=info["task"],
             category=info["category"],
+            label=info["label"],
             license=info["license"],
             min_resource=info["min_resource"],
         )
