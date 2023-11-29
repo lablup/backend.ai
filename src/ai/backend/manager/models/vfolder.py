@@ -14,6 +14,7 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 import yaml
+from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -1830,6 +1831,21 @@ class ModelInfo(graphene.ObjectType):
     min_resource = graphene.JSONString()
     # readme
 
+    def resolve_created_at(self, info: graphene.ResolveInfo) -> datetime:
+        try:
+            return dtparse(self.created_at)
+        except ParserError:
+            return self.created_at
+
+    def resolve_modified_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
+        try:
+            return dtparse(self.modified_at)
+        except ParserError:
+            return self.modified_at
+
     @classmethod
     def from_model_def(
         cls,
@@ -1842,8 +1858,8 @@ class ModelInfo(graphene.ObjectType):
             author=info["author"],
             title=info["title"],
             version=info["version"],
-            created_at=info["created_at"],
-            modified_at=info["modified_at"],
+            created_at=info["created"],
+            modified_at=info["last_modified"],
             description=info["description"],
             task=info["task"],
             category=info["category"],
