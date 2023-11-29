@@ -13,6 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
 from .etcd import (
     ContainerRegistry,
@@ -49,10 +50,18 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
-from .base import DataLoaderManager, privileged_query, scoped_query
+from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
-from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
+from .group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .image import (
     AliasImage,
     ClearImages,
@@ -114,7 +123,9 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
+    UserConnection,
     UserList,
+    UserNode,
     UserRole,
     UserStatus,
 )
@@ -238,7 +249,7 @@ class Queries(graphene.ObjectType):
     All available GraphQL queries.
     """
 
-    node = graphene.relay.Node.Field()
+    node = AsyncNode.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -291,6 +302,11 @@ class Queries(graphene.ObjectType):
         Domain,
         is_active=graphene.Boolean(),
     )
+
+    group_node = graphene.Field(
+        GroupNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    group_nodes = PaginatedConnectionField(GroupConnection, description="Added in 24.03.0.")
 
     group = graphene.Field(
         Group,
@@ -357,6 +373,11 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
+
+    user_node = graphene.Field(
+        UserNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    user_nodes = PaginatedConnectionField(UserConnection, description="Added in 24.03.0.")
 
     keypair = graphene.Field(
         KeyPair,
@@ -794,6 +815,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    async def resolve_group_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await GroupNode.get_node(info, id)
+
+    async def resolve_group_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await GroupNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     @staticmethod
     async def resolve_group(
         root: Any,
@@ -1088,6 +1139,36 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return UserList(user_list, total_count)
+
+    async def resolve_user_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await UserNode.get_node(info, id)
+
+    async def resolve_user_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await UserNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
