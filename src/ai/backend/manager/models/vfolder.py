@@ -1818,13 +1818,14 @@ class ModelInfo(graphene.ObjectType):
 
     name = graphene.String()
     author = graphene.String()
-    title = graphene.String()
+    title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
-    created_at = GQLDateTime()
-    modified_at = GQLDateTime()
+    created_at = GQLDateTime(description="The time the model was created.")
+    modified_at = GQLDateTime(description="The last time the model was modified.")
     description = graphene.String()
     task = graphene.String()
-    category = graphene.List(lambda: graphene.String)
+    category = graphene.String()
+    label = graphene.List(lambda: graphene.String)
     license = graphene.String()
     min_resource = graphene.JSONString()
     # readme
@@ -1848,6 +1849,24 @@ class ModelInfo(graphene.ObjectType):
             category=info["category"],
             license=info["license"],
             min_resource=info["min_resource"],
+        )
+
+    @classmethod
+    def get_default_from_row(cls, vfolder_row: VFolderRow) -> ModelInfo:
+        return cls(
+            id=vfolder_row.id,
+            name=vfolder_row.name,
+            author=vfolder_row.creator or "",
+            title=vfolder_row.name,
+            version="",
+            created_at=vfolder_row.created_at,
+            modified_at=vfolder_row.created_at,
+            description="",
+            task="",
+            label=[],
+            category="",
+            license="",
+            min_resource={},
         )
 
     @classmethod
@@ -1877,9 +1896,7 @@ class ModelInfo(graphene.ObjectType):
                 yaml_name = item["name"]
                 break
         else:
-            raise InvalidAPIParameters(
-                "Model definition YAML file not found inside the model storage"
-            )
+            return cls.get_default_from_row(vfolder_row)
 
         chunks = bytes()
         async with graph_ctx.storage_manager.request(
