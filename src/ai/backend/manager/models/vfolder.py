@@ -13,6 +13,7 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
+import yaml
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -24,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -36,7 +38,12 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
+from ..defs import (
+    DEFAULT_CHUNK_SIZE,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+    VFOLDER_DSTPATHS_MAP,
+)
 from ..types import UserScope
 from .base import (
     GUID,
@@ -48,7 +55,13 @@ from .base import (
     PaginatedList,
     QuotaScopeIDType,
     batch_multiresult,
+    generate_sql_info_for_gql_connection,
     metadata,
+)
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -1797,3 +1810,164 @@ class UnsetQuotaScope(graphene.Mutation):
                 storage_host_name=storage_host_name,
             )
         )
+
+
+class ModelInfo(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    author = graphene.String()
+    title = graphene.String()
+    version = graphene.String()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    description = graphene.String()
+    task = graphene.String()
+    category = graphene.List(lambda: graphene.String)
+    license = graphene.String()
+    min_resource = graphene.JSONString()
+    # readme
+
+    @classmethod
+    def from_model_def(
+        cls,
+        model_def: dict[str, Any],
+    ) -> ModelInfo:
+        info = model_def["models"][0]["info"]
+        return cls(
+            id=model_def["id"],
+            name=model_def["models"][0]["name"],
+            author=info["author"],
+            title=info["title"],
+            version=info["version"],
+            created_at=info["created_at"],
+            modified_at=info["modified_at"],
+            description=info["description"],
+            task=info["task"],
+            category=info["category"],
+            license=info["license"],
+            min_resource=info["min_resource"],
+        )
+
+    @classmethod
+    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelInfo:
+        graph_ctx: GraphQueryContext = info.context
+
+        vfolder_row_id = vfolder_row.id
+        quota_scope_id = vfolder_row.quota_scope_id
+        host = vfolder_row.host
+        folder_name = vfolder_row.name
+        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfolder_id),
+                "relpath": ".",
+            },
+        ) as (_, storage_resp):
+            result = await storage_resp.json()
+
+        for item in result["items"]:
+            if item["name"] in ("model-definition.yml", "model-definition.yaml"):
+                yaml_name = item["name"]
+                break
+        else:
+            raise InvalidAPIParameters(
+                "Model definition YAML file not found inside the model storage"
+            )
+
+        chunks = bytes()
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfolder_id),
+                "relpath": f"./{yaml_name}",
+            },
+        ) as (_, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        model_definition_yaml = chunks.decode("utf-8")
+        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+        try:
+            model_definition = model_definition_iv.check(model_definition_dict)
+            assert model_definition is not None
+        except t.DataError as e:
+            raise InvalidAPIParameters(
+                f"Failed to validate model definition from vFolder {folder_name} (ID"
+                f" {vfolder_row_id}): {e}",
+            ) from e
+        except yaml.error.YAMLError as e:
+            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+        model_definition["id"] = vfolder_row_id
+        return cls.from_model_def(model_definition)
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> ModelInfo:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_row = (await db_session.scalars(query)).first()
+            if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
+                raise ValueError(
+                    f"Given vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
+                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
+                )
+            return await cls.from_row(info, vfolder_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        query, conditions, cursor, pagination_order, page_size = (
+            generate_sql_info_for_gql_connection(
+                info,
+                VFolderRow,
+                VFolderRow.id,
+                filter_expr,
+                order_expr,
+                offset,
+                after=after,
+                first=first,
+                before=before,
+                last=last,
+            )
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            result = [
+                (await cls.from_row(info, vf))
+                for vf in vfolder_rows
+                if vf.usage_mode == VFolderUsageMode.MODEL
+            ]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class ModelInfoConnection(Connection):
+    class Meta:
+        node = ModelInfo

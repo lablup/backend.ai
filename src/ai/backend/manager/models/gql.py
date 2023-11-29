@@ -130,6 +130,8 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
+    ModelInfo,
+    ModelInfoConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -663,6 +665,11 @@ class Queries(graphene.ObjectType):
     container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
     container_registries = graphene.List(ContainerRegistry)
+
+    model_info = graphene.Field(
+        ModelInfo, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    model_infos = PaginatedConnectionField(ModelInfoConnection, description="Added in 24.03.0.")
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2038,6 +2045,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
+
+    async def resolve_model_info(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelInfo.get_node(info, id)
+
+    async def resolve_model_infos(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ModelInfo.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
 
 class GQLMutationPrivilegeCheckMiddleware:
