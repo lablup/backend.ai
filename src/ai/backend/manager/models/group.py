@@ -747,19 +747,23 @@ class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    name = graphene.String(description="Added in 24.03.0.")
-    description = graphene.String(description="Added in 24.03.0.")
-    is_active = graphene.Boolean(description="Added in 24.03.0.")
-    created_at = GQLDateTime(description="Added in 24.03.0.")
-    modified_at = GQLDateTime(description="Added in 24.03.0.")
-    domain_name = graphene.String(description="Added in 24.03.0.")
-    total_resource_slots = graphene.JSONString(description="Added in 24.03.0.")
-    allowed_vfolder_hosts = graphene.JSONString(description="Added in 24.03.0.")
-    integration_id = graphene.String(description="Added in 24.03.0.")
-    resource_policy = graphene.String(description="Added in 24.03.0.")
-    scaling_groups = graphene.List(lambda: graphene.String, description="Added in 24.03.0.")
+    name = graphene.String()
+    description = graphene.String()
+    is_active = graphene.Boolean()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    domain_name = graphene.String()
+    total_resource_slots = graphene.JSONString()
+    allowed_vfolder_hosts = graphene.JSONString()
+    integration_id = graphene.String()
+    resource_policy = graphene.String()
+    scaling_groups = graphene.List(
+        lambda: graphene.String,
+    )
 
-    user_nodes = PaginatedConnectionField(UserConnection, description="Added in 24.03.0.")
+    user_nodes = PaginatedConnectionField(
+        UserConnection,
+    )
 
     @classmethod
     def from_row(cls, row: GroupRow) -> GroupNode:
