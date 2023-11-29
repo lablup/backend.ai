@@ -1171,19 +1171,19 @@ def validate_connection_args(
     return ConnectionArgs(cursor, order, requested_page_size)
 
 
-def _build_sql_stmt_from_connection_arg(
+def _build_sql_stmt_from_connection_args(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
     filter_expr: str | None = None,
     order_expr: str | None = None,
     *,
-    connection_arg: ConnectionArgs,
+    connection_args: ConnectionArgs,
 ) -> tuple[sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
     conditions: list[WhereClauseType] = []
 
-    cursor_id, pagination_order, requested_page_size = connection_arg
+    cursor_id, pagination_order, requested_page_size = connection_args
 
     # Default ordering by id column
     id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
@@ -1297,23 +1297,23 @@ def generate_sql_info_for_gql_connection(
     """
 
     if offset is None:
-        connection_arg = validate_connection_args(
+        connection_args = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt, conditions = _build_sql_stmt_from_connection_arg(
+        stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
             orm_class,
             id_column,
             filter_expr,
             order_expr,
-            connection_arg=connection_arg,
+            connection_args=connection_args,
         )
         return GraphQLConnectionSQLInfo(
             stmt,
             conditions,
-            connection_arg.cursor,
-            connection_arg.pagination_order,
-            connection_arg.requested_page_size,
+            connection_args.cursor,
+            connection_args.pagination_order,
+            connection_args.requested_page_size,
         )
     else:
         page_size = first
