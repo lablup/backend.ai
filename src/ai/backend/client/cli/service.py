@@ -312,7 +312,6 @@ def create(
 @pass_ctx_obj
 @click.argument("image", metavar="IMAGE", type=str)
 @click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
-@click.argument("initial_session_count", metavar="COUNT", type=int)
 @click.option("-t", "--name", metavar="NAME", type=str, default=None)
 @click.option("--model-version", metavar="VERSION", type=str, default=None)
 @click.option("--model-mount-destination", metavar="PATH", type=str, default="/models")
@@ -426,7 +425,6 @@ def try_start(
     ctx: CLIContext,
     image: str,
     model_name_or_id: str,
-    initial_session_count: int,
     *,
     name: Optional[str],
     model_version: Optional[str],
@@ -485,7 +483,6 @@ def try_start(
             result = session.Service.try_start(
                 image,
                 model_name_or_id,
-                initial_session_count,
                 **body,
             )
             ctx.output.print_item(

@@ -185,7 +185,6 @@ class Service(BaseFunction):
         cls,
         image: str,
         model_id_or_name: str,
-        initial_session_count: int,
         *,
         service_name: Optional[str] = None,
         model_version: Optional[str] = None,
@@ -216,8 +215,6 @@ class Service(BaseFunction):
         :param service_name: A client-side (user-defined) identifier to distinguish the session among currently
             running sessions.
             It may be used to seamlessly reuse the session already created.
-        :param initial_session_count: Number of sessions to be started along with
-            service initiation.
         :param mounts: The ID of model type vFolder which contains model files required
             to start inference session.
         :param model_mount_destination: Path inside the container to mount model vFolder,
@@ -244,7 +241,7 @@ class Service(BaseFunction):
         rqst.set_json(
             {
                 "name": service_name,
-                "desired_session_count": initial_session_count,
+                "desired_session_count": 1,
                 "image": image,
                 "arch": architecture,
                 "group": group_name,

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -41,6 +42,7 @@ from ..models import (
     EndpointTokenRow,
     ImageRow,
     KernelLoadingStrategy,
+    KeyPairRow,
     RouteStatus,
     RoutingRow,
     SessionRow,
@@ -462,6 +464,19 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
 
     validation_result = await _validate(request, params)
 
+    async with root_ctx.db.begin_readonly_session() as session:
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageRef(params["image"], ["*"], params["architecture"]),
+                params["image"],
+            ],
+        )
+        query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
+            UserRow.uuid == request["user"]["uuid"]
+        )
+        created_user = (await session.execute(query)).fetchone()
+
     params["config"]["mount_map"] = {
         validation_result.model_id: params["config"]["model_mount_destination"]
     }
@@ -471,25 +486,37 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
         terminated_event = asyncio.Event()
 
         result = await root_ctx.registry.create_session(
-            "",
-            params["image"],
-            params["architecture"],
+            f"model-eval-{secrets.token_urlsafe(16)}",
+            image_row.name,
+            image_row.architecture,
             UserScope(
                 domain_name=params["domain"],
                 group_id=validation_result.group_id,
-                user_uuid=request["user"]["uuid"],
-                user_role=request["user"]["role"],
+                user_uuid=created_user.uuid,
+                user_role=created_user.role,
             ),
             validation_result.owner_access_key,
             validation_result.resource_policy,
             SessionTypes.INFERENCE,
-            params["config"],
+            {
+                "mounts": [validation_result.model_id],
+                "mount_map": {
+                    validation_result.model_id: params["config"]["model_mount_destination"]
+                },
+                "environ": params["config"]["environ"],
+                "scaling_group": validation_result.scaling_group,
+                "resources": params["config"]["resources"],
+                "resource_opts": params["config"]["resource_opts"],
+                "preopen_ports": None,
+                "agent_list": None,
+            },
             params["cluster_mode"],
             params["cluster_size"],
             bootstrap_script=params["bootstrap_script"],
             startup_command=params["startup_command"],
             tag=params["tag"],
             callback_url=params["callback_url"],
+            enqueue_only=True,
             sudo_session_enabled=sudo_session_enabled,
         )
 
