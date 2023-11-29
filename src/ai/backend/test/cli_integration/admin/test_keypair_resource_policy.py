@@ -21,10 +21,6 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         "20",
         "--max-containers-per-session",
         "2",
-        "--max-vfolder-count",
-        "15",
-        "--max-vfolder-size",
-        "0",
         "--vfolder-host-perms",
         '{"local:volume1":["create-vfolder","delete-vfolder","mount-in-session","upload-file","download-file"]}',
         "--idle-timeout",
@@ -45,6 +41,8 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
     test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
+    allowed_vfolder_hosts_str = str(test_krp.get("allowed_vfolder_hosts"))
+    allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -59,17 +57,12 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
     assert (
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume1": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    assert set(allowed_vfolder_hosts_json.get("local:volume1")) == {
+        "create-vfolder",
+        "delete-vfolder",
+        "mount-in-session",
+        "upload-file",
+        "download-file",
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
@@ -90,10 +83,6 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         "30",
         "--max-containers-per-session",
         "1",
-        "--max-vfolder-count",
-        "10",
-        "--max-vfolder-size",
-        "0",
         "--vfolder-host-perms",
         '{"local:volume2":["create-vfolder","delete-vfolder","mount-in-session","upload-file","download-file"]}',
         "--idle-timeout",
@@ -114,6 +103,8 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
     test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
+    allowed_vfolder_hosts_str = str(test_krp.get("allowed_vfolder_hosts"))
+    allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -128,17 +119,12 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     assert (
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume2": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    assert set(allowed_vfolder_hosts_json.get("local:volume2")) == {
+        "create-vfolder",
+        "delete-vfolder",
+        "mount-in-session",
+        "upload-file",
+        "download-file",
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
