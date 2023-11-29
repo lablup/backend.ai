@@ -1816,6 +1816,7 @@ class ModelInfo(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    name = graphene.String()
     author = graphene.String()
     title = graphene.String()
     version = graphene.String()
@@ -1956,13 +1957,11 @@ class ModelInfo(graphene.ObjectType):
         cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
+        query = query.where(VFolderRow.usage_mode == VFolderUsageMode.MODEL)
+        cnt_query = cnt_query.where(VFolderRow.usage_mode == VFolderUsageMode.MODEL)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
-            result = [
-                (await cls.from_row(info, vf))
-                for vf in vfolder_rows
-                if vf.usage_mode == VFolderUsageMode.MODEL
-            ]
+            result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
