@@ -1966,8 +1966,12 @@ class ModelInfo(graphene.ObjectType):
             vfolder_row = (await db_session.scalars(query)).first()
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
-                    f"Given vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
+                    f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
                     f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
+                )
+            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+                raise ValueError(
+                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
             return await cls.from_row(info, vfolder_row)
 
@@ -2001,8 +2005,11 @@ class ModelInfo(graphene.ObjectType):
         cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
-        query = query.where(VFolderRow.usage_mode == VFolderUsageMode.MODEL)
-        cnt_query = cnt_query.where(VFolderRow.usage_mode == VFolderUsageMode.MODEL)
+        additional_cond = (VFolderRow.usage_mode == VFolderUsageMode.MODEL) & (
+            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)
+        )
+        query = query.where(additional_cond)
+        cnt_query = cnt_query.where(additional_cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
