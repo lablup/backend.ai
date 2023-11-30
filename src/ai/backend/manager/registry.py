@@ -3407,7 +3407,9 @@ async def handle_model_service_status_update(
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
             route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-    except SessionNotFound | NoResultFound:
+    except SessionNotFound:
+        return
+    except NoResultFound:
         return
 
     async def _update():

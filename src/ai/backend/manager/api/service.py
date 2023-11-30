@@ -28,6 +28,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
     SessionCancelledEvent,
+    SessionPreparingEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
@@ -549,10 +550,16 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
                     forced=True,
                 )
 
-        session_event_matcher = lambda args: args[0] == result["sessionId"]
-        model_service_event_matcher = lambda args: args[1] == result["sessionId"]
+        session_event_matcher = lambda args: args[0] == str(result["sessionId"])
+        model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
 
         handlers: list[EventHandler] = [
+            root_ctx.event_dispatcher.subscribe(
+                SessionPreparingEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
             root_ctx.event_dispatcher.subscribe(
                 SessionStartedEvent,
                 None,
@@ -565,13 +572,13 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.consume(
+            root_ctx.event_dispatcher.subscribe(
                 SessionTerminatedEvent,
                 None,
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.consume(
+            root_ctx.event_dispatcher.subscribe(
                 ModelServiceStatusEvent,
                 None,
                 _handle_event,
@@ -586,7 +593,7 @@ async def try_start(request: web.Request, params: Any) -> web.Response:
                 root_ctx.event_dispatcher.unsubscribe(handler)
 
     task_id = await background_task_manager.start(_task)
-    return web.json_response({"task_id": task_id})
+    return web.json_response({"task_id": str(task_id)})
 
 
 @auth_required
