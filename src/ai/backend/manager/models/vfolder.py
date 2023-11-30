@@ -1876,7 +1876,7 @@ class ModelInfo(graphene.ObjectType):
             description=info.get("description") or "",
             task=info.get("task") or "",
             architecture=info.get("architecture") or "",
-            framework=info.get("framework") or "",
+            framework=info.get("framework") or [],
             label=info.get("label") or [],
             category=info.get("category") or "",
             license=info.get("license") or "",
