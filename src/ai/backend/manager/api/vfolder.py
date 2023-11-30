@@ -464,13 +464,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
 
-    if (
-        group_type == ProjectType.MODEL_STORE
-        and params["permission"] != VFolderPermission.RW_DELETE
-    ):
-        raise InvalidAPIParameters(
-            "Setting custom permission is not supported for model store VFolders"
-        )
+    if group_type == ProjectType.MODEL_STORE:
+        if params["permission"] != VFolderPermission.READ_WRITE:
+            raise InvalidAPIParameters(
+                "Setting custom permission is not supported for model store VFolder"
+            )
+        if params["usage_mode"] != VFolderUsageMode.MODEL:
+            raise InvalidAPIParameters(
+                "Only Model VFolder can be created under the model store project"
+            )
 
     async with root_ctx.db.begin() as conn:
         if not unmanaged_path:

@@ -1210,9 +1210,12 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
+        from .group import groups
         from .user import users
 
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
+        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
+            groups, vfolders.c.group == groups.c.id, isouter=True
+        )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)

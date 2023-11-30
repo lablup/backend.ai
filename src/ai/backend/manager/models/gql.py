@@ -330,7 +330,7 @@ class Queries(graphene.ObjectType):
         Group,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
-        type=graphene.Enum(enum=ProjectType, default_value=ProjectType.GENERAL),
+        type=graphene.List(graphene.String, default_value=[ProjectType.GENERAL.name]),
     )
 
     image = graphene.Field(
@@ -861,7 +861,7 @@ class Queries(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str = None,
-        type: ProjectType = ProjectType.GENERAL,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Group:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -896,7 +896,7 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id, type=type)
+            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -958,7 +958,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
-        type: ProjectType = ProjectType.GENERAL,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -980,7 +980,10 @@ class Queries(graphene.ObjectType):
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
-            info.context, domain_name=domain_name, is_active=is_active, type=type
+            info.context,
+            domain_name=domain_name,
+            is_active=is_active,
+            type=[ProjectType[t] for t in type],
         )
 
     @staticmethod
