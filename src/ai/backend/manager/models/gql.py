@@ -330,7 +330,11 @@ class Queries(graphene.ObjectType):
         Group,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
-        type=graphene.List(graphene.String, default_value=[ProjectType.GENERAL.name]),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description="Added since 24.03.0. Available values: GENERAL, MODEL_STORE",
+        ),
     )
 
     image = graphene.Field(

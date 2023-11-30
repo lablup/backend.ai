@@ -258,7 +258,7 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String()
+    type = graphene.String(description="Added since 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -403,7 +403,11 @@ class Group(graphene.ObjectType):
 
 
 class GroupInput(graphene.InputObjectType):
-    type = graphene.String(required=False, default_value="GENERAL")
+    type = graphene.String(
+        required=False,
+        default_value="GENERAL",
+        description="Added since 24.03.0. Available values: 'GENERAL', 'MODEL_STORE'",
+    )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
     domain_name = graphene.String(required=True)
