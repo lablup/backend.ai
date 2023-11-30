@@ -35,6 +35,7 @@ users = sa.Table(
     "users",
     metadata,
     IDColumn("uuid"),
+    sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
 )
 groups = sa.Table(
     "groups",
@@ -135,7 +136,7 @@ def upgrade():
         )
     )
 
-    uids = conn.execute(sa.select([users.c.uuid])).all()
+    uids = conn.execute(sa.select([users.c.uuid]).where(users.c.domain_name == "default")).all()
     conn.execute(
         sa.insert(association_groups_users).values(
             user_id=sa.bindparam("user_id"),
