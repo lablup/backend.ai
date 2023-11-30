@@ -333,7 +333,9 @@ class Queries(graphene.ObjectType):
         type=graphene.List(
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
-            description="Added since 24.03.0. Available values: GENERAL, MODEL_STORE",
+            description=(
+                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
         ),
     )
 

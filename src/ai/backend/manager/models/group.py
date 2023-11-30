@@ -406,7 +406,9 @@ class GroupInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
-        description="Added since 24.03.0. Available values: 'GENERAL', 'MODEL_STORE'",
+        description=(
+            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+        ),
     )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
