@@ -1826,6 +1826,8 @@ class ModelInfo(graphene.ObjectType):
     description = graphene.String()
     task = graphene.String()
     category = graphene.String()
+    architecture = graphene.String()
+    framework = graphene.List(lambda: graphene.String)
     label = graphene.List(lambda: graphene.String)
     license = graphene.String()
     min_resource = graphene.JSONString()
@@ -1873,6 +1875,8 @@ class ModelInfo(graphene.ObjectType):
             description=info["description"],
             task=info["task"],
             category=info["category"],
+            architecture=info["architecture"],
+            framework=info["framework"],
             label=info["label"],
             license=info["license"],
             min_resource=info["min_resource"],
@@ -1890,6 +1894,8 @@ class ModelInfo(graphene.ObjectType):
             modified_at=vfolder_row.created_at,
             description="",
             task="",
+            architecture="",
+            framework=[],
             label=[],
             category="",
             license="",
