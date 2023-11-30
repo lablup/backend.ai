@@ -1901,7 +1901,9 @@ class ModelInfo(graphene.ObjectType):
 
     @classmethod
     async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelInfo:
-        async def _fetch_file(filename: str) -> bytes:
+        async def _fetch_file(
+            filename: str,
+        ) -> bytes:  # FIXME: We should avoid fetching files from disk
             chunks = bytes()
             async with graph_ctx.storage_manager.request(
                 proxy_name,
@@ -1948,7 +1950,7 @@ class ModelInfo(graphene.ObjectType):
                 not model_definition_filename
             ):
                 model_definition_filename = item["name"]
-            if item["name"].lower() == "readme.md":
+            if item["name"].lower().startswith("readme."):
                 readme_idx = idx
 
         if readme_idx is not None:
