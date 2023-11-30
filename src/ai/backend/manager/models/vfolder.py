@@ -1849,51 +1849,34 @@ class ModelInfo(graphene.ObjectType):
         except ParserError:
             return self.modified_at
 
-    def resolve_label(
-        self,
-        info: graphene.ResolveInfo,
-    ) -> list[str]:
-        # filter out empty string
-        return [label for label in self.label if label]
-
     @classmethod
-    def from_model_def(
-        cls,
-        model_def: dict[str, Any],
+    def parse_model(
+        cls, vfolder_row: VFolderRow, model_def: dict[str, Any] | None = None
     ) -> ModelInfo:
-        info = model_def["models"][0]["info"]
-        return cls(
-            id=model_def["id"],
-            name=model_def["models"][0]["name"],
-            author=info["author"],
-            title=info["title"],
-            version=info["version"],
-            created_at=info["created"],
-            modified_at=info["last_modified"],
-            description=info["description"],
-            task=info["task"],
-            category=info["category"],
-            label=info["label"],
-            license=info["license"],
-            min_resource=info["min_resource"],
-        )
-
-    @classmethod
-    def get_default_from_row(cls, vfolder_row: VFolderRow) -> ModelInfo:
+        if model_def is not None:
+            models = model_def["models"]
+        else:
+            models = []
+        try:
+            info = models[0]["info"]
+            name = models[0]["name"]
+        except (IndexError, KeyError):
+            info = {}
+            name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
-            name=vfolder_row.name,
-            author=vfolder_row.creator or "",
-            title=vfolder_row.name,
-            version="",
-            created_at=vfolder_row.created_at,
-            modified_at=vfolder_row.created_at,
-            description="",
-            task="",
-            label=[],
-            category="",
-            license="",
-            min_resource={},
+            name=name,
+            author=info.get("author") or vfolder_row.creator or "",
+            title=info.get("title") or vfolder_row.name,
+            version=info.get("version") or "",
+            created_at=info.get("created") or vfolder_row.created_at,
+            modified_at=info.get("last_modified") or vfolder_row.created_at,
+            description=info.get("description") or "",
+            task=info.get("task") or "",
+            label=info.get("label") or [],
+            category=info.get("category") or "",
+            license=info.get("license") or "",
+            min_resource=info.get("min_resource") or {},
         )
 
     @classmethod
@@ -1923,7 +1906,7 @@ class ModelInfo(graphene.ObjectType):
                 yaml_name = item["name"]
                 break
         else:
-            return cls.get_default_from_row(vfolder_row)
+            return cls.parse_model(vfolder_row)
 
         chunks = bytes()
         async with graph_ctx.storage_manager.request(
@@ -1954,7 +1937,7 @@ class ModelInfo(graphene.ObjectType):
         except yaml.error.YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
         model_definition["id"] = vfolder_row_id
-        return cls.from_model_def(model_definition)
+        return cls.parse_model(vfolder_row, model_definition)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> ModelInfo:
