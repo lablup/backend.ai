@@ -1826,6 +1826,8 @@ class ModelInfo(graphene.ObjectType):
     description = graphene.String()
     task = graphene.String()
     category = graphene.String()
+    architecture = graphene.String()
+    framework = graphene.List(lambda: graphene.String)
     label = graphene.List(lambda: graphene.String)
     license = graphene.String()
     min_resource = graphene.JSONString()
@@ -1873,6 +1875,8 @@ class ModelInfo(graphene.ObjectType):
             modified_at=info.get("last_modified") or vfolder_row.created_at,
             description=info.get("description") or "",
             task=info.get("task") or "",
+            architecture=info.get("architecture") or "",
+            framework=info.get("framework") or "",
             label=info.get("label") or [],
             category=info.get("category") or "",
             license=info.get("license") or "",
