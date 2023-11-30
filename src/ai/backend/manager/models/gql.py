@@ -60,6 +60,7 @@ from .group import (
     GroupConnection,
     GroupNode,
     ModifyGroup,
+    ProjectType,
     PurgeGroup,
 )
 from .image import (
@@ -329,6 +330,7 @@ class Queries(graphene.ObjectType):
         Group,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
+        type=graphene.Enum(enum=ProjectType, default_value=ProjectType.GENERAL),
     )
 
     image = graphene.Field(
@@ -859,6 +861,7 @@ class Queries(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str = None,
+        type: ProjectType = ProjectType.GENERAL,
     ) -> Group:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -893,7 +896,7 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id)
+            client_groups = await loader.load(client_user_id, type=type)
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -955,6 +958,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: ProjectType = ProjectType.GENERAL,
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -975,7 +979,9 @@ class Queries(graphene.ObjectType):
             return client_groups
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return await Group.load_all(info.context, domain_name=domain_name, is_active=is_active)
+        return await Group.load_all(
+            info.context, domain_name=domain_name, is_active=is_active, type=type
+        )
 
     @staticmethod
     async def resolve_image(

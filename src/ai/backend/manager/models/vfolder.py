@@ -64,6 +64,7 @@ from .gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
+from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
@@ -1992,8 +1993,16 @@ class ModelInfo(graphene.ObjectType):
         cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
-        additional_cond = (VFolderRow.usage_mode == VFolderUsageMode.MODEL) & (
-            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            model_store_project_gids = (
+                (await sa.select([GroupRow.id]).where(GroupRow.type == ProjectType.MODEL_STORE))
+                .scalars()
+                .all()
+            )
+        additional_cond = (
+            (VFolderRow.usage_mode == VFolderUsageMode.MODEL)
+            & (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
+            & (VFolderRow.group.in_(model_store_project_gids))
         )
         query = query.where(additional_cond)
         cnt_query = cnt_query.where(additional_cond)
