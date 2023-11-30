@@ -131,6 +131,8 @@ model_definition_iv = t.Dict(
                             t.Key("description"): t.String(allow_blank=True),
                             t.Key("task"): t.String(allow_blank=True),
                             t.Key("category"): t.String(allow_blank=True),
+                            t.Key("architecture"): t.String(allow_blank=True),
+                            t.Key("framework"): t.List(t.String),
                             t.Key("label"): t.List(t.String),
                             t.Key("license"): t.String(allow_blank=True),
                             t.Key("min_resource"): t.Dict().allow_extra("*"),
