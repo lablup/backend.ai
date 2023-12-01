@@ -5,19 +5,20 @@ import json
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
 import aiofiles
 import aiohttp_cors
 import click
 import trafaret as t
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
+from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
 from ai.backend.manager import __version__
 from ai.backend.manager.api.session import UndefChecker
-from ai.backend.manager.api.utils import Undefined
+from ai.backend.manager.api.utils import TypedJSONResponse, Undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
 from ai.backend.manager.server import global_subapp_pkgs
 
@@ -67,7 +68,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Bool):
         return {"type": "boolean"}
     if isinstance(scheme, t.Dict):
-        items = parse_traferet_definition(scheme)
+        items = parse_trafaret_definition(scheme)
         properties = {d["name"]: d["schema"] for d in items}
         required_keys: list[str] = [d["name"] for d in items if d["required"]]
         return {"type": "object", "properties": properties, "required": required_keys}
@@ -168,7 +169,7 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
     return _traverse(scheme), optional
 
 
-def parse_traferet_definition(root: t.Dict) -> list[dict]:
+def parse_trafaret_definition(root: t.Dict) -> list[dict]:
     resp = []
     for key in root.keys:  # type: ignore[attr-defined]
         names: list[str] = []
@@ -189,6 +190,8 @@ def parse_traferet_definition(root: t.Dict) -> list[dict]:
                 default_value = key.default
 
             schema["default"] = default_value
+        if hasattr(key, "__openapi_desc__"):
+            schema["description"] = getattr(key, "__openapi_desc__")
         resp += [{"name": names[0], "schema": schema, "required": not optional}]
     return resp
 
@@ -210,7 +213,8 @@ async def generate_openapi(output_path: Path) -> None:
         "components": {
             "securitySchemes": {
                 "TokenAuth": {"type": "ApiKey", "in": "header", "name": "Authorization: BackendAI"},
-            }
+            },
+            "schemas": {},
         },
         "paths": defaultdict(lambda: {}),
     }
@@ -270,27 +274,86 @@ async def generate_openapi(output_path: Path) -> None:
                         description.append(f"* {item}")
                     description.append("")
                 if request_scheme := handler_attrs.get("request_scheme"):
-                    parsed_definition = parse_traferet_definition(request_scheme)
-                    if method == "GET" or method == "DELETE":
-                        parameters.extend([{**d, "in": "query"} for d in parsed_definition])
-                    else:
-                        properties = {d["name"]: d["schema"] for d in parsed_definition}
-                        required_keys: list[str] = [
-                            d["name"] for d in parsed_definition if d["required"]
-                        ]
-                        route_def["requestBody"] = {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": properties,
-                                        "required": required_keys,
+                    if isinstance(request_scheme, t.Dict) or isinstance(request_scheme, t.List):
+                        parsed_definition = parse_trafaret_definition(request_scheme)
+                        if method == "GET" or method == "DELETE":
+                            parameters.extend([{**d, "in": "query"} for d in parsed_definition])
+                        else:
+                            properties = {d["name"]: d["schema"] for d in parsed_definition}
+                            required_keys: list[str] = [
+                                d["name"] for d in parsed_definition if d["required"]
+                            ]
+                            raw_examples = handler_attrs.get("request_examples") or []
+                            examples = {
+                                f"{operation_id}_Example{i}": {"value": e}
+                                for e, i in zip(raw_examples, range(1, len(raw_examples) + 1))
+                            }
+                            route_def["requestBody"] = {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": properties,
+                                            "required": required_keys,
+                                        },
+                                        "examples": examples,
                                     }
                                 }
                             }
+                    elif issubclass(request_scheme, BaseModel):
+                        schema_name = request_scheme.__name__
+                        schema = request_scheme.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
+
+                        if additional_definitions := schema.pop("$defs", None):
+                            openapi["components"]["schemas"].update(additional_definitions)
+                        openapi["components"]["schemas"][schema_name] = schema
+                        route_def["requestBody"] = {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                                }
+                            }
                         }
+                    else:
+                        raise RuntimeError(
+                            f"{request_scheme} not recognized as a valid request type"
+                        )
+
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
+            type_hints = get_type_hints(route.handler)
+            if (ret_type := type_hints.get("return")) and getattr(
+                ret_type, "__origin__", None
+            ) == TypedJSONResponse:
+                schema: dict[str, Any]
+                (arg,) = get_args(ret_type)
+                if getattr(arg, "__origin__", None) == list:
+                    (list_arg,) = get_args(arg)
+                    schema_name = f"{list_arg.__name__}_List"
+                    schema = TypeAdapter(list[list_arg]).json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
+                elif issubclass(arg, BaseModel):
+                    schema_name = arg.__name__
+                    schema = arg.model_json_schema(ref_template="#/components/schemas/{model}")
+
+                else:
+                    raise RuntimeError(f"{arg} not recognized as a valid response type")
+
+                if additional_definitions := schema.pop("$defs", None):
+                    openapi["components"]["schemas"].update(additional_definitions)
+                openapi["components"]["schemas"][schema_name] = schema
+                route_def["responses"] = {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                            }
+                        }
+                    }
+                }
             openapi["paths"][path][method.lower()] = route_def
     if output_path == "-" or output_path is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))

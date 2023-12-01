@@ -12,6 +12,15 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
+from pydantic import (
+    AliasChoices,
+    AnyUrl,
+    BaseModel,
+    Field,
+    HttpUrl,
+    NonNegativeFloat,
+    NonNegativeInt,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
@@ -44,11 +53,18 @@ from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_access_key_scopes, get_user_uuid_scopes, undefined
+from .utils import (
+    TypedJSONResponse,
+    check_api_params,
+    get_access_key_scopes,
+    get_user_uuid_scopes,
+    undefined,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
 
+SESSION_NAME_MATCHER = re.compile(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII)
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
@@ -77,6 +93,30 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
+class CompactServeInfoModel(BaseModel):
+    id: uuid.UUID
+    name: str
+    desired_session_count: NonNegativeInt
+    active_route_count: NonNegativeInt
+    service_endpoint: HttpUrl | None = Field(default=None)
+    is_public: bool
+
+
+class RouteInfoModel(BaseModel):
+    route_id: uuid.UUID
+    session_id: uuid.UUID
+    traffic_ratio: NonNegativeFloat
+
+
+class ServeInfoModel(BaseModel):
+    endpoint_id: uuid.UUID
+    name: str
+    desired_session_count: NonNegativeInt
+    active_routes: list[RouteInfoModel]
+    service_endpoint: HttpUrl | None = Field(default=None)
+    is_public: bool
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -86,7 +126,9 @@ async def is_user_allowed_to_access_resource(
         }
     )
 )
-async def list_serve(request: web.Request, params: Any) -> web.Response:
+async def list_serve(
+    request: web.Request, params: Any
+) -> TypedJSONResponse[list[CompactServeInfoModel]]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
@@ -104,18 +146,18 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
 
-    return web.json_response(
+    return TypedJSONResponse(
         [
-            {
-                "id": str(endpoint.id),
-                "name": endpoint.name,
-                "desired_session_count": endpoint.desired_session_count,
-                "active_route_count": len(
+            CompactServeInfoModel(
+                id=endpoint.id,
+                name=endpoint.name,
+                desired_session_count=endpoint.desired_session_count,
+                active_route_count=len(
                     [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
                 ),
-                "service_endpoint": endpoint.url,
-                "is_public": endpoint.open_to_public,
-            }
+                service_endpoint=endpoint.url,
+                is_public=endpoint.open_to_public,
+            )
             for endpoint in rows
         ],
         status=200,
@@ -124,7 +166,7 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def get_info(request: web.Request) -> web.Response:
+async def get_info(request: web.Request) -> TypedJSONResponse[ServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -140,79 +182,127 @@ async def get_info(request: web.Request) -> web.Response:
             raise ObjectNotFound
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
-    resp = {
-        "endpoint_id": str(endpoint.id),
-        "name": endpoint.name,
-        "desired_session_count": endpoint.desired_session_count,
-        "active_routes": [
-            {
-                "route_id": str(r.id),
-                "session_id": str(r.session),
-                "traffic_ratio": r.traffic_ratio,
-            }
-            for r in endpoint.routings
-            if r.status == RouteStatus.HEALTHY
-        ],
-        "service_endpoint": endpoint.url,
-        "is_public": endpoint.open_to_public,
-    }
 
-    return web.json_response(resp, status=200)
+    return TypedJSONResponse(
+        ServeInfoModel(
+            endpoint_id=endpoint.id,
+            name=endpoint.name,
+            desired_session_count=endpoint.desired_session_count,
+            active_routes=[
+                RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
+                for r in endpoint.routings
+                if r.status == RouteStatus.HEALTHY
+            ],
+            service_endpoint=endpoint.url,
+            is_public=endpoint.open_to_public,
+        )
+    )
+
+
+class ServiceConfigModel(BaseModel):
+    model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
+    model_version: int = Field(
+        validation_alias=AliasChoices("model_version", "modelVersion"),
+        description="Unused; Reserved for future works",
+        default=1,
+    )
+    model_mount_destination: str = Field(
+        validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
+        default="/models",
+        description=(
+            "Mount destination for the model VFolder will be mounted inside the inference session"
+        ),
+    )
+    environ: dict[str, str] | None = Field(
+        description="Environment variables to be set inside the inference session",
+        default=None,
+    )
+    scaling_group: str = Field(
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
+        description="Name of the resource group to spawn inference sessions",
+        examples=["nvidia-H100"],
+    )
+    resources: dict[str, str] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resource_opts: dict[str, str] = Field(examples=[{"shmem": "2g"}], default={})
+
+
+class NewServiceRequestModel(BaseModel):
+    service_name: str = Field(
+        validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
+        description="Name of the service",
+    )
+    desired_session_count: int = Field(
+        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
+        description="Number of sessions to serve traffic",
+    )
+    image: str = Field(
+        validation_alias=AliasChoices("image", "lang"),
+        description="String reference of the image which will be used to create session",
+        examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
+    )
+    architecture: str = Field(
+        validation_alias=AliasChoices("arch", "architecture"),
+        description="Image architecture",
+        default=DEFAULT_IMAGE_ARCH,
+    )
+    group: str = Field(
+        validation_alias=AliasChoices("group", "groupName", "group_name"),
+        description="Name of project to spawn session",
+        default="default",
+    )
+    domain: str = Field(
+        validation_alias=AliasChoices("domain", "domainName", "domain_name"),
+        description="Name of domain to spawn session",
+        default="default",
+    )
+    cluster_size: int = Field(
+        validation_alias=AliasChoices("cluster_size", "clusterSize"), default=1
+    )
+    cluster_mode: ClusterMode = Field(
+        validation_alias=AliasChoices("cluster_mode", "clusterMode"),
+        default=ClusterMode.SINGLE_NODE,
+    )
+    tag: str | None = Field(default=None)
+    startup_command: str | None = Field(
+        validation_alias=AliasChoices("startup_command", "startupCommand"),
+        default=None,
+    )
+    bootstrap_script: str | None = Field(
+        validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
+        default=None,
+    )
+    callback_url: AnyUrl | None = Field(
+        validation_alias=AliasChoices("callback_url", "callbackUrl", "CallbackURL"),
+        default=None,
+    )
+    owner_access_key: str | None = Field(
+        description=(
+            "(for privileged users only) when specified, transfer ownership of the inference"
+            " session to specified user"
+        ),
+        default=None,
+    )
+    open_to_public: bool = Field(
+        description="If set to true, do not require an API key to access the model service",
+        default=False,
+    )
+    config: ServiceConfigModel
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "service_name", "clientSessionToken"])
-            >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
-            tx.AliasedKey(["image", "lang"]): t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("tag", default=None): t.Null | t.String,
-            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-            t.Key("open_to_public", default=False): t.Bool,
-            t.Key("config"): t.Dict(
-                {
-                    t.Key("model"): t.String,
-                    tx.AliasedKey(["model_version", "modelVersion"], default=None): (
-                        t.Null | t.String
-                    ),
-                    tx.AliasedKey(
-                        ["model_mount_destination", "modelMountDestination"], default="/models"
-                    ): t.String,
-                    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-                    # cluster_size is moved to the root-level parameters
-                    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): (
-                        t.Null | t.String
-                    ),
-                    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-                    tx.AliasedKey(
-                        ["resource_opts", "resourceOpts"], default=None
-                    ): t.Null | t.Mapping(t.String, t.Any),
-                }
-            ),
-        }
-    ),
-)
-async def create(request: web.Request, params: Any) -> web.Response:
+@check_api_params(NewServiceRequestModel)
+async def create(request: web.Request, params: NewServiceRequestModel) -> web.Response:
+    """
+    Creates a new model service. If `desired_session_count` is greater than zero,
+    then inference sessions will be automatically scheduled upon successful creation of model service.
+    """
+    if not SESSION_NAME_MATCHER.match(params.service_name):
+        raise InvalidAPIParameters(f"service_name must match {SESSION_NAME_MATCHER.pattern}")
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
         "owner_access_key": (
-            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+            None if params.owner_access_key is undefined else params.owner_access_key
         ),
     }
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
@@ -220,11 +310,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         checked_scaling_group = await check_scaling_group(
             conn,
-            params["config"]["scaling_group"],
+            params.config.scaling_group,
             SessionTypes.INFERENCE,
             owner_access_key,
-            params["domain"],
-            params["group"],
+            params.domain,
+            params.group,
         )
 
         query = (
@@ -242,17 +332,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if not sgroup["wsproxy_api_token"]:
             raise ServiceUnavailable("Scaling group not ready to start model service")
 
-        params["config"]["scaling_group"] = checked_scaling_group
+        params.config.scaling_group = checked_scaling_group
 
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(
+            request, params.model_dump(), conn
+        )
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
-            extra_vf_conds = vfolders.c.id == uuid.UUID(params["config"]["model"])
+            extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
             matched_vfolders = await query_accessible_vfolders(
                 conn,
                 owner_uuid,
                 user_role=request["user"]["role"],
-                domain_name=params["domain"],
+                domain_name=params.domain,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
             )
@@ -261,14 +353,14 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # TypeError: catching classes that do not inherit from BaseException is not allowed
             if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
                 try:
-                    extra_vf_conds = (vfolders.c.name == params["config"]["model"]) & (
+                    extra_vf_conds = (vfolders.c.name == params.config.model) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL
                     )
                     matched_vfolders = await query_accessible_vfolders(
                         conn,
                         owner_uuid,
                         user_role=request["user"]["role"],
-                        domain_name=params["domain"],
+                        domain_name=params.domain,
                         allowed_vfolder_types=allowed_vfolder_types,
                         extra_vf_conds=extra_vf_conds,
                     )
@@ -338,21 +430,22 @@ async def create(request: web.Request, params: Any) -> web.Response:
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params["image"], ["*"], params["architecture"]),
-                params["image"],
+                ImageRef(params.image, ["*"], params.architecture),
+                params.image,
             ],
         )
 
-    params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
+    creation_config = params.config.model_dump()
+    creation_config["mount_map"] = {model_id: params.config.model_mount_destination}
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
-        params["image"],
-        params["architecture"],
+        params.image,
+        params.architecture,
         UserScope(
-            domain_name=params["domain"],
+            domain_name=params.domain,
             group_id=group_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
@@ -360,21 +453,21 @@ async def create(request: web.Request, params: Any) -> web.Response:
         owner_access_key,
         resource_policy,
         SessionTypes.INFERENCE,
-        params["config"],
-        params["cluster_mode"],
-        params["cluster_size"],
+        creation_config,
+        params.cluster_mode,
+        params.cluster_size,
         dry_run=True,  # Setting this to True will prevent actual session from being enqueued
-        bootstrap_script=params["bootstrap_script"],
-        startup_command=params["startup_command"],
-        tag=params["tag"],
-        callback_url=params["callback_url"],
+        bootstrap_script=params.bootstrap_script,
+        startup_command=params.startup_command,
+        tag=params.tag,
+        callback_url=params.callback_url,
         sudo_session_enabled=sudo_session_enabled,
     )
 
     async with root_ctx.db.begin_session() as db_sess:
         query = sa.select(EndpointRow).where(
             (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
-            & (EndpointRow.name == params["service_name"])
+            & (EndpointRow.name == params.service_name)
         )
         result = await db_sess.execute(query)
         service_with_duplicate_name = result.scalar()
@@ -382,31 +475,31 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("Cannot create multiple services with same name")
 
         project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params["domain"], params["group"]
+            await db_sess.connection(), params.domain, params.group
         )
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
-            params["service_name"],
+            params.service_name,
             request["user"]["uuid"],
             owner_uuid,
-            params["desired_session_count"],
+            params.desired_session_count,
             image_row,
             model_id,
-            params["domain"],
+            params.domain,
             project_id,
             checked_scaling_group,
-            params["config"]["resources"],
-            params["cluster_mode"],
-            params["cluster_size"],
-            model_mount_destination=params["config"]["model_mount_destination"],
-            tag=params["tag"],
-            startup_command=params["startup_command"],
-            callback_url=params["callback_url"],
-            environ=params["config"]["environ"],
-            bootstrap_script=params["bootstrap_script"],
-            resource_opts=params["config"]["resource_opts"],
-            open_to_public=params["open_to_public"],
+            params.config.resources,
+            params.cluster_mode,
+            params.cluster_size,
+            model_mount_destination=params.config.model_mount_destination,
+            tag=params.tag,
+            startup_command=params.startup_command,
+            callback_url=params.callback_url,
+            environ=params.config.environ,
+            bootstrap_script=params.bootstrap_script,
+            resource_opts=params.config.resource_opts,
+            open_to_public=params.open_to_public,
         )
         db_sess.add(endpoint)
         await db_sess.commit()
@@ -417,6 +510,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def delete(request: web.Request) -> web.Response:
+    """
+    Removes model service (and inference sessions for the service also).
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -454,6 +550,11 @@ async def delete(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def sync(request: web.Request) -> web.Response:
+    """
+    Force syncs up-to-date model service information with AppProxy.
+    In normal situations this will be automatically handled by Backend.AI schedulers,
+    but this API is left open in case of unexpected restart of AppProxy process.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -474,16 +575,18 @@ async def sync(request: web.Request) -> web.Response:
     return web.json_response({"success": True}, status=200)
 
 
+class ScaleRequestModel(BaseModel):
+    to: int = Field(description="Ideal number of inference sessions")
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("to"): t.Int,
-        }
-    ),
-)
-async def scale(request: web.Request, params: Any) -> web.Response:
+@check_api_params(ScaleRequestModel)
+async def scale(request: web.Request, params: ScaleRequestModel) -> web.Response:
+    """
+    Updates ideal inference session count manually. Based on the difference of this number,
+    inference sessions will be created or removed automatically.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -499,18 +602,18 @@ async def scale(request: web.Request, params: Any) -> web.Response:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params["to"] < 0:
+    if params.to < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": params["to"]})
+            .values({"desired_session_count": params.to})
         )
         await db_sess.execute(query)
         return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
+            {"current_route_count": len(endpoint.routings), "target_count": params.to}
         )
 
 
@@ -524,6 +627,9 @@ async def scale(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def update_route(request: web.Request, params: Any) -> web.Response:
+    """
+    Updates traffic bias of specific route.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -565,6 +671,9 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def delete_route(request: web.Request) -> web.Response:
+    """
+    Scales down the service by removing specific inference session.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -597,7 +706,7 @@ async def delete_route(request: web.Request) -> web.Response:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": route.endpoint_row.desired_session_count})
+            .values({"desired_session_count": route.endpoint_row.desired_session_count - 1})
         )
         await db_sess.execute(query)
         return web.json_response({"success": True})

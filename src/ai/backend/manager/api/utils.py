@@ -16,11 +16,13 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Generic,
     Hashable,
     Mapping,
     MutableMapping,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -28,6 +30,8 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
+from aiohttp.typedefs import LooseHeaders
+from pydantic import BaseModel, TypeAdapter
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -151,9 +155,10 @@ async def get_user_scopes(
 
 
 def check_api_params(
-    checker: t.Trafaret,
+    checker: t.Trafaret | BaseModel,
     loads: Callable[[str], Any] = None,
     query_param_checker: t.Trafaret = None,
+    request_examples: list[Any] | None = None,
 ) -> Any:
     # FIXME: replace ... with [web.Request, Any...] in the future mypy
     def wrap(handler: Callable[..., Awaitable[web.Response]]):
@@ -173,7 +178,10 @@ def check_api_params(
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-                checked_params = checker.check(stripped_params)
+                if isinstance(checker, BaseModel):
+                    checked_params = checker.model_validate_json(stripped_params)
+                else:
+                    checked_params = checker.check(stripped_params)
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
@@ -184,6 +192,8 @@ def check_api_params(
             return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)
+        if request_examples:
+            set_handler_attr(wrapped, "request_examples", request_examples)
 
         return wrapped
 
@@ -377,3 +387,28 @@ class Undefined(metaclass=Singleton):
 
 
 undefined = Undefined()
+BaseResponseModel = TypeVar("BaseResponseModel", bound=BaseModel | list[BaseModel])
+
+
+class TypedJSONResponse(web.Response, Generic[BaseResponseModel]):
+    def __init__(
+        self,
+        response: BaseResponseModel,
+        *,
+        body: Optional[bytes] = None,
+        status: int = 200,
+        reason: Optional[str] = None,
+        headers: Optional[LooseHeaders] = None,
+    ):
+        if isinstance(response, list):
+            text = TypeAdapter(list[BaseModel]).dump_json(response).decode("utf-8")
+        else:
+            text = response.model_dump_json()
+        super().__init__(
+            text=text,
+            body=body,
+            status=status,
+            reason=reason,
+            headers=headers,
+            content_type="application/json",
+        )
