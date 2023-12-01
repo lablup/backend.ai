@@ -1890,6 +1890,15 @@ class AbstractAgent(
                     ):
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
+                        overlapping_services = [
+                            s for s in service_ports if s["container_ports"][0] == port_no
+                        ]
+                        if len(overlapping_services) > 0:
+                            raise AgentError(
+                                f"Port {port_no} overlaps with built-in service"
+                                f" {overlapping_services[0]['name']}"
+                            )
+
                         preopen_sport: ServicePort = {
                             "name": str(port_no),
                             "protocol": ServicePortProtocols.PREOPEN,
