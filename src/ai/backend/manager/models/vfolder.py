@@ -326,6 +326,15 @@ vfolder_permissions = sa.Table(
 class VFolderRow(Base):
     __table__ = vfolders
 
+    def __contains__(self, key):
+        return key in self.__dir__()
+
+    def __getitem__(self, item):
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
+
 
 def verify_vfolder_name(folder: str) -> bool:
     if folder in RESERVED_VFOLDERS:
@@ -1112,7 +1121,7 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
         if row is None:
             return None
 
@@ -1822,6 +1831,7 @@ class ModelInfo(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
+    vfolder = graphene.Field(VirtualFolder)
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -1863,6 +1873,7 @@ class ModelInfo(graphene.ObjectType):
     @classmethod
     def parse_model(
         cls,
+        resolve_info: graphene.ResolveInfo,
         vfolder_row: VFolderRow,
         *,
         model_def: dict[str, Any] | None = None,
@@ -1882,6 +1893,7 @@ class ModelInfo(graphene.ObjectType):
         return cls(
             id=vfolder_row.id,
             name=name,
+            vfolder=VirtualFolder.from_row(resolve_info.context, vfolder_row),
             author=info.get("author") or vfolder_row.creator or "",
             title=info.get("title") or vfolder_row.name,
             version=info.get("version") or "",
@@ -1981,6 +1993,7 @@ class ModelInfo(graphene.ObjectType):
             model_definition = None
 
         return cls.parse_model(
+            info,
             vfolder_row,
             model_def=model_definition,
             readme=readme,
@@ -1988,7 +2001,7 @@ class ModelInfo(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> ModelInfo:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelInfo:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
