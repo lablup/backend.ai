@@ -155,7 +155,7 @@ async def get_user_scopes(
 
 
 def check_api_params(
-    checker: t.Trafaret | BaseModel,
+    checker: t.Trafaret | type[BaseModel],
     loads: Callable[[str], Any] = None,
     query_param_checker: t.Trafaret = None,
     request_examples: list[Any] | None = None,
@@ -178,10 +178,10 @@ def check_api_params(
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-                if isinstance(checker, BaseModel):
-                    checked_params = checker.model_validate_json(stripped_params)
-                else:
+                if isinstance(checker, t.Trafaret):
                     checked_params = checker.check(stripped_params)
+                else:
+                    checked_params = checker.model_validate_json(stripped_params)
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
@@ -387,7 +387,7 @@ class Undefined(metaclass=Singleton):
 
 
 undefined = Undefined()
-BaseResponseModel = TypeVar("BaseResponseModel", bound=BaseModel | list[BaseModel])
+BaseResponseModel = TypeVar("BaseResponseModel", bound=BaseModel)
 
 
 class TypedJSONResponse(web.Response, Generic[BaseResponseModel]):
@@ -400,10 +400,28 @@ class TypedJSONResponse(web.Response, Generic[BaseResponseModel]):
         reason: Optional[str] = None,
         headers: Optional[LooseHeaders] = None,
     ):
-        if isinstance(response, list):
-            text = TypeAdapter(list[BaseModel]).dump_json(response).decode("utf-8")
-        else:
-            text = response.model_dump_json()
+        text = response.model_dump_json()
+        super().__init__(
+            text=text,
+            body=body,
+            status=status,
+            reason=reason,
+            headers=headers,
+            content_type="application/json",
+        )
+
+
+class TypedJSONListResponse(web.Response, Generic[BaseResponseModel]):
+    def __init__(
+        self,
+        response: list[BaseResponseModel],
+        *,
+        body: Optional[bytes] = None,
+        status: int = 200,
+        reason: Optional[str] = None,
+        headers: Optional[LooseHeaders] = None,
+    ):
+        text = TypeAdapter(list[BaseResponseModel]).dump_json(response).decode("utf-8")
         super().__init__(
             text=text,
             body=body,

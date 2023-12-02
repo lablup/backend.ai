@@ -24,13 +24,20 @@ from pydantic import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
+from yarl import URL
 
 from ai.backend.common import validators as tx
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
+from ai.backend.common.types import (
+    ClusterMode,
+    ImageAlias,
+    SessionTypes,
+    VFolderID,
+    VFolderUsageMode,
+)
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
@@ -54,6 +61,7 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
+    TypedJSONListResponse,
     TypedJSONResponse,
     check_api_params,
     get_access_key_scopes,
@@ -128,7 +136,7 @@ class ServeInfoModel(BaseModel):
 )
 async def list_serve(
     request: web.Request, params: Any
-) -> TypedJSONResponse[list[CompactServeInfoModel]]:
+) -> TypedJSONListResponse[CompactServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
@@ -146,7 +154,7 @@ async def list_serve(
         result = await db_sess.execute(query)
         rows = result.scalars().all()
 
-    return TypedJSONResponse(
+    return TypedJSONListResponse(
         [
             CompactServeInfoModel(
                 id=endpoint.id,
@@ -431,7 +439,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> web.Re
             session,
             [
                 ImageRef(params.image, ["*"], params.architecture),
-                params.image,
+                ImageAlias(params.image),
             ],
         )
 
@@ -460,7 +468,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> web.Re
         bootstrap_script=params.bootstrap_script,
         startup_command=params.startup_command,
         tag=params.tag,
-        callback_url=params.callback_url,
+        callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
         sudo_session_enabled=sudo_session_enabled,
     )
 
@@ -495,7 +503,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> web.Re
             model_mount_destination=params.config.model_mount_destination,
             tag=params.tag,
             startup_command=params.startup_command,
-            callback_url=params.callback_url,
+            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
             environ=params.config.environ,
             bootstrap_script=params.bootstrap_script,
             resource_opts=params.config.resource_opts,
