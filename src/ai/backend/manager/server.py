@@ -30,6 +30,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from pydantic import BaseModel
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -62,7 +63,14 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
+from .api.types import (
+    AppCreator,
+    CleanupContext,
+    TypedJSONListResponse,
+    TypedJSONResponse,
+    WebMiddleware,
+    WebRequestHandler,
+)
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
@@ -152,6 +160,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".ratelimit",
     ".vfolder",
     ".admin",
+    ".openapi",
     ".service",
     ".session",
     ".stream",
@@ -217,6 +226,10 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
     resp = await _handler(request)
+    if isinstance(resp, BaseModel):
+        return TypedJSONResponse(resp)
+    elif isinstance(resp, list):
+        return TypedJSONListResponse(resp)
     return resp
 
 
@@ -682,6 +695,7 @@ def _init_subapp(
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
+        subapp["_root_app"] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)

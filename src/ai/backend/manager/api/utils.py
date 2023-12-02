@@ -16,13 +16,11 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Generic,
     Hashable,
     Mapping,
     MutableMapping,
     Optional,
     Tuple,
-    TypeVar,
     Union,
 )
 
@@ -30,8 +28,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
-from aiohttp.typedefs import LooseHeaders
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -387,46 +384,3 @@ class Undefined(metaclass=Singleton):
 
 
 undefined = Undefined()
-BaseResponseModel = TypeVar("BaseResponseModel", bound=BaseModel)
-
-
-class TypedJSONResponse(web.Response, Generic[BaseResponseModel]):
-    def __init__(
-        self,
-        response: BaseResponseModel,
-        *,
-        body: Optional[bytes] = None,
-        status: int = 200,
-        reason: Optional[str] = None,
-        headers: Optional[LooseHeaders] = None,
-    ):
-        text = response.model_dump_json()
-        super().__init__(
-            text=text,
-            body=body,
-            status=status,
-            reason=reason,
-            headers=headers,
-            content_type="application/json",
-        )
-
-
-class TypedJSONListResponse(web.Response, Generic[BaseResponseModel]):
-    def __init__(
-        self,
-        response: list[BaseResponseModel],
-        *,
-        body: Optional[bytes] = None,
-        status: int = 200,
-        reason: Optional[str] = None,
-        headers: Optional[LooseHeaders] = None,
-    ):
-        text = TypeAdapter(list[BaseResponseModel]).dump_json(response).decode("utf-8")
-        super().__init__(
-            text=text,
-            body=body,
-            status=status,
-            reason=reason,
-            headers=headers,
-            content_type="application/json",
-        )

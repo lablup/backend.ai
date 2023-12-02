@@ -61,8 +61,6 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    TypedJSONListResponse,
-    TypedJSONResponse,
     check_api_params,
     get_access_key_scopes,
     get_user_uuid_scopes,
@@ -101,6 +99,10 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
+class SuccessResponseModel(BaseModel):
+    success: bool = Field(default=True)
+
+
 class CompactServeInfoModel(BaseModel):
     id: uuid.UUID
     name: str
@@ -134,9 +136,7 @@ class ServeInfoModel(BaseModel):
         }
     )
 )
-async def list_serve(
-    request: web.Request, params: Any
-) -> TypedJSONListResponse[CompactServeInfoModel]:
+async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
@@ -154,27 +154,24 @@ async def list_serve(
         result = await db_sess.execute(query)
         rows = result.scalars().all()
 
-    return TypedJSONListResponse(
-        [
-            CompactServeInfoModel(
-                id=endpoint.id,
-                name=endpoint.name,
-                desired_session_count=endpoint.desired_session_count,
-                active_route_count=len(
-                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-                ),
-                service_endpoint=endpoint.url,
-                is_public=endpoint.open_to_public,
-            )
-            for endpoint in rows
-        ],
-        status=200,
-    )
+    return [
+        CompactServeInfoModel(
+            id=endpoint.id,
+            name=endpoint.name,
+            desired_session_count=endpoint.desired_session_count,
+            active_route_count=len(
+                [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+            ),
+            service_endpoint=endpoint.url,
+            is_public=endpoint.open_to_public,
+        )
+        for endpoint in rows
+    ]
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def get_info(request: web.Request) -> TypedJSONResponse[ServeInfoModel]:
+async def get_info(request: web.Request) -> ServeInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -191,19 +188,17 @@ async def get_info(request: web.Request) -> TypedJSONResponse[ServeInfoModel]:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    return TypedJSONResponse(
-        ServeInfoModel(
-            endpoint_id=endpoint.id,
-            name=endpoint.name,
-            desired_session_count=endpoint.desired_session_count,
-            active_routes=[
-                RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
-                for r in endpoint.routings
-                if r.status == RouteStatus.HEALTHY
-            ],
-            service_endpoint=endpoint.url,
-            is_public=endpoint.open_to_public,
-        )
+    return ServeInfoModel(
+        endpoint_id=endpoint.id,
+        name=endpoint.name,
+        desired_session_count=endpoint.desired_session_count,
+        active_routes=[
+            RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
+            for r in endpoint.routings
+            if r.status == RouteStatus.HEALTHY
+        ],
+        service_endpoint=endpoint.url,
+        is_public=endpoint.open_to_public,
     )
 
 
@@ -300,7 +295,7 @@ class NewServiceRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params(NewServiceRequestModel)
-async def create(request: web.Request, params: NewServiceRequestModel) -> web.Response:
+async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
     """
     Creates a new model service. If `desired_session_count` is greater than zero,
     then inference sessions will be automatically scheduled upon successful creation of model service.
@@ -512,12 +507,12 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> web.Re
         db_sess.add(endpoint)
         await db_sess.commit()
 
-    return web.json_response({"endpoint_id": str(endpoint.id)})
+    return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def delete(request: web.Request) -> web.Response:
+async def delete(request: web.Request) -> SuccessResponseModel:
     """
     Removes model service (and inference sessions for the service also).
     """
@@ -552,12 +547,12 @@ async def delete(request: web.Request) -> web.Response:
                 )
             )
         await db_sess.execute(query)
-    return web.json_response({"success": True}, status=200)
+    return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def sync(request: web.Request) -> web.Response:
+async def sync(request: web.Request) -> SuccessResponseModel:
     """
     Force syncs up-to-date model service information with AppProxy.
     In normal situations this will be automatically handled by Backend.AI schedulers,
@@ -580,17 +575,22 @@ async def sync(request: web.Request) -> web.Response:
         await root_ctx.registry.update_appproxy_endpoint_routes(
             db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
         )
-    return web.json_response({"success": True}, status=200)
+    return SuccessResponseModel()
 
 
 class ScaleRequestModel(BaseModel):
     to: int = Field(description="Ideal number of inference sessions")
 
 
+class ScaleResponseModel(BaseModel):
+    current_route_count: int
+    target_count: int
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(ScaleRequestModel)
-async def scale(request: web.Request, params: ScaleRequestModel) -> web.Response:
+async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
     """
     Updates ideal inference session count manually. Based on the difference of this number,
     inference sessions will be created or removed automatically.
@@ -620,8 +620,8 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> web.Response
             .values({"desired_session_count": params.to})
         )
         await db_sess.execute(query)
-        return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params.to}
+        return ScaleResponseModel(
+            current_route_count=len(endpoint.routings), target_count=params.to
         )
 
 
@@ -634,7 +634,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> web.Response
         }
     ),
 )
-async def update_route(request: web.Request, params: Any) -> web.Response:
+async def update_route(request: web.Request, params: Any) -> SuccessResponseModel:
     """
     Updates traffic bias of specific route.
     """
@@ -673,12 +673,12 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
             )
         except aiohttp.ClientError as e:
             log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-        return web.json_response({"success": True})
+        return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def delete_route(request: web.Request) -> web.Response:
+async def delete_route(request: web.Request) -> SuccessResponseModel:
     """
     Scales down the service by removing specific inference session.
     """
@@ -717,7 +717,11 @@ async def delete_route(request: web.Request) -> web.Response:
             .values({"desired_session_count": route.endpoint_row.desired_session_count - 1})
         )
         await db_sess.execute(query)
-        return web.json_response({"success": True})
+        return SuccessResponseModel()
+
+
+class TokenResponseModel(BaseModel):
+    token: str
 
 
 @auth_required
@@ -730,7 +734,7 @@ async def delete_route(request: web.Request) -> web.Response:
         }
     ),
 )
-async def generate_token(request: web.Request, params: Any) -> web.Response:
+async def generate_token(request: web.Request, params: Any) -> TokenResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -791,12 +795,22 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
         )
         db_sess.add(token_row)
         await db_sess.commit()
-        return web.json_response({"token": token})
+        return TokenResponseModel(token=token)
+
+
+class ErrorInfoModel(BaseModel):
+    session_id: uuid.UUID | None
+    error: dict[str, Any]
+
+
+class ErrorListResponseModel(BaseModel):
+    errors: list[ErrorInfoModel]
+    retries: int
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def list_errors(request: web.Request) -> web.Response:
+async def list_errors(request: web.Request) -> ErrorListResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -817,17 +831,14 @@ async def list_errors(request: web.Request) -> web.Response:
 
     error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
-    return web.json_response(
-        {
-            "errors": [
-                {
-                    "session_id": route.error_data.get("session_id"),
-                    "error": route.error_data["errors"],
-                }
-                for route in error_routes
-            ],
-            "retries": endpoint.retries,
-        }
+    return ErrorListResponseModel(
+        errors=[
+            ErrorInfoModel(
+                session_id=route.error_data.get("session_id"), error=route.error_data["errors"]
+            )
+            for route in error_routes
+        ],
+        retries=endpoint.retries,
     )
 
 
