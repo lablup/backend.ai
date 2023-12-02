@@ -112,21 +112,6 @@ class CompactServeInfoModel(BaseModel):
     is_public: bool
 
 
-class RouteInfoModel(BaseModel):
-    route_id: uuid.UUID
-    session_id: uuid.UUID
-    traffic_ratio: NonNegativeFloat
-
-
-class ServeInfoModel(BaseModel):
-    endpoint_id: uuid.UUID
-    name: str
-    desired_session_count: NonNegativeInt
-    active_routes: list[RouteInfoModel]
-    service_endpoint: HttpUrl | None = Field(default=None)
-    is_public: bool
-
-
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -167,6 +152,21 @@ async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfo
         )
         for endpoint in rows
     ]
+
+
+class RouteInfoModel(BaseModel):
+    route_id: uuid.UUID
+    session_id: uuid.UUID
+    traffic_ratio: NonNegativeFloat
+
+
+class ServeInfoModel(BaseModel):
+    endpoint_id: uuid.UUID
+    name: str
+    desired_session_count: NonNegativeInt
+    active_routes: list[RouteInfoModel]
+    service_endpoint: HttpUrl | None = Field(default=None)
+    is_public: bool
 
 
 @auth_required
@@ -625,15 +625,13 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         )
 
 
+class UpdateRouteRequestModel(BaseModel):
+    traffic_ratio: NonNegativeFloat
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("traffic_ratio"): t.Float[0:],
-        }
-    ),
-)
+@check_api_params(UpdateRouteRequestModel)
 async def update_route(request: web.Request, params: Any) -> SuccessResponseModel:
     """
     Updates traffic bias of specific route.
