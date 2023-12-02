@@ -36,7 +36,7 @@ HTML = """
   <body>
     <script
       id="api-reference"
-      data-url="openapi/openapi.json"></script>
+      data-url="spec/spec.json"></script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   </body>
 </html>
@@ -79,10 +79,10 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4, 5)
-    app["prefix"] = "openapi"
+    app["prefix"] = "spec"
     app.on_startup.append(init)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", "", render_html))
-    cors.add(app.router.add_route("GET", "/openapi.json", generate_spec))
+    cors.add(app.router.add_route("GET", "/spec.json", generate_spec))
 
     return app, []

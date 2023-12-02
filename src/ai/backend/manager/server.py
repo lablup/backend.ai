@@ -160,7 +160,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".ratelimit",
     ".vfolder",
     ".admin",
-    ".openapi",
+    ".spec",
     ".service",
     ".session",
     ".stream",
