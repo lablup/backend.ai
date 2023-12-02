@@ -164,7 +164,7 @@ class PersistentServiceContainer:
                         " to use a private tmp directory. To resolve, explicitly configure the"
                         " 'ipc-base-path' option in agent.toml to indicate a directory under"
                         " $HOME or a non-virtualized directory.",
-                    )
+                    ) from e
                 else:
                     raise
 

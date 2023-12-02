@@ -232,11 +232,11 @@ async def exception_middleware(
         resp = await handler(request)
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}") from ex
         elif len(ex.args) == 1:
-            raise InvalidAPIParameters(ex.args[0])
+            raise InvalidAPIParameters(ex.args[0]) from ex
         else:
-            raise InvalidAPIParameters()
+            raise InvalidAPIParameters() from ex
     except BackendError as ex:
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
@@ -252,14 +252,14 @@ async def exception_middleware(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -269,9 +269,9 @@ async def exception_middleware(
         await error_monitor.capture_exception()
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config["debug"]["enabled"]:
-            raise InternalServerError(traceback.format_exc())
+            raise InternalServerError(traceback.format_exc()) from e
         else:
-            raise InternalServerError()
+            raise InternalServerError() from e
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp

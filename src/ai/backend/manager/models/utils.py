@@ -145,7 +145,7 @@ class ExtendedAsyncSAEngine(SAEngine):
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
-                    raise asyncio.CancelledError()
+                    raise asyncio.CancelledError() from e
                 raise
             except asyncio.CancelledError:
                 raise
@@ -263,10 +263,10 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                     result = await txn_func()
                 except DBAPIError as e:
                     if is_db_retry_error(e):
-                        raise TryAgain
+                        raise TryAgain from None
                     raise
-    except RetryError:
-        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+    except RetryError as ex:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries") from ex
     assert result is not Sentinel.token
     return result
 

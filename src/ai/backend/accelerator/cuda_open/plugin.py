@@ -317,8 +317,8 @@ class CUDAPlugin(AbstractComputePlugin):
                     nvdocker_url = "http://localhost:3476/docker/cli/json"
                     async with sess.get(nvdocker_url) as resp:
                         nvidia_params = await resp.json()
-                except aiohttp.ClientError:
-                    raise RuntimeError("NVIDIA Docker plugin is not available.")
+                except aiohttp.ClientError as ex:
+                    raise RuntimeError("NVIDIA Docker plugin is not available.") from ex
 
             volumes = await docker.volumes.list()
             existing_volumes = set(vol["Name"] for vol in volumes["Volumes"])

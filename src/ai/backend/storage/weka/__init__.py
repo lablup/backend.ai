@@ -190,10 +190,8 @@ class WekaVolume(BaseVolume):
                 start_time,
             )
             latest_metric = metrics["ops"][-1]["stats"]
-        except KeyError:
-            raise WekaNoMetricError
-        except IndexError:
-            raise WekaNoMetricError
+        except (KeyError, IndexError):
+            raise WekaNoMetricError from None
         return FSPerfMetric(
             iops_read=latest_metric["READS"],
             iops_write=latest_metric["WRITES"],

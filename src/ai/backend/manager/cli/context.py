@@ -42,7 +42,7 @@ class CLIContext:
                 file=sys.stderr,
             )
             print(pformat(e.invalid_data), file=sys.stderr)
-            raise click.Abort()
+            raise click.Abort() from e
         return self._local_config
 
     def __enter__(self) -> Self:

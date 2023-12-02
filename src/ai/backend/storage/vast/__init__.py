@@ -87,7 +87,7 @@ class VASTQuotaModel(BaseQuotaModel):
             if vast_quota_id is not None:
                 quota = await self.api_client.get_quota(vast_quota_id)
                 if quota is not None:
-                    raise QuotaScopeAlreadyExists
+                    raise QuotaScopeAlreadyExists from None
         if options is not None:
             try:
                 quota = await self.api_client.set_quota(
@@ -95,10 +95,10 @@ class VASTQuotaModel(BaseQuotaModel):
                     soft_limit=options.limit_bytes,
                     hard_limit=options.limit_bytes,
                 )
-            except VASTInvalidParameterError:
-                raise InvalidQuotaConfig
+            except VASTInvalidParameterError as e:
+                raise InvalidQuotaConfig from e
             except VASTUnknownError as e:
-                raise ExternalError(str(e))
+                raise ExternalError(str(e)) from e
             await self._set_vast_quota_id(quota_scope_id, quota.id)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
@@ -111,10 +111,10 @@ class VASTQuotaModel(BaseQuotaModel):
                 soft_limit=config.limit_bytes,
                 hard_limit=config.limit_bytes,
             )
-        except VASTInvalidParameterError:
-            raise InvalidQuotaConfig
+        except VASTInvalidParameterError as e:
+            raise InvalidQuotaConfig from e
         except VASTUnknownError as e:
-            raise ExternalError(str(e))
+            raise ExternalError(str(e)) from e
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -136,7 +136,7 @@ class VASTQuotaModel(BaseQuotaModel):
         try:
             await self.api_client.remove_quota(vast_quota_id)
         except VASTNotFoundError:
-            raise QuotaScopeNotFoundError
+            raise QuotaScopeNotFoundError from None
         await self._rm_vast_quota_id(quota_scope_id)
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:

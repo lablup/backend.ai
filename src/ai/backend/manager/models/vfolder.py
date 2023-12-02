@@ -919,9 +919,9 @@ async def initiate_vfolder_clone(
                 insert_query = sa.insert(vfolders, insert_values)
                 try:
                     await db_session.execute(insert_query)
-                except sa.exc.DataError:
+                except sa.exc.DataError as e:
                     # TODO: pass exception info
-                    raise InvalidAPIParameters
+                    raise InvalidAPIParameters from e
 
         await execute_with_retry(_insert_vfolder)
 
@@ -938,8 +938,8 @@ async def initiate_vfolder_clone(
                 },
             ):
                 pass
-        except aiohttp.ClientResponseError:
-            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
+        except aiohttp.ClientResponseError as ex:
+            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id)) from ex
 
         async def _update_source_vfolder() -> None:
             async with db_engine.begin_session() as db_session:

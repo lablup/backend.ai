@@ -165,10 +165,10 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
     try:
         status = params["status"]
         force_kill = params["force_kill"]
-    except json.JSONDecodeError:
-        raise InvalidAPIParameters(extra_msg="No request body!")
+    except json.JSONDecodeError as ex:
+        raise InvalidAPIParameters(extra_msg="No request body!") from ex
     except (AssertionError, ValueError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     if force_kill:
         await root_ctx.registry.kill_all_sessions()
@@ -230,7 +230,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
         raise InvalidAPIParameters(
             f"Input validation failed for args with {params['op']}",
             extra_data=e.as_dict(),
-        )
+        ) from e
     if params["op"] in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
         schedulable = params["op"] == SchedulerOps.INCLUDE_AGENTS
         async with root_ctx.db.begin() as conn:

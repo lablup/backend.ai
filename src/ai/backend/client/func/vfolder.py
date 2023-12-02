@@ -350,9 +350,9 @@ class VFolder(BaseFunction):
                                                                 chunk_size
                                                             )
                                                         except asyncio.TimeoutError:
-                                                            raise TryAgain
-                                            except RetryError:
-                                                raise ResponseFailed
+                                                            raise TryAgain from None
+                                            except RetryError as e:
+                                                raise ResponseFailed from e
                                             range_start += len(chunk)
                                             pbar.update(len(chunk))
                                             if not chunk:
@@ -368,9 +368,11 @@ class VFolder(BaseFunction):
                         aiohttp.ClientPayloadError,
                         aiohttp.ClientConnectorError,
                     ):
-                        raise TryAgain
-        except RetryError:
-            raise RuntimeError(f"Downloading {file_path.name} failed after {max_retries} retries")
+                        raise TryAgain from None
+        except RetryError as ex:
+            raise RuntimeError(
+                f"Downloading {file_path.name} failed after {max_retries} retries"
+            ) from ex
 
     @api_function
     async def download(

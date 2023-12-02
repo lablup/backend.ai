@@ -177,8 +177,8 @@ class RootContext:
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
         try:
             volume_config = self.local_config["volume"][name]
-        except KeyError:
-            raise InvalidVolumeError(name)
+        except KeyError as ex:
+            raise InvalidVolumeError(name) from ex
         volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
         volume_obj = volume_cls(
             local_config=self.local_config,

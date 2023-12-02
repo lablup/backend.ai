@@ -331,7 +331,7 @@ class SchedulerDispatcher(aobject):
                     "schedule(): cancelled due to advisory lock timeout; "
                     "maybe another schedule() call is still running"
                 )
-                raise asyncio.CancelledError()
+                raise asyncio.CancelledError() from e
             raise
 
     async def _load_scheduler(
@@ -1332,7 +1332,7 @@ class SchedulerDispatcher(aobject):
                     "prepare(): cancelled due to advisory lock timeout; "
                     "maybe another prepare() call is still running"
                 )
-                raise asyncio.CancelledError()
+                raise asyncio.CancelledError() from e
             raise
         except asyncio.TimeoutError:
             log.warn("prepare(): timeout while executing start_session()")

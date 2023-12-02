@@ -1987,7 +1987,7 @@ class AbstractAgent(
                     )
                     raise AgentError(
                         f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
-                    )
+                    ) from e
                 except Exception:
                     log.warning(
                         "Kernel failed to create container (k:{}). Kernel is going to be"
@@ -2029,13 +2029,13 @@ class AbstractAgent(
                 except asyncio.CancelledError:
                     log.warning("cancelled waiting of container startup (k:{})", kernel_id)
                     raise
-                except Exception:
+                except Exception as ex:
                     log.exception(
                         "unexpected error while waiting container startup (k:{})", kernel_id
                     )
                     raise RuntimeError(
                         "cancelled waiting of container startup due to initialization failure",
-                    )
+                    ) from ex
                 finally:
                     self._pending_creation_tasks[kernel_id].remove(current_task)
                     if not self._pending_creation_tasks[kernel_id]:

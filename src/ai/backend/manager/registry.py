@@ -459,8 +459,8 @@ class AgentRegistry:
                     allowed_registries = await conn.scalar(query)
                     if requested_image_ref.registry not in allowed_registries:
                         raise AliasResolutionFailed
-        except AliasResolutionFailed:
-            raise ImageNotFound("unknown alias or disallowed registry")
+        except AliasResolutionFailed as ex:
+            raise ImageNotFound("unknown alias or disallowed registry") from ex
 
         # Check existing (access_key, session_name) instance
         try:
@@ -745,8 +745,8 @@ class AgentRegistry:
                     if requested_image_ref.registry not in allowed_registries:
                         raise AliasResolutionFailed
                     kernel_config["image_ref"] = requested_image_ref
-            except AliasResolutionFailed:
-                raise ImageNotFound("unknown alias or disallowed registry")
+            except AliasResolutionFailed as ex:
+                raise ImageNotFound("unknown alias or disallowed registry") from ex
 
             for i in range(node["replicas"]):
                 kernel_config["cluster_idx"] = i + 1
@@ -1073,7 +1073,7 @@ class AgentRegistry:
                         raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
                 try:
                     requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
-                except ValueError:
+                except ValueError as ex:
                     log.exception("request_slots & image_slots calculation error")
                     # happens when requested_slots have more keys
                     # than the image-defined slots
@@ -1081,7 +1081,7 @@ class AgentRegistry:
                     #  requested by the client)
                     raise InvalidAPIParameters(
                         "Your resource request has resource type(s) not supported by the image."
-                    )
+                    ) from ex
 
                 # If intrinsic resources are not specified,
                 # fill them with image minimums.
@@ -1216,11 +1216,11 @@ class AgentRegistry:
                                     access_key,
                                     allow_stale=True,
                                 )
-                            except SessionNotFound:
+                            except SessionNotFound as ex:
                                 raise InvalidAPIParameters(
                                     "Unknown session ID or name in the dependency list",
                                     extra_data={"session_ref": dependency_id},
-                                )
+                                ) from ex
                             else:
                                 matched_dependency_session_ids.append(match_info.id)
 
@@ -1257,9 +1257,9 @@ class AgentRegistry:
             if getattr(e.orig, "pgcode", None) == "23503":
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
                 if match:
-                    raise InvalidAPIParameters(f"No such agent: {match.group('agent')}")
+                    raise InvalidAPIParameters(f"No such agent: {match.group('agent')}") from e
                 else:
-                    raise InvalidAPIParameters("No such agent")
+                    raise InvalidAPIParameters("No such agent") from e
             raise
 
         await self.hook_plugin_ctx.notify(

@@ -62,8 +62,8 @@ class QueryOrderTransformer(Transformer):
             else:
                 col = get_col_from_table(self._sa_table, col_name)
             return col
-        except KeyError:
-            raise ValueError("Unknown/unsupported field name", col_name)
+        except KeyError as ex:
+            raise ValueError("Unknown/unsupported field name", col_name) from ex
 
     def col(self, *args) -> OrderingItem:
         children: list[Token] = args[0]
@@ -93,7 +93,7 @@ class QueryOrderParser:
             orders = QueryOrderTransformer(table, self._column_map).transform(ast)
             return orders
         except LarkError as e:
-            raise ValueError(f"Query ordering parsing error: {e}")
+            raise ValueError(f"Query ordering parsing error: {e}") from e
 
     def append_ordering(
         self,

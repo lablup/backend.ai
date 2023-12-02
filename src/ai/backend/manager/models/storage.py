@@ -164,8 +164,8 @@ class StorageSessionManager:
         proxy_name, _ = self.split_host(vfolder_host_or_proxy_name)
         try:
             proxy_info = self._proxies[proxy_name]
-        except KeyError:
-            raise InvalidArgument("There is no such storage proxy", proxy_name)
+        except KeyError as ex:
+            raise InvalidArgument("There is no such storage proxy", proxy_name) from ex
         headers = kwargs.pop("headers", {})
         headers[AUTH_TOKEN_HDR] = proxy_info.secret
         async with proxy_info.session.request(
@@ -182,7 +182,7 @@ class StorageSessionManager:
                         extra_msg=error_data.pop("msg", None),
                         extra_data=error_data,
                     )
-                except aiohttp.ClientResponseError:
+                except aiohttp.ClientResponseError as ex:
                     # when the response body is not JSON, just raise with status info.
                     raise VFolderOperationFailed(
                         extra_msg=(
@@ -190,9 +190,9 @@ class StorageSessionManager:
                             f"{client_resp.status} {client_resp.reason}"
                         ),
                         extra_data=None,
-                    )
+                    ) from ex
                 except VFolderOperationFailed as e:
-                    raise InvalidAPIParameters(e.extra_msg, e.extra_data)
+                    raise InvalidAPIParameters(e.extra_msg, e.extra_data) from e
             yield proxy_info.client_api_url, client_resp
 
 
@@ -222,8 +222,8 @@ class StorageVolume(graphene.ObjectType):
         proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+        except KeyError as ex:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}") from ex
         try:
             async with proxy_info.session.request(
                 "GET",
@@ -242,8 +242,8 @@ class StorageVolume(graphene.ObjectType):
         proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+        except KeyError as ex:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}") from ex
         try:
             async with proxy_info.session.request(
                 "GET",
@@ -307,8 +307,8 @@ class StorageVolume(graphene.ObjectType):
         proxy_name, volume_name = ctx.storage_manager.split_host(id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+        except KeyError as ex:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}") from ex
         async with proxy_info.session.request(
             "GET",
             proxy_info.manager_api_url / "volumes",

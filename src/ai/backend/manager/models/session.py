@@ -274,8 +274,10 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
 def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionStatus:
     try:
         main_kern_status = [k.status for k in sibling_kernels if k.cluster_role == DEFAULT_ROLE][0]
-    except IndexError:
-        raise MainKernelNotFound("Cannot determine session status without status of main kernel")
+    except IndexError as ex:
+        raise MainKernelNotFound(
+            "Cannot determine session status without status of main kernel"
+        ) from ex
     candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kern_status]
     if candidate in LEADING_SESSION_STATUSES:
         return candidate
@@ -1032,8 +1034,8 @@ class SessionRow(Base):
         )
         try:
             return session_list
-        except IndexError:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.")
+        except IndexError as ex:
+            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from ex
 
     @classmethod
     async def get_session_by_id(
@@ -1059,8 +1061,8 @@ class SessionRow(Base):
         )
         try:
             return sessions[0]
-        except IndexError:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        except IndexError as ex:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.") from ex
 
     @classmethod
     async def get_sgroup_managed_sessions(

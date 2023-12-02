@@ -187,7 +187,7 @@ async def push_background_task_events(
     try:
         return await root_ctx.background_task_manager.push_bgtask_events(request, task_id)
     except ValueError as e:
-        raise ObjectNotFound(extra_data=str(e), object_name="background task")
+        raise ObjectNotFound(extra_data=str(e), object_name="background task") from e
 
 
 async def enqueue_kernel_creation_status_update(

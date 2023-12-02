@@ -91,10 +91,10 @@ def error_handler(inner):
     async def outer(*args, **kwargs):
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise WekaInvalidBodyError
+        except web.HTTPBadRequest as e:
+            raise WekaInvalidBodyError from e
         except web.HTTPNotFound:
-            raise WekaNotFoundError
+            raise WekaNotFoundError from None
 
     return outer
 
@@ -207,8 +207,8 @@ class WekaAPIClient:
                         ssl=self.ssl_context,
                     )
 
-            except web.HTTPUnauthorized:
-                raise WekaUnauthorizedError
+            except web.HTTPUnauthorized as e:
+                raise WekaUnauthorizedError from e
 
     @error_handler
     async def list_fs(self) -> Iterable[WekaFs]:

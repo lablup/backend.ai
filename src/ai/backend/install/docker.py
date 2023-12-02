@@ -90,13 +90,13 @@ async def detect_system_docker(ctx: Context) -> str:
     try:
         async with asyncio.timeout(0.5):
             await proc.communicate()
-    except asyncio.TimeoutError:
+    except asyncio.TimeoutError as ex:
         proc.kill()
         await proc.wait()
         raise PrerequisiteError(
             "sudo requires prompt.",
             instruction="Please make sudo available without password prompts.",
-        )
+        ) from ex
 
     if ctx.docker_sudo:
         # Change the docker socket permission (temporarily)

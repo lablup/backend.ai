@@ -116,8 +116,8 @@ class CephFSVolume(BaseVolume):
     async def init(self) -> None:
         try:
             await run([b"ceph", b"--version"])
-        except FileNotFoundError:
-            raise RuntimeError("Ceph is not installed. ")
+        except FileNotFoundError as ex:
+            raise RuntimeError("Ceph is not installed. ") from ex
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:

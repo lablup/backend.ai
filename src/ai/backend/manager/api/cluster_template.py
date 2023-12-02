@@ -144,11 +144,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
         log.debug("Params: {0}", params)
         try:
             body = json.loads(params["payload"])
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             try:
                 body = yaml.safe_load(params["payload"])
             except (yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed payload")
+                raise InvalidAPIParameters("Malformed payload") from e
         template_data = check_cluster_template(body)
         template_id = uuid.uuid4().hex
         resp = {
@@ -341,8 +341,8 @@ async def put(request: web.Request, params: Any) -> web.Response:
             body = json.loads(params["payload"])
         except json.JSONDecodeError:
             body = yaml.safe_load(params["payload"])
-        except (yaml.YAMLError, yaml.MarkedYAMLError):
-            raise InvalidAPIParameters("Malformed payload")
+        except (yaml.YAMLError, yaml.MarkedYAMLError) as ex:
+            raise InvalidAPIParameters("Malformed payload") from ex
         template_data = check_cluster_template(body)
         query = (
             sa.update(session_templates)

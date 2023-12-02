@@ -729,11 +729,11 @@ def run(
                 )
         except BackendError as e:
             print_fail("[{0}] {1}".format(idx, e))
-            raise RuntimeError(e)
+            raise RuntimeError(e) from e
         except Exception as e:
             print_fail("[{0}] Execution failed!".format(idx))
             traceback.print_exc()
-            raise RuntimeError(e)
+            raise RuntimeError(e) from e
         finally:
             try:
                 if rm:
@@ -758,7 +758,7 @@ def run(
             except Exception as e:
                 print_fail("[{0}] Error while printing stats".format(idx))
                 traceback.print_exc()
-                raise RuntimeError(e)
+                raise RuntimeError(e) from e
             finally:
                 if is_multi:
                     stdout.close()

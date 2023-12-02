@@ -143,7 +143,7 @@ class MetadataServer(aobject):
             structure_pointer = self.route_structure
             for component in components:
                 if structure_pointer.get(component) is None:
-                    raise web.HTTPNotFound
+                    raise web.HTTPNotFound from None
                 structure_pointer = structure_pointer[component]
             resources = []
             for k, v in structure_pointer.items():

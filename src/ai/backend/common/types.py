@@ -415,8 +415,8 @@ class ReadableCIDR(Generic[_Address]):
     def _to_ip_network(val: str) -> _Address:
         try:
             return cast(_Address, ip_network(val))
-        except ValueError:
-            raise InvalidIpAddressValue
+        except ValueError as e:
+            raise InvalidIpAddressValue from e
 
     @property
     def address(self) -> _Address | None:
@@ -490,13 +490,13 @@ class BinarySize(int):
                     else:
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
-                        raise ValueError("Fractional bytes are not allowed")
+                        raise ValueError("Fractional bytes are not allowed") from None
             except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_expr)
+                raise ValueError("Unconvertible value", orig_expr) from None
             try:
                 multiplier = cls.suffix_map[suffix]
             except KeyError:
-                raise ValueError("Unconvertible value", orig_expr)
+                raise ValueError("Unconvertible value", orig_expr) from None
             return cls(dec_expr * multiplier)
 
     @classmethod
@@ -692,8 +692,8 @@ class ResourceSlot(UserDict):
                 value = Decimal(value)
                 if value.is_finite():
                     value = value.quantize(Quantum).normalize()
-        except ArithmeticError:
-            raise ValueError("Cannot convert to decimal", value)
+        except ArithmeticError as ex:
+            raise ValueError("Cannot convert to decimal", value) from ex
         return value
 
     @classmethod
@@ -729,7 +729,7 @@ class ResourceSlot(UserDict):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0]) from e
         return cls(data)
 
     @classmethod
@@ -754,7 +754,7 @@ class ResourceSlot(UserDict):
                     if k not in data:
                         data[k] = Decimal(0)
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0]) from e
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
@@ -765,7 +765,7 @@ class ResourceSlot(UserDict):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0]) from e
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
@@ -923,8 +923,10 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
-            except ValueError:
-                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            except ValueError as ex:
+                raise ValueError(
+                    f"Invalid type. Permissions of Host `{host}` are ({perms})"
+                ) from ex
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 

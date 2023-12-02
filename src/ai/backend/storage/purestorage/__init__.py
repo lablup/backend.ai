@@ -39,7 +39,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                 ]
             )
         except CalledProcessError as e:
-            raise RuntimeError(f'"pcp" command failed: {e.stderr}')
+            raise RuntimeError(f'"pcp" command failed: {e.stderr}') from e
 
     async def delete_tree(
         self,
@@ -54,7 +54,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                 ]
             )
         except CalledProcessError as e:
-            raise RuntimeError(f"'prm' command failed: {e.stderr}")
+            raise RuntimeError(f"'prm' command failed: {e.stderr}") from e
 
     def scan_tree(
         self,

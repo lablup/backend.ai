@@ -121,7 +121,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         # scaling_group = request.query.get('scaling_group')
         # assert scaling_group is not None, 'scaling_group parameter is missing.'
     except (json.decoder.JSONDecodeError, AssertionError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
     resp: MutableMapping[str, Any] = {
         "keypair_limits": None,
@@ -540,8 +540,8 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     try:
         start_date = datetime.strptime(params["month"], "%Y%m").replace(tzinfo=local_tz)
         end_date = start_date + relativedelta(months=+1)
-    except ValueError:
-        raise InvalidAPIParameters(extra_msg="Invalid date values")
+    except ValueError as ex:
+        raise InvalidAPIParameters(extra_msg="Invalid date values") from ex
     resp = await get_container_stats_for_period(request, start_date, end_date, params["group_ids"])
     log.debug("container list are retrieved for month {0}", params["month"])
     return web.json_response(resp, status=200)
@@ -578,8 +578,8 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         end_date = end_date + timedelta(days=1)  # include sessions in end_date
         if end_date - start_date > timedelta(days=100):
             raise InvalidAPIParameters("Cannot query more than 100 days")
-    except ValueError:
-        raise InvalidAPIParameters(extra_msg="Invalid date values")
+    except ValueError as ex:
+        raise InvalidAPIParameters(extra_msg="Invalid date values") from ex
     if end_date <= start_date:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
     log.info("USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
