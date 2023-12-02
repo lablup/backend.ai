@@ -30,7 +30,7 @@ from packaging import version
 from . import validators as tx
 from .arch import arch_name_aliases
 from .etcd import AsyncEtcd
-from .etcd import quota as etcd_quote
+from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
 from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
