@@ -196,6 +196,18 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 
 
 @web.middleware
+async def pydantic_response_conversion_middleware(
+    request: web.Request, handler: WebRequestHandler
+) -> web.StreamResponse:
+    resp = await handler(request)
+    if isinstance(resp, BaseModel):
+        return TypedJSONResponse(resp)
+    elif isinstance(resp, list):
+        return TypedJSONListResponse(resp)
+    return resp
+
+
+@web.middleware
 async def api_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
     _handler = handler
     method_override = request.headers.get("X-Method-Override", None)
@@ -226,10 +238,6 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
     resp = await _handler(request)
-    if isinstance(resp, BaseModel):
-        return TypedJSONResponse(resp)
-    elif isinstance(resp, list):
-        return TypedJSONListResponse(resp)
     return resp
 
 
@@ -841,6 +849,9 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+
+    # This middleware should be placed at the start of the chain
+    app.middlewares.append(pydantic_response_conversion_middleware)
     return app
 
 

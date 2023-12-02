@@ -28,7 +28,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -178,7 +178,7 @@ def check_api_params(
                 if isinstance(checker, t.Trafaret):
                     checked_params = checker.check(stripped_params)
                 else:
-                    checked_params = checker.model_validate_json(stripped_params)
+                    checked_params = checker.model_validate(stripped_params)
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
@@ -186,6 +186,8 @@ def check_api_params(
                 raise InvalidAPIParameters("Malformed body")
             except t.DataError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+            except ValidationError as e:
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)
