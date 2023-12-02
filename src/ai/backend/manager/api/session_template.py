@@ -56,11 +56,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
         log.debug("Params: {0}", params)
         try:
             body = json.loads(params["payload"])
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             try:
                 body = yaml.safe_load_all(params["payload"])
             except (yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed payload")
+                raise InvalidAPIParameters("Malformed payload") from e
         for st in body:
             template_data = check_task_template(st["template"])
             template_id = uuid.uuid4().hex
@@ -267,8 +267,8 @@ async def put(request: web.Request, params: Any) -> web.Response:
             body = json.loads(params["payload"])
         except json.JSONDecodeError:
             body = yaml.safe_load(params["payload"])
-        except (yaml.YAMLError, yaml.MarkedYAMLError):
-            raise InvalidAPIParameters("Malformed payload")
+        except (yaml.YAMLError, yaml.MarkedYAMLError) as ex:
+            raise InvalidAPIParameters("Malformed payload") from ex
         for st in body:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]

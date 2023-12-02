@@ -150,7 +150,7 @@ class DellEMCOneFSVolume(BaseVolume):
             protocol_stats = await self.get_protocol_stats()
             workload = await self.get_workload_stats()
         except (KeyError, IndexError):
-            raise DellNoMetricError
+            raise DellNoMetricError from None
         return FSPerfMetric(
             iops_read=protocol_stats["disk"]["iops"] or 0,
             iops_write=0,  # Dell does not support IOPS Read/Write, They support only IOPS.
@@ -167,25 +167,25 @@ class DellEMCOneFSVolume(BaseVolume):
             resp = await self.api_client.get_drive_stats()
             return resp
         except KeyError:
-            raise DellNoMetricError
+            raise DellNoMetricError from None
 
     async def get_protocol_stats(self):
         try:
             resp = await self.api_client.get_protocol_stats()
             return resp
         except KeyError:
-            raise DellNoMetricError
+            raise DellNoMetricError from None
 
     async def get_system_stats(self):
         try:
             resp = await self.api_client.get_system_stats()
             return resp
         except KeyError:
-            raise DellNoMetricError
+            raise DellNoMetricError from None
 
     async def get_workload_stats(self):
         try:
             resp = await self.api_client.get_workload_stats()
             return resp
         except KeyError:
-            raise DellNoMetricError
+            raise DellNoMetricError from None

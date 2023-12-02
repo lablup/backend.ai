@@ -138,8 +138,8 @@ def _clean_address_map(v: Union[str, Mapping]) -> Mapping:
             k, _, v = assignment.partition("=")
             if k == "" or v == "":
                 raise ValueError
-        except ValueError:
-            raise ValueError(f"{v} is not a valid mapping expression")
+        except ValueError as ex:
+            raise ValueError(f"{v} is not a valid mapping expression") from ex
         else:
             override_map[k] = v
     return override_map

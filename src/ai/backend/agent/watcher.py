@@ -404,7 +404,7 @@ def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> N
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     # Change the filename from the logging config's file section.
     log_sockpath = Path(f"/tmp/backend.ai/ipc/watcher-logger-{os.getpid()}.sock")

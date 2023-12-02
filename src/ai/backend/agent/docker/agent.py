@@ -883,13 +883,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as ex:
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=cid, message="Container creation cancelled"
-                    )
+                    ) from ex
                 raise
-            except Exception:
+            except Exception as ex:
                 # Oops, we have to restore the allocated resources!
                 scratch_type = self.local_config["container"]["scratch-type"]
                 scratch_root = self.local_config["container"]["scratch-root"]
@@ -907,7 +907,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid, message="unknown")
+                    raise ContainerCreationError(container_id=cid, message="unknown") from ex
                 raise
 
             additional_network_names: Set[str] = set()
@@ -1301,7 +1301,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 elif auto_pull == AutoPullBehavior.TAG:
                     return True
                 elif auto_pull == AutoPullBehavior.NONE:
-                    raise ImageNotAvailable(image_ref)
+                    raise ImageNotAvailable(image_ref) from e
             else:
                 raise
         return False

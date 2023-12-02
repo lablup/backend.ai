@@ -252,7 +252,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     if debug:
         log_level = "DEBUG"
     override_key(local_config, ("debug", "enabled"), log_level == "DEBUG")

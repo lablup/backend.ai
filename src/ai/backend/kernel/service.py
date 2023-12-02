@@ -68,19 +68,19 @@ class ServiceParser:
                     if "prestart" in raw_service_def:
                         raw_service_def["prestart_actions"] = raw_service_def["prestart"]
                         del raw_service_def["prestart"]
-            except IOError:
+            except IOError as ex:
                 raise InvalidServiceDefinition(
                     f"could not read the service-def file: {service_def_file.name}"
-                )
-            except json.JSONDecodeError:
+                ) from ex
+            except json.JSONDecodeError as ex:
                 raise InvalidServiceDefinition(
                     f"malformed JSON in service-def file: {service_def_file.name}"
-                )
+                ) from ex
             name = service_def_file.stem
             try:
                 self.services[name] = ServiceDefinition(**raw_service_def)
             except TypeError as e:
-                raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+                raise InvalidServiceDefinition(e.args[0][11:]) from e  # lstrip "__init__() "
 
     def add_model_service(self, name, model_service_info) -> None:
         service_def = ServiceDefinition(
@@ -104,10 +104,10 @@ class ServiceParser:
         for action in service.prestart_actions:
             try:
                 action_impl = getattr(service_actions, action["action"])
-            except AttributeError:
+            except AttributeError as ex:
                 raise InvalidServiceDefinition(
                     f"Service-def for {service_name} used invalid action: {action['action']}"
-                )
+                ) from ex
             ret = await action_impl(self.variables, **action["args"])
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret

@@ -163,6 +163,6 @@ class AgentRPCCache:
                 finally:
                     peer.call.order_key.reset(okey_token)
         except RPCUserError as orig_exc:
-            raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
+            raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args) from orig_exc
         except Exception:
             raise

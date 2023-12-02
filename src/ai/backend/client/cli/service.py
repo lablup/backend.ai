@@ -46,9 +46,9 @@ def get_service_id(session: Session, name_or_id: str):
             return services[0]["id"]
         except Exception as e:
             if isinstance(e, KeyError) or isinstance(e, IndexError):
-                raise RuntimeError(f"Service {name_or_id} not found")
+                raise RuntimeError(f"Service {name_or_id} not found") from e
             else:
-                raise e
+                raise
 
 
 @main.group()

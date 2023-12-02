@@ -286,7 +286,7 @@ class StructuredJSONColumn(TypeDecorator):
             raise ValueError(
                 "The given value does not conform with the structured json column format.",
                 e.as_dict(),
-            )
+            ) from e
         return value
 
     def process_result_value(self, raw_value, dialect):
@@ -378,8 +378,8 @@ class IPColumn(TypeDecorator):
             return value
         try:
             cidr = ReadableCIDR(value).address
-        except InvalidIpAddressValue:
-            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        except InvalidIpAddressValue as ex:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value") from ex
         return cidr
 
     def process_result_value(self, value, dialect):
@@ -416,8 +416,8 @@ class PermissionListColumn(TypeDecorator):
             return []
         try:
             return [self._perm_type(perm).value for perm in value]
-        except ValueError:
-            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
+        except ValueError as ex:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}") from ex
 
     def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
         if value is None:

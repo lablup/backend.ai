@@ -129,8 +129,8 @@ async def rescan_images(
                 try:
                     registries = {registry: latest_registry_config[registry]}
                     log.debug("running a per-registry metadata scan")
-                except KeyError:
-                    raise RuntimeError("It is an unknown registry.", registry)
+                except KeyError as ex:
+                    raise RuntimeError("It is an unknown registry.", registry) from ex
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -617,7 +617,7 @@ class Image(graphene.ObjectType):
                     ],
                 )
         except UnknownImageReference:
-            raise ImageNotFound
+            raise ImageNotFound(object_name=f"{reference}/{architecture}") from None
         return await cls.from_row(ctx, row)
 
     @classmethod
@@ -808,7 +808,7 @@ class AliasImage(graphene.Mutation):
                 try:
                     image_row = await ImageRow.from_image_ref(session, image_ref, load_aliases=True)
                 except UnknownImageReference:
-                    raise ImageNotFound
+                    raise ImageNotFound(object_name=f"{target}/{architecture}") from None
                 else:
                     image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
         except ValueError as e:

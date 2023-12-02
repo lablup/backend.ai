@@ -44,10 +44,10 @@ def error_handler(inner):
     async def outer(*args, **kwargs):
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise GPFSInvalidBodyError
-        except web.HTTPNotFound:
-            raise GPFSNotFoundError
+        except web.HTTPBadRequest as e:
+            raise GPFSInvalidBodyError from e
+        except web.HTTPNotFound as e:
+            raise GPFSNotFoundError from e
 
     return outer
 
@@ -125,8 +125,8 @@ class GPFSAPIClient:
                     "/scalemgmt/v2" + path, headers=self._req_header, json=body, ssl=self.ssl
                 )
             return await response_handler(response)
-        except web.HTTPUnauthorized:
-            raise GPFSUnauthorizedError
+        except web.HTTPUnauthorized as e:
+            raise GPFSUnauthorizedError from e
 
     async def _wait_for_job_done(self, jobs: List[GPFSJob]) -> None:
         for job_to_wait in jobs:

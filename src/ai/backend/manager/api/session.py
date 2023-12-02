@@ -302,7 +302,7 @@ async def query_userinfo(
             ),
         )
     except ValueError as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
 
 
 async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
@@ -360,15 +360,15 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
+    except UnknownImageReference as ex:
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}") from ex
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
-    except Exception:
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": owner_uuid})
         log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
+        raise InternalServerError from e
 
 
 @server_status_required(ALL_ALLOWED)
@@ -434,7 +434,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             params["config"] = creation_config_v3_template.check(params["config"])
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
-        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict()) from e
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([session_templates])
@@ -520,7 +520,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         log.exception(e1)
     except t.DataError as e2:
         log.debug("Error: {0}", str(e2))
-        raise InvalidAPIParameters("Error while validating template")
+        raise InvalidAPIParameters("Error while validating template") from e2
     params["config"] = config_from_template
 
     log.debug("Updated param: {0}", params)
@@ -711,16 +711,16 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         )
         return web.json_response(resp, status=201)
     except TooManySessionsMatched:
-        raise SessionAlreadyExists
+        raise SessionAlreadyExists from None
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
-    except Exception:
+    except UnknownImageReference as ex:
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}") from ex
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
+        raise InternalServerError from e
 
 
 @server_status_required(READ_ALLOWED)
@@ -803,10 +803,10 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                 # using one of the primary/secondary ports of the app
                 try:
                     hport_idx = sport["container_ports"].index(params["port"])
-                except ValueError:
+                except ValueError as ex:
                     raise InvalidAPIParameters(
                         f"Service {service} does not open the port number {params['port']}."
-                    )
+                    ) from ex
                 host_port = sport["host_ports"][hport_idx]
             else:
                 # using the default (primary) port of the app
@@ -1373,10 +1373,10 @@ async def restart(request: web.Request, params: Any) -> web.Response:
     except BackendError:
         log.exception("RESTART: exception")
         raise
-    except Exception:
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
-        raise web.HTTPInternalServerError
+        raise web.HTTPInternalServerError from e
     return web.Response(status=204)
 
 
@@ -1390,9 +1390,9 @@ async def execute(request: web.Request) -> web.Response:
     try:
         params = await request.json(loads=json.loads)
         log.info("EXECUTE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    except json.decoder.JSONDecodeError:
+    except json.decoder.JSONDecodeError as e:
         log.warning("EXECUTE: invalid/missing parameters")
-        raise InvalidAPIParameters
+        raise InvalidAPIParameters from e
     async with root_ctx.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
@@ -1474,7 +1474,7 @@ async def execute(request: web.Request) -> web.Response:
             resp["result"] = result
     except AssertionError as e:
         log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
-        raise InvalidAPIParameters(extra_msg=e.args[0])
+        raise InvalidAPIParameters(extra_msg=e.args[0]) from e
     except BackendError:
         log.exception("EXECUTE: exception")
         raise
@@ -1521,8 +1521,8 @@ async def complete(request: web.Request) -> web.Response:
         log.info(
             "COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
         )
-    except json.decoder.JSONDecodeError:
-        raise InvalidAPIParameters
+    except json.decoder.JSONDecodeError as e:
+        raise InvalidAPIParameters from e
     async with root_ctx.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
@@ -1538,8 +1538,8 @@ async def complete(request: web.Request) -> web.Response:
             Dict[str, Any],
             await root_ctx.registry.get_completions(session, code, opts),
         )
-    except AssertionError:
-        raise InvalidAPIParameters
+    except AssertionError as e:
+        raise InvalidAPIParameters from e
     except BackendError:
         log.exception("COMPLETE: exception")
         raise
@@ -1791,12 +1791,12 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
     except BackendError:
         log.exception("DOWNLOAD_FILE: exception")
         raise
-    except (ValueError, FileNotFoundError):
-        raise InvalidAPIParameters("The file is not found.")
-    except Exception:
+    except (ValueError, FileNotFoundError) as ex:
+        raise InvalidAPIParameters("The file is not found.") from ex
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("DOWNLOAD_FILE: unexpected error!")
-        raise InternalServerError
+        raise InternalServerError from e
 
     with aiohttp.MultipartWriter("mixed") as mpwriter:
         headers = multidict.MultiDict({"Content-Encoding": "identity"})
@@ -1844,12 +1844,12 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     except BackendError:
         log.exception("DOWNLOAD_SINGLE: exception")
         raise
-    except (ValueError, FileNotFoundError):
-        raise InvalidAPIParameters("The file is not found.")
-    except Exception:
+    except (ValueError, FileNotFoundError) as ex:
+        raise InvalidAPIParameters("The file is not found.") from ex
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("DOWNLOAD_SINGLE: unexpected error!")
-        raise InternalServerError
+        raise InternalServerError from e
     return web.Response(body=result, status=200)
 
 
@@ -1878,7 +1878,7 @@ async def list_files(request: web.Request) -> web.Response:
             )
     except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
     resp: MutableMapping[str, Any] = {}
     try:
         await root_ctx.registry.increment_session_usage(session)
@@ -1890,10 +1890,10 @@ async def list_files(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("LIST_FILES: exception")
         raise
-    except Exception:
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("LIST_FILES: unexpected error!")
-        raise InternalServerError
+        raise InternalServerError from e
     return web.json_response(resp, status=200)
 
 
@@ -2008,7 +2008,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
                     prepared = True
                 await response.write(chunk)
     except aiohttp.ClientResponseError as e:
-        raise StorageProxyError(status=e.status, extra_msg=e.message)
+        raise StorageProxyError(status=e.status, extra_msg=e.message) from e
     finally:
         if prepared:
             await response.write_eof()

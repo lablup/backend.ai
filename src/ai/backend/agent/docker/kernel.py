@@ -170,8 +170,8 @@ class DockerKernel(AbstractKernel):
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
-        except ValueError:  # parent_path does not start with work_dir!
-            raise ValueError("malformed committed path.")
+        except ValueError as ex:  # parent_path does not start with work_dir!
+            raise ValueError("malformed committed path.") from ex
 
         def _write_chunks(
             fileobj: gzip.GzipFile,
@@ -229,8 +229,8 @@ class DockerKernel(AbstractKernel):
             # create intermediate directories in the path
             dest_path = (work_dir / filename).resolve(strict=False)
             parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+        except ValueError as ex:  # parent_path does not start with work_dir!
+            raise AssertionError("malformed upload filename and path.") from ex
 
         def _write_to_disk():
             parent_path.mkdir(parents=True, exist_ok=True)
@@ -251,8 +251,8 @@ class DockerKernel(AbstractKernel):
             try:
                 abspath = home_path / filepath
                 abspath.relative_to(home_path)
-            except ValueError:
-                raise PermissionError("You cannot download files outside /home/work")
+            except ValueError as ex:
+                raise PermissionError("You cannot download files outside /home/work") from ex
             try:
                 with await container.get_archive(str(abspath)) as tarobj:
                     tarobj.fileobj.seek(0, 2)
@@ -260,9 +260,9 @@ class DockerKernel(AbstractKernel):
                     if fsize > 1048576:
                         raise ValueError("too large file")
                     tarbytes = tarobj.fileobj.getvalue()
-            except DockerError:
+            except DockerError as ex:
                 log.warning("Could not found the file: {0}", abspath)
-                raise FileNotFoundError(f"Could not found the file: {abspath}")
+                raise FileNotFoundError(f"Could not found the file: {abspath}") from ex
         return tarbytes
 
     async def download_single(self, filepath: str):
@@ -273,8 +273,8 @@ class DockerKernel(AbstractKernel):
             try:
                 abspath = home_path / filepath
                 abspath.relative_to(home_path)
-            except ValueError:
-                raise PermissionError("You cannot download files outside /home/work")
+            except ValueError as ex:
+                raise PermissionError("You cannot download files outside /home/work") from ex
             try:
                 with await container.get_archive(str(abspath)) as tarobj:
                     tarobj.fileobj.seek(0, 2)
@@ -288,9 +288,9 @@ class DockerKernel(AbstractKernel):
                     else:
                         log.warning("Could not found the file: {0}", abspath)
                         raise FileNotFoundError(f"Could not found the file: {abspath}")
-            except DockerError:
+            except DockerError as ex:
                 log.warning("Could not found the file: {0}", abspath)
-                raise FileNotFoundError(f"Could not found the file: {abspath}")
+                raise FileNotFoundError(f"Could not found the file: {abspath}") from ex
         return tarbytes
 
     async def list_files(self, container_path: str):

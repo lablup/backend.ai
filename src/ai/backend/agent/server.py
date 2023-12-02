@@ -887,7 +887,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     # Override the read config with environment variables (for legacy).
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
@@ -931,7 +931,7 @@ def main(
     except config.ConfigurationError as e:
         print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()

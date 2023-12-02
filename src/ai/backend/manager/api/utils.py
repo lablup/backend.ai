@@ -73,9 +73,9 @@ async def get_access_key_scopes(
             )
             return request["keypair"]["access_key"], owner_access_key
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
         except RuntimeError as e:
-            raise GenericForbidden(str(e))
+            raise GenericForbidden(str(e)) from e
 
 
 async def get_user_uuid_scopes(
@@ -97,9 +97,9 @@ async def get_user_uuid_scopes(
             )
             return request["user"]["uuid"], owner_uuid
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
         except RuntimeError as e:
-            raise GenericForbidden(str(e))
+            raise GenericForbidden(str(e)) from e
 
 
 async def get_user_scopes(
@@ -177,10 +177,10 @@ def check_api_params(
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as ex:
+                raise InvalidAPIParameters("Malformed body") from ex
             except t.DataError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict()) from e
             return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)

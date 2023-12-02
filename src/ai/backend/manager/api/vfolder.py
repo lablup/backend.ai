@@ -313,8 +313,8 @@ def vfolder_check_exists(
             )
             try:
                 result = await conn.execute(query)
-            except sa.exc.DataError:
-                raise InvalidAPIParameters
+            except sa.exc.DataError as e:
+                raise InvalidAPIParameters from e
             row = result.first()
             if row is None:
                 raise VFolderNotFound()
@@ -587,8 +587,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         query = sa.insert(vfolders, insert_values)
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
         assert result.rowcount == 1
     return web.json_response(resp, status=201)
 
@@ -1703,8 +1703,8 @@ async def invite(request: web.Request, params: Any) -> web.Response:
         )
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
         vf = result.first()
         if vf is None:
             raise VFolderNotFound()
@@ -1733,8 +1733,8 @@ async def invite(request: web.Request, params: Any) -> web.Response:
         )
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
         kps = result.fetchall()
         if len(kps) < 1:
             raise ObjectNotFound(object_name="vfolder invitation")
@@ -1985,11 +1985,11 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
             )
             await conn.execute(query)
     except sa.exc.IntegrityError as e:
-        raise InternalServerError(f"integrity error: {e}")
+        raise InternalServerError(f"integrity error: {e}") from e
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
-        raise InternalServerError(f"unexpected error: {e}")
+        raise InternalServerError(f"unexpected error: {e}") from e
     return web.json_response({})
 
 
@@ -2848,21 +2848,21 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
                         )
         except asyncio.CancelledError:
             raise
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as ex:
             log.error(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
-        except Exception:
+            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from ex
+        except Exception as e:
             log.exception(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
                 "unexpected error while reading from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise InternalServerError
+            raise InternalServerError from e
     else:
         resp = {
             "content": (
@@ -3247,8 +3247,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         )
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")

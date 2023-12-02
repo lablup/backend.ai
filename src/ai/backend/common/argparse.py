@@ -11,18 +11,18 @@ def port_no(s: str) -> int:
         port = int(s)
         assert port > 0
         assert port < 65536
-    except (ValueError, AssertionError):
+    except (ValueError, AssertionError) as ex:
         msg = f"{s!r} is not a valid port number."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from ex
     return port
 
 
 def port_range(s: str) -> Tuple[int, int]:
     try:
         port_range = tuple(map(int, s.split("-")))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as ex:
         msg = f"{s!r} should be a hyphen-separated pair of integers."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from ex
     if len(port_range) != 2:
         msg = f"{s!r} should have exactly two integers."
         raise argparse.ArgumentTypeError(msg)
@@ -42,9 +42,9 @@ def positive_int(s: str) -> int:
     try:
         val = int(s)
         assert val > 0
-    except (ValueError, AssertionError):
+    except (ValueError, AssertionError) as ex:
         msg = f"{s!r} is not a positive integer."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from ex
     return val
 
 
@@ -52,9 +52,9 @@ def non_negative_int(s: str) -> int:
     try:
         val = int(s)
         assert val >= 0
-    except (ValueError, AssertionError):
+    except (ValueError, AssertionError) as ex:
         msg = f"{s!r} is not a non-negative integer."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from ex
     return val
 
 
@@ -76,18 +76,18 @@ def host_port_pair(s: str) -> Tuple[ipaddress._BaseAddress, int]:
             port = int(pieces[1])
             assert port > 0
             assert port < 65536
-        except (ValueError, AssertionError):
+        except (ValueError, AssertionError) as ex:
             msg = f"{pieces[1]!r} is not a valid port number."
-            raise argparse.ArgumentTypeError(msg)
+            raise argparse.ArgumentTypeError(msg) from ex
     return HostPortPair(host, port)
 
 
 def ipaddr(s: str) -> ipaddress._BaseAddress:
     try:
         ip = ipaddress.ip_address(s.strip("[]"))
-    except ValueError:
+    except ValueError as ex:
         msg = f"{s!r} is not a valid IP address."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from ex
     return ip
 
 

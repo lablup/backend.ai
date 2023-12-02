@@ -74,6 +74,7 @@ select = [
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "I",  # isort
+    "B904",  # flake8-bugbear: raise-without-from-inside-except
     # "C",  # flake8-comprehensions
     # "B",  # flake8-bugbear
 ]

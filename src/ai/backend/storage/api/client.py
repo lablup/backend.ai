@@ -158,7 +158,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                 file_path.relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
-            except (ValueError, FileNotFoundError):
+            except (ValueError, FileNotFoundError) as ex:
                 raise web.HTTPNotFound(
                     body=json.dumps(
                         {
@@ -167,7 +167,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                         },
                     ),
                     content_type="application/problem+json",
-                )
+                ) from ex
             if not file_path.is_file():
                 if params["archive"]:
                     # Download directory as an archive when archive param is set.

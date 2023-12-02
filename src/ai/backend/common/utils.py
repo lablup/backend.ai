@@ -387,11 +387,11 @@ async def umount(
             raw_out.decode("utf8")
             err = raw_err.decode("utf8")
             await proc.wait()
-    except asyncio.TimeoutError:
+    except asyncio.TimeoutError as ex:
         raise VolumeUnmountFailed(
             f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."
-        )
+        ) from ex
     if err:
         raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
     if rmdir_if_empty:

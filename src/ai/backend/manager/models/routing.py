@@ -327,7 +327,7 @@ class Routing(graphene.ObjectType):
                     session, routing_id, project=project, domain=domain_name, user_uuid=user_uuid
                 )
         except NoResultFound:
-            raise RoutingNotFound
+            raise RoutingNotFound(object_name=str(routing_id)) from None
         return await Routing.from_row(ctx, row)
 
     async def resolve_error(self, info: graphene.ResolveInfo) -> Any:

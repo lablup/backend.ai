@@ -177,12 +177,12 @@ def read_from_file(
         discovered_path = Path(toml_path)
     try:
         config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
-    except IOError:
+    except IOError as ex:
         raise ConfigurationError(
             {
                 "read_from_file()": f"Could not read config from: {discovered_path}",
             }
-        )
+        ) from ex
     else:
         return config, discovered_path
 
@@ -218,7 +218,7 @@ def check(table: Any, iv: t.Trafaret):
     try:
         config = iv.check(table)
     except t.DataError as e:
-        raise ConfigurationError(e.as_dict())
+        raise ConfigurationError(e.as_dict()) from e
     else:
         return config
 

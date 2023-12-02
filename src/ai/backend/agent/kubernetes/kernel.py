@@ -230,8 +230,8 @@ class KubernetesKernel(AbstractKernel):
             # create intermediate directories in the path
             dest_path = (work_dir / filename).resolve(strict=False)
             parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+        except ValueError as ex:  # parent_path does not start with work_dir!
+            raise AssertionError("malformed upload filename and path.") from ex
 
         def _write_to_disk():
             parent_path.mkdir(parents=True, exist_ok=True)
@@ -253,8 +253,8 @@ class KubernetesKernel(AbstractKernel):
         try:
             abspath = (home_path / filepath).resolve()
             abspath.relative_to(home_path)
-        except ValueError:
-            raise PermissionError("You cannot download files outside /home/work")
+        except ValueError as ex:
+            raise PermissionError("You cannot download files outside /home/work") from ex
 
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,

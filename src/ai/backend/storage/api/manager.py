@@ -126,7 +126,7 @@ def handle_fs_errors(
                 },
             ),
             content_type="application/json",
-        )
+        ) from e
 
 
 @ctxmgr
@@ -141,7 +141,7 @@ def handle_external_errors() -> Iterator[None]:
                 }
             ),
             content_type="application/json",
-        )
+        ) from e
 
 
 async def get_volumes(request: web.Request) -> web.Response:
@@ -454,7 +454,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                     params["vfid"],
                     params["subpath"],
                 )
-            except VFolderNotFoundError:
+            except VFolderNotFoundError as ex:
                 raise web.HTTPBadRequest(
                     body=json.dumps(
                         {
@@ -463,7 +463,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from ex
             except InvalidSubpathError as e:
                 raise web.HTTPBadRequest(
                     body=json.dumps(
@@ -474,7 +474,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from e
             return web.json_response(
                 {
                     "path": str(mount_path),

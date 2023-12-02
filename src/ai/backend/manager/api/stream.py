@@ -478,10 +478,10 @@ async def stream_proxy(
                 # using one of the primary/secondary ports of the app
                 try:
                     hport_idx = sport["container_ports"].index(params["port"])
-                except ValueError:
+                except ValueError as ex:
                     raise InvalidAPIParameters(
                         f"Service {service} does not open the port number {params['port']}."
-                    )
+                    ) from ex
                 host_port = sport["host_ports"][hport_idx]
             else:  # using the default (primary) port of the app
                 if "host_ports" not in sport:

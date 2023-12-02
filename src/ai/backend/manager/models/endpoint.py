@@ -541,7 +541,7 @@ class Endpoint(graphene.ObjectType):
                     load_routes=True,
                 )
         except NoResultFound:
-            raise EndpointNotFound
+            raise EndpointNotFound(object_name=str(endpoint_id)) from None
         return await Endpoint.from_row(ctx, row)
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
@@ -723,7 +723,7 @@ class EndpointToken(graphene.ObjectType):
                     session, token, project=project, domain=domain_name, user_uuid=user_uuid
                 )
         except NoResultFound:
-            raise EndpointTokenNotFound
+            raise EndpointTokenNotFound(object_name=str(token)) from None
         return await EndpointToken.from_row(ctx, row)
 
     async def resolve_valid_until(

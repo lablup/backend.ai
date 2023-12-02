@@ -74,8 +74,10 @@ class BaseQuotaModel(AbstractQuotaModel):
                     raise InvalidQuotaScopeError(
                         f"Invalid value format for quota scope ID: {ref!r}"
                     )
-        except t.DataError:
-            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
+        except t.DataError as ex:
+            raise InvalidQuotaScopeError(
+                f"Invalid value format for quota scope ID: {ref!r}"
+            ) from ex
 
     async def create_quota_scope(
         self,
@@ -430,10 +432,10 @@ class BaseVolume(AbstractVolume):
         # perform the file-tree copy
         try:
             await self.fsop_model.copy_tree(src_vfpath, dst_vfpath)
-        except Exception:
+        except Exception as ex:
             await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
-            raise ExecutionError("Copying files from source directories failed.")
+            raise ExecutionError("Copying files from source directories failed.") from ex
 
     @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:

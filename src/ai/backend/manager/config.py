@@ -603,7 +603,7 @@ def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalCo
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return LocalConfig(cfg)
 
@@ -644,7 +644,7 @@ class SharedConfig(AbstractConfig):
         except config.ConfigurationError as e:
             print("Validation of shared etcd configuration has failed:", file=sys.stderr)
             print(pformat(e.invalid_data), file=sys.stderr)
-            raise click.Abort()
+            raise click.Abort() from e
         else:
             self.data = cfg
 
@@ -692,8 +692,8 @@ class SharedConfig(AbstractConfig):
         registries = await self.list_container_registry()
         try:
             item = registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
+        except KeyError as ex:
+            raise ObjectNotFound(object_name="container registry") from ex
         return item
 
     async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
@@ -712,8 +712,8 @@ class SharedConfig(AbstractConfig):
         try:
             original_item = registries[hostname]
             del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
+        except KeyError as ex:
+            raise ObjectNotFound(object_name="container registry") from ex
         # Delete all items with having the prefix of the given hostname.
         # This will "accidentally" delete any registry sharing the same prefix.
         raw_hostname = urllib.parse.quote(hostname, safe="")
@@ -755,8 +755,8 @@ class SharedConfig(AbstractConfig):
         # Exclude the target hostname from the raw data.
         try:
             del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
+        except KeyError as ex:
+            raise ObjectNotFound(object_name="container registry") from ex
         # Delete all items with having the prefix of the given hostname.
         # This will "accidentally" delete any registry sharing the same prefix.
         raw_hostname = urllib.parse.quote(hostname, safe="")

@@ -137,7 +137,7 @@ async def get_info(request: web.Request) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
     resp = {
@@ -429,7 +429,7 @@ async def delete(request: web.Request) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
@@ -464,7 +464,7 @@ async def sync(request: web.Request) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
@@ -496,7 +496,7 @@ async def scale(request: web.Request, params: Any) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     if params["to"] < 0:
@@ -541,7 +541,7 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
         try:
             route = await RoutingRow.get(db_sess, route_id, load_endpoint=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"route_id": str(route_id)}) from None
         if route.endpoint != service_id:
             raise ObjectNotFound
         await get_user_uuid_scopes(request, {"owner_uuid": route.endpoint_row.session_owner})
@@ -580,9 +580,9 @@ async def delete_route(request: web.Request) -> web.Response:
         try:
             route = await RoutingRow.get(db_sess, route_id, load_session=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"route_id": str(route_id)}) from None
         if route.endpoint != service_id:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"route_id": str(route_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": route.endpoint_row.session_owner})
     if route.status == RouteStatus.PROVISIONING:
         raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
@@ -629,7 +629,7 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
@@ -695,7 +695,7 @@ async def list_errors(request: web.Request) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
@@ -732,7 +732,7 @@ async def clear_error(request: web.Request) -> web.Response:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
-            raise ObjectNotFound
+            raise ObjectNotFound(extra_data={"service_id": str(service_id)}) from None
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
