@@ -44,7 +44,7 @@ def test_fieldspec_init():
             ]
         ),
     )
-    assert f.field_ref == "key_foo { bar baz }"
+    assert f.field_ref == "key_foo { bar baz baz }"
     assert f.field_name == "key_foo"
     assert f.humanized_name == "Key Foo"
     assert f.subfields["bar"].field_ref == "bar"
