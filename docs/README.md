@@ -31,7 +31,7 @@ $ pip install -U \
 
 ## Building API Reference JSON file
 ```console
-$ ./py -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
+$ ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ```
 This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
 Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
@@ -84,7 +84,7 @@ The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
 
 Building PDF requires following libraries to be present on your system.
 
-* TeX Live 
+* TeX Live
   - ko.TeX (texlive-lang-korean)
   - latexmk
 * ImageMagick
@@ -93,7 +93,7 @@ Building PDF requires following libraries to be present on your system.
 ### Installing dependencies on macOS
 1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
 2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
-3. Exceute following command to install missing dependencies.   
+3. Exceute following command to install missing dependencies.
 ```console
 sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
 ```
