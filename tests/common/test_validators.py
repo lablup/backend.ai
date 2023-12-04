@@ -37,8 +37,6 @@ def test_trafaret_dataerror_pickling():
             bindata = pickle.dumps(e)
             pickle.loads(bindata)
 
-    tx.fix_trafaret_pickle_support()
-
     try:
         iv = t.Int()
         iv.check("x")

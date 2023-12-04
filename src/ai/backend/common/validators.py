@@ -76,13 +76,6 @@ __all__ = (
 )
 
 
-def fix_trafaret_pickle_support():
-    def __reduce__(self):
-        return (type(self), (self.error, self.name, self.value, self.trafaret, self.code))
-
-    t.DataError.__reduce__ = __reduce__
-
-
 class StringLengthMeta(TrafaretMeta):
     """
     A metaclass that makes string-like trafarets to have sliced min/max length indicator.
