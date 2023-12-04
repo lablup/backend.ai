@@ -62,6 +62,7 @@ from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
     check_api_params,
+    check_api_params_v2,
     get_access_key_scopes,
     get_user_uuid_scopes,
     undefined,
@@ -114,7 +115,7 @@ class CompactServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
+@check_api_params(  # TODO: migrate to check_api_params_v2
     t.Dict(
         {
             t.Key("name", default=None): t.Null | t.String,
@@ -294,7 +295,7 @@ class NewServiceRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(NewServiceRequestModel)
+@check_api_params_v2(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
     """
     Creates a new model service. If `desired_session_count` is greater than zero,
@@ -589,7 +590,7 @@ class ScaleResponseModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(ScaleRequestModel)
+@check_api_params_v2(ScaleRequestModel)
 async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
     """
     Updates ideal inference session count manually. Based on the difference of this number,
@@ -631,7 +632,7 @@ class UpdateRouteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(UpdateRouteRequestModel)
+@check_api_params_v2(UpdateRouteRequestModel)
 async def update_route(request: web.Request, params: Any) -> SuccessResponseModel:
     """
     Updates traffic bias of specific route.
@@ -724,7 +725,7 @@ class TokenResponseModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
+@check_api_params(  # TODO: migrate to check_api_params_v2
     t.Dict(
         {
             t.Key("duration", default=None): t.Null | tx.TimeDuration,

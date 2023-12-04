@@ -30,7 +30,6 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
-from pydantic import BaseModel
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -66,8 +65,6 @@ from .api.exceptions import (
 from .api.types import (
     AppCreator,
     CleanupContext,
-    TypedJSONListResponse,
-    TypedJSONResponse,
     WebMiddleware,
     WebRequestHandler,
 )
@@ -193,18 +190,6 @@ async def hello(request: web.Request) -> web.Response:
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
-
-
-@web.middleware
-async def pydantic_response_conversion_middleware(
-    request: web.Request, handler: WebRequestHandler
-) -> web.StreamResponse:
-    resp = await handler(request)
-    if isinstance(resp, BaseModel):
-        return TypedJSONResponse(resp)
-    elif isinstance(resp, list):
-        return TypedJSONListResponse(resp)
-    return resp
 
 
 @web.middleware
@@ -849,9 +834,6 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
-
-    # This middleware should be placed at the start of the chain
-    app.middlewares.append(pydantic_response_conversion_middleware)
     return app
 
 

@@ -16,11 +16,14 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Concatenate,
     Hashable,
     Mapping,
     MutableMapping,
     Optional,
+    ParamSpec,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -28,7 +31,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -40,7 +43,6 @@ from ..utils import (
 )
 from .exceptions import (
     GenericForbidden,
-    InternalServerError,
     InvalidAPIParameters,
     QueryNotImplemented,
 )
@@ -156,16 +158,27 @@ async def get_user_scopes(
     return owner_user_uuid, owner_user_role
 
 
+P = ParamSpec("P")
+TParamTrafaret = TypeVar("TParamTrafaret", bound=t.Trafaret)
+TQueryTrafaret = TypeVar("TQueryTrafaret", bound=t.Trafaret)
+
+
 def check_api_params(
-    checker: t.Trafaret | type[BaseModel],
-    loads: Callable[[str], Any] = None,
-    query_param_checker: t.Trafaret = None,
+    checker: TParamTrafaret,
+    loads: Callable[[str], Any] | None = None,
+    query_param_checker: TQueryTrafaret | None = None,
     request_examples: list[Any] | None = None,
-) -> Any:
-    # FIXME: replace ... with [web.Request, Any...] in the future mypy
-    def wrap(handler: Callable[..., Awaitable[web.Response]]):
+) -> Callable[
+    # We mark the arg for the validated param as Any because we cannot define a generic type of
+    # Trafaret's return value.
+    [Callable[Concatenate[web.Request, Any, P], Awaitable[web.StreamResponse]]],
+    Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]],
+]:
+    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[web.StreamResponse]]):
         @functools.wraps(handler)
-        async def wrapped(request: web.Request, *args, **kwargs) -> web.Response:
+        async def wrapped(
+            request: web.Request, *args: P.args, **kwargs: P.kwargs
+        ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
             try:
@@ -180,14 +193,7 @@ def check_api_params(
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-                basemodel_type_cls = type(BaseModel)
-                match checker:
-                    case t.Trafaret():
-                        checked_params = checker.check(stripped_params)
-                    case basemodel_type_cls():  # type: ignore[misc]
-                        checked_params = checker.model_validate(stripped_params)
-                    case _:
-                        raise InternalServerError("Unsupported type of checker provided")
+                checked_params = checker.check(stripped_params)
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
@@ -198,6 +204,68 @@ def check_api_params(
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             return await handler(request, checked_params, *args, **kwargs)
+
+        set_handler_attr(wrapped, "request_scheme", checker)
+        if request_examples:
+            set_handler_attr(wrapped, "request_examples", request_examples)
+        return wrapped
+
+    return wrap
+
+
+TParamModel = TypeVar("TParamModel", bound=BaseModel)
+TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+
+
+def check_api_params_v2(
+    checker: type[TParamModel],
+    loads: Callable[[str], Any] | None = None,
+    query_param_checker: type[TQueryModel] | None = None,
+    request_examples: list[Any] | None = None,
+) -> Callable[
+    [Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel]]],
+    Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]],
+]:
+    def wrap(
+        handler: Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel]]
+    ) -> Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]]:
+        @functools.wraps(handler)
+        async def wrapped(
+            request: web.Request, *args: P.args, **kwargs: P.kwargs
+        ) -> web.StreamResponse:
+            orig_params: Any
+            body: str = ""
+            try:
+                body_exists = request.can_read_body
+                if body_exists:
+                    body = await request.text()
+                    if request.content_type == "text/yaml":
+                        orig_params = yaml.load(body, Loader=yaml.BaseLoader)
+                    else:
+                        orig_params = (loads or json.loads)(body)
+                else:
+                    orig_params = dict(request.query)
+                stripped_params = orig_params.copy()
+                log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
+                checked_params = checker.model_validate(stripped_params)
+                if body_exists and query_param_checker:
+                    query_params = query_param_checker.model_validate(request.query)
+                    kwargs["query"] = query_params
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
+                raise InvalidAPIParameters("Malformed body")
+            except t.DataError as e:
+                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+            except ValidationError as e:
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+            response = await handler(request, checked_params, *args, **kwargs)
+            match response:
+                case BaseModel():
+                    return web.json_response(response.model_dump_json())
+                case list():
+                    return web.json_response(TypeAdapter(list[TResponseModel]).dump_json(response))
+                case _:
+                    raise RuntimeError("Unsupported response type")
 
         set_handler_attr(wrapped, "request_scheme", checker)
         if request_examples:
