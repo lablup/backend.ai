@@ -201,8 +201,6 @@ def check_api_params(
                 raise InvalidAPIParameters("Malformed body")
             except t.DataError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)
@@ -254,8 +252,6 @@ def check_api_params_v2(
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
                 raise InvalidAPIParameters("Malformed body")
-            except t.DataError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             response = await handler(request, checked_params, *args, **kwargs)
