@@ -1,5 +1,3 @@
-import asyncio
-import json
 import logging
 import re
 import uuid
@@ -20,7 +18,8 @@ from typing import (
 )
 
 import aiodocker
-import aiohttp
+from aiodocker.exceptions import DockerError
+from aiotools import closing_async
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -29,6 +28,7 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
+from ai.backend.agent.utils import update_nested_dict
 from ai.backend.common.logging import BraceStyleAdapter
 
 try:
@@ -100,7 +100,6 @@ class CUDAPlugin(AbstractComputePlugin):
         (SlotName("cuda.device"), SlotTypes("count")),
     )
 
-    nvdocker_version: Tuple[int, ...] = (0, 0, 0)
     docker_version: Tuple[int, ...] = (0, 0, 0)
 
     device_mask: Sequence[DeviceId] = []
@@ -108,32 +107,24 @@ class CUDAPlugin(AbstractComputePlugin):
 
     async def init(self, context: Any = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
-        # Check nvidia-docker and docker versions
+
+        # Basic docker version & nvidia contaienr runtime check
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "nvidia-docker",
-                "version",
-                "-f",
-                "{{json .}}",
-                stdout=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await proc.communicate()
-            lines = stdout.decode().splitlines()
-        except FileNotFoundError:
-            log.warning("nvidia-docker is not installed.")
+            async with closing_async(aiodocker.Docker()) as docker:
+                docker_info = await docker.system.info()
+        except DockerError:
             log.info("CUDA acceleration is disabled.")
             self.enabled = False
             return
-        m = rx_triple_version.search(lines[0])
-        if m:
-            self.nvdocker_version = tuple(map(int, m.group(1).split(".")))
-        else:
-            log.error("could not detect nvidia-docker version!")
+
+        if "nvidia" not in docker_info["Runtimes"]:
+            log.error("could not detect valid NVIDIA Container Runtime!")
             log.info("CUDA acceleration is disabled.")
             self.enabled = False
             return
-        docker_version_data = json.loads(lines[1])
-        m = rx_triple_version.search(docker_version_data["Server"]["Version"])
+
+        rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
+        m = rx_triple_version.search(docker_info["ServerVersion"])
         if m:
             self.docker_version = tuple(map(int, m.group(1).split(".")))
         else:
@@ -150,7 +141,6 @@ class CUDAPlugin(AbstractComputePlugin):
         try:
             detected_devices = await self.list_devices()
             log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("nvidia-docker version: {}", self.nvdocker_version)
             log.info("CUDA acceleration is enabled.")
         except ImportError:
             log.warning("could not load the CUDA runtime library.")
@@ -310,96 +300,47 @@ class CUDAPlugin(AbstractComputePlugin):
             for device_id, alloc in per_device_alloc.items():
                 if alloc > 0:
                     assigned_device_ids.append(device_id)
-        if self.nvdocker_version[0] == 1:
-            timeout = aiohttp.ClientTimeout(total=3)
-            async with aiohttp.ClientSession(raise_for_status=True, timeout=timeout) as sess:
-                try:
-                    nvdocker_url = "http://localhost:3476/docker/cli/json"
-                    async with sess.get(nvdocker_url) as resp:
-                        nvidia_params = await resp.json()
-                except aiohttp.ClientError:
-                    raise RuntimeError("NVIDIA Docker plugin is not available.")
-
-            volumes = await docker.volumes.list()
-            existing_volumes = set(vol["Name"] for vol in volumes["Volumes"])
-            required_volumes = set(vol.split(":")[0] for vol in nvidia_params["Volumes"])
-            missing_volumes = required_volumes - existing_volumes
-            binds = []
-            for vol_name in missing_volumes:
-                for vol_param in nvidia_params["Volumes"]:
-                    if vol_param.startswith(vol_name + ":"):
-                        _, _, permission = vol_param.split(":")
-                        driver = nvidia_params["VolumeDriver"]
-                        await docker.volumes.create(
-                            {
-                                "Name": vol_name,
-                                "Driver": driver,
-                            }
-                        )
-            for vol_name in required_volumes:
-                for vol_param in nvidia_params["Volumes"]:
-                    if vol_param.startswith(vol_name + ":"):
-                        _, mount_pt, permission = vol_param.split(":")
-                        binds.append("{}:{}:{}".format(vol_name, mount_pt, permission))
-            devices = []
-            for dev in nvidia_params["Devices"]:
-                m = re.search(r"^/dev/nvidia(\d+)$", dev)
-                if m is None:
-                    # Always add non-GPU device files required by the driver.
-                    # (e.g., nvidiactl, nvidia-uvm, ... etc.)
-                    devices.append(dev)
-                    continue
-                device_id = DeviceId(m.group(1))
-                if device_id not in assigned_device_ids:
-                    continue
-                devices.append(dev)
-            devices = [
-                {
-                    "PathOnHost": dev,
-                    "PathInContainer": dev,
-                    "CgroupPermissions": "mrw",
-                }
-                for dev in devices
-            ]
-            return {
-                "HostConfig": {
-                    "Binds": binds,
-                    "Devices": devices,
-                },
-            }
-        elif self.nvdocker_version[0] == 2:
-            device_list_str = ",".join(sorted(assigned_device_ids))
-            if self.docker_version >= (19, 3, 0):
-                docker_config: Dict[str, Any] = {}
-                if assigned_device_ids:
-                    docker_config.update(
-                        {
-                            "HostConfig": {
-                                "DeviceRequests": [
-                                    {
-                                        "Driver": "nvidia",
-                                        "DeviceIDs": assigned_device_ids,
-                                        # "all" does not work here
-                                        "Capabilities": [
-                                            ["utility", "compute", "video", "graphics", "display"],
+        docker_config: Dict[str, Any] = {}
+        if self.docker_version >= (19, 3, 0):
+            # NOTE: You may put additional Docker container creation API params here.
+            if assigned_device_ids:
+                update_nested_dict(
+                    docker_config,
+                    {
+                        "HostConfig": {
+                            "DeviceRequests": [
+                                {
+                                    "Driver": "nvidia",
+                                    "DeviceIDs": assigned_device_ids,
+                                    # "all" does not work here
+                                    "Capabilities": [
+                                        [
+                                            "utility",
+                                            "compute",
+                                            "video",
+                                            "graphics",
+                                            "display",
                                         ],
-                                    },
-                                ],
-                            },
-                        }
-                    )
-                return docker_config
-            else:
-                return {
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                )
+        else:
+            update_nested_dict(
+                docker_config,
+                {
                     "HostConfig": {
                         "Runtime": "nvidia",
                     },
                     "Env": [
-                        f"NVIDIA_VISIBLE_DEVICES={device_list_str}",
+                        "NVIDIA_DRIVER_CAPABILITIES=all",
+                        "NVIDIA_VISIBLE_DEVICES={}".format(",".join(assigned_device_ids)),
                     ],
-                }
-        else:
-            raise RuntimeError("BUG: should not be reached here!")
+                },
+            )
+        return docker_config
 
     async def get_attached_devices(
         self,
