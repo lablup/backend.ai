@@ -10,6 +10,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole
 from .base import privileged_mutation, set_if_set
+from .gql_relay import AsyncNode
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -58,7 +59,7 @@ class ContainerRegistry(graphene.ObjectType):
     config = graphene.Field(ContainerRegistryConfig)
 
     class Meta:
-        interfaces = (graphene.relay.Node,)
+        interfaces = (AsyncNode,)
 
     # TODO: `get_node()` should be implemented to query a scalar object directly by ID
     #       (https://docs.graphene-python.org/en/latest/relay/nodes/#nodes)
