@@ -180,10 +180,11 @@ def check_api_params(
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
+                basemodel_type_cls = type(BaseModel)
                 match checker:
                     case t.Trafaret():
                         checked_params = checker.check(stripped_params)
-                    case BaseModel():
+                    case basemodel_type_cls():  # type: ignore[misc]
                         checked_params = checker.model_validate(stripped_params)
                     case _:
                         raise InternalServerError("Unsupported type of checker provided")
