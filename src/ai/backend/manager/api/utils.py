@@ -38,7 +38,12 @@ from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
-from .exceptions import GenericForbidden, InvalidAPIParameters, QueryNotImplemented
+from .exceptions import (
+    GenericForbidden,
+    InternalServerError,
+    InvalidAPIParameters,
+    QueryNotImplemented,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -175,10 +180,13 @@ def check_api_params(
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-                if isinstance(checker, t.Trafaret):
-                    checked_params = checker.check(stripped_params)
-                else:
-                    checked_params = checker.model_validate(stripped_params)
+                match checker:
+                    case t.Trafaret():
+                        checked_params = checker.check(stripped_params)
+                    case BaseModel():
+                        checked_params = checker.model_validate(stripped_params)
+                    case _:
+                        raise InternalServerError("Unsupported type of checker provided")
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
