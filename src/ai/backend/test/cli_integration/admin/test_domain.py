@@ -4,7 +4,7 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_domain(run: ClientRunnerFunc):
+def test_add_domain(run_admin: ClientRunnerFunc):
     print("[ Add domain ]")
 
     # Add domain
@@ -24,13 +24,13 @@ def test_add_domain(run: ClientRunnerFunc):
         "cr.backend.ai",
         "test",
     ]
-    with closing(run(add_arguments)) as p:
+    with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get("ok") is True, "Domain creation not successful"
 
     # Check if domain is added
-    with closing(run(["--output=json", "admin", "domain", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "domain", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -59,7 +59,7 @@ def test_add_domain(run: ClientRunnerFunc):
     ], "Domain allowed docker registries mismatch"
 
 
-def test_update_domain(run: ClientRunnerFunc):
+def test_update_domain(run_admin: ClientRunnerFunc):
     print("[ Update domain ]")
 
     # Update domain
@@ -82,13 +82,13 @@ def test_update_domain(run: ClientRunnerFunc):
         "cr1.backend.ai",
         "test",
     ]
-    with closing(run(add_arguments)) as p:
+    with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get("ok") is True, "Domain update not successful"
 
     # Check if domain is updated
-    with closing(run(["--output=json", "admin", "domain", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "domain", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -117,11 +117,11 @@ def test_update_domain(run: ClientRunnerFunc):
     ], "Domain allowed docker registries mismatch"
 
 
-def test_delete_domain(run: ClientRunnerFunc):
+def test_delete_domain(run_admin: ClientRunnerFunc):
     print("[ Delete domain ]")
 
     # Delete domain
-    with closing(run(["--output=json", "admin", "domain", "purge", "test123"])) as p:
+    with closing(run_admin(["--output=json", "admin", "domain", "purge", "test123"])) as p:
         p.sendline("y")
         p.expect(EOF)
         before = p.before.decode()
@@ -129,8 +129,8 @@ def test_delete_domain(run: ClientRunnerFunc):
         assert response.get("ok") is True, "Domain deletion failed"
 
 
-def test_list_domain(run: ClientRunnerFunc):
-    with closing(run(["--output=json", "admin", "domain", "list"])) as p:
+def test_list_domain(run_admin: ClientRunnerFunc):
+    with closing(run_admin(["--output=json", "admin", "domain", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)

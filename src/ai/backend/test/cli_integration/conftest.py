@@ -6,11 +6,12 @@ import secrets
 from collections import namedtuple
 from contextlib import closing
 from pathlib import Path
-from typing import Callable, Iterator, Sequence, Tuple
+from typing import Any, Callable, Iterator, Sequence, Tuple
 
 import pexpect
 import pytest
 from faker import Faker
+from pexpect import spawn
 
 from ai.backend.plugin.entrypoint import find_build_root
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc
@@ -62,6 +63,74 @@ def run(client_bin: Path, client_environ: dict[str, str]) -> Iterator[ClientRunn
         return _run([client_bin, *cmdargs], *args, **kwargs, env=client_environ)
 
     yield run_impl
+
+
+@pytest.fixture(scope="session")
+def run_user(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+    yield run_given_profile(client_bin, "user_file")
+
+
+@pytest.fixture(scope="session")
+def run_user2(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+    yield run_given_profile(client_bin, "user2_file")
+
+
+@pytest.fixture(scope="session")
+def run_admin(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+    yield run_given_profile(client_bin, "admin_file")
+
+
+def run_given_profile(
+    client_bin: Path, profile_env: str
+) -> Callable[[Sequence[str | Path], tuple[Any, ...], dict[str, Any]], spawn]:
+    env_from_file = get_env_from_profile(profile_env)
+
+    def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
+        return _run([client_bin, *cmdargs], *args, **kwargs, env=env_from_file)
+
+    return run_impl
+
+
+def get_env_from_profile(profile_env: str) -> dict[str, str]:
+    file_env = os.environ.get(profile_env, None)
+    if file_env is None:
+        raise RuntimeError(f"Missing {profile_env} env-var!")
+
+    if file_env is None:
+        raise RuntimeError(f"Missing {profile_env} env-var!")
+
+    abs_path = convert_env_to_abs_path(file_env)
+
+    if not abs_path.exists():
+        raise RuntimeError(f"Missing {abs_path} file!")
+
+    envs = {}
+    lines = abs_path.read_text().splitlines()
+    for line in lines:
+        if m := _rx_env_export.search(line.strip()):
+            envs[m.group("key")] = m.group("val")
+    return envs
+
+
+def convert_env_to_abs_path(file_env: str) -> Path:
+    """
+    1. For a bare file name, it's verified not to be a path, and then the file name is searched in the build root.
+    2. If a relative path is entered, it causes an error (Relative paths are an incorrect format).
+    3. If an absolute path is entered, the file located at that path is retrieved and executed.
+    """
+    path = Path(file_env)
+
+    if path.is_absolute():
+        return path
+
+    if "/" in file_env or "\\" in file_env:
+        # if there are '/' or '\\' in the file name, it is considered as a relative path.
+        raise RuntimeError(
+            "Relative paths are an incorrect format. Do not use '/' or '\\' in filename!!!"
+        )
+
+    build_root = find_build_root(Path(__file__))
+    return build_root / path
 
 
 @pytest.fixture

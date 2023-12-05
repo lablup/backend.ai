@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 
@@ -37,10 +38,28 @@ def main(ctx: click.Context) -> None:
     ),
     metavar="PKGS",
 )
+@click.option(
+    "--user_file",
+    type=str,
+    default="env-local-user-api.sh",
+)
+@click.option(
+    "--user2_file",
+    type=str,
+    default="env-local-user2-api.sh",
+)
+@click.option(
+    "--admin_file",
+    type=str,
+    default="env-local-admin-api.sh",
+)
 @click.pass_context
 def run_cli(
     ctx: click.Context,
     pkgs: list[str],
+    user_file: str,
+    user2_file: str,
+    admin_file: str,
 ) -> None:
     """A shortcut command to run pytest against a specific set of CLI-based
     integration tests
@@ -63,7 +82,13 @@ def run_cli(
             "--pyargs",
             *(f"ai.backend.test.cli_integration.{pkg}" for pkg in pkgs),
             *pytest_args,
-        ]
+        ],
+        env={
+            **os.environ,
+            "user_file": user_file,
+            "user2_file": user2_file,
+            "admin_file": admin_file,
+        },
     )
     ctx.exit(result.returncode)
 

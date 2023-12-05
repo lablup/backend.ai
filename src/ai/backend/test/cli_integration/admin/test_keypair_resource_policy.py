@@ -4,7 +4,7 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Add keypair resource policy ]")
 
     # Add keypair resource policy
@@ -27,13 +27,13 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         "1200",
         keypair_resource_policy,
     ]
-    with closing(run(add_arguments)) as p:
+    with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get("ok") is True, "Keypair resource policy creation not successful"
 
     # Check if keypair resource policy is created
-    with closing(run(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -66,7 +66,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Update keypair resource policy ]")
 
     # Update keypair resource policy
@@ -89,13 +89,13 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         "1800",
         keypair_resource_policy,
     ]
-    with closing(run(add_arguments)) as p:
+    with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get("ok") is True, "Keypair resource policy update not successful"
 
     # Check if keypair resource policy is updated
-    with closing(run(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -128,12 +128,12 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_delete_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
     with closing(
-        run(
+        run_admin(
             ["--output=json", "admin", "keypair-resource-policy", "delete", keypair_resource_policy]
         )
     ) as p:
@@ -144,9 +144,9 @@ def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         assert response.get("ok") is True, "Keypair resource policy deletion failed"
 
 
-def test_list_keypair_resource_policy(run: ClientRunnerFunc):
+def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc):
     print("[ List keypair resource policy ]")
-    with closing(run(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
