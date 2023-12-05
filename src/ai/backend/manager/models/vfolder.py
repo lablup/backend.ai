@@ -1860,27 +1860,27 @@ class ModelInfo(graphene.ObjectType):
         else:
             models = []
         try:
-            info = models[0]["info"]
+            metadata = models[0]["metadata"]
             name = models[0]["name"]
         except (IndexError, KeyError):
-            info = {}
+            metadata = {}
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
             name=name,
-            author=info.get("author") or vfolder_row.creator or "",
-            title=info.get("title") or vfolder_row.name,
-            version=info.get("version") or "",
-            created_at=info.get("created") or vfolder_row.created_at,
-            modified_at=info.get("last_modified") or vfolder_row.created_at,
-            description=info.get("description") or "",
-            task=info.get("task") or "",
-            architecture=info.get("architecture") or "",
-            framework=info.get("framework") or [],
-            label=info.get("label") or [],
-            category=info.get("category") or "",
-            license=info.get("license") or "",
-            min_resource=info.get("min_resource") or {},
+            author=metadata.get("author") or vfolder_row.creator or "",
+            title=metadata.get("title") or vfolder_row.name,
+            version=metadata.get("version") or "",
+            created_at=metadata.get("created") or vfolder_row.created_at,
+            modified_at=metadata.get("last_modified") or vfolder_row.created_at,
+            description=metadata.get("description") or "",
+            task=metadata.get("task") or "",
+            architecture=metadata.get("architecture") or "",
+            framework=metadata.get("framework") or [],
+            label=metadata.get("label") or [],
+            category=metadata.get("category") or "",
+            license=metadata.get("license") or "",
+            min_resource=metadata.get("min_resource") or {},
         )
 
     @classmethod

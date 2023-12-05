@@ -121,7 +121,7 @@ model_definition_iv = t.Dict(
                             ),
                         }
                     ),
-                    t.Key("info"): t.Null | t.Dict(
+                    t.Key("metadata"): t.Null | t.Dict(
                         {
                             t.Key("author", default=None): t.Null | t.String(allow_blank=True),
                             t.Key("title", default=None): t.Null | t.String(allow_blank=True),
