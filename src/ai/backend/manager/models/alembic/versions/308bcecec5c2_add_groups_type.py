@@ -148,6 +148,7 @@ def upgrade():
 
 def downgrade():
     conn = op.get_bind()
-    conn.execute(text("DELETE FROM groups WHERE name = 'model-store'"))
+    cmd = """DELETE FROM groups WHERE "type" = 'model-store'"""
+    conn.execute(text(cmd))
     op.drop_column("groups", "type")
     projecttype.drop(conn)

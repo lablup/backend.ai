@@ -114,7 +114,7 @@ class AssocGroupUserRow(Base):
     group = relationship("GroupRow", back_populates="users")
 
 
-class ProjectType(str, enum.Enum):
+class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
 

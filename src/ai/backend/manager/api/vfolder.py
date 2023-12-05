@@ -467,7 +467,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     if group_type == ProjectType.MODEL_STORE:
         if params["permission"] != VFolderPermission.READ_WRITE:
             raise InvalidAPIParameters(
-                "Setting custom permission is not supported for model store VFolder"
+                "Setting custom permission is not supported for model store vfolder"
             )
         if params["usage_mode"] != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
