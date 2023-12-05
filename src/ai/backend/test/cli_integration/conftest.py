@@ -66,7 +66,9 @@ def run(client_bin: Path, client_environ: dict[str, str]) -> Iterator[ClientRunn
 
 
 @pytest.fixture(scope="session")
-def run_user(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+def run_user(
+    client_bin: Path,
+) -> Iterator[Callable[[Sequence[str | Path], tuple[Any, ...], dict[str, Any]], spawn]]:
     yield run_given_profile(client_bin, "user_file")
 
 
