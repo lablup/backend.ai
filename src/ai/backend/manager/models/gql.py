@@ -131,8 +131,8 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
-    ModelMetadata,
-    ModelMetadataConnection,
+    ModelCard,
+    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -674,12 +674,10 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
-    model_metadata = graphene.Field(
-        ModelMetadata, id=graphene.String(required=True), description="Added in 24.03.0."
+    model_card = graphene.Field(
+        ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
-    model_metadatas = PaginatedConnectionField(
-        ModelMetadataConnection, description="Added in 24.03.0."
-    )
+    model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2063,14 +2061,14 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
 
-    async def resolve_model_metadata(
+    async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ):
-        return await ModelMetadata.get_node(info, id)
+        return await ModelCard.get_node(info, id)
 
-    async def resolve_model_metadatas(
+    async def resolve_model_cards(
         root: Any,
         info: graphene.ResolveInfo,
         *,
@@ -2082,7 +2080,7 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
-        return await ModelMetadata.get_connection(
+        return await ModelCard.get_connection(
             info,
             filter,
             order,
