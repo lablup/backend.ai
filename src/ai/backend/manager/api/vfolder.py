@@ -57,6 +57,7 @@ from ..models import (
     GroupRow,
     KernelStatus,
     ProjectResourcePolicyRow,
+    ProjectType,
     UserResourcePolicyRow,
     UserRole,
     UserRow,
@@ -384,6 +385,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
+    group_type: ProjectType | None = None
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -407,6 +409,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
+                group_type = group_row.type
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 log.debug("group_id_or_name(uuid):{}", group_id_or_name)
@@ -427,6 +430,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
+                group_type = group_row.type
             case None:
                 query = (
                     sa.select(UserRow)
@@ -450,7 +454,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if group_uuid is not None:
             ownership_type = "group"
             quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
-            if not request["is_admin"]:
+            if not request["is_admin"] and group_type != ProjectType.MODEL_STORE:
                 raise GenericForbidden("no permission")
         else:
             ownership_type = "user"
@@ -458,6 +462,16 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if ownership_type not in allowed_vfolder_types:
             raise InvalidAPIParameters(
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
+            )
+
+    if group_type == ProjectType.MODEL_STORE:
+        if params["permission"] != VFolderPermission.READ_WRITE:
+            raise InvalidAPIParameters(
+                "Setting custom permission is not supported for model store VFolder"
+            )
+        if params["usage_mode"] != VFolderUsageMode.MODEL:
+            raise InvalidAPIParameters(
+                "Only Model VFolder can be created under the model store project"
             )
 
     async with root_ctx.db.begin() as conn:
@@ -542,6 +556,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailed from e
 
+        # By default model store VFolder should be considered as read only for every users but without the creator
+        if group_type == ProjectType.MODEL_STORE:
+            params["permission"] = VFolderPermission.READ_ONLY
+
         # TODO: include quota scope ID in the database
         # TODO: include quota scope ID in the API response
         insert_values = {
@@ -584,9 +602,20 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 }
             )
             resp["unmanaged_path"] = unmanaged_path
-        query = sa.insert(vfolders, insert_values)
         try:
+            query = sa.insert(vfolders, insert_values)
             result = await conn.execute(query)
+
+            # Here we grant creator the permission to alter VFolder contents
+            if group_type == ProjectType.MODEL_STORE:
+                query = sa.insert(vfolder_permissions).values(
+                    {
+                        "user": request["user"]["uuid"],
+                        "vfolder": vfid.folder_id.hex,
+                        "permission": VFolderPermission.OWNER_PERM,
+                    }
+                )
+                await conn.execute(query)
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1

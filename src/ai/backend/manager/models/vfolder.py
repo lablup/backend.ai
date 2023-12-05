@@ -64,6 +64,7 @@ from .gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
+from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
@@ -324,6 +325,15 @@ vfolder_permissions = sa.Table(
 
 class VFolderRow(Base):
     __table__ = vfolders
+
+    def __contains__(self, key):
+        return key in self.__dir__()
+
+    def __getitem__(self, item):
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -1111,7 +1121,7 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
         if row is None:
             return None
 
@@ -1209,9 +1219,12 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
+        from .group import groups
         from .user import users
 
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
+        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
+            groups, vfolders.c.group == groups.c.id, isouter=True
+        )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -1818,6 +1831,7 @@ class ModelInfo(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
+    vfolder = graphene.Field(VirtualFolder)
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -1831,7 +1845,12 @@ class ModelInfo(graphene.ObjectType):
     label = graphene.List(lambda: graphene.String)
     license = graphene.String()
     min_resource = graphene.JSONString()
-    # readme
+    readme = graphene.String()
+    readme_filetype = graphene.String(
+        description=(
+            "Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ..."
+        )
+    )
 
     def resolve_created_at(
         self,
@@ -1853,7 +1872,13 @@ class ModelInfo(graphene.ObjectType):
 
     @classmethod
     def parse_model(
-        cls, vfolder_row: VFolderRow, model_def: dict[str, Any] | None = None
+        cls,
+        resolve_info: graphene.ResolveInfo,
+        vfolder_row: VFolderRow,
+        *,
+        model_def: dict[str, Any] | None = None,
+        readme: str | None = None,
+        readme_filetype: str | None = None,
     ) -> ModelInfo:
         if model_def is not None:
             models = model_def["models"]
@@ -1881,10 +1906,33 @@ class ModelInfo(graphene.ObjectType):
             category=metadata.get("category") or "",
             license=metadata.get("license") or "",
             min_resource=metadata.get("min_resource") or {},
+            readme=readme,
+            readme_filetype=readme_filetype,
         )
 
     @classmethod
     async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelInfo:
+        async def _fetch_file(
+            filename: str,
+        ) -> bytes:  # FIXME: We should avoid fetching files from disk
+            chunks = bytes()
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/file/fetch",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(vfolder_id),
+                    "relpath": f"./{filename}",
+                },
+            ) as (_, storage_resp):
+                while True:
+                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    chunks += chunk
+            return chunks
+
         graph_ctx: GraphQueryContext = info.context
 
         vfolder_row_id = vfolder_row.id
@@ -1903,48 +1951,56 @@ class ModelInfo(graphene.ObjectType):
                 "relpath": ".",
             },
         ) as (_, storage_resp):
-            result = await storage_resp.json()
+            vfolder_files = (await storage_resp.json())["items"]
 
-        for item in result["items"]:
-            if item["name"] in ("model-definition.yml", "model-definition.yaml"):
-                yaml_name = item["name"]
-                break
+        model_definition_filename: str | None = None
+        readme_idx: int | None = None
+
+        for idx, item in zip(range(len(vfolder_files)), vfolder_files):
+            if (item["name"] in ("model-definition.yml", "model-definition.yaml")) and (
+                not model_definition_filename
+            ):
+                model_definition_filename = item["name"]
+            if item["name"].lower().startswith("readme."):
+                readme_idx = idx
+
+        if readme_idx is not None:
+            readme_filename: str = vfolder_files[readme_idx]["name"]
+            chunks = await _fetch_file(readme_filename)
+            readme = chunks.decode("utf-8")
+            readme_filetype = readme_filename.split(".")[-1]
         else:
-            return cls.parse_model(vfolder_row)
+            readme = None
+            readme_filetype = None
 
-        chunks = bytes()
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/fetch",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": f"./{yaml_name}",
-            },
-        ) as (_, storage_resp):
-            while True:
-                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                if not chunk:
-                    break
-                chunks += chunk
-        model_definition_yaml = chunks.decode("utf-8")
-        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-        try:
-            model_definition = model_definition_iv.check(model_definition_dict)
-            assert model_definition is not None
-        except t.DataError as e:
-            raise InvalidAPIParameters(
-                f"Failed to validate model definition from vFolder {folder_name} (ID"
-                f" {vfolder_row_id}): {e}",
-            ) from e
-        except yaml.error.YAMLError as e:
-            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
-        model_definition["id"] = vfolder_row_id
-        return cls.parse_model(vfolder_row, model_definition)
+        if model_definition_filename:
+            chunks = await _fetch_file(model_definition_filename)
+            model_definition_yaml = chunks.decode("utf-8")
+            model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            try:
+                model_definition = model_definition_iv.check(model_definition_dict)
+                assert model_definition is not None
+            except t.DataError as e:
+                raise InvalidAPIParameters(
+                    f"Failed to validate model definition from vFolder {folder_name} (ID"
+                    f" {vfolder_row_id}): {e}",
+                ) from e
+            except yaml.error.YAMLError as e:
+                raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+            model_definition["id"] = vfolder_row_id
+        else:
+            model_definition = None
+
+        return cls.parse_model(
+            info,
+            vfolder_row,
+            model_def=model_definition,
+            readme=readme,
+            readme_filetype=readme_filetype,
+        )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> ModelInfo:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelInfo:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -1992,8 +2048,21 @@ class ModelInfo(graphene.ObjectType):
         cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
-        additional_cond = (VFolderRow.usage_mode == VFolderUsageMode.MODEL) & (
-            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            model_store_project_gids = (
+                (
+                    await db_session.execute(
+                        sa.select([GroupRow.id]).where(
+                            (GroupRow.type == ProjectType.MODEL_STORE)
+                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+            VFolderRow.group.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
         cnt_query = cnt_query.where(additional_cond)

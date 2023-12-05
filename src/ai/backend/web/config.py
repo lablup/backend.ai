@@ -75,6 +75,7 @@ config_iv = t.Dict(
                 t.Key("directory_based_usage", default=False): t.ToBool(),
                 t.Key("allow_custom_resource_allocation", default=True): t.ToBool(),
                 t.Key("edu_appname_prefix", default=""): t.String(allow_blank=True),
+                t.Key("support_model_store", default=True): t.ToBool(),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
