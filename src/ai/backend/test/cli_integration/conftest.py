@@ -98,42 +98,15 @@ def run_given_profile(
 
 
 def get_env_from_profile(profile_env: str) -> dict[str, str]:
-    file_env = os.environ.get(profile_env, None)
-    if file_env is None:
-        raise RuntimeError(f"Missing {profile_env} env-var!")
-
-    abs_path = convert_env_to_abs_path(file_env)
-
-    if not abs_path.exists():
-        raise RuntimeError(f"Missing {abs_path} file!")
+    file_path_env = os.environ.get(profile_env, None)
+    file_path = Path(file_path_env)
 
     envs = {}
-    lines = abs_path.read_text().splitlines()
+    lines = file_path.read_text().splitlines()
     for line in lines:
         if m := _rx_env_export.search(line.strip()):
             envs[m.group("key")] = m.group("val")
     return envs
-
-
-def convert_env_to_abs_path(file_env: str) -> Path:
-    """
-    1. For a bare file name, it's verified not to be a path, and then the file name is searched in the build root.
-    2. If a relative path is entered, it causes an error (Relative paths are an incorrect format).
-    3. If an absolute path is entered, the file located at that path is retrieved and executed.
-    """
-    path = Path(file_env)
-
-    if path.is_absolute():
-        return path
-
-    if "/" in file_env or "\\" in file_env:
-        # if there are '/' or '\\' in the file name, it is considered as a relative path.
-        raise RuntimeError(
-            "Relative path is an incorrect format. Do not use '/' or '\\' in filename!!!"
-        )
-
-    build_root = find_build_root(Path(__file__))
-    return build_root / path
 
 
 @pytest.fixture

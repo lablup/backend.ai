@@ -39,18 +39,18 @@ def main(ctx: click.Context) -> None:
     metavar="PKGS",
 )
 @click.option(
-    "--user_file",
-    type=str,
+    "--user-file",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     default="env-local-user-api.sh",
 )
 @click.option(
-    "--user2_file",
-    type=str,
+    "--user2-file",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     default="env-local-user2-api.sh",
 )
 @click.option(
-    "--admin_file",
-    type=str,
+    "--admin-file",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     default="env-local-admin-api.sh",
 )
 @click.pass_context

@@ -51,6 +51,9 @@ def test_add_keypair(
         response = json.loads(p.before.decode())
         group_id = response.get("items")[0]["id"]
 
+    # FIXME: Delete the following code
+    #  When the bug, where a keypair owned by a user not added to a group is not found, is fixed.
+
     # add created users to group
     arguments = [
         "--output=json",
