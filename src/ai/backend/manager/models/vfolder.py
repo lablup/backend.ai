@@ -1826,7 +1826,7 @@ class UnsetQuotaScope(graphene.Mutation):
         )
 
 
-class ModelInfo(graphene.ObjectType):
+class ModelMetadata(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -1879,7 +1879,7 @@ class ModelInfo(graphene.ObjectType):
         model_def: dict[str, Any] | None = None,
         readme: str | None = None,
         readme_filetype: str | None = None,
-    ) -> ModelInfo:
+    ) -> ModelMetadata:
         if model_def is not None:
             models = model_def["models"]
         else:
@@ -1911,7 +1911,7 @@ class ModelInfo(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelInfo:
+    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelMetadata:
         async def _fetch_file(
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
@@ -2000,7 +2000,7 @@ class ModelInfo(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelInfo:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelMetadata:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -2074,6 +2074,6 @@ class ModelInfo(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class ModelInfoConnection(Connection):
+class ModelMetadataConnection(Connection):
     class Meta:
-        node = ModelInfo
+        node = ModelMetadata
