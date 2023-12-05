@@ -16,7 +16,8 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import joinedload, load_only, noload, relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -25,6 +26,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 
 from ..api.exceptions import VFolderOperationFailed
+from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
     EnumValueType,
@@ -152,15 +154,26 @@ users = sa.Table(
         default=False,
         nullable=False,
     ),
+    sa.Column(
+        "primary_access_key",
+        sa.String(length=20),
+        sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
+        nullable=True,  # keypairs.user is non-nullable
+    ),
 )
 
 
 class UserRow(Base):
     __table__ = users
+    # from .keypair import KeyPairRow
+
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
+    keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+
+    primary_keypair = relationship("KeyPairRow", foreign_keys=users.c.primary_access_key)
 
 
 class UserGroup(graphene.ObjectType):
@@ -220,6 +233,12 @@ class User(graphene.ObjectType):
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
+    primary_access_key = graphene.String(
+        description=(
+            "Added in 24.03.0. Work as default access key of the user. User's primary_access_key is"
+            " changable but not deletable."
+        )
+    )
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -258,6 +277,7 @@ class User(graphene.ObjectType):
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
+            primary_access_key=row["primary_access_key"],
         )
 
     @classmethod
@@ -314,6 +334,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "primary_access_key": ("primary_access_key", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -333,6 +354,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "primary_access_key": ("primary_access_key", None),
     }
 
     @classmethod
@@ -543,6 +565,7 @@ class ModifyUserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
+    primary_access_key = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -607,8 +630,8 @@ class CreateUser(graphene.Mutation):
                 {
                     "is_active": _status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    "resource_policy": "default",
-                    "rate_limit": 10000,
+                    "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                    "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
                 },
             )
             kp_insert_query = sa.insert(keypairs).values(
@@ -616,6 +639,16 @@ class CreateUser(graphene.Mutation):
                 user=created_user.uuid,
             )
             await conn.execute(kp_insert_query)
+
+            # Update user primary_keypair
+            primary_ak = kp_data["access_key"]
+            update_query = (
+                sa.update(users)
+                .where(users.c.uuid == created_user.uuid)
+                .values(primary_access_key=primary_ak)
+            )
+            await conn.execute(update_query)
+
             model_store_query = sa.select([groups.c.uuid]).where(
                 groups.c.type == ProjectType.MODEL_STORE
             )
@@ -668,6 +701,8 @@ class ModifyUser(graphene.Mutation):
         email: str,
         props: ModifyUserInput,
     ) -> ModifyUser:
+        from .keypair import KeyPairRow
+
         graph_ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
         set_if_set(props, data, "username")
@@ -682,6 +717,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "totp_activated")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "sudo_session_enabled")
+        set_if_set(props, data, "primary_access_key")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -690,12 +726,30 @@ class ModifyUser(graphene.Mutation):
         if data.get("password") is not None:
             data["password_changed_at"] = sa.func.now()
 
+        primary_access_key: str | None = data.get("primary_access_key")
         user_update_data: Dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
 
+        if primary_access_key is not None:
+            async with graph_ctx.db.begin_readonly_session() as db_session:
+                keypair_query = (
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == primary_access_key)
+                    .options(
+                        noload("*"),
+                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
+                    )
+                )
+                keypair_row: KeyPairRow = (await db_session.scalars(keypair_query)).first()
+                if keypair_row.user_row.email != email:
+                    raise RuntimeError(
+                        "Some of user's virtual folders are mounted to active kernels. "
+                        "Terminate those kernels first.",
+                    )
+
         async def _pre_func(conn: SAConnection) -> None:
-            nonlocal user_update_data, prev_domain_name, prev_role
+            nonlocal user_update_data, prev_domain_name, prev_role, primary_access_key
             result = await conn.execute(
                 sa.select([users.c.domain_name, users.c.role, users.c.status])
                 .select_from(users)
@@ -708,6 +762,26 @@ class ModifyUser(graphene.Mutation):
             if "status" in data and row.status != data["status"]:
                 user_update_data["status_info"] = (
                     "admin-requested"  # user mutation is only for admin
+                )
+            if primary_access_key is not None:
+                db_session = SASession(conn)
+                keypair_query = (
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == primary_access_key)
+                    .options(
+                        noload("*"),
+                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
+                    )
+                )
+                keypair_row: KeyPairRow = (await db_session.scalars(keypair_query)).first()
+                if keypair_row.user_row.email != email:
+                    raise RuntimeError(
+                        "Cannot set another user's access key as the primary access key."
+                    )
+                await conn.execute(
+                    sa.update(users)
+                    .where(users.c.email == email)
+                    .values(primary_access_key=primary_access_key)
                 )
 
         update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()

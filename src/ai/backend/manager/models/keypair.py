@@ -111,6 +111,8 @@ class KeyPairRow(Base):
         back_populates="keypairs",
     )
 
+    user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+
 
 class UserInfo(graphene.ObjectType):
     email = graphene.String()
@@ -630,11 +632,13 @@ class DeleteKeyPair(graphene.Mutation):
     ) -> DeleteKeyPair:
         ctx: GraphQueryContext = info.context
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-        await redis_helper.execute(
-            ctx.redis_stat,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        result = await simple_db_mutate(cls, ctx, delete_query)
+        if result.ok:
+            await redis_helper.execute(
+                ctx.redis_stat,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
+        return result
 
 
 class Dotfile(TypedDict):
