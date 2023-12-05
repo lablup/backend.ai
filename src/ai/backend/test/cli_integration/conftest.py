@@ -73,12 +73,16 @@ def run_user(
 
 
 @pytest.fixture(scope="session")
-def run_user2(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+def run_user2(
+    client_bin: Path,
+) -> Iterator[Callable[[Sequence[str | Path], tuple[Any, ...], dict[str, Any]], spawn]]:
     yield run_given_profile(client_bin, "user2_file")
 
 
 @pytest.fixture(scope="session")
-def run_admin(client_bin: Path) -> Iterator[ClientRunnerFunc]:
+def run_admin(
+    client_bin: Path,
+) -> Iterator[Callable[[Sequence[str | Path], tuple[Any, ...], dict[str, Any]], spawn]]:
     yield run_given_profile(client_bin, "admin_file")
 
 
