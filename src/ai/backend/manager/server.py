@@ -4,6 +4,7 @@ import asyncio
 import functools
 import grp
 import importlib
+import importlib.resources
 import logging
 import os
 import pwd
@@ -834,6 +835,10 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+
+    vendor_path = importlib.resources.files("ai.backend.manager.vendor")
+    assert isinstance(vendor_path, Path)
+    app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 
 

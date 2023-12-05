@@ -22,15 +22,9 @@ HTML = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Redoc</title>
-    <!-- needed for adaptive design -->
+    <title>Backend.AI REST API Reference</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
-
-    <!--
-    Redoc doesn't change outer page styles
-    -->
     <style>
       body {
         margin: 0;
@@ -40,7 +34,7 @@ HTML = """
   </head>
   <body>
     <redoc spec-url="spec/spec.json"></redoc>
-    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"> </script>
+    <script src="static/vendor/spec-viewer.js"> </script>
   </body>
 </html>
 """
