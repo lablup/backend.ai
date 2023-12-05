@@ -102,9 +102,6 @@ def get_env_from_profile(profile_env: str) -> dict[str, str]:
     if file_env is None:
         raise RuntimeError(f"Missing {profile_env} env-var!")
 
-    if file_env is None:
-        raise RuntimeError(f"Missing {profile_env} env-var!")
-
     abs_path = convert_env_to_abs_path(file_env)
 
     if not abs_path.exists():
@@ -132,7 +129,7 @@ def convert_env_to_abs_path(file_env: str) -> Path:
     if "/" in file_env or "\\" in file_env:
         # if there are '/' or '\\' in the file name, it is considered as a relative path.
         raise RuntimeError(
-            "Relative paths are an incorrect format. Do not use '/' or '\\' in filename!!!"
+            "Relative path is an incorrect format. Do not use '/' or '\\' in filename!!!"
         )
 
     build_root = find_build_root(Path(__file__))
