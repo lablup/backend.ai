@@ -7,8 +7,10 @@ from pydantic import AfterValidator, ValidationInfo
 
 def TimeDuration(
     allow_negative=False,
-) -> Callable[[int | float | str, ValidationInfo], datetime.timedelta]:
-    def validator(value: int | float | str, info: ValidationInfo) -> datetime.timedelta:
+) -> Callable[[int | float | str, ValidationInfo], datetime.timedelta | relativedelta]:
+    def validator(
+        value: int | float | str, info: ValidationInfo
+    ) -> datetime.timedelta | relativedelta:
         assert isinstance(value, (int, float, str)), "value must be a number or string"
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)

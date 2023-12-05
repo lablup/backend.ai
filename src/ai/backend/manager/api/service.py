@@ -2,7 +2,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Annotated, Any, Iterable, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -26,7 +26,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
-from ai.backend.common import validators as tx
+from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
@@ -61,7 +61,6 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    check_api_params,
     check_api_params_v2,
     get_access_key_scopes,
     get_user_uuid_scopes,
@@ -100,6 +99,10 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
+class ListServeRequestModel(BaseModel):
+    name: str | None = Field(default=None)
+
+
 class SuccessResponseModel(BaseModel):
     success: bool = Field(default=True)
 
@@ -115,13 +118,7 @@ class CompactServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(  # TODO: migrate to check_api_params_v2
-    t.Dict(
-        {
-            t.Key("name", default=None): t.Null | t.String,
-        }
-    )
-)
+@check_api_params_v2(ListServeRequestModel)
 async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -156,18 +153,39 @@ async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfo
 
 
 class RouteInfoModel(BaseModel):
-    route_id: uuid.UUID
-    session_id: uuid.UUID
+    route_id: uuid.UUID = Field(
+        description=(
+            "Unique ID referencing endpoint route. Each endpoint route has a one-to-one"
+            " relationship with the inference session."
+        )
+    )
+    session_id: uuid.UUID = Field(description="Unique ID referencing the inference session.")
     traffic_ratio: NonNegativeFloat
 
 
 class ServeInfoModel(BaseModel):
-    endpoint_id: uuid.UUID
-    name: str
-    desired_session_count: NonNegativeInt
-    active_routes: list[RouteInfoModel]
-    service_endpoint: HttpUrl | None = Field(default=None)
-    is_public: bool
+    endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    name: str = Field(description="Name of the model service.")
+    desired_session_count: NonNegativeInt = Field(
+        description="Number of identical inference sessions."
+    )
+    active_routes: list[RouteInfoModel] = Field(
+        description="Information of routes which are bound with healthy sessions."
+    )
+    service_endpoint: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "HTTP(S) endpoint to the API service. This field will be filed after the attempt to"
+            " create a first inference session succeeds. Endpoint created is fixed and immutable"
+            " for the bound endpoint until the endpoint is destroyed."
+        ),
+    )
+    is_public: bool = Field(
+        description=(
+            'Indicates if the API endpoint is open to public. In this context "public" means there'
+            " will be no authentication required to communicate with this API service."
+        )
+    )
 
 
 @auth_required
@@ -719,21 +737,28 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         return SuccessResponseModel()
 
 
+class TokenRequestModel(BaseModel):
+    duration: Annotated[str | int | float, tv.TimeDuration()] = Field(
+        default=None, description="duration of the token."
+    )
+    valid_until: int | None = Field(
+        default=None, description="Absolute token expiry date, expressed in Unix epoch format."
+    )
+
+
 class TokenResponseModel(BaseModel):
     token: str
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(  # TODO: migrate to check_api_params_v2
-    t.Dict(
-        {
-            t.Key("duration", default=None): t.Null | tx.TimeDuration,
-            t.Key("valid_until", default=None): t.Null | t.Int,
-        }
-    ),
-)
+@check_api_params_v2(TokenRequestModel)
 async def generate_token(request: web.Request, params: Any) -> TokenResponseModel:
+    """
+    Generates a token which acts as an API key to authenticate when calling model service endpoint.
+    If both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.
+    duration and valid_until can't be both specified.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -810,6 +835,12 @@ class ErrorListResponseModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def list_errors(request: web.Request) -> ErrorListResponseModel:
+    """
+    List errors raised while trying to create the inference sessions. Backend.AI will
+    stop trying to create an inference session for the model service if six (6) error stacks
+    up. The only way to clear the error and retry spawning session is to call
+    `clear_error` (POST /services/{service_id}/errors/clear) API.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
