@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import re
 import uuid
@@ -34,6 +35,7 @@ from ..defs import RESERVED_DOTFILES
 from .base import (
     GUID,
     Base,
+    EnumValueType,
     IDColumn,
     PaginatedConnectionField,
     ResourceSlotColumn,
@@ -76,6 +78,7 @@ __all__: Sequence[str] = (
     "ModifyGroup",
     "DeleteGroup",
     "GroupDotfile",
+    "ProjectType",
     "MAXIMUM_DOTFILE_SIZE",
     "query_group_dotfiles",
     "query_group_domain",
@@ -111,6 +114,11 @@ class AssocGroupUserRow(Base):
     group = relationship("GroupRow", back_populates="users")
 
 
+class ProjectType(enum.StrEnum):
+    GENERAL = "general"
+    MODEL_STORE = "model-store"
+
+
 groups = sa.Table(
     "groups",
     mapper_registry.metadata,
@@ -142,7 +150,6 @@ groups = sa.Table(
         nullable=False,
         default={},
     ),
-    sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     # dotfiles column, \x90 means empty list in msgpack
     sa.Column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
@@ -153,6 +160,13 @@ groups = sa.Table(
         sa.ForeignKey("project_resource_policies.name"),
         nullable=False,
     ),
+    sa.Column(
+        "type",
+        EnumValueType(ProjectType),
+        nullable=False,
+        default=ProjectType.GENERAL,
+    ),
+    sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
 )
 
 
@@ -244,6 +258,7 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
+    type = graphene.String(description="Added since 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -263,6 +278,7 @@ class Group(graphene.ObjectType):
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
+            type=row["type"].name,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -281,8 +297,9 @@ class Group(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Group]:
-        query = sa.select([groups]).select_from(groups)
+        query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
@@ -341,6 +358,7 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
+        type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Sequence[Group | None]]:
         j = sa.join(
             groups,
@@ -350,7 +368,7 @@ class Group(graphene.ObjectType):
         query = (
             sa.select([groups, association_groups_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids))
+            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -385,6 +403,13 @@ class Group(graphene.ObjectType):
 
 
 class GroupInput(graphene.InputObjectType):
+    type = graphene.String(
+        required=False,
+        default_value="GENERAL",
+        description=(
+            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+        ),
+    )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
     domain_name = graphene.String(required=True)
@@ -435,6 +460,7 @@ class CreateGroup(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
+            "type": ProjectType[props.type],
             "description": props.description,
             "is_active": props.is_active,
             "domain_name": props.domain_name,

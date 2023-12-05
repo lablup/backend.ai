@@ -121,6 +121,29 @@ model_definition_iv = t.Dict(
                             ),
                         }
                     ),
+                    t.Key("metadata"): t.Null | t.Dict(
+                        {
+                            t.Key("author", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("title", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("version", default=None): t.Null | t.Int | t.String,
+                            tx.AliasedKey(
+                                ["created", "created_at"], default=None
+                            ): t.Null | t.String(allow_blank=True),
+                            tx.AliasedKey(
+                                ["last_modified", "modified_at"], default=None
+                            ): t.Null | t.String(allow_blank=True),
+                            t.Key("description", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("task", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("category", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("architecture", default=None): t.Null | t.String(
+                                allow_blank=True
+                            ),
+                            t.Key("framework", default=None): t.Null | t.List(t.String),
+                            t.Key("label", default=None): t.Null | t.List(t.String),
+                            t.Key("license", default=None): t.Null | t.String(allow_blank=True),
+                            t.Key("min_resource", default=None): t.Null | t.Dict().allow_extra("*"),
+                        }
+                    ).allow_extra("*"),
                 }
             )
         )
