@@ -1,8 +1,7 @@
 import logging
-import re
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -70,17 +69,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-SESSION_NAME_MATCHER = re.compile(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII)
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class UndefChecker(t.Trafaret):
-    def check_and_return(self, value: Any) -> object:
-        if value == undefined:
-            return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
 
 
 async def is_user_allowed_to_access_resource(
@@ -108,18 +97,38 @@ class SuccessResponseModel(BaseModel):
 
 
 class CompactServeInfoModel(BaseModel):
-    id: uuid.UUID
-    name: str
-    desired_session_count: NonNegativeInt
-    active_route_count: NonNegativeInt
-    service_endpoint: HttpUrl | None = Field(default=None)
-    is_public: bool
+    id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    name: str = Field(description="Name of the model service.")
+    desired_session_count: NonNegativeInt = Field(
+        description="Number of identical inference sessions."
+    )
+    active_route_count: NonNegativeInt = Field(
+        description=(
+            "Information of routes which are actually spawned and ready to accept the traffic."
+        )
+    )
+    service_endpoint: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "HTTP(S) endpoint to the API service. This field will be filed after the attempt to"
+            " create a first inference session succeeds. Endpoint created is fixed and immutable"
+            " for the bound endpoint until the endpoint is destroyed."
+        ),
+    )
+    is_public: bool = Field(
+        description=(
+            'Indicates if the API endpoint is open to public. In this context "public" means there'
+            " will be no authentication required to communicate with this API service."
+        )
+    )
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(ListServeRequestModel)
-async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfoModel]:
+async def list_serve(
+    request: web.Request, params: ListServeRequestModel
+) -> list[CompactServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
@@ -127,8 +136,8 @@ async def list_serve(request: web.Request, params: Any) -> list[CompactServeInfo
     query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
         EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
     )
-    if params["name"]:
-        query_conds &= EndpointRow.name == params["name"]
+    if params.name:
+        query_conds &= EndpointRow.name == params.name
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
         query = (
@@ -249,7 +258,7 @@ class ServiceConfigModel(BaseModel):
 
 
 class NewServiceRequestModel(BaseModel):
-    service_name: str = Field(
+    service_name: tv.SessionName = Field(
         validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
         description="Name of the service",
     )
@@ -319,8 +328,6 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
     Creates a new model service. If `desired_session_count` is greater than zero,
     then inference sessions will be automatically scheduled upon successful creation of model service.
     """
-    if not SESSION_NAME_MATCHER.match(params.service_name):
-        raise InvalidAPIParameters(f"service_name must match {SESSION_NAME_MATCHER.pattern}")
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
         "owner_access_key": (
@@ -651,7 +658,9 @@ class UpdateRouteRequestModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(UpdateRouteRequestModel)
-async def update_route(request: web.Request, params: Any) -> SuccessResponseModel:
+async def update_route(
+    request: web.Request, params: UpdateRouteRequestModel
+) -> SuccessResponseModel:
     """
     Updates traffic bias of specific route.
     """
@@ -680,7 +689,7 @@ async def update_route(request: web.Request, params: Any) -> SuccessResponseMode
         query = (
             sa.update(RoutingRow)
             .where(RoutingRow.id == route_id)
-            .values({"traffic_ratio": params["traffic_ratio"]})
+            .values({"traffic_ratio": params.traffic_ratio})
         )
         await db_sess.execute(query)
         endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
@@ -738,9 +747,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
 
 
 class TokenRequestModel(BaseModel):
-    duration: Annotated[str | int | float, tv.TimeDuration()] = Field(
-        default=None, description="duration of the token."
-    )
+    duration: tv.TimeDuration = Field(default=None, description="duration of the token.")
     valid_until: int | None = Field(
         default=None, description="Absolute token expiry date, expressed in Unix epoch format."
     )
@@ -753,7 +760,7 @@ class TokenResponseModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(TokenRequestModel)
-async def generate_token(request: web.Request, params: Any) -> TokenResponseModel:
+async def generate_token(request: web.Request, params: TokenRequestModel) -> TokenResponseModel:
     """
     Generates a token which acts as an API key to authenticate when calling model service endpoint.
     If both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.
@@ -788,10 +795,10 @@ async def generate_token(request: web.Request, params: Any) -> TokenResponseMode
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params["valid_until"]:
-        exp = params["valid_until"]
-    elif params["duration"]:
-        exp = int((datetime.now() + params["duration"]).timestamp())
+    if params.valid_until:
+        exp = params.valid_until
+    elif params.duration:
+        exp = int((datetime.now() + params.duration).timestamp())
     else:
         raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
     if datetime.now().timestamp() > exp:

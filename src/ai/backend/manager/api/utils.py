@@ -161,6 +161,7 @@ async def get_user_scopes(
 P = ParamSpec("P")
 TParamTrafaret = TypeVar("TParamTrafaret", bound=t.Trafaret)
 TQueryTrafaret = TypeVar("TQueryTrafaret", bound=t.Trafaret)
+TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)
 
 
 def check_api_params(
@@ -171,14 +172,12 @@ def check_api_params(
 ) -> Callable[
     # We mark the arg for the validated param as Any because we cannot define a generic type of
     # Trafaret's return value.
-    [Callable[Concatenate[web.Request, Any, P], Awaitable[web.StreamResponse]]],
-    Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]],
+    [Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]],
+    Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]],
 ]:
-    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[web.StreamResponse]]):
+    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]):
         @functools.wraps(handler)
-        async def wrapped(
-            request: web.Request, *args: P.args, **kwargs: P.kwargs
-        ) -> web.StreamResponse:
+        async def wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
             orig_params: Any
             body: str = ""
             try:
@@ -220,13 +219,14 @@ def check_api_params_v2(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-    request_examples: list[Any] | None = None,
 ) -> Callable[
-    [Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel]]],
+    [Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel | list]]],
     Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]],
 ]:
     def wrap(
-        handler: Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel]]
+        handler: Callable[
+            Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel | list]
+        ]
     ) -> Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]]:
         @functools.wraps(handler)
         async def wrapped(
@@ -264,8 +264,6 @@ def check_api_params_v2(
                     raise RuntimeError("Unsupported response type")
 
         set_handler_attr(wrapped, "request_scheme", checker)
-        if request_examples:
-            set_handler_attr(wrapped, "request_examples", request_examples)
 
         return wrapped
 
