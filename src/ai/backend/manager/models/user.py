@@ -731,23 +731,6 @@ class ModifyUser(graphene.Mutation):
         prev_domain_name: str
         prev_role: UserRole
 
-        if primary_access_key is not None:
-            async with graph_ctx.db.begin_readonly_session() as db_session:
-                keypair_query = (
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == primary_access_key)
-                    .options(
-                        noload("*"),
-                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-                    )
-                )
-                keypair_row: KeyPairRow = (await db_session.scalars(keypair_query)).first()
-                if keypair_row.user_row.email != email:
-                    raise RuntimeError(
-                        "Some of user's virtual folders are mounted to active kernels. "
-                        "Terminate those kernels first.",
-                    )
-
         async def _pre_func(conn: SAConnection) -> None:
             nonlocal user_update_data, prev_domain_name, prev_role, primary_access_key
             result = await conn.execute(
@@ -773,7 +756,11 @@ class ModifyUser(graphene.Mutation):
                         joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
                     )
                 )
-                keypair_row: KeyPairRow = (await db_session.scalars(keypair_query)).first()
+                keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
+                if keypair_row is None:
+                    raise RuntimeError(
+                        "Cannot set non-existing access key as the primary access key."
+                    )
                 if keypair_row.user_row.email != email:
                     raise RuntimeError(
                         "Cannot set another user's access key as the primary access key."

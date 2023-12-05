@@ -36,6 +36,7 @@ _default_list_fields = (
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
     user_fields["sudo_session_enabled"],
+    user_fields["primary_access_key"],
 )
 
 _default_detail_fields = (
@@ -52,6 +53,7 @@ _default_detail_fields = (
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
     user_fields["sudo_session_enabled"],
+    user_fields["primary_access_key"],
 )
 
 
@@ -322,6 +324,7 @@ class User(BaseFunction):
         totp_activated: bool | Undefined = undefined,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
+        primary_access_key: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -348,6 +351,7 @@ class User(BaseFunction):
         set_if_set(inputs, "totp_activated", totp_activated)
         set_if_set(inputs, "group_ids", group_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
+        set_if_set(inputs, "primary_access_key", primary_access_key)
         variables = {
             "email": email,
             "input": inputs,
