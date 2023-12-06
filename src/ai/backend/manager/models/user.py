@@ -235,8 +235,9 @@ class User(graphene.ObjectType):
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Work as default access key of the user. User's main_access_key is"
-            " changable but not deletable."
+            "Added in 24.03.0. Used as the default authentication credential for password-based"
+            " logins and sets the user's total resource usage limit. User's main_access_key cannot"
+            " be deleted, and only super-admin can replace main_access_key."
         )
     )
 
