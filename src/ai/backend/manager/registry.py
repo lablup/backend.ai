@@ -1762,6 +1762,29 @@ class AgentRegistry:
             "public_key": public_key.decode("utf-8"),
         }
 
+    async def get_user_occupancy(self, user_id, *, db_sess=None):
+        known_slot_types = await self.shared_config.get_resource_slots()
+
+        async def _query() -> ResourceSlot:
+            async with reenter_txn_session(self.db, db_sess) as _sess:
+                subq = sa.select(KeyPairRow.access_key).where(KeyPairRow.user == user_id)
+                query = sa.select(KernelRow.occupied_slots).where(
+                    (KernelRow.access_key.in_(subq))
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                )
+                zero = ResourceSlot()
+                user_occupied = sum(
+                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
+                )
+                # drop no-longer used slot types
+                user_occupied = ResourceSlot(
+                    {key: val for key, val in user_occupied.items() if key in known_slot_types}
+                )
+                return user_occupied
+
+        return await execute_with_retry(_query)
+
     async def get_keypair_occupancy(self, access_key, *, db_sess=None):
         known_slot_types = await self.shared_config.get_resource_slots()
 
