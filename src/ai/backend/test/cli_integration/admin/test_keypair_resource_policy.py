@@ -7,8 +7,9 @@ from ...utils.cli import EOF, ClientRunnerFunc
 def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Add keypair resource policy ]")
 
+    vfolder_volume_name = "local:volume1"
     vfolder_host_perms_obj = {
-        "local:volume1": [
+        vfolder_volume_name: [
             "create-vfolder",
             "delete-vfolder",
             "mount-in-session",
@@ -67,17 +68,25 @@ def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resour
     assert (
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert set(allowed_vfolder_hosts_json.get("local:volume1")) == set(
-        vfolder_host_perms_obj.get("local:volume1")
-    )
-    "Test keypair resource policy allowed vfolder hosts mismatch"
+
+    assert (
+        vfolder_volume_name in allowed_vfolder_hosts_json
+    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    assert (
+        vfolder_volume_name in vfolder_host_perms_obj
+    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+
+    assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
+        vfolder_host_perms_obj[vfolder_volume_name]
+    ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
 def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Update keypair resource policy ]")
 
+    vfolder_volume_name = "local:volume2"
     vfolder_host_perms_obj = {
-        "local:volume2": [
+        vfolder_volume_name: [
             "create-vfolder",
             "delete-vfolder",
             "mount-in-session",
@@ -136,8 +145,15 @@ def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     assert (
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert set(allowed_vfolder_hosts_json.get("local:volume2")) == set(
-        vfolder_host_perms_obj.get("local:volume2")
+
+    assert (
+        vfolder_volume_name in allowed_vfolder_hosts_json
+    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    assert (
+        vfolder_volume_name in vfolder_host_perms_obj
+    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
+        vfolder_host_perms_obj[vfolder_volume_name]
     ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 

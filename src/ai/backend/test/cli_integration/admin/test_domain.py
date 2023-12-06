@@ -7,8 +7,9 @@ from ...utils.cli import EOF, ClientRunnerFunc
 def test_add_domain(run_admin: ClientRunnerFunc):
     print("[ Add domain ]")
 
+    vfolder_volume_name = "local:volume1"
     vfolder_host_perms_obj = {
-        "local:volume1": [
+        vfolder_volume_name: [
             "create-vfolder",
             "delete-vfolder",
             "mount-in-session",
@@ -55,9 +56,15 @@ def test_add_domain(run_admin: ClientRunnerFunc):
     assert test_domain.get("description") == "Test domain", "Domain description mismatch"
     assert test_domain.get("is_active") is False, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
-    assert allowed_vfolder_hosts_json.get("local:volume1")
-    assert set(allowed_vfolder_hosts_json.get("local:volume1")) == set(
-        vfolder_host_perms_obj.get("local:volume1")
+
+    assert (
+        vfolder_volume_name in allowed_vfolder_hosts_json
+    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    assert (
+        vfolder_volume_name in vfolder_host_perms_obj
+    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
+        vfolder_host_perms_obj[vfolder_volume_name]
     )
     "Domain allowed vfolder hosts mismatch"
     assert test_domain.get("allowed_docker_registries") == [
@@ -68,9 +75,9 @@ def test_add_domain(run_admin: ClientRunnerFunc):
 def test_update_domain(run_admin: ClientRunnerFunc):
     print("[ Update domain ]")
 
-    # vfolder
+    vfolder_volume_name = "local:volume2"
     vfolder_host_perms_obj = {
-        "local:volume2": [
+        vfolder_volume_name: [
             "create-vfolder",
             "delete-vfolder",
             "mount-in-session",
@@ -121,10 +128,17 @@ def test_update_domain(run_admin: ClientRunnerFunc):
     assert test_domain.get("description") == "Test domain updated", "Domain description mismatch"
     assert test_domain.get("is_active") is True, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
-    assert allowed_vfolder_hosts_json.get("local:volume2")
-    assert set(allowed_vfolder_hosts_json.get("local:volume2")) == set(
-        vfolder_host_perms_obj.get("local:volume2")
+
+    assert (
+        vfolder_volume_name in allowed_vfolder_hosts_json
+    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    assert (
+        vfolder_volume_name in vfolder_host_perms_obj
+    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
+        vfolder_host_perms_obj[vfolder_volume_name]
     ), "Domain allowed vfolder hosts mismatch"
+
     assert test_domain.get("allowed_docker_registries") == [
         "cr1.backend.ai"
     ], "Domain allowed docker registries mismatch"
