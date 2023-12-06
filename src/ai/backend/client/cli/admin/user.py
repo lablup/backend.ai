@@ -47,7 +47,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
-        user_fields["primary_access_key"],
+        user_fields["main_access_key"],
     ]
     with Session() as session:
         try:
@@ -149,7 +149,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
-        user_fields["primary_access_key"],
+        user_fields["main_access_key"],
     ]
     try:
         with Session() as session:
@@ -369,7 +369,7 @@ def update(
     allowed_ip: Sequence[str] | Undefined,
     description: str | Undefined,
     sudo_session_enabled: bool | Undefined,
-    primary_access_key: str | Undefined,
+    main_access_key: str | Undefined,
 ):
     """
     Update an existing user.
@@ -391,7 +391,7 @@ def update(
                 allowed_client_ip=allowed_ip,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
-                primary_access_key=primary_access_key,
+                main_access_key=main_access_key,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

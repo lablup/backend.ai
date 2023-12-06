@@ -1,8 +1,8 @@
-"""user_primary_keypair
+"""user_main_keypair
 
-Revision ID: 36acd1ce117e
+Revision ID: d3f8c74bf148
 Revises: 308bcecec5c2
-Create Date: 2023-12-05 16:38:40.297142
+Create Date: 2023-12-06 12:20:11.537908
 
 """
 import enum
@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import GUID, EnumValueType, convention
 from ai.backend.manager.models.keypair import generate_keypair, generate_ssh_keypair
 
 # revision identifiers, used by Alembic.
-revision = "36acd1ce117e"
+revision = "d3f8c74bf148"
 down_revision = "308bcecec5c2"
 branch_labels = None
 depends_on = None
@@ -45,17 +45,17 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
 def upgrade():
-    op.add_column("users", sa.Column("primary_access_key", sa.String(length=20), nullable=True))
+    op.add_column("users", sa.Column("main_access_key", sa.String(length=20), nullable=True))
     op.create_foreign_key(
-        op.f("fk_users_primary_access_key_keypairs"),
+        op.f("fk_users_main_access_key_keypairs"),
         "users",
         "keypairs",
-        ["primary_access_key"],
+        ["main_access_key"],
         ["access_key"],
     )
 
-    # Update all user's primary_access_key
-    # The oldest keypair of a user will be primary_access_key
+    # Update all user's main_access_key
+    # The oldest keypair of a user will be main_access_key
     class KeyPairRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "keypairs"
         __table_args__ = {"extend_existing": True}
@@ -94,8 +94,8 @@ def upgrade():
         uuid = sa.Column("uuid", GUID, primary_key=True)
         role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
         email = sa.Column("email", sa.String(length=64))
-        primary_access_key = sa.Column(
-            "primary_access_key",
+        main_access_key = sa.Column(
+            "main_access_key",
             sa.String(length=20),
             sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
             nullable=True,
@@ -103,9 +103,9 @@ def upgrade():
         keypairs = relationship(
             "KeyPairRow", back_populates="user_row", foreign_keys=KeyPairRow.user
         )
-        primary_keypair = relationship("KeyPairRow", foreign_keys=primary_access_key)
+        main_keypair = relationship("KeyPairRow", foreign_keys=main_access_key)
 
-    def pick_primary_keypair(keypair_list: list[KeyPairRow]) -> KeyPairRow | None:
+    def pick_main_keypair(keypair_list: list[KeyPairRow]) -> KeyPairRow | None:
         try:
             return sorted(keypair_list, key=lambda k: k.created_at)[0]
         except IndexError:
@@ -139,7 +139,7 @@ def upgrade():
         user_id_pk_maps = []
         user_query = (
             sa.select(UserRow)
-            .where(UserRow.primary_access_key.is_(sa.null()))
+            .where(UserRow.main_access_key.is_(sa.null()))
             .limit(PAGE_SIZE)
             .options(selectinload(UserRow.keypairs))
         )
@@ -149,27 +149,25 @@ def upgrade():
             break
 
         for row in user_rows:
-            primary = pick_primary_keypair(row.keypairs)
+            primary = pick_main_keypair(row.keypairs)
             if primary is None:
                 # Create new keypair when the user has no keypair
                 kp_data = prepare_keypair(row.email, row.uuid, row.role)
                 db_session.execute(sa.insert(KeyPairRow).values(**kp_data))
                 user_id_pk_maps.append(
-                    {"user_id": row.uuid, "primary_access_key": kp_data["access_key"]}
+                    {"user_id": row.uuid, "main_access_key": kp_data["access_key"]}
                 )
             else:
-                user_id_pk_maps.append(
-                    {"user_id": row.uuid, "primary_access_key": primary.access_key}
-                )
+                user_id_pk_maps.append({"user_id": row.uuid, "main_access_key": primary.access_key})
 
         update_query = (
             sa.update(UserRow)
             .where(UserRow.uuid == sa.bindparam("user_id"))
-            .values(primary_access_key=sa.bindparam("primary_access_key"))
+            .values(main_access_key=sa.bindparam("main_access_key"))
         )
         db_session.execute(update_query, user_id_pk_maps)
 
 
 def downgrade():
-    op.drop_constraint(op.f("fk_users_primary_access_key_keypairs"), "users", type_="foreignkey")
-    op.drop_column("users", "primary_access_key")
+    op.drop_constraint(op.f("fk_users_main_access_key_keypairs"), "users", type_="foreignkey")
+    op.drop_column("users", "main_access_key")

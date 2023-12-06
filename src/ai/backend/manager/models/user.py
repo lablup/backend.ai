@@ -155,7 +155,7 @@ users = sa.Table(
         nullable=False,
     ),
     sa.Column(
-        "primary_access_key",
+        "main_access_key",
         sa.String(length=20),
         sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
         nullable=True,  # keypairs.user is non-nullable
@@ -173,7 +173,7 @@ class UserRow(Base):
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
 
-    primary_keypair = relationship("KeyPairRow", foreign_keys=users.c.primary_access_key)
+    main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
 
 class UserGroup(graphene.ObjectType):
@@ -233,9 +233,9 @@ class User(graphene.ObjectType):
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
-    primary_access_key = graphene.String(
+    main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Work as default access key of the user. User's primary_access_key is"
+            "Added in 24.03.0. Work as default access key of the user. User's main_access_key is"
             " changable but not deletable."
         )
     )
@@ -277,7 +277,7 @@ class User(graphene.ObjectType):
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
-            primary_access_key=row["primary_access_key"],
+            main_access_key=row["main_access_key"],
         )
 
     @classmethod
@@ -334,7 +334,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "primary_access_key": ("primary_access_key", None),
+        "main_access_key": ("main_access_key", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -354,7 +354,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "primary_access_key": ("primary_access_key", None),
+        "main_access_key": ("main_access_key", None),
     }
 
     @classmethod
@@ -565,7 +565,7 @@ class ModifyUserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
-    primary_access_key = graphene.String(required=False)
+    main_access_key = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -640,12 +640,12 @@ class CreateUser(graphene.Mutation):
             )
             await conn.execute(kp_insert_query)
 
-            # Update user primary_keypair
-            primary_ak = kp_data["access_key"]
+            # Update user main_keypair
+            main_ak = kp_data["access_key"]
             update_query = (
                 sa.update(users)
                 .where(users.c.uuid == created_user.uuid)
-                .values(primary_access_key=primary_ak)
+                .values(main_access_key=main_ak)
             )
             await conn.execute(update_query)
 
@@ -717,7 +717,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "totp_activated")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "sudo_session_enabled")
-        set_if_set(props, data, "primary_access_key")
+        set_if_set(props, data, "main_access_key")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -726,13 +726,13 @@ class ModifyUser(graphene.Mutation):
         if data.get("password") is not None:
             data["password_changed_at"] = sa.func.now()
 
-        primary_access_key: str | None = data.get("primary_access_key")
+        main_access_key: str | None = data.get("main_access_key")
         user_update_data: Dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
 
         async def _pre_func(conn: SAConnection) -> None:
-            nonlocal user_update_data, prev_domain_name, prev_role, primary_access_key
+            nonlocal user_update_data, prev_domain_name, prev_role, main_access_key
             result = await conn.execute(
                 sa.select([users.c.domain_name, users.c.role, users.c.status])
                 .select_from(users)
@@ -746,11 +746,11 @@ class ModifyUser(graphene.Mutation):
                 user_update_data["status_info"] = (
                     "admin-requested"  # user mutation is only for admin
                 )
-            if primary_access_key is not None:
+            if main_access_key is not None:
                 db_session = SASession(conn)
                 keypair_query = (
                     sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == primary_access_key)
+                    .where(KeyPairRow.access_key == main_access_key)
                     .options(
                         noload("*"),
                         joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
@@ -768,7 +768,7 @@ class ModifyUser(graphene.Mutation):
                 await conn.execute(
                     sa.update(users)
                     .where(users.c.email == email)
-                    .values(primary_access_key=primary_access_key)
+                    .values(main_access_key=main_access_key)
                 )
 
         update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
