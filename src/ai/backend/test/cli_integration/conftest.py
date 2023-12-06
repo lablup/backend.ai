@@ -98,7 +98,8 @@ def run_given_profile(
 
 
 def get_env_from_profile(profile_env: str) -> dict[str, str]:
-    file_path_env = os.environ.get(profile_env, None)
+    if not (file_path_env := os.environ.get(profile_env)):
+        raise RuntimeError(f"Missing {profile_env} enviroment variable!")
     file_path = Path(file_path_env)
 
     envs = {}
