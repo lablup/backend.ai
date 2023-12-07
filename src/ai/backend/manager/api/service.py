@@ -33,7 +33,7 @@ from ..models import (
     RouteStatus,
     RoutingRow,
     UserRow,
-    query_accessible_vfolders,
+    query_mountable_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
     vfolders,
@@ -248,7 +248,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
             extra_vf_conds = vfolders.c.id == uuid.UUID(params["config"]["model"])
-            matched_vfolders = await query_accessible_vfolders(
+            matched_vfolders = await query_mountable_vfolders(
                 conn,
                 owner_uuid,
                 user_role=request["user"]["role"],
@@ -264,7 +264,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     extra_vf_conds = (vfolders.c.name == params["config"]["model"]) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL
                     )
-                    matched_vfolders = await query_accessible_vfolders(
+                    matched_vfolders = await query_mountable_vfolders(
                         conn,
                         owner_uuid,
                         user_role=request["user"]["role"],
