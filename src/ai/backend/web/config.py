@@ -127,6 +127,11 @@ config_iv = t.Dict(
                 ).allow_extra("*"),
             },
         ).allow_extra("*"),
+        # t.Key("supergraph", default=None): t.Null | t.Dict(
+        #     {
+        #         t.Key("endpoint"): tx.URL,
+        #     },
+        # ).allow_extra("*"),
         t.Key("ui"): t.Dict(
             {
                 t.Key("brand"): t.String,
