@@ -91,9 +91,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if len(duplicate) > 0:
             raise DotfileAlreadyExists
         new_dotfiles = list(dotfiles)
-        new_dotfiles.append(
-            {"path": params["path"], "perm": params["permission"], "data": params["data"]}
-        )
+        new_dotfiles.append({
+            "path": params["path"], "perm": params["permission"], "data": params["data"]
+        })
         dotfile_packed = msgpack.packb(new_dotfiles)
         if len(dotfile_packed) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("No leftover space for dotfile storage")
@@ -106,13 +106,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
-            t.Key("domain", default=None): t.String | t.Null,
-            t.Key("path", default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+        t.Key("domain", default=None): t.String | t.Null,
+        t.Key("path", default=None): t.Null | t.String,
+    })
 )
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.LIST_OR_GET_DOTFILE (group: {0})", params["group"])
@@ -167,13 +165,11 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             if dotfiles is None:
                 raise GroupNotFound
             for entry in dotfiles:
-                resp.append(
-                    {
-                        "path": entry["path"],
-                        "permission": entry["perm"],
-                        "data": entry["data"],
-                    }
-                )
+                resp.append({
+                    "path": entry["path"],
+                    "permission": entry["perm"],
+                    "data": entry["data"],
+                })
             return web.json_response(resp)
 
 
@@ -221,9 +217,9 @@ async def update(request: web.Request, params: Any) -> web.Response:
         if len(new_dotfiles) == len(dotfiles):
             raise DotfileNotFound
 
-        new_dotfiles.append(
-            {"path": params["path"], "perm": params["permission"], "data": params["data"]}
-        )
+        new_dotfiles.append({
+            "path": params["path"], "perm": params["permission"], "data": params["data"]
+        })
         dotfile_packed = msgpack.packb(new_dotfiles)
         if len(dotfile_packed) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("No leftover space for dotfile storage")
@@ -236,13 +232,11 @@ async def update(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @admin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
-            t.Key("domain", default=None): t.String | t.Null,
-            t.Key("path"): t.String,
-        }
-    ),
+    t.Dict({
+        tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+        t.Key("domain", default=None): t.String | t.Null,
+        t.Key("path"): t.String,
+    }),
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])

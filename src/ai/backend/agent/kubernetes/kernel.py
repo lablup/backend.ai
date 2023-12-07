@@ -189,15 +189,13 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service(
-            {
-                "name": service,
-                "port": sport["container_ports"][0],  # primary port
-                "ports": sport["container_ports"],
-                "protocol": sport["protocol"],
-                "options": opts,
-            }
-        )
+        result = await self.runner.feed_start_service({
+            "name": service,
+            "port": sport["container_ports"][0],  # primary port
+            "ports": sport["container_ports"],
+            "protocol": sport["protocol"],
+            "options": opts,
+        })
         return result
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
@@ -420,28 +418,7 @@ async def prepare_krunner_env_impl(
 
             log.debug(
                 "Executing {}",
-                " ".join(
-                    [
-                        "docker",
-                        "run",
-                        "--rm",
-                        "-i",
-                        "-v",
-                        f"{archive_path}:/root/archive.tar.xz",
-                        "-v",
-                        f"{extractor_path}:/root/krunner-extractor.sh",
-                        "-v",
-                        f"{target_path.absolute().as_posix()}:/root/volume",
-                        "-e",
-                        f"KRUNNER_VERSION={current_version}",
-                        extractor_image,
-                        "/root/krunner-extractor.sh",
-                    ]
-                ),
-            )
-
-            proc = await asyncio.create_subprocess_exec(
-                *[
+                " ".join([
                     "docker",
                     "run",
                     "--rm",
@@ -456,8 +433,25 @@ async def prepare_krunner_env_impl(
                     f"KRUNNER_VERSION={current_version}",
                     extractor_image,
                     "/root/krunner-extractor.sh",
-                ]
+                ]),
             )
+
+            proc = await asyncio.create_subprocess_exec(*[
+                "docker",
+                "run",
+                "--rm",
+                "-i",
+                "-v",
+                f"{archive_path}:/root/archive.tar.xz",
+                "-v",
+                f"{extractor_path}:/root/krunner-extractor.sh",
+                "-v",
+                f"{target_path.absolute().as_posix()}:/root/volume",
+                "-e",
+                f"KRUNNER_VERSION={current_version}",
+                extractor_image,
+                "/root/krunner-extractor.sh",
+            ])
             if await proc.wait() != 0:
                 raise RuntimeError("extracting krunner environment has failed!")
     except Exception:

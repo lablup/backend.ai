@@ -7,6 +7,7 @@ Create Date: 2023-02-15 15:24:29.112938
 Reference: https://www.postgresql.org/message-id/CANu8FiwwBxZZGX23=Na_7bc4DZ-yzd_poKhaoPmN3+SHG08MAg@mail.gmail.com
 
 """
+
 import textwrap
 
 from alembic import op

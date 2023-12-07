@@ -639,16 +639,14 @@ class Context(metaclass=ABCMeta):
             )
 
     async def alias_image(self, alias: str, target_ref: str, arch: str) -> None:
-        await self.run_manager_cli(
-            [
-                "mgr",
-                "image",
-                "alias",
-                alias,
-                target_ref,
-                arch,
-            ]
-        )
+        await self.run_manager_cli([
+            "mgr",
+            "image",
+            "alias",
+            alias,
+            target_ref,
+            arch,
+        ])
 
     async def populate_images(self) -> None:
         data: Any
@@ -716,9 +714,9 @@ class Context(metaclass=ABCMeta):
                     self.log_header("Populating local container images...")
                     for src in self.dist_info.image_payloads:
                         # TODO: Ensure src.ref
-                        await self.run_exec(
-                            [*self.docker_sudo, "docker", "load", "-i", str(src.file)]
-                        )
+                        await self.run_exec([
+                            *self.docker_sudo, "docker", "load", "-i", str(src.file)
+                        ])
                 case ImageSource.LOCAL_REGISTRY:
                     raise NotImplementedError()
 

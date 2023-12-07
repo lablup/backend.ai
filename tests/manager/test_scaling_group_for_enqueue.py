@@ -17,27 +17,21 @@ async def test_allowed_session_types_check(mock_query):
     mock_query.return_value = [
         {
             "name": "a",
-            "scheduler_opts": ScalingGroupOpts().from_json(
-                {
-                    "allowed_session_types": ["batch"],
-                }
-            ),
+            "scheduler_opts": ScalingGroupOpts().from_json({
+                "allowed_session_types": ["batch"],
+            }),
         },
         {
             "name": "b",
-            "scheduler_opts": ScalingGroupOpts().from_json(
-                {
-                    "allowed_session_types": ["interactive"],
-                }
-            ),
+            "scheduler_opts": ScalingGroupOpts().from_json({
+                "allowed_session_types": ["interactive"],
+            }),
         },
         {
             "name": "c",
-            "scheduler_opts": ScalingGroupOpts().from_json(
-                {
-                    "allowed_session_types": ["batch", "interactive"],
-                }
-            ),
+            "scheduler_opts": ScalingGroupOpts().from_json({
+                "allowed_session_types": ["batch", "interactive"],
+            }),
         },
     ]
     mock_conn = MagicMock()
@@ -132,11 +126,9 @@ async def test_allowed_session_types_check(mock_query):
     mock_query.return_value = [
         {
             "name": "a",
-            "scheduler_opts": ScalingGroupOpts.from_json(
-                {
-                    "allowed_session_types": ["batch"],
-                }
-            ),
+            "scheduler_opts": ScalingGroupOpts.from_json({
+                "allowed_session_types": ["batch"],
+            }),
         },
     ]
 

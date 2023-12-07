@@ -95,11 +95,9 @@ async def test_get_available_cores_without_docker(monkeypatch):
     with aioresponses() as m:
         m.get(
             "http://docker/info",
-            body=json.dumps(
-                {
-                    "NCPU": 4,
-                }
-            ),
+            body=json.dumps({
+                "NCPU": 4,
+            }),
         )
 
         monkeypatch.setattr(linux.os, "sched_getaffinity", mock_sched_getaffinity, raising=False)
@@ -213,12 +211,10 @@ async def test_allocate_rollback(monkeypatch):
 
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json(
-            {
-                "cpu": "1",
-                "mem": "512",
-            }
-        ),
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "512",
+        }),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -235,12 +231,10 @@ async def test_allocate_rollback(monkeypatch):
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json(
-            {
-                "cpu": "1",
-                "mem": "1024",  # should fail to allocate
-            }
-        ),
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "1024",  # should fail to allocate
+        }),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -270,12 +264,10 @@ async def test_allocate_rollback(monkeypatch):
 
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json(
-            {
-                "cpu": "1",
-                "mem": "512",
-            }
-        ),
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "512",
+        }),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -292,12 +284,10 @@ async def test_allocate_rollback(monkeypatch):
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json(
-            {
-                "cpu": "1",
-                "mem": "1024",  # should fail to allocate
-            }
-        ),
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "1024",  # should fail to allocate
+        }),
         allocations={},
         scratch_disk_size=0,
         mounts=[],

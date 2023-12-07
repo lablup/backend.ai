@@ -1,6 +1,7 @@
 """
 Manager-facing API
 """
+
 from __future__ import annotations
 
 import json
@@ -135,11 +136,9 @@ def handle_external_errors() -> Iterator[None]:
         yield
     except ExternalError as e:
         raise web.HTTPInternalServerError(
-            body=json.dumps(
-                {
-                    "msg": str(e),
-                }
-            ),
+            body=json.dumps({
+                "msg": str(e),
+            }),
             content_type="application/json",
         )
 
@@ -252,14 +251,10 @@ async def get_quota_scope(request: web.Request) -> web.Response:
                 quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
-            return web.json_response(
-                {
-                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                    "limit_bytes": (
-                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
-                    ),
-                }
-            )
+            return web.json_response({
+                "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+            })
 
 
 async def update_quota_scope(request: web.Request) -> web.Response:

@@ -73,16 +73,14 @@ BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, 
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "sessionName"], default="*") >> "session_name": t.String,
-            t.Key("ownerAccessKey", default=None) >> "owner_access_key": t.Null | t.String,
-            t.Key("sessionId", default=None) >> "session_id": t.Null | tx.UUID,
-            # NOTE: if set, sessionId overrides sessionName and ownerAccessKey parameters.
-            tx.AliasedKey(["group", "groupName"], default="*") >> "group_name": t.String,
-            t.Key("scope", default="*"): t.Enum("*", "session", "kernel"),
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["name", "sessionName"], default="*") >> "session_name": t.String,
+        t.Key("ownerAccessKey", default=None) >> "owner_access_key": t.Null | t.String,
+        t.Key("sessionId", default=None) >> "session_id": t.Null | tx.UUID,
+        # NOTE: if set, sessionId overrides sessionName and ownerAccessKey parameters.
+        tx.AliasedKey(["group", "groupName"], default="*") >> "group_name": t.String,
+        t.Key("scope", default="*"): t.Enum("*", "session", "kernel"),
+    })
 )
 @adefer
 async def push_session_events(
@@ -170,11 +168,9 @@ async def push_session_events(
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["task_id", "taskId"]): tx.UUID,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["task_id", "taskId"]): tx.UUID,
+    })
 )
 async def push_background_task_events(
     request: web.Request,
@@ -201,19 +197,17 @@ async def enqueue_kernel_creation_status_update(
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.session_id,
-                        kernels.c.session_name,
-                        kernels.c.access_key,
-                        kernels.c.cluster_role,
-                        kernels.c.cluster_idx,
-                        kernels.c.domain_name,
-                        kernels.c.group_id,
-                        kernels.c.user_uuid,
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.cluster_role,
+                    kernels.c.cluster_idx,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.user_uuid,
+                ])
                 .select_from(kernels)
                 .where(
                     (kernels.c.id == event.kernel_id),
@@ -240,19 +234,17 @@ async def enqueue_kernel_termination_status_update(
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.session_id,
-                        kernels.c.session_name,
-                        kernels.c.access_key,
-                        kernels.c.cluster_role,
-                        kernels.c.cluster_idx,
-                        kernels.c.domain_name,
-                        kernels.c.group_id,
-                        kernels.c.user_uuid,
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.cluster_role,
+                    kernels.c.cluster_idx,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.user_uuid,
+                ])
                 .select_from(kernels)
                 .where(
                     (kernels.c.id == event.kernel_id),
@@ -276,10 +268,9 @@ async def enqueue_kernel_termination_status_update(
 async def enqueue_session_creation_status_update(
     app: web.Application,
     source: AgentId,
-    event: SessionEnqueuedEvent
-    | SessionScheduledEvent
-    | SessionStartedEvent
-    | SessionCancelledEvent,
+    event: (
+        SessionEnqueuedEvent | SessionScheduledEvent | SessionStartedEvent | SessionCancelledEvent
+    ),
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -287,17 +278,15 @@ async def enqueue_session_creation_status_update(
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.session_id,
-                        kernels.c.session_name,
-                        kernels.c.access_key,
-                        kernels.c.domain_name,
-                        kernels.c.group_id,
-                        kernels.c.user_uuid,
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.user_uuid,
+                ])
                 .select_from(kernels)
                 .where(
                     (kernels.c.id == event.session_id),
@@ -325,17 +314,15 @@ async def enqueue_session_termination_status_update(
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.session_id,
-                        kernels.c.session_name,
-                        kernels.c.access_key,
-                        kernels.c.domain_name,
-                        kernels.c.group_id,
-                        kernels.c.user_uuid,
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.user_uuid,
+                ])
                 .select_from(kernels)
                 .where(
                     (kernels.c.session_id == event.session_id),
@@ -363,17 +350,15 @@ async def enqueue_batch_task_result_update(
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.session_id,
-                        kernels.c.session_name,
-                        kernels.c.access_key,
-                        kernels.c.domain_name,
-                        kernels.c.group_id,
-                        kernels.c.user_uuid,
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.user_uuid,
+                ])
                 .select_from(kernels)
                 .where(
                     (kernels.c.session_id == event.session_id),

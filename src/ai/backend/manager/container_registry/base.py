@@ -127,25 +127,23 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
-                session.add_all(
-                    [
-                        ImageRow(
-                            name=k.canonical,
-                            registry=k.registry,
-                            image=k.name,
-                            tag=k.tag,
-                            architecture=k.architecture,
-                            is_local=is_local,
-                            config_digest=v["config_digest"],
-                            size_bytes=v["size_bytes"],
-                            type=ImageType.COMPUTE,
-                            accelerators=v.get("accels"),
-                            labels=v["labels"],
-                            resources=v["resources"],
-                        )
-                        for k, v in _all_updates.items()
-                    ]
-                )
+                session.add_all([
+                    ImageRow(
+                        name=k.canonical,
+                        registry=k.registry,
+                        image=k.name,
+                        tag=k.tag,
+                        architecture=k.architecture,
+                        is_local=is_local,
+                        config_digest=v["config_digest"],
+                        size_bytes=v["size_bytes"],
+                        type=ImageType.COMPUTE,
+                        accelerators=v.get("accels"),
+                        labels=v["labels"],
+                        resources=v["resources"],
+                    )
+                    for k, v in _all_updates.items()
+                ])
                 await session.flush()
 
     async def scan_single_ref(self, image_ref: str) -> None:
@@ -356,11 +354,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
                 updates["resources"] = ImageRow.resources.type._schema.check(resources)
-                all_updates.get().update(
-                    {
-                        update_key: updates,
-                    }
-                )
+                all_updates.get().update({
+                    update_key: updates,
+                })
             except (InvalidImageName, InvalidImageTag) as e:
                 skip_reason = str(e)
             finally:

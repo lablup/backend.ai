@@ -156,51 +156,45 @@ def local_config(
     postgres_addr = postgres_container[1]
 
     # Establish a self-contained config.
-    cfg = LocalConfig(
-        {
-            **etcd_config_iv.check(
-                {
-                    "etcd": {
-                        "namespace": test_id,
-                        "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-                    },
-                }
-            ),
-            "redis": redis_config_iv.check(
-                {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                }
-            ),
-            "db": {
-                "addr": postgres_addr,
-                "name": test_db,
-                "user": "postgres",
-                "password": "develove",
-                "pool-size": 8,
-                "max-overflow": 64,
+    cfg = LocalConfig({
+        **etcd_config_iv.check({
+            "etcd": {
+                "namespace": test_id,
+                "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
             },
-            "manager": {
-                "id": f"i-{test_id}",
-                "num-proc": 1,
-                "distributed-lock": "filelock",
-                "ipc-base-path": ipc_base_path,
-                "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
-                "allowed-plugins": set(),
-                "disabled-plugins": set(),
+        }),
+        "redis": redis_config_iv.check({
+            "addr": {
+                "host": redis_addr.host,
+                "port": redis_addr.port,
             },
-            "debug": {
-                "enabled": False,
-                "log-events": False,
-                "log-scheduler-ticks": False,
-                "periodic-sync-stats": False,
-            },
-            "logging": logging_config,
-        }
-    )
+            "redis_helper_config": config.redis_helper_default_config,
+        }),
+        "db": {
+            "addr": postgres_addr,
+            "name": test_db,
+            "user": "postgres",
+            "password": "develove",
+            "pool-size": 8,
+            "max-overflow": 64,
+        },
+        "manager": {
+            "id": f"i-{test_id}",
+            "num-proc": 1,
+            "distributed-lock": "filelock",
+            "ipc-base-path": ipc_base_path,
+            "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+            "allowed-plugins": set(),
+            "disabled-plugins": set(),
+        },
+        "debug": {
+            "enabled": False,
+            "log-events": False,
+            "log-scheduler-ticks": False,
+            "periodic-sync-stats": False,
+        },
+        "logging": logging_config,
+    })
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()
@@ -731,13 +725,11 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
 
     async def create_kernel(image="lua:5.3-alpine", tag=None):
         url = "/v3/kernel/"
-        req_bytes = json.dumps(
-            {
-                "image": image,
-                "tag": tag,
-                "clientSessionToken": sess_id,
-            }
-        ).encode()
+        req_bytes = json.dumps({
+            "image": image,
+            "tag": tag,
+            "clientSessionToken": sess_id,
+        }).encode()
         headers = get_headers("POST", url, req_bytes)
         response = await client.post(url, data=req_bytes, headers=headers)
         return await response.json()

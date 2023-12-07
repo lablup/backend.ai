@@ -756,9 +756,9 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                await pipe.mget(
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
-                )
+                await pipe.mget([
+                    f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"
+                ])
             return pipe
 
         stats = []

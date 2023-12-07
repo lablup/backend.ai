@@ -5,6 +5,7 @@ Revises: 01456c812164
 Create Date: 2019-03-30 01:45:07.525096
 
 """
+
 from decimal import Decimal
 
 import sqlalchemy as sa

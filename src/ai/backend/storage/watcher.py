@@ -33,13 +33,11 @@ async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
         if task.cancelled():
             continue
         if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during loop shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+            loop.call_exception_handler({
+                "message": "unhandled exception during loop shutdown",
+                "exception": task.exception(),
+                "task": task,
+            })
 
 
 # Using extra_procs
