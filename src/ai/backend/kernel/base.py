@@ -190,6 +190,9 @@ class BaseRunner(metaclass=ABCMeta):
         # build status tracker to skip the execute step
         self._build_success = None
 
+        # initialize _health_check_status explicitly to `None`
+        self._health_check_task = None
+
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
         loop = current_loop()
@@ -251,7 +254,7 @@ class BaseRunner(metaclass=ABCMeta):
             self._main_task.cancel()
             await self._run_task
             await self._main_task
-            if health_check_task := getattr(self, "_health_check_task", None):
+            if health_check_task := self._health_check_task:
                 health_check_task.cancel()
                 await health_check_task
             log.debug("terminating service processes...")
