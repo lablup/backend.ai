@@ -190,7 +190,8 @@ class BaseRunner(metaclass=ABCMeta):
         # build status tracker to skip the execute step
         self._build_success = None
 
-        # This attribute can be accessed from non-model serving kernels either.
+        # A reference to the health check task for model-serving kernels.
+        # It will be cancelled gracefully on kernel shutdown.
         self._health_check_task = None
 
     async def _init(self, cmdargs) -> None:
