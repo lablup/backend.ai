@@ -10,6 +10,7 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from passlib.hash import bcrypt
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
@@ -590,6 +591,8 @@ class CreateUser(graphene.Mutation):
             _status = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
         else:
             _status = UserStatus(props.status)
+        group_ids = [] if props.group_ids is Undefined else props.group_ids
+
         user_data = {
             "username": username,
             "email": email,
@@ -641,14 +644,14 @@ class CreateUser(graphene.Mutation):
             await conn.execute(update_query)
 
             # Add user to groups if group_ids parameter is provided.
-            if props.group_ids:
+            if group_ids:
                 from .group import association_groups_users, groups
 
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
                     .where(groups.c.domain_name == props.domain_name)
-                    .where(groups.c.id.in_(props.group_ids))
+                    .where(groups.c.id.in_(group_ids))
                 )
                 grps = (await conn.execute(query)).all()
                 if grps:
