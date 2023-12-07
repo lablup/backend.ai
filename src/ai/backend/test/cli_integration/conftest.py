@@ -13,8 +13,7 @@ import pytest
 from faker import Faker
 
 from ai.backend.plugin.entrypoint import find_build_root
-from ai.backend.test.utils.cli import EOF, ClientRunnerFunc
-from ai.backend.test.utils.cli import run as _run
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, run
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
@@ -49,9 +48,7 @@ def make_run_fixture(profile_env: str) -> Callable[[Path], Iterator[ClientRunner
         env_from_file = get_env_from_profile(profile_env)
 
         def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
-            return _run(
-                [client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file}
-            )
+            return run([client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file})
 
         yield run_impl
 
