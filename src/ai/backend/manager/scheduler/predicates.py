@@ -182,7 +182,7 @@ async def check_keypair_resource_limit(
     return PredicateResult(True)
 
 
-async def check_main_keypair_resource_limit(
+async def check_user_resource_limit(
     db_sess: SASession,
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,

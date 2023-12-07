@@ -1767,9 +1767,8 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                subq = sa.select(KeyPairRow.access_key).where(KeyPairRow.user == user_id)
                 query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.access_key.in_(subq))
+                    (KernelRow.user_uuid == user_id)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
