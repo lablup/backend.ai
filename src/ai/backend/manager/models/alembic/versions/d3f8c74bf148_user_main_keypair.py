@@ -136,7 +136,7 @@ def upgrade():
     sess_factory = sessionmaker(connection)
     db_session = sess_factory()
     while True:
-        user_id_pk_maps = []
+        user_id_kp_maps = []
         user_query = (
             sa.select(UserRow)
             .where(UserRow.main_access_key.is_(sa.null()))
@@ -149,23 +149,23 @@ def upgrade():
             break
 
         for row in user_rows:
-            primary = pick_main_keypair(row.keypairs)
-            if primary is None:
+            main_kp = pick_main_keypair(row.keypairs)
+            if main_kp is None:
                 # Create new keypair when the user has no keypair
                 kp_data = prepare_keypair(row.email, row.uuid, row.role)
                 db_session.execute(sa.insert(KeyPairRow).values(**kp_data))
-                user_id_pk_maps.append(
+                user_id_kp_maps.append(
                     {"user_id": row.uuid, "main_access_key": kp_data["access_key"]}
                 )
             else:
-                user_id_pk_maps.append({"user_id": row.uuid, "main_access_key": primary.access_key})
+                user_id_kp_maps.append({"user_id": row.uuid, "main_access_key": main_kp.access_key})
 
         update_query = (
             sa.update(UserRow)
             .where(UserRow.uuid == sa.bindparam("user_id"))
             .values(main_access_key=sa.bindparam("main_access_key"))
         )
-        db_session.execute(update_query, user_id_pk_maps)
+        db_session.execute(update_query, user_id_kp_maps)
 
 
 def downgrade():
