@@ -77,3 +77,6 @@ class LockID(enum.IntEnum):
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
+
+DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME: Final = "default"
+DEFAULT_KEYPAIR_RATE_LIMIT: Final = 10000

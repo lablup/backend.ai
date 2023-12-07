@@ -10,13 +10,15 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from passlib.hash import bcrypt
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import joinedload, load_only, noload, relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -25,6 +27,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 
 from ..api.exceptions import VFolderOperationFailed
+from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
     EnumValueType,
@@ -152,15 +155,26 @@ users = sa.Table(
         default=False,
         nullable=False,
     ),
+    sa.Column(
+        "main_access_key",
+        sa.String(length=20),
+        sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
+        nullable=True,  # keypairs.user is non-nullable
+    ),
 )
 
 
 class UserRow(Base):
     __table__ = users
+    # from .keypair import KeyPairRow
+
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
+    keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+
+    main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
 
 class UserGroup(graphene.ObjectType):
@@ -220,6 +234,13 @@ class User(graphene.ObjectType):
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
+    main_access_key = graphene.String(
+        description=(
+            "Added in 24.03.0. Used as the default authentication credential for password-based"
+            " logins and sets the user's total resource usage limit. User's main_access_key cannot"
+            " be deleted, and only super-admin can replace main_access_key."
+        )
+    )
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -258,6 +279,7 @@ class User(graphene.ObjectType):
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
+            main_access_key=row["main_access_key"],
         )
 
     @classmethod
@@ -314,6 +336,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": ("main_access_key", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -333,6 +356,7 @@ class User(graphene.ObjectType):
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": ("main_access_key", None),
     }
 
     @classmethod
@@ -543,6 +567,7 @@ class ModifyUserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
+    main_access_key = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -574,6 +599,8 @@ class CreateUser(graphene.Mutation):
             _status = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
         else:
             _status = UserStatus(props.status)
+        group_ids = [] if props.group_ids is Undefined else props.group_ids
+
         user_data = {
             "username": username,
             "email": email,
@@ -607,8 +634,8 @@ class CreateUser(graphene.Mutation):
                 {
                     "is_active": _status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    "resource_policy": "default",
-                    "rate_limit": 10000,
+                    "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                    "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
                 },
             )
             kp_insert_query = sa.insert(keypairs).values(
@@ -616,11 +643,21 @@ class CreateUser(graphene.Mutation):
                 user=created_user.uuid,
             )
             await conn.execute(kp_insert_query)
-            model_store_query = sa.select([groups.c.uuid]).where(
+
+            # Update user main_keypair
+            main_ak = kp_data["access_key"]
+            update_query = (
+                sa.update(users)
+                .where(users.c.uuid == created_user.uuid)
+                .values(main_access_key=main_ak)
+            )
+            await conn.execute(update_query)
+
+            model_store_query = sa.select([groups.c.id]).where(
                 groups.c.type == ProjectType.MODEL_STORE
             )
-            model_store_gid = (await conn.execute(model_store_query)).first()["uuid"]
-            gids_to_join = props.group_ids + [model_store_gid]
+            model_store_gid = (await conn.execute(model_store_query)).first()["id"]
+            gids_to_join = [*group_ids, model_store_gid]
 
             # Add user to groups if group_ids parameter is provided.
             if gids_to_join:
@@ -668,6 +705,8 @@ class ModifyUser(graphene.Mutation):
         email: str,
         props: ModifyUserInput,
     ) -> ModifyUser:
+        from .keypair import KeyPairRow
+
         graph_ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
         set_if_set(props, data, "username")
@@ -682,6 +721,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "totp_activated")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "sudo_session_enabled")
+        set_if_set(props, data, "main_access_key")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -690,12 +730,13 @@ class ModifyUser(graphene.Mutation):
         if data.get("password") is not None:
             data["password_changed_at"] = sa.func.now()
 
+        main_access_key: str | None = data.get("main_access_key")
         user_update_data: Dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
 
         async def _pre_func(conn: SAConnection) -> None:
-            nonlocal user_update_data, prev_domain_name, prev_role
+            nonlocal user_update_data, prev_domain_name, prev_role, main_access_key
             result = await conn.execute(
                 sa.select([users.c.domain_name, users.c.role, users.c.status])
                 .select_from(users)
@@ -708,6 +749,28 @@ class ModifyUser(graphene.Mutation):
             if "status" in data and row.status != data["status"]:
                 user_update_data["status_info"] = (
                     "admin-requested"  # user mutation is only for admin
+                )
+            if main_access_key is not None:
+                db_session = SASession(conn)
+                keypair_query = (
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == main_access_key)
+                    .options(
+                        noload("*"),
+                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
+                    )
+                )
+                keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
+                if keypair_row is None:
+                    raise RuntimeError("Cannot set non-existing access key as the main access key.")
+                if keypair_row.user_row.email != email:
+                    raise RuntimeError(
+                        "Cannot set another user's access key as the main access key."
+                    )
+                await conn.execute(
+                    sa.update(users)
+                    .where(users.c.email == email)
+                    .values(main_access_key=main_access_key)
                 )
 
         update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()

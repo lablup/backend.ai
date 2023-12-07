@@ -94,6 +94,7 @@ from .predicates import (
     check_group_resource_limit,
     check_keypair_resource_limit,
     check_reserved_batch_session,
+    check_user_resource_limit,
 )
 from .types import (
     AbstractScheduler,
@@ -479,6 +480,10 @@ class SchedulerDispatcher(aobject):
                             (
                                 "keypair_resource_limit",
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_resource_limit",
+                                check_user_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
                                 "user_group_resource_limit",
