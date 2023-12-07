@@ -124,7 +124,7 @@ def _list_cmd(name: str = "list", docs: str = None):
             elif format is not None:
                 options = format.split(",")
                 for opt in options:
-                    if opt not in session_fields:
+                    if opt not in session_fields or opt == "containers":
                         ctx.output.print_fail(f"There is no such format option: {opt}")
                         sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
