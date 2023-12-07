@@ -351,10 +351,10 @@ def add(
     ),
 )
 @click.option(
-    "--primary-access-key",
+    "--main-access-key",
     type=OptionalType(str),
     default=undefined,
-    help="Set primary access key which works as default.",
+    help="Set main access key which works as default.",
 )
 def update(
     ctx: CLIContext,

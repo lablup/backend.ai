@@ -762,12 +762,10 @@ class ModifyUser(graphene.Mutation):
                 )
                 keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
                 if keypair_row is None:
-                    raise RuntimeError(
-                        "Cannot set non-existing access key as the primary access key."
-                    )
+                    raise RuntimeError("Cannot set non-existing access key as the main access key.")
                 if keypair_row.user_row.email != email:
                     raise RuntimeError(
-                        "Cannot set another user's access key as the primary access key."
+                        "Cannot set another user's access key as the main access key."
                     )
                 await conn.execute(
                     sa.update(users)
