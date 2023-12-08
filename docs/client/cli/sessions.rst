@@ -82,7 +82,7 @@ Both commands offer options to specify which fields of sessions should be printe
 .. note::
     Fields for ``-f/--format`` option can be displayed by specifying comma-separated parameters.
 
-    Available parameters for this option are: ``id``, ``status``, ``status_info``, ``created_at``, ``status_changed``, ``result``, ``image``, ``type``, ``tag``, ``occupying_slots``.
+    Available parameters for this option are: ``id (session_id)``, ``main_kernel_id``, ``tag``, ``name``, ``type``, ``image``, ``registry``, ``cluster_template (reserved for future release)``, ``cluster_mode``, ``cluster_size``, ``domain_name``, ``group_name``, ``group_id``, ``agent_ids``, ``user_email``, ``user_id``, ``access_key``, ``status``, ``status_info``, ``status_changed``, ``created_at``, ``terminated_at``, ``starts_at``, ``scheduled_at``, ``startup_command``, ``result``, ``resource_opts``, ``scaling_group``, ``service_ports``, ``mounts``, ``occupying_slots``, ``dependencies``, ``abusing_reports``, ``idle_checks``.
 
     For example:
 
