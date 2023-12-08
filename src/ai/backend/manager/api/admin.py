@@ -93,13 +93,11 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
@@ -108,13 +106,11 @@ async def handle_gql(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     # FIXME: remove in v21.09

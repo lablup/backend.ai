@@ -69,46 +69,44 @@ from .exceptions import InvalidArgument
 from .models import SessionRow
 from .types import DistributedLockFactory
 
-VALID_VERSIONS: Final = frozenset(
-    [
-        # 'v1.20160915',  # deprecated
-        # 'v2.20170315',  # deprecated
-        # 'v3.20170615',  # deprecated
-        # authentication changed not to use request bodies
-        "v4.20181215",
-        # added & enabled streaming-execute API
-        "v4.20190115",
-        # changed resource/image formats
-        "v4.20190315",
-        # added user mgmt and ID/password authentication
-        # added domain/group/scaling-group
-        # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
-        "v4.20190615",
-        # added mount_map parameter when creating kernel
-        # changed GraphQL query structures for multi-container bundled sessions
-        "v5.20191215",
-        # rewrote vfolder upload/download APIs to migrate to external storage proxies
-        "v6.20200815",
-        # added standard-compliant /admin/gql endpoint
-        # deprecated /admin/graphql endpoint (still present for backward compatibility)
-        # added "groups_by_name" GQL query
-        # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
-        # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
-        "v6.20210815",
-        # added session dependencies and state callback URLs configs when creating sessions
-        # added session event webhook option to session creation API
-        # added architecture option when making image aliases
-        "v6.20220315",
-        # added payload encryption / decryption on selected transfer
-        "v6.20220615",
-        # added config/resource-slots/details, model mgmt & serving APIs
-        "v6.20230315",
-        # added quota scopes (per-user/per-project quota configs)
-        # added user & project resource policies
-        # deprecated per-vfolder quota configs (BREAKING)
-        "v7.20230615",
-    ]
-)
+VALID_VERSIONS: Final = frozenset([
+    # 'v1.20160915',  # deprecated
+    # 'v2.20170315',  # deprecated
+    # 'v3.20170615',  # deprecated
+    # authentication changed not to use request bodies
+    "v4.20181215",
+    # added & enabled streaming-execute API
+    "v4.20190115",
+    # changed resource/image formats
+    "v4.20190315",
+    # added user mgmt and ID/password authentication
+    # added domain/group/scaling-group
+    # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
+    "v4.20190615",
+    # added mount_map parameter when creating kernel
+    # changed GraphQL query structures for multi-container bundled sessions
+    "v5.20191215",
+    # rewrote vfolder upload/download APIs to migrate to external storage proxies
+    "v6.20200815",
+    # added standard-compliant /admin/gql endpoint
+    # deprecated /admin/graphql endpoint (still present for backward compatibility)
+    # added "groups_by_name" GQL query
+    # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
+    # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
+    "v6.20210815",
+    # added session dependencies and state callback URLs configs when creating sessions
+    # added session event webhook option to session creation API
+    # added architecture option when making image aliases
+    "v6.20220315",
+    # added payload encryption / decryption on selected transfer
+    "v6.20220615",
+    # added config/resource-slots/details, model mgmt & serving APIs
+    "v6.20230315",
+    # added quota scopes (per-user/per-project quota configs)
+    # added user & project resource policies
+    # deprecated per-vfolder quota configs (BREAKING)
+    "v7.20230615",
+])
 LATEST_REV_DATES: Final = {
     1: "20160915",
     2: "20170915",
@@ -174,12 +172,10 @@ async def hello(request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
-    return web.json_response(
-        {
-            "version": LATEST_API_VERSION,
-            "manager": __version__,
-        }
-    )
+    return web.json_response({
+        "version": LATEST_API_VERSION,
+        "manager": __version__,
+    })
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -891,9 +887,9 @@ async def server_main(
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
                 gid = root_ctx.local_config["manager"]["group"]
-                os.setgroups(
-                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem]
-                )
+                os.setgroups([
+                    g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+                ])
                 os.setgid(gid)
                 os.setuid(uid)
                 log.info("changed process uid and gid to {}:{}", uid, gid)

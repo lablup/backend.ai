@@ -383,13 +383,11 @@ class User(graphene.ObjectType):
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
             if group_id is not None:
-                qfparser = QueryFilterParser(
-                    {
-                        k: ("users_" + v[0], v[1])
-                        for k, v in cls._queryfilter_fieldspec.items()
-                        if isinstance(v[0], str)
-                    }
-                )
+                qfparser = QueryFilterParser({
+                    k: ("users_" + v[0], v[1])
+                    for k, v in cls._queryfilter_fieldspec.items()
+                    if isinstance(v[0], str)
+                })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -433,25 +431,21 @@ class User(graphene.ObjectType):
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
             if group_id is not None:
-                qfparser = QueryFilterParser(
-                    {
-                        k: ("users_" + v[0], v[1])
-                        for k, v in cls._queryfilter_fieldspec.items()
-                        if isinstance(v[0], str)
-                    }
-                )
+                qfparser = QueryFilterParser({
+                    k: ("users_" + v[0], v[1])
+                    for k, v in cls._queryfilter_fieldspec.items()
+                    if isinstance(v[0], str)
+                })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         if order is not None:
             if group_id is not None:
-                qoparser = QueryOrderParser(
-                    {
-                        k: ("users_" + v[0], v[1])
-                        for k, v in cls._queryorder_colmap.items()
-                        if isinstance(v[0], str)
-                    }
-                )
+                qoparser = QueryOrderParser({
+                    k: ("users_" + v[0], v[1])
+                    for k, v in cls._queryorder_colmap.items()
+                    if isinstance(v[0], str)
+                })
             else:
                 qoparser = QueryOrderParser(cls._queryorder_colmap)
             query = qoparser.append_ordering(query, order)
@@ -736,9 +730,9 @@ class ModifyUser(graphene.Mutation):
             prev_role = row.role
             user_update_data = data.copy()
             if "status" in data and row.status != data["status"]:
-                user_update_data["status_info"] = (
-                    "admin-requested"  # user mutation is only for admin
-                )
+                user_update_data[
+                    "status_info"
+                ] = "admin-requested"  # user mutation is only for admin
             if main_access_key is not None:
                 db_session = SASession(conn)
                 keypair_query = (
@@ -773,14 +767,12 @@ class ModifyUser(graphene.Mutation):
                 from ai.backend.manager.models import keypairs
 
                 result = await conn.execute(
-                    sa.select(
-                        [
-                            keypairs.c.user,
-                            keypairs.c.is_active,
-                            keypairs.c.is_admin,
-                            keypairs.c.access_key,
-                        ]
-                    )
+                    sa.select([
+                        keypairs.c.user,
+                        keypairs.c.is_active,
+                        keypairs.c.is_admin,
+                        keypairs.c.access_key,
+                    ])
                     .select_from(keypairs)
                     .where(keypairs.c.user == updated_user.uuid)
                     .order_by(sa.desc(keypairs.c.is_admin))
@@ -823,12 +815,10 @@ class ModifyUser(graphene.Mutation):
                     if kp_updates:
                         await conn.execute(
                             sa.update(keypairs)
-                            .values(
-                                {
-                                    "is_admin": bindparam("is_admin"),
-                                    "is_active": bindparam("is_active"),
-                                }
-                            )
+                            .values({
+                                "is_admin": bindparam("is_admin"),
+                                "is_active": bindparam("is_active"),
+                            })
                             .where(keypairs.c.access_key == bindparam("b_access_key")),
                             kp_updates,
                         )

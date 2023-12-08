@@ -3,13 +3,13 @@ pants_version = "2.17.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
-    "pants.backend.python.lint.black",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
     "pants.backend.experimental.python",
-    "pants.backend.experimental.python.lint.ruff",
+    # "pants.backend.experimental.python.lint.ruff",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
+    "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
     "scie",

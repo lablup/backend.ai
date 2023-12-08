@@ -351,31 +351,29 @@ async def query_accessible_vfolders(
                 if "vfolder_permissions_permission" in row_keys
                 else row.vfolders_permission
             )
-            entries.append(
-                {
-                    "name": row.vfolders_name,
-                    "id": row.vfolders_id,
-                    "host": row.vfolders_host,
-                    "quota_scope_id": row.vfolders_quota_scope_id,
-                    "usage_mode": row.vfolders_usage_mode,
-                    "created_at": row.vfolders_created_at,
-                    "last_used": row.vfolders_last_used,
-                    "max_size": row.vfolders_max_size,
-                    "max_files": row.vfolders_max_files,
-                    "ownership_type": row.vfolders_ownership_type,
-                    "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "group": str(row.vfolders_group) if row.vfolders_group else None,
-                    "creator": row.vfolders_creator,
-                    "user_email": row.users_email if "users_email" in row_keys else None,
-                    "group_name": row.groups_name if "groups_name" in row_keys else None,
-                    "is_owner": _is_owner,
-                    "permission": _perm,
-                    "unmanaged_path": row.vfolders_unmanaged_path,
-                    "cloneable": row.vfolders_cloneable,
-                    "status": row.vfolders_status,
-                    "cur_size": row.vfolders_cur_size,
-                }
-            )
+            entries.append({
+                "name": row.vfolders_name,
+                "id": row.vfolders_id,
+                "host": row.vfolders_host,
+                "quota_scope_id": row.vfolders_quota_scope_id,
+                "usage_mode": row.vfolders_usage_mode,
+                "created_at": row.vfolders_created_at,
+                "last_used": row.vfolders_last_used,
+                "max_size": row.vfolders_max_size,
+                "max_files": row.vfolders_max_files,
+                "ownership_type": row.vfolders_ownership_type,
+                "user": str(row.vfolders_user) if row.vfolders_user else None,
+                "group": str(row.vfolders_group) if row.vfolders_group else None,
+                "creator": row.vfolders_creator,
+                "user_email": row.users_email if "users_email" in row_keys else None,
+                "group_name": row.groups_name if "groups_name" in row_keys else None,
+                "is_owner": _is_owner,
+                "permission": _perm,
+                "unmanaged_path": row.vfolders_unmanaged_path,
+                "cloneable": row.vfolders_cloneable,
+                "status": row.vfolders_status,
+                "cur_size": row.vfolders_cur_size,
+            })
 
     entries: List[dict] = []
     # User vfolders.
@@ -1411,12 +1409,10 @@ class VirtualFolder(graphene.ObjectType):
         group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
-            sa.select(
-                [
-                    vfolders,
-                    groups.c.name.label("groups_name"),
-                ]
-            )
+            sa.select([
+                vfolders,
+                groups.c.name.label("groups_name"),
+            ])
             .select_from(j)
             .where(vfolders.c.group.in_(group_ids))
             .limit(limit)
