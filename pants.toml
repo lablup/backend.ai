@@ -3,7 +3,6 @@ pants_version = "2.17.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
-    "pants.backend.python.lint.black",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
     "pants.backend.experimental.python",
