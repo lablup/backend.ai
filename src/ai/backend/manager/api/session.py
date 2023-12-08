@@ -1119,7 +1119,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
                 *dependent_session_ids,
                 session_name,
             ]
-            sessions: Iterable[SessionRow | Exception] = await asyncio.gather(
+            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
                 *[
                     SessionRow.get_session(
                         db_sess,

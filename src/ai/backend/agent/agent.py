@@ -1380,20 +1380,23 @@ class AbstractAgent(
             except Exception as e:
                 return key, e
 
+        keys = []
         for key, plugin in self.computers.items():
+            keys.append(key)
             tasks.append(_get(key, plugin.instance))
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for key, result in results:
-            if isinstance(result, NotImplementedError):
-                continue
-            elif isinstance(result, Exception):
-                hwinfo[key] = {
-                    "status": "unavailable",
-                    "status_info": str(result),
-                    "metadata": {},
-                }
-            else:
-                hwinfo[key] = result
+        for key, result in zip(keys, results):
+            match result:
+                case NotImplementedError():
+                    continue
+                case BaseException():
+                    hwinfo[key] = {
+                        "status": "unavailable",
+                        "status_info": str(result),
+                        "metadata": {},
+                    }
+                case HardwareMetadata():
+                    hwinfo[key] = result
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):

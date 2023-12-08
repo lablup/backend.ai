@@ -208,7 +208,7 @@ def vfolder_permission_required(
     """
 
     def _wrapper(
-        handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]
+        handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]],
     ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
         @functools.wraps(handler)
         async def _wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> web.Response:
@@ -275,7 +275,7 @@ def vfolder_permission_required(
 
 
 def vfolder_check_exists(
-    handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]
+    handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]],
 ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
     """
     Checks if the target vfolder exists and is owned by the current user.
@@ -2911,10 +2911,11 @@ async def list_mounts(request: web.Request) -> web.Response:
             *[_fetch_mounts(sema, sess, row.id) for row in rows], return_exceptions=True
         )
         for mount in mounts:
-            if isinstance(mount, Exception):
-                # exceptions are already logged.
-                continue
-            resp["agents"][mount[0]] = mount[1]
+            match mount:
+                case BaseException():
+                    continue
+                case _:
+                    resp["agents"][mount[0]] = mount[1]
 
     return web.json_response(resp, status=200)
 

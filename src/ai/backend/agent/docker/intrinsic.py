@@ -295,12 +295,12 @@ class CPUPlugin(AbstractComputePlugin):
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: List[Decimal]
+        results: List[Decimal | None] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks = []
+                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
                 # group by container ID
                 cid_pids_map: Dict[str, List[int]] = {}
                 for pid, cid in pid_map_list:
@@ -310,7 +310,6 @@ class CPUPlugin(AbstractComputePlugin):
                 for cid, pids in cid_pids_map.items():
                     api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
-                results = []
                 for chunk in chunked_results:
                     results.extend(chunk)
             case _:

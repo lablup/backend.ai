@@ -2,7 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Any, Awaitable, Callable, Collection, Sequence, Tuple, Type, TypeVar, cast
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Collection,
+    Sequence,
+    Tuple,
+    Type,
+    cast,
+)
 
 __all__ = (
     "AsyncBarrier",
@@ -11,12 +20,10 @@ __all__ = (
     "run_through",
 )
 
-RT = TypeVar("RT")
-
 
 async def cancel_tasks(
-    tasks: Collection[asyncio.Task[RT]],
-) -> Sequence[RT | Exception]:
+    tasks: Collection[asyncio.Task[Any]],
+) -> Sequence[Any]:
     """
     Cancel all unfinished tasks from the given collection of asyncio tasks,
     using :func:`asyncio.gather()` to let them clean up concurrently.
