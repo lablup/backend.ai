@@ -50,43 +50,37 @@ default_pkg_ns = {
     "tests": "DEBUG",
 }
 
-logging_config_iv = t.Dict(
-    {
-        t.Key("level", default="INFO"): loglevel_iv,
-        t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
-        t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
-        t.Key(
-            "console",
-            default={
-                "colored": None,
-                "format": "verbose",
-            },
-        ): t.Dict(
-            {
-                t.Key("colored", default=None): t.Null | t.Bool,
-                t.Key("format", default="verbose"): logformat_iv,
-            }
-        ).allow_extra("*"),
-        t.Key("file", default=None): t.Null | t.Dict(
-            {
-                t.Key("path"): tx.Path(type="dir", auto_create=True),
-                t.Key("filename"): t.String,
-                t.Key("backup-count", default=5): t.Int[1:100],
-                t.Key("rotation-size", default="10M"): tx.BinarySize,
-                t.Key("format", default="verbose"): logformat_iv,
-            }
-        ).allow_extra("*"),
-        t.Key("logstash", default=None): t.Null | t.Dict(
-            {
-                t.Key("endpoint"): tx.HostPortPair,
-                t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
-                t.Key("ssl-enabled", default=True): t.Bool,
-                t.Key("ssl-verify", default=True): t.Bool,
-                # NOTE: logstash does not have format option.
-            }
-        ).allow_extra("*"),
-    }
-).allow_extra("*")
+logging_config_iv = t.Dict({
+    t.Key("level", default="INFO"): loglevel_iv,
+    t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
+    t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
+    t.Key(
+        "console",
+        default={
+            "colored": None,
+            "format": "verbose",
+        },
+    ): t.Dict({
+        t.Key("colored", default=None): t.Null | t.Bool,
+        t.Key("format", default="verbose"): logformat_iv,
+    }).allow_extra("*"),
+    t.Key("file", default=None): t.Null
+    | t.Dict({
+        t.Key("path"): tx.Path(type="dir", auto_create=True),
+        t.Key("filename"): t.String,
+        t.Key("backup-count", default=5): t.Int[1:100],
+        t.Key("rotation-size", default="10M"): tx.BinarySize,
+        t.Key("format", default="verbose"): logformat_iv,
+    }).allow_extra("*"),
+    t.Key("logstash", default=None): t.Null
+    | t.Dict({
+        t.Key("endpoint"): tx.HostPortPair,
+        t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
+        t.Key("ssl-enabled", default=True): t.Bool,
+        t.Key("ssl-verify", default=True): t.Bool,
+        # NOTE: logstash does not have format option.
+    }).allow_extra("*"),
+}).allow_extra("*")
 
 
 class PickledException(Exception):
@@ -149,9 +143,9 @@ class LogstashHandler(logging.Handler):
             sock.connect((str(self._endpoint.host), self._endpoint.port))
             self._sock = sock
         else:
-            raise ConfigurationError(
-                {"logging.LogstashHandler": f"unsupported protocol: {self._protocol}"}
-            )
+            raise ConfigurationError({
+                "logging.LogstashHandler": f"unsupported protocol: {self._protocol}"
+            })
 
     def cleanup(self):
         if self._sock:
@@ -173,20 +167,18 @@ class LogstashHandler(logging.Handler):
                 extra_data["exception"] = logging._defaultFormatter.formatException(record.exc_info)
 
         # This log format follows logstash's event format.
-        log = OrderedDict(
-            [
-                ("@timestamp", datetime.now().isoformat()),
-                ("@version", 1),
-                ("host", self._myhost),
-                ("logger", record.name),
-                ("path", record.pathname),
-                ("func", record.funcName),
-                ("lineno", record.lineno),
-                ("message", record.getMessage()),
-                ("level", record.levelname),
-                ("tags", list(tags)),
-            ]
-        )
+        log = OrderedDict([
+            ("@timestamp", datetime.now().isoformat()),
+            ("@version", 1),
+            ("host", self._myhost),
+            ("logger", record.name),
+            ("path", record.pathname),
+            ("func", record.funcName),
+            ("lineno", record.lineno),
+            ("message", record.getMessage()),
+            ("level", record.levelname),
+            ("tags", list(tags)),
+        ])
         log.update(extra_data)
         if self._protocol.startswith("zmq"):
             self._sock.send_json(log)
@@ -336,16 +328,14 @@ def log_worker(
             except (pickle.PickleError, TypeError):
                 # We have an unpickling error.
                 # Change into a self-created log record with exception info.
-                rec = logging.makeLogRecord(
-                    {
-                        "name": __name__,
-                        "msg": "Cannot unpickle the log record (raw data: %r)",
-                        "levelno": logging.ERROR,
-                        "levelname": "error",
-                        "args": (data,),  # attach the original data for inspection
-                        "exc_info": sys.exc_info(),
-                    }
-                )
+                rec = logging.makeLogRecord({
+                    "name": __name__,
+                    "msg": "Cannot unpickle the log record (raw data: %r)",
+                    "levelno": logging.ERROR,
+                    "levelname": "error",
+                    "args": (data,),  # attach the original data for inspection
+                    "exc_info": sys.exc_info(),
+                })
             if rec is None:
                 break
             if console_handler:
@@ -418,17 +408,15 @@ class RelayHandler(logging.Handler):
                     )
                 else:
                     exc_info = record.exc_info
-                record = logging.makeLogRecord(
-                    {
-                        "name": record.name,
-                        "pathname": record.pathname,
-                        "lineno": record.lineno,
-                        "msg": record.getMessage(),
-                        "levelno": record.levelno,
-                        "levelname": record.levelname,
-                        "exc_info": exc_info,
-                    }
-                )
+                record = logging.makeLogRecord({
+                    "name": record.name,
+                    "pathname": record.pathname,
+                    "lineno": record.lineno,
+                    "msg": record.getMessage(),
+                    "levelno": record.levelno,
+                    "levelname": record.levelname,
+                    "exc_info": exc_info,
+                })
             pickled_rec = pickle.dumps(record)
         try:
             self._sock.send(pickled_rec)

@@ -63,13 +63,11 @@ async def list_images(cli_ctx, short, installed_only):
                         map(lambda s: s.decode(), installed_agents)
                     )
                     if short:
-                        displayed_items.append(
-                            (
-                                item.image_ref.canonical,
-                                item.config_digest,
-                                formatted_installed_agents,
-                            )
-                        )
+                        displayed_items.append((
+                            item.image_ref.canonical,
+                            item.config_digest,
+                            formatted_installed_agents,
+                        ))
                     else:
                         print(f"{pformat(item)} @ {formatted_installed_agents}")
             else:

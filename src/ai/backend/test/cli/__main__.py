@@ -30,12 +30,10 @@ def main(ctx: click.Context) -> None:
 )
 @click.argument(
     "pkgs",
-    type=CommaSeparatedChoice(
-        [
-            "admin",
-            "user",
-        ]
-    ),
+    type=CommaSeparatedChoice([
+        "admin",
+        "user",
+    ]),
     metavar="PKGS",
 )
 @click.option(

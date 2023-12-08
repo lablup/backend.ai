@@ -186,12 +186,10 @@ async def test_streaming_fetch(dummy_endpoint):
 @pytest.mark.asyncio
 async def test_invalid_requests(dummy_endpoint):
     with aioresponses() as m, Session():
-        body = json.dumps(
-            {
-                "type": "https://api.backend.ai/probs/kernel-not-found",
-                "title": "Kernel Not Found",
-            }
-        ).encode("utf8")
+        body = json.dumps({
+            "type": "https://api.backend.ai/probs/kernel-not-found",
+            "title": "Kernel Not Found",
+        }).encode("utf8")
         m.post(
             dummy_endpoint,
             status=404,

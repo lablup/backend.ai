@@ -44,7 +44,7 @@ class Runner(BaseRunner):
             *map(str, cmd),
             env=self.child_env,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await proc.communicate()
         user_site = stdout.decode("utf8").strip()
