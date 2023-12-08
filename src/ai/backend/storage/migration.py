@@ -166,15 +166,17 @@ async def upgrade_2_to_3(
                         current_size = None
                     if quota_scope_id not in created_quota_scopes:
                         created_quota_scopes.add(quota_scope_id)
-                    migration_informations.append({
-                        "volume_id": volume_id,
-                        "folder_id": folder_id,
-                        "quota_scope_id": quota_scope_id,
-                        "src_path": volume.mangle_vfpath(orig_vfid),
-                        "dst_path": volume.mangle_vfpath(dst_vfid),
-                        "current_size": current_size,
-                        "old_quota": old_quota_map[folder_id],
-                    })
+                    migration_informations.append(
+                        {
+                            "volume_id": volume_id,
+                            "folder_id": folder_id,
+                            "quota_scope_id": quota_scope_id,
+                            "src_path": volume.mangle_vfpath(orig_vfid),
+                            "dst_path": volume.mangle_vfpath(dst_vfid),
+                            "current_size": current_size,
+                            "old_quota": old_quota_map[folder_id],
+                        }
+                    )
                 except Exception:
                     log.exception("error during migration of vfolder {}", folder_id)
                 finally:

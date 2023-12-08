@@ -90,9 +90,9 @@ def upgrade():
     # ### Create users based on keypair.user_id & associate keypairs.user to user record ###
     # Get all keypairs
     connection = op.get_bind()
-    query = sa.select([
-        keypairs.c.user_id, keypairs.c.access_key, keypairs.c.secret_key, keypairs.c.is_admin
-    ]).select_from(keypairs)
+    query = sa.select(
+        [keypairs.c.user_id, keypairs.c.access_key, keypairs.c.secret_key, keypairs.c.is_admin]
+    ).select_from(keypairs)
     results = connection.execute(query).fetchall()
     for keypair in results:
         email = keypair["user_id"]

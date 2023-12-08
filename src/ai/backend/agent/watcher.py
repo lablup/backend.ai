@@ -56,19 +56,23 @@ async def handle_status(request: web.Request) -> web.Response:
     else:
         status = "unknown"
     await proc.wait()
-    return web.json_response({
-        "agent-status": status,  # maybe also "inactive", "activating"
-        "watcher-status": "active",
-    })
+    return web.json_response(
+        {
+            "agent-status": status,  # maybe also "inactive", "activating"
+            "watcher-status": "active",
+        }
+    )
 
 
 async def handle_soft_reset(request: web.Request) -> web.Response:
     svc = request.app["config"]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "reload", svc])
     await proc.wait()
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_hard_reset(request: web.Request) -> web.Response:
@@ -79,9 +83,11 @@ async def handle_hard_reset(request: web.Request) -> web.Response:
     await proc.wait()
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "start", svc])
     await proc.wait()
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_shutdown(request: web.Request) -> web.Response:
@@ -91,36 +97,44 @@ async def handle_shutdown(request: web.Request) -> web.Response:
     await proc.wait()
     shutdown_enabled = True
     signal.alarm(1)
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_agent_start(request: web.Request) -> web.Response:
     svc = request.app["config"]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "start", svc])
     await proc.wait()
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_agent_stop(request: web.Request) -> web.Response:
     svc = request.app["config"]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "stop", svc])
     await proc.wait()
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_agent_restart(request: web.Request) -> web.Response:
     svc = request.app["config"]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "restart", svc])
     await proc.wait()
-    return web.json_response({
-        "result": "ok",
-    })
+    return web.json_response(
+        {
+            "result": "ok",
+        }
+    )
 
 
 async def handle_fstab_detail(request: web.Request) -> web.Response:
@@ -339,20 +353,26 @@ async def watcher_server(loop, pidx, args):
 @click.pass_context
 def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> None:
     watcher_config_iv = (
-        t.Dict({
-            t.Key("watcher"): t.Dict({
-                t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
-                t.Key("ssl-enabled", default=False): t.Bool,
-                t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
-                t.Key("target-service", default="backendai-agent.service"): t.String,
-                t.Key("soft-reset-available", default=False): t.Bool,
-            }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
-            t.Key("debug"): t.Dict({
-                t.Key("enabled", default=False): t.Bool,
-            }).allow_extra("*"),
-        })
+        t.Dict(
+            {
+                t.Key("watcher"): t.Dict(
+                    {
+                        t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
+                        t.Key("ssl-enabled", default=False): t.Bool,
+                        t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+                        t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
+                        t.Key("target-service", default="backendai-agent.service"): t.String,
+                        t.Key("soft-reset-available", default=False): t.Bool,
+                    }
+                ).allow_extra("*"),
+                t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+                t.Key("debug"): t.Dict(
+                    {
+                        t.Key("enabled", default=False): t.Bool,
+                    }
+                ).allow_extra("*"),
+            }
+        )
         .merge(config.etcd_config_iv)
         .allow_extra("*")
     )

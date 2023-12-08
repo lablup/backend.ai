@@ -38,9 +38,11 @@ def upgrade():
     # ### end Alembic commandk ###
 
     print("\nSet group's total_resource_slots with empty dictionary.")
-    query = textwrap.dedent("""\
+    query = textwrap.dedent(
+        """\
         UPDATE groups SET total_resource_slots = '{}'::jsonb;
-    """)
+    """
+    )
     connection = op.get_bind()
     connection.execute(text(query))
 

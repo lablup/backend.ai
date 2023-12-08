@@ -28,14 +28,16 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         if src_path.is_dir():
             extra_opts.append(b"-r")
         try:
-            await run([
-                b"pcp",
-                *extra_opts,
-                b"-p",
-                # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
-                os.fsencode(src_path),
-                os.fsencode(dst_path),
-            ])
+            await run(
+                [
+                    b"pcp",
+                    *extra_opts,
+                    b"-p",
+                    # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
+                    os.fsencode(src_path),
+                    os.fsencode(dst_path),
+                ]
+            )
         except CalledProcessError as e:
             raise RuntimeError(f'"pcp" command failed: {e.stderr}')
 
@@ -44,11 +46,13 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         path: Path,
     ) -> None:
         try:
-            await run([
-                b"prm",
-                b"-r",
-                os.fsencode(path),
-            ])
+            await run(
+                [
+                    b"prm",
+                    b"-r",
+                    os.fsencode(path),
+                ]
+            )
         except CalledProcessError as e:
             raise RuntimeError(f"'prm' command failed: {e.stderr}")
 

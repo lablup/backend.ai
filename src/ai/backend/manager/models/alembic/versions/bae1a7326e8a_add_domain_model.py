@@ -67,9 +67,11 @@ def upgrade():
         query = sa.insert(domains).values(
             name="default", description="Default domain", is_active=True, total_resource_slots="{}"
         )
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             INSERT INTO domains (name, description, is_active, total_resource_slots)
-            VALUES ('default', 'Default domain', True, '{}'::jsonb);""")
+            VALUES ('default', 'Default domain', True, '{}'::jsonb);"""
+        )
         connection.execute(text(query))
 
     # Fill in users' domain_name field.

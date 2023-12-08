@@ -147,9 +147,9 @@ def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
 
     # Delete keypair resource policy
     with closing(
-        run([
-            "--output=json", "admin", "keypair-resource-policy", "delete", keypair_resource_policy
-        ])
+        run(
+            ["--output=json", "admin", "keypair-resource-policy", "delete", keypair_resource_policy]
+        )
     ) as p:
         p.sendline("y")
         p.expect(EOF)

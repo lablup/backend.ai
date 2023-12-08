@@ -113,13 +113,17 @@ class Runner(BaseRunner):
                 )
                 commit_info.append(info)
 
-            self.outsock.send_multipart([
-                b"media",
-                json.dumps({
-                    "type": "application/vnd.sorna.gitgraph",
-                    "data": commit_info,
-                }).encode("utf-8"),
-            ])
+            self.outsock.send_multipart(
+                [
+                    b"media",
+                    json.dumps(
+                        {
+                            "type": "application/vnd.sorna.gitgraph",
+                            "data": commit_info,
+                        }
+                    ).encode("utf-8"),
+                ]
+            )
         else:
             raise ValueError("Unsupported show target", args.target)
 

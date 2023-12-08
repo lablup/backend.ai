@@ -52,7 +52,8 @@ NotHostPID: Final = HostPID(PID(-1))
 
 
 class SupportsAsyncClose(Protocol):
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        ...
 
 
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
@@ -114,19 +115,23 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[bool], default: bool) -> bool: ...
+def read_sysfs(path: Union[str, Path], type_: Type[bool], default: bool) -> bool:
+    ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[int], default: int) -> int: ...
+def read_sysfs(path: Union[str, Path], type_: Type[int], default: int) -> int:
+    ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> float: ...
+def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> float:
+    ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str: ...
+def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str:
+    ...
 
 
 def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Any = None) -> Any:
@@ -231,11 +236,13 @@ async def get_container_process_table(
         f"exec/{exec_id}/start",
         method="POST",
         headers={"content-type": "application/json"},
-        data=json.dumps({
-            "Stream": False,  # get response immediately
-            "Detach": False,
-            "Tty": False,
-        }),
+        data=json.dumps(
+            {
+                "Stream": False,  # get response immediately
+                "Detach": False,
+                "Tty": False,
+            }
+        ),
     ) as resp:
         result = await resp.read()
         result = result.decode("latin-1").strip().split("\n")

@@ -56,11 +56,13 @@ class Auth(BaseFunction):
         Update user's password. This API works only for account owner.
         """
         rqst = Request("POST", "/auth/update-password")
-        rqst.set_json({
-            "old_password": old_password,
-            "new_password": new_password,
-            "new_password2": new_password2,
-        })
+        rqst.set_json(
+            {
+                "old_password": old_password,
+                "new_password": new_password,
+                "new_password2": new_password2,
+            }
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -75,12 +77,14 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/auth/update-password-no-auth")
-        rqst.set_json({
-            "domain": domain,
-            "username": user_id,
-            "current_password": current_password,
-            "new_password": new_password,
-        })
+        rqst.set_json(
+            {
+                "domain": domain,
+                "username": user_id,
+                "current_password": current_password,
+                "new_password": new_password,
+            }
+        )
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
 
@@ -95,10 +99,12 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/server/update-password-no-auth")
-        rqst.set_json({
-            "username": user_id,
-            "current_password": current_password,
-            "new_password": new_password,
-        })
+        rqst.set_json(
+            {
+                "username": user_id,
+                "current_password": current_password,
+                "new_password": new_password,
+            }
+        )
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()

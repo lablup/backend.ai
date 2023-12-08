@@ -126,13 +126,15 @@ def upgrade():
 
     model_store_gid = uuid4()
     conn.execute(
-        sa.insert(groups).values({
-            "id": model_store_gid,
-            "name": "model-store",
-            "domain_name": "default",
-            "resource_policy": "default",
-            "type": ProjectType.MODEL_STORE,
-        })
+        sa.insert(groups).values(
+            {
+                "id": model_store_gid,
+                "name": "model-store",
+                "domain_name": "default",
+                "resource_policy": "default",
+                "type": ProjectType.MODEL_STORE,
+            }
+        )
     )
 
     uids = conn.execute(sa.select([users.c.uuid]).where(users.c.domain_name == "default")).all()

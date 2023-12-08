@@ -286,13 +286,15 @@ async def test_modification_queries(virtual_user_db) -> None:
 @pytest.mark.asyncio
 async def test_fieldspec(virtual_user_db) -> None:
     conn, users = virtual_user_db
-    parser = QueryFilterParser({
-        "n1": ("name", None),
-        "n2": ("full_name", lambda s: s.lower()),
-        "t1": ("type", lambda s: UserTypes[s]),
-        "hobby": (JSONFieldItem("data", "hobby"), None),
-        "tag": (ArrayFieldItem("tags"), None),
-    })
+    parser = QueryFilterParser(
+        {
+            "n1": ("name", None),
+            "n2": ("full_name", lambda s: s.lower()),
+            "t1": ("type", lambda s: UserTypes[s]),
+            "hobby": (JSONFieldItem("data", "hobby"), None),
+            "tag": (ArrayFieldItem("tags"), None),
+        }
+    )
 
     sa_query = parser.append_filter(
         sa.select([users.c.name, users.c.age]).select_from(users),

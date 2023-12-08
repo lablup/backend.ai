@@ -92,36 +92,44 @@ def example_agents():
             addr="10.0.1.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("4.0"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("4.0"),
-                "rocm.devices": Decimal("2"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("4.0"),
+                    "mem": Decimal("4096"),
+                    "cuda.shares": Decimal("4.0"),
+                    "rocm.devices": Decimal("2"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
         ),
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("3.0"),
-                "mem": Decimal("2560"),
-                "cuda.shares": Decimal("1.0"),
-                "rocm.devices": Decimal("8"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("3.0"),
+                    "mem": Decimal("2560"),
+                    "cuda.shares": Decimal("1.0"),
+                    "rocm.devices": Decimal("8"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
         ),
     ]
 
@@ -134,32 +142,40 @@ def example_mixed_agents():
             addr="10.0.1.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("4.0"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("4.0"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("4.0"),
+                    "mem": Decimal("4096"),
+                    "cuda.shares": Decimal("4.0"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                }
+            ),
         ),
         AgentRow(
             id=AgentId("i-cpu"),
             addr="10.0.2.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("3.0"),
-                "mem": Decimal("2560"),
-                "cuda.shares": Decimal("0"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("3.0"),
+                    "mem": Decimal("2560"),
+                    "cuda.shares": Decimal("0"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                }
+            ),
         ),
     ]
 
@@ -172,36 +188,44 @@ def example_agents_first_one_assigned():
             addr="10.0.1.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("2.0"),
-                "mem": Decimal("2048"),
-                "cuda.shares": Decimal("2.0"),
-                "rocm.devices": Decimal("1"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("2.0"),
-                "mem": Decimal("2048"),
-                "cuda.shares": Decimal("2.0"),
-                "rocm.devices": Decimal("1"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("2048"),
+                    "cuda.shares": Decimal("2.0"),
+                    "rocm.devices": Decimal("1"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("2048"),
+                    "cuda.shares": Decimal("2.0"),
+                    "rocm.devices": Decimal("1"),
+                }
+            ),
         ),
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("3.0"),
-                "mem": Decimal("2560"),
-                "cuda.shares": Decimal("1.0"),
-                "rocm.devices": Decimal("8"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("3.0"),
+                    "mem": Decimal("2560"),
+                    "cuda.shares": Decimal("1.0"),
+                    "rocm.devices": Decimal("8"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
         ),
     ]
 
@@ -214,36 +238,44 @@ def example_agents_no_valid():
             addr="10.0.1.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("4.0"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("4.0"),
-                "rocm.devices": Decimal("2"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("4.0"),
+                    "mem": Decimal("4096"),
+                    "cuda.shares": Decimal("4.0"),
+                    "rocm.devices": Decimal("2"),
+                }
+            ),
         ),
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
             architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
-            available_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
-            occupied_slots=ResourceSlot({
-                "cpu": Decimal("3.0"),
-                "mem": Decimal("2560"),
-                "cuda.shares": Decimal("1.0"),
-                "rocm.devices": Decimal("8"),
-            }),
+            available_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("0"),
+                    "mem": Decimal("0"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
+            occupied_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("3.0"),
+                    "mem": Decimal("2560"),
+                    "cuda.shares": Decimal("1.0"),
+                    "rocm.devices": Decimal("8"),
+                }
+            ),
         ),
     ]
 
@@ -339,12 +371,14 @@ def example_cancelled_sessions():
             cluster_mode="single-node",
             cluster_size=1,
             scaling_group_name=example_sgroup_name1,
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2.0"),
-                "mem": Decimal("1024"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("1"),
-            }),
+            requested_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("1024"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("1"),
+                }
+            ),
             target_sgroup_names=[],
             **_common_dummy_for_pending_session,
             created_at=dtparse("2021-12-28T23:59:59+00:00"),
@@ -371,12 +405,14 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2.0"),
-                        "mem": Decimal("1024"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("1"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("2.0"),
+                            "mem": Decimal("1024"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("1"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-28T23:59:59+00:00"),
@@ -391,12 +427,14 @@ def example_pending_sessions():
             cluster_mode="single-node",
             cluster_size=1,
             scaling_group_name=example_sgroup_name1,
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2.0"),
-                "mem": Decimal("1024"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("1"),
-            }),
+            requested_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("1024"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("1"),
+                }
+            ),
             target_sgroup_names=[],
             **_common_dummy_for_pending_session,
             created_at=dtparse("2021-12-28T23:59:59+00:00"),
@@ -416,12 +454,14 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "mem": Decimal("2048"),
-                        "cuda.shares": Decimal("0.5"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("1.0"),
+                            "mem": Decimal("2048"),
+                            "cuda.shares": Decimal("0.5"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-01T23:59:59+00:00"),
@@ -436,12 +476,14 @@ def example_pending_sessions():
             cluster_mode="single-node",
             cluster_size=1,
             scaling_group_name=example_sgroup_name1,
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("1.0"),
-                "mem": Decimal("2048"),
-                "cuda.shares": Decimal("0.5"),
-                "rocm.devices": Decimal("0"),
-            }),
+            requested_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("1.0"),
+                    "mem": Decimal("2048"),
+                    "cuda.shares": Decimal("0.5"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
             target_sgroup_names=[],
             **_common_dummy_for_pending_session,
             created_at=dtparse("2022-02-01T23:59:59+00:00"),
@@ -461,12 +503,14 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("0.4"),
-                        "mem": Decimal("512"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("0.4"),
+                            "mem": Decimal("512"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
@@ -484,12 +528,14 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("0.3"),
-                        "mem": Decimal("256"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("0.3"),
+                            "mem": Decimal("256"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
@@ -507,12 +553,14 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("0.3"),
-                        "mem": Decimal("256"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("0.3"),
+                            "mem": Decimal("256"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
@@ -528,12 +576,14 @@ def example_pending_sessions():
             cluster_mode="single-node",
             cluster_size=3,
             scaling_group_name=example_sgroup_name1,
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("1.0"),
-                "mem": Decimal("1024"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
+            requested_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("1.0"),
+                    "mem": Decimal("1024"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
             target_sgroup_names=[],
             **_common_dummy_for_pending_session,
             created_at=dtparse("2021-12-01T23:59:59+00:00"),
@@ -559,12 +609,14 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "mem": Decimal("512"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("1.0"),
+                            "mem": Decimal("512"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-05T00:00:00+00:00"),
@@ -582,12 +634,14 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2.0"),
-                        "mem": Decimal("512"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("1"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("2.0"),
+                            "mem": Decimal("512"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("1"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-05T00:00:00+00:00"),
@@ -600,12 +654,14 @@ def example_existing_sessions():
             status=SessionStatus.RUNNING,
             cluster_mode="single-node",
             cluster_size=2,
-            occupying_slots=ResourceSlot({
-                "cpu": Decimal("3.0"),
-                "mem": Decimal("1024"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("1"),
-            }),
+            occupying_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("3.0"),
+                    "mem": Decimal("1024"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("1"),
+                }
+            ),
             scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),
@@ -624,12 +680,14 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "mem": Decimal("2048"),
-                        "cuda.shares": Decimal("0.5"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("1.0"),
+                            "mem": Decimal("2048"),
+                            "cuda.shares": Decimal("0.5"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-09-03T00:00:00+00:00"),
@@ -642,12 +700,14 @@ def example_existing_sessions():
             name="ees02",
             cluster_mode="single-node",
             cluster_size=1,
-            occupying_slots=ResourceSlot({
-                "cpu": Decimal("1.0"),
-                "mem": Decimal("2048"),
-                "cuda.shares": Decimal("0.5"),
-                "rocm.devices": Decimal("0"),
-            }),
+            occupying_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("1.0"),
+                    "mem": Decimal("2048"),
+                    "cuda.shares": Decimal("0.5"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
             scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),
@@ -666,12 +726,14 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("4.0"),
-                        "mem": Decimal("4096"),
-                        "cuda.shares": Decimal("0"),
-                        "rocm.devices": Decimal("0"),
-                    }),
+                    requested_slots=ResourceSlot(
+                        {
+                            "cpu": Decimal("4.0"),
+                            "mem": Decimal("4096"),
+                            "cuda.shares": Decimal("0"),
+                            "rocm.devices": Decimal("0"),
+                        }
+                    ),
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-01-15T00:00:00+00:00"),
@@ -684,12 +746,14 @@ def example_existing_sessions():
             name="ees03",
             cluster_mode="single-node",
             cluster_size=1,
-            occupying_slots=ResourceSlot({
-                "cpu": Decimal("4.0"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("0"),
-                "rocm.devices": Decimal("0"),
-            }),
+            occupying_slots=ResourceSlot(
+                {
+                    "cpu": Decimal("4.0"),
+                    "mem": Decimal("4096"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("0"),
+                }
+            ),
             scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),

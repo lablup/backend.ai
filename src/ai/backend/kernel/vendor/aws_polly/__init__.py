@@ -55,10 +55,12 @@ class Runner(BaseRunner):
         return 0
 
     async def complete(self, data):
-        self.outsock.send_multipart([
-            b"completion",
-            [],
-        ])
+        self.outsock.send_multipart(
+            [
+                b"completion",
+                [],
+            ]
+        )
 
     async def interrupt(self):
         if self.inproc_runner is None:

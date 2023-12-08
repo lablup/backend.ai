@@ -31,11 +31,13 @@ async def prepare_dotfiles(
     # Feed SSH keypair and dotfiles if exists.
     internal_data = {}
     query = (
-        sa.select([
-            keypairs.c.ssh_public_key,
-            keypairs.c.ssh_private_key,
-            keypairs.c.dotfiles,
-        ])
+        sa.select(
+            [
+                keypairs.c.ssh_public_key,
+                keypairs.c.ssh_private_key,
+                keypairs.c.dotfiles,
+            ]
+        )
         .select_from(keypairs)
         .where(keypairs.c.access_key == access_key)
     )

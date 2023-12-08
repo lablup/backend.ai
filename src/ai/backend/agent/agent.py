@@ -160,17 +160,21 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 _sentinel = Sentinel.TOKEN
 
-ACTIVE_STATUS_SET = frozenset([
-    ContainerStatus.RUNNING,
-    ContainerStatus.RESTARTING,
-    ContainerStatus.PAUSED,
-])
+ACTIVE_STATUS_SET = frozenset(
+    [
+        ContainerStatus.RUNNING,
+        ContainerStatus.RESTARTING,
+        ContainerStatus.PAUSED,
+    ]
+)
 
-DEAD_STATUS_SET = frozenset([
-    ContainerStatus.EXITED,
-    ContainerStatus.DEAD,
-    ContainerStatus.REMOVING,
-])
+DEAD_STATUS_SET = frozenset(
+    [
+        ContainerStatus.EXITED,
+        ContainerStatus.DEAD,
+        ContainerStatus.REMOVING,
+    ]
+)
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
@@ -803,7 +807,8 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent("""
+        commit_status_script = textwrap.dedent(
+            """
         local key_and_value = {}
         for i, k in pairs(KEYS) do
             key_and_value[i*2-1] = k
@@ -815,7 +820,8 @@ class AbstractAgent(
                 redis.call('EXPIRE', k, ARGV[1])
             end
         end
-        """)
+        """
+        )
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
@@ -1452,7 +1458,8 @@ class AbstractAgent(
                 await self.container_lifecycle_queue.put(ev)
 
             hash_name = "abuse_report"
-            abuse_report_script = textwrap.dedent("""
+            abuse_report_script = textwrap.dedent(
+                """
                 local key = KEYS[1]
                 local new_report = cjson.decode(ARGV[1])
 
@@ -1472,7 +1479,8 @@ class AbstractAgent(
                         redis.call('HSET', key, kern_id, report_val)
                     end
                 end
-            """)
+            """
+            )
             await redis_helper.execute_script(
                 self.redis_stat_pool,
                 "report_abusing_kernels",
@@ -1795,20 +1803,24 @@ class AbstractAgent(
                 if preopen_ports is None:
                     preopen_ports = []
 
-                service_ports.append({
-                    "name": "sshd",
-                    "protocol": ServicePortProtocols.TCP,
-                    "container_ports": (2200,),
-                    "host_ports": (None,),
-                    "is_inference": False,
-                })
-                service_ports.append({
-                    "name": "ttyd",
-                    "protocol": ServicePortProtocols.HTTP,
-                    "container_ports": (7681,),
-                    "host_ports": (None,),
-                    "is_inference": False,
-                })
+                service_ports.append(
+                    {
+                        "name": "sshd",
+                        "protocol": ServicePortProtocols.TCP,
+                        "container_ports": (2200,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    }
+                )
+                service_ports.append(
+                    {
+                        "name": "ttyd",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7681,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    }
+                )
 
                 model_definition: Optional[Mapping[str, Any]] = None
                 # Read model config
@@ -1851,13 +1863,15 @@ class AbstractAgent(
                             environ["BACKEND_MODEL_NAME"] = model["name"]
                             environ["BACKEND_MODEL_PATH"] = model["model_path"]
                             if service := model.get("service"):
-                                service_ports.append({
-                                    "name": f"{model['name']}-{service['port']}",
-                                    "protocol": ServicePortProtocols.PREOPEN,
-                                    "container_ports": (service["port"],),
-                                    "host_ports": (None,),
-                                    "is_inference": True,
-                                })
+                                service_ports.append(
+                                    {
+                                        "name": f"{model['name']}-{service['port']}",
+                                        "protocol": ServicePortProtocols.PREOPEN,
+                                        "container_ports": (service["port"],),
+                                        "host_ports": (None,),
+                                        "is_inference": True,
+                                    }
+                                )
                     except DataError as e:
                         raise AgentError(
                             "Failed to validate model definition from vFolder"
@@ -1888,13 +1902,15 @@ class AbstractAgent(
                         for cport in sport["container_ports"]:
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
-                        service_ports.append({
-                            "name": f"hostport{index+1}",
-                            "protocol": ServicePortProtocols.INTERNAL,
-                            "container_ports": (port,),
-                            "host_ports": (port,),
-                            "is_inference": False,
-                        })
+                        service_ports.append(
+                            {
+                                "name": f"hostport{index+1}",
+                                "protocol": ServicePortProtocols.INTERNAL,
+                                "container_ports": (port,),
+                                "host_ports": (port,),
+                                "is_inference": False,
+                            }
+                        )
                         exposed_ports.append(port)
                     log.debug("exposed ports: {!r}", exposed_ports)
 

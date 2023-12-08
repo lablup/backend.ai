@@ -213,7 +213,8 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]: ...
+) -> Iterable[uuid.UUID]:
+    ...
 
 
 @overload
@@ -221,7 +222,8 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]: ...
+) -> Iterable[uuid.UUID]:
+    ...
 
 
 async def resolve_groups(
@@ -830,19 +832,23 @@ class GroupNode(graphene.ObjectType):
         from .user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
-        query, conditions, cursor, pagination_order, page_size = (
-            generate_sql_info_for_gql_connection(
-                info,
-                UserRow,
-                UserRow.uuid,
-                filter,
-                order,
-                offset,
-                after=after,
-                first=first,
-                before=before,
-                last=last,
-            )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            UserRow,
+            UserRow.uuid,
+            filter,
+            order,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
         )
         j = sa.join(UserRow, AssocGroupUserRow)
         user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
@@ -880,19 +886,23 @@ class GroupNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query, conditions, cursor, pagination_order, page_size = (
-            generate_sql_info_for_gql_connection(
-                info,
-                GroupRow,
-                GroupRow.id,
-                filter_expr,
-                order_expr,
-                offset,
-                after=after,
-                first=first,
-                before=before,
-                last=last,
-            )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            GroupRow,
+            GroupRow.id,
+            filter_expr,
+            order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
         )
         cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
         for cond in conditions:

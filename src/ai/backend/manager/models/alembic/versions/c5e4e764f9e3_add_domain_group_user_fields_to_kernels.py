@@ -77,18 +77,22 @@ def upgrade():
     query = sa.insert(groups).values(
         name="default", description="Default group", is_active=True, domain_name="default"
     )
-    query = textwrap.dedent("""\
+    query = textwrap.dedent(
+        """\
         INSERT INTO groups (name, description, is_active, domain_name)
         VALUES ('default', 'Default group', True, 'default')
         ON CONFLICT (name, domain_name) DO NOTHING
         RETURNING id;
-    """)
+    """
+    )
     result = connection.execute(text(query)).first()
     gid = result.id if hasattr(result, "id") else None
     if gid is None:  # group already exists
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             SELECT id FROM groups where name = 'default' and domain_name = 'default';
-        """)
+        """
+        )
         gid = connection.execute(text(query)).first().id
 
     # Fill in kernels' domain_name, group_id, and user_uuid.

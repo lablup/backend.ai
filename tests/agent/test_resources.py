@@ -95,9 +95,11 @@ async def test_get_available_cores_without_docker(monkeypatch):
     with aioresponses() as m:
         m.get(
             "http://docker/info",
-            body=json.dumps({
-                "NCPU": 4,
-            }),
+            body=json.dumps(
+                {
+                    "NCPU": 4,
+                }
+            ),
         )
 
         monkeypatch.setattr(linux.os, "sched_getaffinity", mock_sched_getaffinity, raising=False)
@@ -139,24 +141,36 @@ async def test_scan_resource_usage_per_slot():
         (tmpdir / str(kernel_ids[0]) / "config").mkdir(parents=True, exist_ok=True)
         (tmpdir / str(kernel_ids[1]) / "config").mkdir(parents=True, exist_ok=True)
         (tmpdir / str(kernel_ids[2]) / "config").mkdir(parents=True, exist_ok=True)
-        (tmpdir / str(kernel_ids[0]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        (tmpdir / str(kernel_ids[0]) / "config" / "resource.txt").write_text(
+            textwrap.dedent(
+                """
         CID=a001
         SCRATCH_SIZE=0
         MOUNTS=
         SLOTS={"cpu":"5","mem":"4096","cuda.shares":"0.5"}
-        """))
-        (tmpdir / str(kernel_ids[1]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        """
+            )
+        )
+        (tmpdir / str(kernel_ids[1]) / "config" / "resource.txt").write_text(
+            textwrap.dedent(
+                """
         CID=a002
         SCRATCH_SIZE=0
         MOUNTS=
         SLOTS={"cpu":"7","mem":"2048","cuda.shares":"0.8"}
-        """))
-        (tmpdir / str(kernel_ids[2]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        """
+            )
+        )
+        (tmpdir / str(kernel_ids[2]) / "config" / "resource.txt").write_text(
+            textwrap.dedent(
+                """
         CID=a003
         SCRATCH_SIZE=0
         MOUNTS=
         SLOTS={"cpu":"13","mem":"1024","cuda.shares":"0.2"}
-        """))
+        """
+            )
+        )
         slot_allocs = await scan_resource_usage_per_slot(kernel_ids, tmpdir)
         assert slot_allocs[SlotName("cpu")] == Decimal(25)
         assert slot_allocs[SlotName("mem")] == Decimal(7168)
@@ -211,10 +225,12 @@ async def test_allocate_rollback(monkeypatch):
 
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json({
-            "cpu": "1",
-            "mem": "512",
-        }),
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "512",
+            }
+        ),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -231,10 +247,12 @@ async def test_allocate_rollback(monkeypatch):
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json({
-            "cpu": "1",
-            "mem": "1024",  # should fail to allocate
-        }),
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "1024",  # should fail to allocate
+            }
+        ),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -264,10 +282,12 @@ async def test_allocate_rollback(monkeypatch):
 
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json({
-            "cpu": "1",
-            "mem": "512",
-        }),
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "512",
+            }
+        ),
         allocations={},
         scratch_disk_size=0,
         mounts=[],
@@ -284,10 +304,12 @@ async def test_allocate_rollback(monkeypatch):
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
         "a0001",
-        ResourceSlot.from_json({
-            "cpu": "1",
-            "mem": "1024",  # should fail to allocate
-        }),
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "1024",  # should fail to allocate
+            }
+        ),
         allocations={},
         scratch_disk_size=0,
         mounts=[],

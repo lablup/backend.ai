@@ -9,22 +9,24 @@ from ...utils.cli import EOF, ClientRunnerFunc
 def test_add_scaling_group(run: ClientRunnerFunc):
     # Create scaling group
     with closing(
-        run([
-            "--output=json",
-            "admin",
-            "scaling-group",
-            "add",
-            "-d",
-            "Test scaling group",
-            "-i",
-            "--driver",
-            "static",
-            "--driver-opts",
-            '{"x": 1}',
-            "--scheduler",
-            "fifo",
-            "test_group1",
-        ])
+        run(
+            [
+                "--output=json",
+                "admin",
+                "scaling-group",
+                "add",
+                "-d",
+                "Test scaling group",
+                "-i",
+                "--driver",
+                "static",
+                "--driver-opts",
+                '{"x": 1}',
+                "--scheduler",
+                "fifo",
+                "test_group1",
+            ]
+        )
     ) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
@@ -69,19 +71,21 @@ def test_add_scaling_group(run: ClientRunnerFunc):
 def test_update_scaling_group(run: ClientRunnerFunc):
     # Update scaling group
     with closing(
-        run([
-            "--output=json",
-            "admin",
-            "scaling-group",
-            "update",
-            "-d",
-            "Test scaling group updated",
-            "--driver",
-            "non-static",
-            "--scheduler",
-            "lifo",
-            "test_group1",
-        ])
+        run(
+            [
+                "--output=json",
+                "admin",
+                "scaling-group",
+                "update",
+                "-d",
+                "Test scaling group updated",
+                "--driver",
+                "non-static",
+                "--scheduler",
+                "lifo",
+                "test_group1",
+            ]
+        )
     ) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())

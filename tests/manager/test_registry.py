@@ -38,9 +38,11 @@ async def test_handle_heartbeat(
 
     registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
     image_data = zlib.compress(
-        msgpack.packb([
-            ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
-        ])
+        msgpack.packb(
+            [
+                ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
+            ]
+        )
     )
 
     _1 = Decimal("1")

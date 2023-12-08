@@ -49,24 +49,26 @@ def upgrade():
             break
         query = (
             sa.update(kernels)
-            .values({
-                "role": cast(
-                    coalesce(
-                        # `limit(1)` is introduced since it is possible (not prevented) for two
-                        # records have the same image name. Without `limit(1)`, the records
-                        # raises multiple values error.
-                        sa.select([images.c.labels.op("->>")("ai.backend.role")])
-                        .select_from(images)
-                        .where(images.c.name == kernels.c.image)
-                        .limit(1)
-                        .as_scalar(),
-                        # Set the default role when there is no matching image.
-                        # This may occur when one of the previously used image is deleted.
-                        KernelRole.COMPUTE.value,
-                    ),
-                    EnumType(KernelRole),
-                )
-            })
+            .values(
+                {
+                    "role": cast(
+                        coalesce(
+                            # `limit(1)` is introduced since it is possible (not prevented) for two
+                            # records have the same image name. Without `limit(1)`, the records
+                            # raises multiple values error.
+                            sa.select([images.c.labels.op("->>")("ai.backend.role")])
+                            .select_from(images)
+                            .where(images.c.name == kernels.c.image)
+                            .limit(1)
+                            .as_scalar(),
+                            # Set the default role when there is no matching image.
+                            # This may occur when one of the previously used image is deleted.
+                            KernelRole.COMPUTE.value,
+                        ),
+                        EnumType(KernelRole),
+                    )
+                }
+            )
             .where(kernels.c.id.in_(kernel_ids_to_update))
         )
         result = connection.execute(query)

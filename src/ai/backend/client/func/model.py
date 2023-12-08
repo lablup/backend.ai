@@ -61,9 +61,11 @@ class Model(BaseFunction):
         async with rqst.fetch() as resp:
             info = await resp.json()
         rqst = Request("GET", "/folders/{}/files".format(self.model_name))
-        rqst.set_json({
-            "path": "versions",
-        })
+        rqst.set_json(
+            {
+                "path": "versions",
+            }
+        )
         async with rqst.fetch() as resp:
             versions = await resp.json()
         info["versions"] = [
@@ -85,24 +87,28 @@ class Model(BaseFunction):
         cloneable: bool = False,
     ):
         rqst = Request("POST", "/folders")
-        rqst.set_json({
-            "name": name,
-            "host": host,
-            "unmanaged_path": unmanaged_path,
-            "group": group,
-            "usage_mode": "model",
-            "permission": permission,
-            "quota": quota,
-            "cloneable": cloneable,
-        })
+        rqst.set_json(
+            {
+                "name": name,
+                "host": host,
+                "unmanaged_path": unmanaged_path,
+                "group": group,
+                "usage_mode": "model",
+                "permission": permission,
+                "quota": quota,
+                "cloneable": cloneable,
+            }
+        )
         async with rqst.fetch() as resp:
             result = await resp.json()
         rqst = Request("POST", "/folders/{}/mkdir".format(name))
-        rqst.set_json({
-            "path": "versions",
-            "parents": True,
-            "exist_ok": True,
-        })
+        rqst.set_json(
+            {
+                "path": "versions",
+                "parents": True,
+                "exist_ok": True,
+            }
+        )
         async with rqst.fetch() as resp:
             await resp.text()
         return result

@@ -249,8 +249,9 @@ def _create_cmd(docs: str = None):
                     )
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled."
-                        .format(compute_session.id)
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            compute_session.id
+                        )
                     )
 
     if docs is not None:
@@ -457,8 +458,9 @@ def _create_from_template_cmd(docs: str = None):
                     print_info("Session ID {0} is still on the job queue.".format(name))
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled."
-                        .format(name)
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            name
+                        )
                     )
 
     if docs is not None:
@@ -1033,16 +1035,18 @@ session.command()(_events_cmd())
 
 
 def _fetch_session_names():
-    status = ",".join([
-        "PENDING",
-        "SCHEDULED",
-        "PREPARING",
-        "RUNNING",
-        "RUNNING_DEGRADED",
-        "RESTARTING",
-        "TERMINATING",
-        "ERROR",
-    ])
+    status = ",".join(
+        [
+            "PENDING",
+            "SCHEDULED",
+            "PREPARING",
+            "RUNNING",
+            "RUNNING_DEGRADED",
+            "RESTARTING",
+            "TERMINATING",
+            "ERROR",
+        ]
+    )
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],

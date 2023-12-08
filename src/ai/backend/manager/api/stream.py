@@ -361,13 +361,15 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
                 code = ""
                 opts.clear()
                 continue
-            await ws.send_json({
-                "status": raw_result["status"],
-                "console": raw_result.get("console"),
-                "exitCode": raw_result.get("exitCode"),
-                "options": raw_result.get("options"),
-                "files": raw_result.get("files"),
-            })
+            await ws.send_json(
+                {
+                    "status": raw_result["status"],
+                    "console": raw_result.get("console"),
+                    "exitCode": raw_result.get("exitCode"),
+                    "options": raw_result.get("options"),
+                    "files": raw_result.get("files"),
+                }
+            )
             if raw_result["status"] == "waiting-input":
                 mode = "input"
                 code = await ws.receive_str()
@@ -381,27 +383,33 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     except (json.decoder.JSONDecodeError, AssertionError) as e:
         log.warning("STREAM_EXECUTE: invalid/missing parameters: {0!r}", e)
         if not ws.closed:
-            await ws.send_json({
-                "status": "error",
-                "msg": f"Invalid API parameters: {e!r}",
-            })
+            await ws.send_json(
+                {
+                    "status": "error",
+                    "msg": f"Invalid API parameters: {e!r}",
+                }
+            )
     except BackendError as e:
         log.exception("STREAM_EXECUTE: exception")
         if not ws.closed:
-            await ws.send_json({
-                "status": "error",
-                "msg": f"BackendError: {e!r}",
-            })
+            await ws.send_json(
+                {
+                    "status": "error",
+                    "msg": f"BackendError: {e!r}",
+                }
+            )
         raise
     except asyncio.CancelledError:
         if not ws.closed:
-            await ws.send_json({
-                "status": "server-restarting",
-                "msg": (
-                    "The API server is going to restart for maintenance. "
-                    "Please connect again with the same run ID."
-                ),
-            })
+            await ws.send_json(
+                {
+                    "status": "server-restarting",
+                    "msg": (
+                        "The API server is going to restart for maintenance. "
+                        "Please connect again with the same run ID."
+                    ),
+                }
+            )
         raise
     finally:
         return ws
@@ -410,20 +418,22 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict({
-        tx.AliasedKey(["app", "service"]): t.String,
-        # The port argument is only required to use secondary ports
-        # when the target app listens multiple TCP ports.
-        # Otherwise it should be omitted or set to the same value of
-        # the actual port number used by the app.
-        tx.AliasedKey(["port"], default=None): t.Null | t.Int[1024:65535],
-        tx.AliasedKey(["envs"], default=None): t.Null | t.String,  # stringified JSON
-        # e.g., '{"PASSWORD": "12345"}'
-        tx.AliasedKey(["arguments"], default=None): t.Null | t.String,  # stringified JSON
-        # e.g., '{"-P": "12345"}'
-        # The value can be one of:
-        # None, str, List[str]
-    })
+    t.Dict(
+        {
+            tx.AliasedKey(["app", "service"]): t.String,
+            # The port argument is only required to use secondary ports
+            # when the target app listens multiple TCP ports.
+            # Otherwise it should be omitted or set to the same value of
+            # the actual port number used by the app.
+            tx.AliasedKey(["port"], default=None): t.Null | t.Int[1024:65535],
+            tx.AliasedKey(["envs"], default=None): t.Null | t.String,  # stringified JSON
+            # e.g., '{"PASSWORD": "12345"}'
+            tx.AliasedKey(["arguments"], default=None): t.Null | t.String,  # stringified JSON
+            # e.g., '{"-P": "12345"}'
+            # The value can be one of:
+            # None, str, List[str]
+        }
+    )
 )
 @adefer
 async def stream_proxy(
@@ -506,11 +516,13 @@ async def stream_proxy(
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent("""
+    _conn_tracker_script = textwrap.dedent(
+        """
         local now = redis.call('TIME')
         now = now[1] + (now[2] / (10^6))
         redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """)
+    """
+    )
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(

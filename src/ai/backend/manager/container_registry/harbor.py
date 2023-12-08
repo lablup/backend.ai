@@ -226,9 +226,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
+        rqst_args["headers"].update(
+            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+        )
         digests: list[tuple[str, str]] = []
         tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
@@ -264,9 +264,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
+        rqst_args["headers"].update(
+            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+        )
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tag_name = image_info["tags"][0]["name"]

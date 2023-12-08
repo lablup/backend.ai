@@ -252,9 +252,9 @@ class BackgroundTaskManager:
         task_result: TaskResult
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
-        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
-            BgtaskDoneEvent
-        )
+        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[
+            BgtaskFailedEvent
+        ] = BgtaskDoneEvent
         try:
             message = await func(reporter, **kwargs) or ""
             task_result = "bgtask_done"

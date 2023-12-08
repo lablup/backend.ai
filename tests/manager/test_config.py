@@ -46,32 +46,38 @@ def test_shared_config_flatten():
 
 
 def test_container_registry_iv() -> None:
-    data = container_registry_iv.check({
-        "": "http://user:passwd@example.com:8080/registry",
-        "username": "hello",
-        "password": "world",
-        "project": "",
-    })
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "username": "hello",
+            "password": "world",
+            "project": "",
+        }
+    )
     assert isinstance(data[""], yarl.URL)
     assert data["project"] == []
     assert data["ssl_verify"] is True
 
-    data = container_registry_iv.check({
-        "": "http://user:passwd@example.com:8080/registry",
-        "username": "hello",
-        "password": "world",
-        "project": "a,b,c",
-        "ssl_verify": "false",  # accepts various true/false expressions in strings
-    })
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "username": "hello",
+            "password": "world",
+            "project": "a,b,c",
+            "ssl_verify": "false",  # accepts various true/false expressions in strings
+        }
+    )
     assert isinstance(data[""], yarl.URL)
     assert data["project"] == ["a", "b", "c"]
     assert data["ssl_verify"] is False
 
-    data = container_registry_iv.check({
-        "": "http://user:passwd@example.com:8080/registry",
-        "type": "harbor2",
-        "project": ["x", "y", "z"],  # already structured
-    })
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "type": "harbor2",
+            "project": ["x", "y", "z"],  # already structured
+        }
+    )
     assert isinstance(data[""], yarl.URL)
     assert data["type"] == "harbor2"
     assert data["project"] == ["x", "y", "z"]

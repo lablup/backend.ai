@@ -155,11 +155,13 @@ def _traverse(scheme: t.Trafaret) -> dict:
 def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
     optional = (
         isinstance(scheme, t.Or)
-        and len([
-            x
-            for x in scheme.trafarets  # type: ignore[attr-defined]
-            if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
-        ])
+        and len(
+            [
+                x
+                for x in scheme.trafarets  # type: ignore[attr-defined]
+                if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+            ]
+        )
         > 0
     )
 

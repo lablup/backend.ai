@@ -178,10 +178,12 @@ class ImageRow(Base):
         StructuredJSONColumn(
             t.Mapping(
                 t.String,
-                t.Dict({
-                    t.Key("min"): t.String,
-                    t.Key("max", default=None): t.Null | t.String,
-                }),
+                t.Dict(
+                    {
+                        t.Key("min"): t.String,
+                        t.Key("max", default=None): t.Null | t.String,
+                    }
+                ),
             ),
         ),
         nullable=False,
@@ -393,11 +395,13 @@ class ImageRow(Base):
             max_value = slot_range.get("max")
             if max_value is None:
                 max_value = Decimal("Infinity")
-            res_limits.append({
-                "key": slot_key,
-                "min": min_value,
-                "max": max_value,
-            })
+            res_limits.append(
+                {
+                    "key": slot_key,
+                    "min": min_value,
+                    "max": max_value,
+                }
+            )
 
         accels = self.accelerators
         if accels is None:

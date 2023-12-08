@@ -94,9 +94,11 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 
 
 @check_api_params(
-    t.Dict({
-        t.Key("sgroup", default=None): t.Null | t.String,
-    })
+    t.Dict(
+        {
+            t.Key("sgroup", default=None): t.Null | t.String,
+        }
+    )
 )
 async def get_resource_metadata(request: web.Request, params: Any) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params["sgroup"])
@@ -166,10 +168,12 @@ async def get_docker_registries(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key("key"): t.String,
-        t.Key("prefix", default=False): t.Bool,
-    })
+    t.Dict(
+        {
+            t.Key("key"): t.String,
+            t.Key("prefix", default=False): t.Bool,
+        }
+    )
 )
 async def get_config(request: web.Request, params: Any) -> web.Response:
     """
@@ -213,10 +217,12 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key("key"): t.String,
-        t.Key("value"): t.Any,
-    })
+    t.Dict(
+        {
+            t.Key("key"): t.String,
+            t.Key("value"): t.Any,
+        }
+    )
 )
 async def set_config(request: web.Request, params: Any) -> web.Response:
     """
@@ -252,10 +258,12 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key("key"): t.String,
-        t.Key("prefix", default=False): t.Bool,
-    })
+    t.Dict(
+        {
+            t.Key("key"): t.String,
+            t.Key("prefix", default=False): t.Bool,
+        }
+    )
 )
 async def delete_config(request: web.Request, params: Any) -> web.Response:
     """

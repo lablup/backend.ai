@@ -80,9 +80,11 @@ async def is_user_allowed_to_access_resource(
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("name", default=None): t.Null | t.String,
-    })
+    t.Dict(
+        {
+            t.Key("name", default=None): t.Null | t.String,
+        }
+    )
 )
 async def list_serve(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -108,9 +110,9 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
                 "id": str(endpoint.id),
                 "name": endpoint.name,
                 "desired_session_count": endpoint.desired_session_count,
-                "active_route_count": len([
-                    r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
-                ]),
+                "active_route_count": len(
+                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+                ),
                 "service_endpoint": endpoint.url,
                 "is_public": endpoint.open_to_public,
             }
@@ -161,42 +163,47 @@ async def get_info(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params(
-    t.Dict({
-        tx.AliasedKey(["name", "service_name", "clientSessionToken"])
-        >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
-        tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
-        tx.AliasedKey(["image", "lang"]): t.String,
-        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-        >> "architecture": t.String,
-        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-        tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-            ClusterMode
-        ),  # new in APIv6
-        t.Key("tag", default=None): t.Null | t.String,
-        tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
-        tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
-        tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-            t.Null | tx.URL
-        ),
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-        t.Key("open_to_public", default=False): t.Bool,
-        t.Key("config"): t.Dict({
-            t.Key("model"): t.String,
-            tx.AliasedKey(["model_version", "modelVersion"], default=None): t.Null | t.String,
-            tx.AliasedKey(
-                ["model_mount_destination", "modelMountDestination"], default="/models"
-            ): t.String,
-            t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-            # cluster_size is moved to the root-level parameters
-            tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-            t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
-                t.String, t.Any
+    t.Dict(
+        {
+            tx.AliasedKey(["name", "service_name", "clientSessionToken"])
+            >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
+            tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
+            tx.AliasedKey(["image", "lang"]): t.String,
+            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
+            >> "architecture": t.String,
+            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
+            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
+            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+                ClusterMode
+            ),  # new in APIv6
+            t.Key("tag", default=None): t.Null | t.String,
+            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
+            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
+            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+                t.Null | tx.URL
             ),
-        }),
-    }),
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+            t.Key("open_to_public", default=False): t.Bool,
+            t.Key("config"): t.Dict(
+                {
+                    t.Key("model"): t.String,
+                    tx.AliasedKey(["model_version", "modelVersion"], default=None): t.Null
+                    | t.String,
+                    tx.AliasedKey(
+                        ["model_mount_destination", "modelMountDestination"], default="/models"
+                    ): t.String,
+                    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+                    # cluster_size is moved to the root-level parameters
+                    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null
+                    | t.String,
+                    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+                    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+                    | t.Mapping(t.String, t.Any),
+                }
+            ),
+        }
+    ),
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -433,9 +440,9 @@ async def delete(request: web.Request) -> web.Response:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
-                .values({
-                    "desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING
-                })
+                .values(
+                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
+                )
             )
         await db_sess.execute(query)
     return web.json_response({"success": True}, status=200)
@@ -467,9 +474,11 @@ async def sync(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("to"): t.Int,
-    }),
+    t.Dict(
+        {
+            t.Key("to"): t.Int,
+        }
+    ),
 )
 async def scale(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -497,17 +506,19 @@ async def scale(request: web.Request, params: Any) -> web.Response:
             .values({"desired_session_count": params["to"]})
         )
         await db_sess.execute(query)
-        return web.json_response({
-            "current_route_count": len(endpoint.routings), "target_count": params["to"]
-        })
+        return web.json_response(
+            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
+        )
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("traffic_ratio"): t.Float[0:],
-    }),
+    t.Dict(
+        {
+            t.Key("traffic_ratio"): t.Float[0:],
+        }
+    ),
 )
 async def update_route(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -592,10 +603,12 @@ async def delete_route(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("duration", default=None): t.Null | tx.TimeDuration,
-        t.Key("valid_until", default=None): t.Null | t.Int,
-    }),
+    t.Dict(
+        {
+            t.Key("duration", default=None): t.Null | tx.TimeDuration,
+            t.Key("valid_until", default=None): t.Null | t.Int,
+        }
+    ),
 )
 async def generate_token(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -684,16 +697,18 @@ async def list_errors(request: web.Request) -> web.Response:
 
     error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
-    return web.json_response({
-        "errors": [
-            {
-                "session_id": route.error_data.get("session_id"),
-                "error": route.error_data["errors"],
-            }
-            for route in error_routes
-        ],
-        "retries": endpoint.retries,
-    })
+    return web.json_response(
+        {
+            "errors": [
+                {
+                    "session_id": route.error_data.get("session_id"),
+                    "error": route.error_data["errors"],
+                }
+                for route in error_routes
+            ],
+            "retries": endpoint.retries,
+        }
+    )
 
 
 @auth_required

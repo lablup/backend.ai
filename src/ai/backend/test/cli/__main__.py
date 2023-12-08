@@ -29,10 +29,12 @@ def main(ctx: click.Context) -> None:
 )
 @click.argument(
     "pkgs",
-    type=CommaSeparatedChoice([
-        "admin",
-        "user",
-    ]),
+    type=CommaSeparatedChoice(
+        [
+            "admin",
+            "user",
+        ]
+    ),
     metavar="PKGS",
 )
 @click.pass_context
@@ -53,14 +55,16 @@ def run_cli(
       user
     """
     pytest_args = ctx.args
-    result = subprocess.run([
-        sys.executable,
-        "-m",
-        "pytest",
-        "--pyargs",
-        *(f"ai.backend.test.cli_integration.{pkg}" for pkg in pkgs),
-        *pytest_args,
-    ])
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--pyargs",
+            *(f"ai.backend.test.cli_integration.{pkg}" for pkg in pkgs),
+            *pytest_args,
+        ]
+    )
     ctx.exit(result.returncode)
 
 

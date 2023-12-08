@@ -65,7 +65,9 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     variables = {
         "hostname": "cr.example.com",
@@ -101,7 +103,9 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     variables = {
         "hostname": "cr.example.com",
@@ -148,7 +152,9 @@ async def test_modify_container_registry_allows_empty_string(
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     # Given an empty string to password
     variables = {
@@ -184,7 +190,9 @@ async def test_modify_container_registry_allows_null_for_unset(
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     # Given a null to password
     variables = {
@@ -215,7 +223,9 @@ async def test_delete_container_registry(client: Client, context: GraphQueryCont
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     variables = {
         "hostname": "cr.example.com",
@@ -231,7 +241,9 @@ async def test_delete_container_registry(client: Client, context: GraphQueryCont
                 $CONTAINER_REGISTRY_FIELDS
             }
         }
-    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+    """.replace(
+        "$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS
+    )
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     assert response["data"] is None

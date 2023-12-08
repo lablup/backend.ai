@@ -163,11 +163,13 @@ class Request:
             self.api_version = override_api_version
         else:
             self.api_version = f"v{self.session.api_version[0]}.{self.session.api_version[1]}"
-        self.headers = CIMultiDict([
-            ("User-Agent", self.config.user_agent),
-            ("X-BackendAI-Domain", self.config.domain),
-            ("X-BackendAI-Version", self.api_version),
-        ])
+        self.headers = CIMultiDict(
+            [
+                ("User-Agent", self.config.user_agent),
+                ("X-BackendAI-Domain", self.config.domain),
+                ("X-BackendAI-Version", self.api_version),
+            ]
+        )
         self._content = b""
         self._attached_files = None
         self.set_content(content, content_type=content_type)

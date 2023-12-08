@@ -442,9 +442,9 @@ class Endpoint(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(EndpointRow)
             .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING
-                ])
+                EndpointRow.lifecycle_stage.in_(
+                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
+                )
             )
         )
         if project is not None:
@@ -478,9 +478,9 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.routings))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING
-                ])
+                EndpointRow.lifecycle_stage.in_(
+                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
+                )
             )
         )
         if project is not None:

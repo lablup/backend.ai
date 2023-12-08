@@ -54,10 +54,12 @@ async def test_upload_jwt_generation(tmp_path):
             )
 
             rqst = Request("POST", "/folders/{}/request-upload".format(vfolder_name))
-            rqst.set_json({
-                "path": "{}".format(str(Path(mock_file))),
-                "size": str(file_size),
-            })
+            rqst.set_json(
+                {
+                    "path": "{}".format(str(Path(mock_file))),
+                    "size": str(file_size),
+                }
+            )
 
             async with rqst.fetch() as resp:
                 res = await resp.json()

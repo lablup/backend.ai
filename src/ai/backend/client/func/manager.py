@@ -18,9 +18,11 @@ class Manager(BaseFunction):
         Returns the current status of the configured API server.
         """
         rqst = Request("GET", "/manager/status")
-        rqst.set_json({
-            "status": "running",
-        })
+        rqst.set_json(
+            {
+                "status": "running",
+            }
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -40,10 +42,12 @@ class Manager(BaseFunction):
             new compute sessions.
         """
         rqst = Request("PUT", "/manager/status")
-        rqst.set_json({
-            "status": "frozen",
-            "force_kill": force_kill,
-        })
+        rqst.set_json(
+            {
+                "status": "frozen",
+                "force_kill": force_kill,
+            }
+        )
         async with rqst.fetch():
             pass
 
@@ -54,9 +58,11 @@ class Manager(BaseFunction):
         Unfreezes the configured API server so that it resumes to normal operation.
         """
         rqst = Request("PUT", "/manager/status")
-        rqst.set_json({
-            "status": "running",
-        })
+        rqst.set_json(
+            {
+                "status": "running",
+            }
+        )
         async with rqst.fetch():
             pass
 
@@ -80,10 +86,12 @@ class Manager(BaseFunction):
         :param message: Announcement message. Required if ``enabled`` is True.
         """
         rqst = Request("POST", "/manager/announcement")
-        rqst.set_json({
-            "enabled": enabled,
-            "message": message,
-        })
+        rqst.set_json(
+            {
+                "enabled": enabled,
+                "message": message,
+            }
+        )
         async with rqst.fetch():
             pass
 
@@ -97,9 +105,11 @@ class Manager(BaseFunction):
         :param args: Arguments specific to the given operation.
         """
         rqst = Request("POST", "/manager/scheduler/operation")
-        rqst.set_json({
-            "op": op,
-            "args": args,
-        })
+        rqst.set_json(
+            {
+                "op": op,
+                "args": args,
+            }
+        )
         async with rqst.fetch():
             pass

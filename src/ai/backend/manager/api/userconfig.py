@@ -91,10 +91,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("path", default=None): t.Null | t.String,
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    })
+    t.Dict(
+        {
+            t.Key("path", default=None): t.Null | t.String,
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+        }
+    )
 )
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
     resp = []
@@ -117,11 +119,13 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
         else:
             dotfiles, _ = await query_owned_dotfiles(conn, access_key)
             for entry in dotfiles:
-                resp.append({
-                    "path": entry["path"],
-                    "permission": entry["perm"],
-                    "data": entry["data"],
-                })
+                resp.append(
+                    {
+                        "path": entry["path"],
+                        "permission": entry["perm"],
+                        "data": entry["data"],
+                    }
+                )
             return web.json_response(resp)
 
 
@@ -169,10 +173,12 @@ async def update(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict({
-        t.Key("path"): t.String,
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    }),
+    t.Dict(
+        {
+            t.Key("path"): t.String,
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+        }
+    ),
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)

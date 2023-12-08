@@ -585,10 +585,12 @@ def downgrade():
                 # session_id must be same with kernel_id.
                 kernel_id = sess_kern_map[sess_id]
                 single_kern_sess[sess_id] = kernel_id
-                sess_update_params.append({
-                    "kernel_id": kernel_id,
-                    "session_id": kernel_id,
-                })
+                sess_update_params.append(
+                    {
+                        "kernel_id": kernel_id,
+                        "session_id": kernel_id,
+                    }
+                )
         if sess_update_params:
             connection.execute(kern_update_query, sess_update_params)
 

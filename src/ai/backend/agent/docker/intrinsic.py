@@ -385,9 +385,11 @@ class CPUPlugin(AbstractComputePlugin):
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
         if resource_spec is None:
             return
-        alloc_map.apply_allocation({
-            SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
-        })
+        alloc_map.apply_allocation(
+            {
+                SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
+            }
+        )
 
     async def get_attached_devices(
         self,
@@ -398,11 +400,13 @@ class CPUPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append({
-                    "device_id": device.device_id,
-                    "model_name": "",
-                    "data": {"cores": len(device_ids)},
-                })
+                attached_devices.append(
+                    {
+                        "device_id": device.device_id,
+                        "model_name": "",
+                        "data": {"cores": len(device_ids)},
+                    }
+                )
         return attached_devices
 
     async def get_docker_networks(
@@ -873,9 +877,11 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> None:
         assert isinstance(alloc_map, DiscretePropertyAllocMap)
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
-        alloc_map.apply_allocation({
-            SlotName("mem"): {DeviceId("root"): memory_limit},
-        })
+        alloc_map.apply_allocation(
+            {
+                SlotName("mem"): {DeviceId("root"): memory_limit},
+            }
+        )
 
     async def get_attached_devices(
         self,
@@ -886,11 +892,13 @@ class MemoryPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append({
-                    "device_id": device.device_id,
-                    "model_name": "",
-                    "data": {},
-                })
+                attached_devices.append(
+                    {
+                        "device_id": device.device_id,
+                        "model_name": "",
+                        "data": {},
+                    }
+                )
         return attached_devices
 
     async def get_docker_networks(

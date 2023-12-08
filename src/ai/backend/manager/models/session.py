@@ -941,23 +941,27 @@ class SessionRow(Base):
         """
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
+                eager_loading_op.extend(
+                    [
                         noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
+                eager_loading_op.extend(
+                    [
                         noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
+                        selectinload(kernel_rel).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
 
         session_list = await cls.match_sessions(
             db_session,
@@ -996,23 +1000,27 @@ class SessionRow(Base):
     ) -> Iterable[SessionRow]:
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
+                eager_loading_op.extend(
+                    [
                         noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
+                eager_loading_op.extend(
+                    [
                         noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
+                        selectinload(kernel_rel).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
 
         session_list = await cls.match_sessions(
             db_session,

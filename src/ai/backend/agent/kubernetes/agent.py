@@ -329,34 +329,38 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             self.config_maps.append(cm)
 
-        await self.process_volumes([
-            KubernetesConfigMapVolume(
-                name=f"kernel-{self.kernel_id}-ssh-keypair",
-                configMap={
-                    "name": "ssh-keypair-hash",
-                },
-            ),
-        ])
-        await self.process_mounts([
-            Mount(
-                MountTypes.K8S_GENERIC,
-                Path("public"),
-                Path("/home/config/ssh/id_cluster.pub"),
-                permission=MountPermission.READ_ONLY,
-                opts={
-                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                },
-            ),
-            Mount(
-                MountTypes.K8S_GENERIC,
-                Path("private"),
-                Path("/home/config/ssh/id_cluster.pub"),
-                permission=MountPermission.READ_ONLY,
-                opts={
-                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                },
-            ),
-        ])
+        await self.process_volumes(
+            [
+                KubernetesConfigMapVolume(
+                    name=f"kernel-{self.kernel_id}-ssh-keypair",
+                    configMap={
+                        "name": "ssh-keypair-hash",
+                    },
+                ),
+            ]
+        )
+        await self.process_mounts(
+            [
+                Mount(
+                    MountTypes.K8S_GENERIC,
+                    Path("public"),
+                    Path("/home/config/ssh/id_cluster.pub"),
+                    permission=MountPermission.READ_ONLY,
+                    opts={
+                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                    },
+                ),
+                Mount(
+                    MountTypes.K8S_GENERIC,
+                    Path("private"),
+                    Path("/home/config/ssh/id_cluster.pub"),
+                    permission=MountPermission.READ_ONLY,
+                    opts={
+                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                    },
+                ),
+            ]
+        )
 
     async def process_mounts(self, mounts: Sequence[Mount]):
         for i, mount in zip(range(len(mounts)), mounts):
@@ -438,15 +442,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     "name": f"kernel-{self.kernel_id}-hostPath-{idx}",
                 },
             )
-            await self.process_volumes([
-                KubernetesHostPathVolume(
-                    name=f"kernel-{self.kernel_id}-hostPath-{idx}",
-                    hostPath={
-                        "path": vfolder.host_path.as_posix(),
-                        "type": "Directory",
-                    },
-                ),
-            ])
+            await self.process_volumes(
+                [
+                    KubernetesHostPathVolume(
+                        name=f"kernel-{self.kernel_id}-hostPath-{idx}",
+                        hostPath={
+                            "path": vfolder.host_path.as_posix(),
+                            "type": "Directory",
+                        },
+                    ),
+                ]
+            )
             resource_spec.mounts.append(mount)
 
     async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
@@ -576,32 +582,36 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 ssh_config_map = ConfigMap(self.kernel_id, f"kernel-{self.kernel_id}-ssh-config")
                 ssh_config_map.put("authorized_keys", pubkey)
                 ssh_config_map.put("id_container", privkey)
-                await self.process_volumes([
-                    KubernetesConfigMapVolume(
-                        name="ssh-config",
-                        configMap={
-                            "name": f"kernel-{self.kernel_id}-ssh-config",
-                        },
-                    ),
-                ])
-                await self.process_mounts([
-                    Mount(
-                        MountTypes.K8S_GENERIC,
-                        Path("authorized_keys"),
-                        Path("/home/work/.ssh/authorized_keys"),
-                        opts={
-                            "name": "ssh-config",
-                        },
-                    ),
-                    Mount(
-                        MountTypes.K8S_GENERIC,
-                        Path("id_container"),
-                        Path("/home/work/.ssh/id_container"),
-                        opts={
-                            "name": "ssh-config",
-                        },
-                    ),
-                ])
+                await self.process_volumes(
+                    [
+                        KubernetesConfigMapVolume(
+                            name="ssh-config",
+                            configMap={
+                                "name": f"kernel-{self.kernel_id}-ssh-config",
+                            },
+                        ),
+                    ]
+                )
+                await self.process_mounts(
+                    [
+                        Mount(
+                            MountTypes.K8S_GENERIC,
+                            Path("authorized_keys"),
+                            Path("/home/work/.ssh/authorized_keys"),
+                            opts={
+                                "name": "ssh-config",
+                            },
+                        ),
+                        Mount(
+                            MountTypes.K8S_GENERIC,
+                            Path("id_container"),
+                            Path("/home/work/.ssh/id_container"),
+                            opts={
+                                "name": "ssh-config",
+                            },
+                        ),
+                    ]
+                )
 
         # higher priority dotfiles are stored last to support overwriting
         for dotfile in self.internal_data.get("dotfiles", []):
@@ -838,13 +848,15 @@ class KubernetesAgent(
 
         namespaces = await core_api.list_namespace()
         if len(list(filter(lambda ns: ns.metadata.name == "backend-ai", namespaces.items))) == 0:
-            await core_api.create_namespace({
-                "apiVersion": "v1",
-                "kind": "Namespace",
-                "metadata": {
-                    "name": "backend-ai",
-                },
-            })
+            await core_api.create_namespace(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Namespace",
+                    "metadata": {
+                        "name": "backend-ai",
+                    },
+                }
+            )
 
         pv = await core_api.list_persistent_volume(
             label_selector="backend.ai/backend-ai-scratch-volume"

@@ -464,20 +464,22 @@ class AgentRPCServer(aobject):
                 case BaseException():
                     errors.append(result)
                 case _:
-                    raw_results.append({
-                        "id": str(result["id"]),
-                        "kernel_host": result["kernel_host"],
-                        "repl_in_port": result["repl_in_port"],
-                        "repl_out_port": result["repl_out_port"],
-                        "stdin_port": result["stdin_port"],  # legacy
-                        "stdout_port": result["stdout_port"],  # legacy
-                        "service_ports": result["service_ports"],
-                        "container_id": result["container_id"],
-                        "resource_spec": result["resource_spec"],
-                        "attached_devices": result["attached_devices"],
-                        "agent_addr": result["agent_addr"],
-                        "scaling_group": result["scaling_group"],
-                    })
+                    raw_results.append(
+                        {
+                            "id": str(result["id"]),
+                            "kernel_host": result["kernel_host"],
+                            "repl_in_port": result["repl_in_port"],
+                            "repl_out_port": result["repl_out_port"],
+                            "stdin_port": result["stdin_port"],  # legacy
+                            "stdout_port": result["stdout_port"],  # legacy
+                            "service_ports": result["service_ports"],
+                            "container_id": result["container_id"],
+                            "resource_spec": result["resource_spec"],
+                            "attached_devices": result["attached_devices"],
+                            "agent_addr": result["agent_addr"],
+                            "scaling_group": result["scaling_group"],
+                        }
+                    )
         if errors:
             # Raise up the first error.
             if len(errors) == 1:

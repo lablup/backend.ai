@@ -381,12 +381,12 @@ async def tus_options(request: web.Request) -> web.Response:
     ctx: RootContext = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers["Access-Control-Allow-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
-    headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
+    headers[
+        "Access-Control-Allow-Headers"
+    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers[
+        "Access-Control-Expose-Headers"
+    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
@@ -416,12 +416,12 @@ async def prepare_tus_session_headers(
         )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers["Access-Control-Allow-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
-    headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
+    headers[
+        "Access-Control-Allow-Headers"
+    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers[
+        "Access-Control-Expose-Headers"
+    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"

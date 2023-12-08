@@ -55,7 +55,8 @@ class ProcessStat(NamedTuple):
 
 
 class SupportsAsyncClose(Protocol):
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        ...
 
 
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)

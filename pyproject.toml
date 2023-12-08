@@ -89,7 +89,11 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 
 [tool.ruff.format]
-preview = true  # enable the black's preview style
+preview = false  # enable the black's preview style
+
+[tool.black]
+line-length = 100
+preview = false
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -99,7 +103,3 @@ namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.11.6/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
-
-[tool.black]
-line-length = 100
-preview = true

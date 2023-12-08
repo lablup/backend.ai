@@ -19,12 +19,14 @@ async def install_git_lfs(ctx: Context) -> None:
             "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh"
             "| sudo bash"
         )
-    await ctx.install_system_package({
-        "Debian": ["git-lfs"],
-        "RedHat": ["git-lfs"],
-        "SUSE": ["git-lfs"],
-        "Darwin": ["git-lfs"],
-    })
+    await ctx.install_system_package(
+        {
+            "Debian": ["git-lfs"],
+            "RedHat": ["git-lfs"],
+            "SUSE": ["git-lfs"],
+            "Darwin": ["git-lfs"],
+        }
+    )
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
 
 
@@ -62,14 +64,18 @@ async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
 
 async def pants_export(ctx: Context) -> None:
     ctx.log_header("Creating virtualenvs from pants export")
-    await ctx.run_shell(textwrap.dedent("""
+    await ctx.run_shell(
+        textwrap.dedent(
+            """
     pants export \
      --resolve=python-default \
      --resolve=towncrier \
      --resolve=ruff \
      --resolve=mypy \
      --resolve=black
-    """))
+    """
+        )
+    )
 
 
 async def install_editable_webui(ctx: Context) -> None:

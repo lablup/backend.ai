@@ -401,13 +401,16 @@ class PermissionListColumn(TypeDecorator):
         self._perm_type = perm_type
 
     @overload
-    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]:
+        ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]:
+        ...
 
     @overload
-    def process_bind_param(self, value: None, dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect) -> List[str]:
+        ...
 
     def process_bind_param(
         self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
@@ -446,9 +449,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()
-        return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
-        })
+        return VFolderHostPermissionMap(
+            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
+        )
 
 
 class CurrencyTypes(enum.Enum):
@@ -665,7 +668,8 @@ class _SQLBasedGQLObject(Protocol):
         cls: Type[_GenericSQLBasedGQLObject],
         ctx: GraphQueryContext,
         row: Row,
-    ) -> _GenericSQLBasedGQLObject: ...
+    ) -> _GenericSQLBasedGQLObject:
+        ...
 
 
 async def batch_result(
