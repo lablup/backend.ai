@@ -88,6 +88,9 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 
+[tool.ruff.format]
+preview = true  # enable the black's preview style
+
 [tool.mypy]
 ignore_missing_imports = true
 implicit_optional = true  # FIXME: remove after adding https://github.com/hauntsaninja/no_implicit_optional to fmt
