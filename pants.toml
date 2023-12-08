@@ -3,7 +3,6 @@ pants_version = "2.17.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
-    "pants.backend.python.lint.black",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
     "pants.backend.experimental.python",
@@ -68,7 +67,6 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
-black = "tools/black.lock"
 ruff = "tools/ruff.lock"
 pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
@@ -88,10 +86,6 @@ known_versions = [
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
-
-[black]
-install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.6"]  # don't know why this is required... (maybe a Pants bug?)
 
 [ruff]
 install_from_resolve = "ruff"
