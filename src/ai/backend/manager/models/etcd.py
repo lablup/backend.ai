@@ -14,9 +14,7 @@ from .base import privileged_mutation, set_if_set
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(
-    logging.getLogger("ai.backend.manager.models.etcd")
-)  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "ContainerRegistry",

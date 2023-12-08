@@ -5,6 +5,7 @@ Revises: 308bcecec5c2
 Create Date: 2023-12-06 12:20:11.537908
 
 """
+
 import enum
 from typing import Any
 
@@ -154,9 +155,10 @@ def upgrade():
                 # Create new keypair when the user has no keypair
                 kp_data = prepare_keypair(row.email, row.uuid, row.role)
                 db_session.execute(sa.insert(KeyPairRow).values(**kp_data))
-                user_id_kp_maps.append(
-                    {"user_id": row.uuid, "main_access_key": kp_data["access_key"]}
-                )
+                user_id_kp_maps.append({
+                    "user_id": row.uuid,
+                    "main_access_key": kp_data["access_key"],
+                })
             else:
                 user_id_kp_maps.append({"user_id": row.uuid, "main_access_key": main_kp.access_key})
 
