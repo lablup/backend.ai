@@ -1170,8 +1170,6 @@ class ComputeSession(graphene.ObjectType):
     full_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
-    created_user_email = graphene.String()
-    created_user_id = graphene.UUID()
 
     # status
     status = graphene.String()
@@ -1244,8 +1242,6 @@ class ComputeSession(graphene.ObjectType):
             "full_name": full_name,
             "user_id": row.user_uuid,
             "access_key": row.access_key,
-            "created_user_email": None,  # TODO: implement
-            "created_user_id": None,  # TODO: implement
             # status
             "status": row.status.name,
             "status_changed": row.status_changed,

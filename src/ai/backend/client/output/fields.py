@@ -187,8 +187,6 @@ session_fields = FieldSet(
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
-        FieldSpec("created_user_email"),
-        FieldSpec("created_user_id"),
         FieldSpec("status"),
         FieldSpec("status_info"),
         FieldSpec("status_data", formatter=nested_dict_formatter),

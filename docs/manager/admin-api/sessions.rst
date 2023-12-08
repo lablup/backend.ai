@@ -33,8 +33,6 @@ Query Schema
      user_email: String
      user_id: UUID
      access_key: String
-     created_user_email: String  # reserved for future release
-     created_user_uuid: UUID     # reserved for future release
 
      # status
      status: String
