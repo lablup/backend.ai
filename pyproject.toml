@@ -89,11 +89,7 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 
 [tool.ruff.format]
-preview = false  # enable the black's preview style
-
-[tool.black]
-line-length = 100
-preview = false
+preview = true  # enable the black's preview style
 
 [tool.mypy]
 ignore_missing_imports = true
