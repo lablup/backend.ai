@@ -19,14 +19,12 @@ async def install_git_lfs(ctx: Context) -> None:
             "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh"
             "| sudo bash"
         )
-    await ctx.install_system_package(
-        {
-            "Debian": ["git-lfs"],
-            "RedHat": ["git-lfs"],
-            "SUSE": ["git-lfs"],
-            "Darwin": ["git-lfs"],
-        }
-    )
+    await ctx.install_system_package({
+        "Debian": ["git-lfs"],
+        "RedHat": ["git-lfs"],
+        "SUSE": ["git-lfs"],
+        "Darwin": ["git-lfs"],
+    })
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
 
 

@@ -19,40 +19,32 @@ from graphql_relay.utils import base64, unbase64
 
 class PageInfoType(Protocol):
     @property
-    def start_cursor(self) -> str | None:
-        ...
+    def start_cursor(self) -> str | None: ...
 
     @property
-    def end_cursor(self) -> str | None:
-        ...
+    def end_cursor(self) -> str | None: ...
 
     @property
-    def has_previous_page(self) -> bool:
-        ...
+    def has_previous_page(self) -> bool: ...
 
     @property
-    def has_next_page(self) -> bool:
-        ...
+    def has_next_page(self) -> bool: ...
 
 
 class EdgeType(Protocol):
     @property
-    def node(self) -> Any:
-        ...
+    def node(self) -> Any: ...
 
     @property
-    def cursor(self) -> str:
-        ...
+    def cursor(self) -> str: ...
 
 
 class ConnectionType(Protocol):
     @property
-    def edges(self) -> list[EdgeType]:
-        ...
+    def edges(self) -> list[EdgeType]: ...
 
     @property
-    def page_info(self) -> PageInfoType:
-        ...
+    def page_info(self) -> PageInfoType: ...
 
 
 class EdgeConstructor(Protocol):
@@ -61,14 +53,12 @@ class EdgeConstructor(Protocol):
         *,
         node: Any,
         cursor: str,
-    ) -> EdgeType:
-        ...
+    ) -> EdgeType: ...
 
 
 class ConnectionConstructor(Protocol):
     @property
-    def Edge(self) -> EdgeConstructor:
-        ...
+    def Edge(self) -> EdgeConstructor: ...
 
     def __call__(
         self,
@@ -76,8 +66,7 @@ class ConnectionConstructor(Protocol):
         edges: list[EdgeType],
         page_info: PageInfoType,
         count: int,
-    ) -> Connection:
-        ...
+    ) -> Connection: ...
 
 
 class AsyncNodeField(NodeField):

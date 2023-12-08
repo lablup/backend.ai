@@ -72,12 +72,10 @@ class Terminal:
         newsz_in = struct.pack("HHHH", args.rows, args.cols, orig_lines, orig_cols)
         newsz_out = fcntl.ioctl(self.fd, termios.TIOCSWINSZ, newsz_in, False)
         new_lines, new_cols, _, _ = struct.unpack("HHHH", newsz_out)
-        await self.sock_out.send_multipart(
-            [
-                b"stdout",
-                f"OK; terminal resized to {new_lines} lines and {new_cols} columns".encode(),
-            ]
-        )
+        await self.sock_out.send_multipart([
+            b"stdout",
+            f"OK; terminal resized to {new_lines} lines and {new_cols} columns".encode(),
+        ])
         return 0
 
     async def handle_command(self, code_txt) -> int:

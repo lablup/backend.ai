@@ -145,32 +145,28 @@ T4 = TypeVar("T4")
 def check_typed_tuple(
     value: Tuple[Any],
     types: Tuple[Type[T1]],
-) -> Tuple[T1]:
-    ...
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any],
     types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]:
-    ...
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]:
-    ...
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]:
-    ...
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
@@ -599,9 +595,9 @@ class ResourceSlot(UserDict):
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
         self.sync_keys(other)
-        return type(self)(
-            {k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())}
-        )
+        return type(self)({
+            k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
+        })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
@@ -902,18 +898,16 @@ class VFolderMount(JSONSerializableMixin):
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
 
-        return t.Dict(
-            {
-                t.Key("name"): t.String,
-                t.Key("vfid"): tx.VFolderID,
-                t.Key("vfsubpath", default="."): tx.PurePath,
-                t.Key("host_path"): tx.PurePath,
-                t.Key("kernel_path"): tx.PurePath,
-                t.Key("mount_perm"): tx.Enum(MountPermission),
-                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null
-                | tx.Enum(VFolderUsageMode),
-            }
-        )
+        return t.Dict({
+            t.Key("name"): t.String,
+            t.Key("vfid"): tx.VFolderID,
+            t.Key("vfsubpath", default="."): tx.PurePath,
+            t.Key("host_path"): tx.PurePath,
+            t.Key("kernel_path"): tx.PurePath,
+            t.Key("mount_perm"): tx.Enum(MountPermission),
+            t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null
+            | tx.Enum(VFolderUsageMode),
+        })
 
 
 class VFolderHostPermissionMap(dict, JSONSerializableMixin):
@@ -951,11 +945,9 @@ class QuotaConfig:
 
     class Validator(t.Trafaret):
         def check_and_return(self, value: Any) -> QuotaConfig:
-            validator = t.Dict(
-                {
-                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
-                }
-            )
+            validator = t.Dict({
+                t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+            })
             converted = validator.check(value)
             return QuotaConfig(
                 limit_bytes=converted["limit_bytes"],
@@ -1180,12 +1172,10 @@ class RoundRobinState(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict(
-            {
-                t.Key("schedulable_group_id"): t.String,
-                t.Key("next_index"): t.Int,
-            }
-        )
+        return t.Dict({
+            t.Key("schedulable_group_id"): t.String,
+            t.Key("next_index"): t.Int,
+        })
 
 
 # States of the round-robin scheduler for each resource group and architecture.

@@ -259,18 +259,16 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.access_key,
-                        kernels.c.session_id,
-                        kernels.c.session_type,
-                        kernels.c.created_at,
-                        kernels.c.occupied_slots,
-                        kernels.c.cluster_size,
-                        users.c.created_at.label("user_created_at"),
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.access_key,
+                    kernels.c.session_id,
+                    kernels.c.session_type,
+                    kernels.c.created_at,
+                    kernels.c.occupied_slots,
+                    kernels.c.cluster_size,
+                    users.c.created_at.label("user_created_at"),
+                ])
                 .select_from(j)
                 .where(
                     (kernels.c.status.in_(LIVE_STATUS))
@@ -285,12 +283,10 @@ class IdleCheckerHost:
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
-                        sa.select(
-                            [
-                                keypair_resource_policies.c.max_session_lifetime,
-                                keypair_resource_policies.c.idle_timeout,
-                            ]
-                        )
+                        sa.select([
+                            keypair_resource_policies.c.max_session_lifetime,
+                            keypair_resource_policies.c.idle_timeout,
+                        ])
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -539,7 +535,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
-        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
+        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
         self._evhandlers = [
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
@@ -800,9 +796,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join(
-            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
-        )
+        thresholds_log = " ".join([
+            f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()
+        ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '

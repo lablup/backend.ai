@@ -81,9 +81,11 @@ def upgrade():
     j = vfolder_permissions.join(
         keypairs, vfolder_permissions.c.access_key == keypairs.c.access_key
     )
-    query = sa.select(
-        [vfolder_permissions.c.vfolder, keypairs.c.access_key, keypairs.c.user]
-    ).select_from(j)
+    query = sa.select([
+        vfolder_permissions.c.vfolder,
+        keypairs.c.access_key,
+        keypairs.c.user,
+    ]).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [
         {"_vfolder": row.vfolder, "_access_key": row.access_key, "_user": row.user}
@@ -177,9 +179,11 @@ def downgrade():
 
     # Migrate vfolder_permissions' used into access_key.
     j = vfolder_permissions.join(keypairs, vfolder_permissions.c.user == keypairs.c.user)
-    query = sa.select(
-        [vfolder_permissions.c.vfolder, keypairs.c.user, keypairs.c.access_key]
-    ).select_from(j)
+    query = sa.select([
+        vfolder_permissions.c.vfolder,
+        keypairs.c.user,
+        keypairs.c.access_key,
+    ]).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [
         {"_vfolder": row.vfolder, "_access_key": row.access_key, "_user": row.user}

@@ -32,9 +32,7 @@ def upgrade():
             textwrap.dedent(
                 """\
                 ALTER TABLE sessions ALTER COLUMN session_type TYPE {} USING session_type::text::sessiontypes;
-            """.format(
-                    typename
-                )
+            """.format(typename)
             )
         )
     )
@@ -76,9 +74,7 @@ def downgrade():
                 DELETE FROM pg_enum
                 WHERE enumtypid = {enumtypid}
                 AND enumlabel = 'INFERENCE';
-            """.format(
-                    enumtypid=enumtypid
-                )
+            """.format(enumtypid=enumtypid)
             )
         )
     )

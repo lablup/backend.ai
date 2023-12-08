@@ -144,32 +144,30 @@ class Service(BaseFunction):
             service_name = f"bai-serve-{faker.user_name()}"
 
         rqst = Request("POST", "/services")
-        rqst.set_json(
-            {
-                "name": service_name,
-                "desired_session_count": initial_session_count,
-                "image": image,
-                "arch": architecture,
-                "group": group_name,
-                "domain": domain_name,
-                "cluster_size": cluster_size,
-                "cluster_mode": cluster_mode,
-                "tag": tag,
-                "startup_command": startup_command,
-                "bootstrap_script": bootstrap_script,
-                "owner_access_key": owner_access_key,
-                "open_to_public": expose_to_public,
-                "config": {
-                    "model": model_id_or_name,
-                    "model_version": model_version,
-                    "model_mount_destination": model_mount_destination,
-                    "environ": envs,
-                    "scaling_group": scaling_group,
-                    "resources": resources,
-                    "resource_opts": resource_opts,
-                },
-            }
-        )
+        rqst.set_json({
+            "name": service_name,
+            "desired_session_count": initial_session_count,
+            "image": image,
+            "arch": architecture,
+            "group": group_name,
+            "domain": domain_name,
+            "cluster_size": cluster_size,
+            "cluster_mode": cluster_mode,
+            "tag": tag,
+            "startup_command": startup_command,
+            "bootstrap_script": bootstrap_script,
+            "owner_access_key": owner_access_key,
+            "open_to_public": expose_to_public,
+            "config": {
+                "model": model_id_or_name,
+                "model_version": model_version,
+                "model_mount_destination": model_mount_destination,
+                "environ": envs,
+                "scaling_group": scaling_group,
+                "resources": resources,
+                "resource_opts": resource_opts,
+            },
+        })
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {

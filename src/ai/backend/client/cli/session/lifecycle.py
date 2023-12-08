@@ -1035,18 +1035,16 @@ session.command()(_events_cmd())
 
 
 def _fetch_session_names():
-    status = ",".join(
-        [
-            "PENDING",
-            "SCHEDULED",
-            "PREPARING",
-            "RUNNING",
-            "RUNNING_DEGRADED",
-            "RESTARTING",
-            "TERMINATING",
-            "ERROR",
-        ]
-    )
+    status = ",".join([
+        "PENDING",
+        "SCHEDULED",
+        "PREPARING",
+        "RUNNING",
+        "RUNNING_DEGRADED",
+        "RESTARTING",
+        "TERMINATING",
+        "ERROR",
+    ])
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],

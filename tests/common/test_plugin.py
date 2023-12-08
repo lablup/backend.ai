@@ -68,8 +68,7 @@ def mock_entrypoints_with_class(
     blocklist: set[str] = None,
     *,
     plugin_cls: list[Type[AbstractPlugin]],
-) -> Iterator[DummyEntrypoint]:
-    ...
+) -> Iterator[DummyEntrypoint]: ...
 
 
 @overload
@@ -79,8 +78,7 @@ def mock_entrypoints_with_class(
     blocklist: set[str] = None,
     *,
     plugin_cls: Type[AbstractPlugin],
-) -> DummyEntrypoint:
-    ...
+) -> DummyEntrypoint: ...
 
 
 def mock_entrypoints_with_class(

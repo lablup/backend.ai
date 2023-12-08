@@ -186,8 +186,7 @@ T = TypeVar("T")
 
 
 class SingleValueConstructorType(Protocol):
-    def __init__(self, value: Any) -> None:
-        ...
+    def __init__(self, value: Any) -> None: ...
 
 
 TScalar = TypeVar("TScalar", bound=SingleValueConstructorType)
