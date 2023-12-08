@@ -58,11 +58,12 @@ Both commands offer options to specify which fields of sessions should be printe
      - Included Session Fields
 
    * - (no option)
-     - ``Name``, ``Session ID``, ``Project/Group``,
+     - ``Name``, ``Owner Access Key (admin only)``, ``Session ID``, ``Project/Group``,
 
        ``Main Kernel ID``, ``Image``, ``Type``, ``Status``,
 
        ``Status Info``, ``Last Updated``, and ``Result``.
+
 
    * - ``--name-only``
      - ``Name``.
