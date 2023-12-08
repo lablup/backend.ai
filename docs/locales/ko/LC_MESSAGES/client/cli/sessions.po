@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-12-04 17:39+0900\n"
+"POT-Creation-Date: 2023-12-08 16:08+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -99,12 +99,13 @@ msgstr ""
 msgid "Included Session Fields"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:61 ../../client/cli/sessions.rst:71
-#: 204d52a45d004d749ee7de1b242b047b
-msgid "``Name``, ``Session ID``, ``Project/Group``,"
+#: ../../client/cli/sessions.rst:61 51ecd7ba4b9649a69beb647405ecedf4
+msgid ""
+"``Name``, ``Owner Access Key (admin only)``, ``Session ID``, "
+"``Project/Group``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:63 ../../client/cli/sessions.rst:73
+#: ../../client/cli/sessions.rst:63 ../../client/cli/sessions.rst:74
 #: dad921c7e2b54b2fa138634a068f4304
 msgid "``Main Kernel ID``, ``Image``, ``Type``, ``Status``,"
 msgstr ""
@@ -113,63 +114,74 @@ msgstr ""
 msgid "``Status Info``, ``Last Updated``, and ``Result``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:67 aa78e7b2f53a4e63bc8520dbc4071827
+#: ../../client/cli/sessions.rst:68 aa78e7b2f53a4e63bc8520dbc4071827
 msgid "``--name-only``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:68 9727079cfaed45babffeda98fcbb09c2
+#: ../../client/cli/sessions.rst:69 9727079cfaed45babffeda98fcbb09c2
 msgid "``Name``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:70 5d191c27630b4d5c8cb2a8b824ed8572
+#: ../../client/cli/sessions.rst:71 5d191c27630b4d5c8cb2a8b824ed8572
 msgid "``--detail``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:75 fad1369498c2442a9d271f4d30898da9
+#: ../../client/cli/sessions.rst:72 204d52a45d004d749ee7de1b242b047b
+msgid "``Name``, ``Session ID``, ``Project/Group``,"
+msgstr ""
+
+#: ../../client/cli/sessions.rst:76 fad1369498c2442a9d271f4d30898da9
 msgid "``Status Info``, ``Last Updated``, ``Result``, ``Tag``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:77 7480e1bdf5d04d1a8b8924debf4bac7c
+#: ../../client/cli/sessions.rst:78 7480e1bdf5d04d1a8b8924debf4bac7c
 msgid "``Created At``, and ``Occupying Slots``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:79 b5a57bc94cb7452ba8f10c4ddf4525e6
+#: ../../client/cli/sessions.rst:80 b5a57bc94cb7452ba8f10c4ddf4525e6
 msgid "``-f``, ``--format``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:80 4fb6ba0f9011472784989ba0a3102104
+#: ../../client/cli/sessions.rst:81 4fb6ba0f9011472784989ba0a3102104
 msgid "Specified fields by user."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:83 5f9d9cf84442408b9c4573201d624ecb
+#: ../../client/cli/sessions.rst:84 5f9d9cf84442408b9c4573201d624ecb
 msgid ""
 "Fields for ``-f/--format`` option can be displayed by specifying comma-"
 "separated parameters."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:85 bd4fc3a109b3445295fd002f97329b97
+#: ../../client/cli/sessions.rst:86 9672c105dff24506ad2a9149bf742538
 msgid ""
-"Available parameters for this option are: ``id``, ``status``, "
-"``status_info``, ``created_at``, ``status_changed``, ``result``, "
-"``image``, ``type``, ``tag``, ``occupying_slots``."
+"Available parameters for this option are: ``id (session_id)``, "
+"``main_kernel_id``, ``tag``, ``name``, ``type``, ``image``, ``registry``,"
+" ``cluster_template (reserved for future release)``, ``cluster_mode``, "
+"``cluster_size``, ``domain_name``, ``group_name``, ``group_id``, "
+"``agent_ids``, ``user_email``, ``user_id``, ``access_key``, ``status``, "
+"``status_info``, ``status_changed``, ``created_at``, ``terminated_at``, "
+"``starts_at``, ``scheduled_at``, ``startup_command``, ``result``, "
+"``resource_opts``, ``scaling_group``, ``service_ports``, ``mounts``, "
+"``occupying_slots``, ``dependencies``, ``abusing_reports``, "
+"``idle_checks``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:87 4a7fdc7e2798496eaa135e2bcb3a4d8d
+#: ../../client/cli/sessions.rst:88 4a7fdc7e2798496eaa135e2bcb3a4d8d
 msgid "For example:"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:96 2380cf3a412842bd8f3d62aff2c256ae
+#: ../../client/cli/sessions.rst:97 2380cf3a412842bd8f3d62aff2c256ae
 msgid "Running simple sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:98 ccc28a81d72e4e51a94dd5d63aec9cef
+#: ../../client/cli/sessions.rst:99 ccc28a81d72e4e51a94dd5d63aec9cef
 msgid ""
 "The following command spawns a Python session and executes the code "
 "passed as ``-c`` argument immediately. ``--rm`` option states that the "
 "client automatically terminates the session after execution finishes."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:109 c83fc90146144906b508cf3bd7644051
+#: ../../client/cli/sessions.rst:110 c83fc90146144906b508cf3bd7644051
 msgid ""
 "By default, you need to specify language with full version tag like "
 "``python:3.6-ubuntu18.04``. Depending on the Backend.AI admin's language "
@@ -177,33 +189,33 @@ msgid ""
 "know defined language aliases, contact the admin of Backend.AI server."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:115 8be0c6fd03fc470dbc2fb14d6174f207
+#: ../../client/cli/sessions.rst:116 8be0c6fd03fc470dbc2fb14d6174f207
 msgid ""
 "The following command spawns a Python session and executes the code "
 "passed as ``./myscript.py`` file, using the shell command specified in "
 "the ``--exec`` option."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:125 4a021c9ab0984eda8dd51b7c93cab8e1
+#: ../../client/cli/sessions.rst:126 4a021c9ab0984eda8dd51b7c93cab8e1
 msgid ""
 "Please note that your ``run`` command may hang up for a very long time "
 "due to queueing when the cluster resource is not sufficiently available."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:128 a4d71a7a4c2e461588db57173edd11e3
+#: ../../client/cli/sessions.rst:129 a4d71a7a4c2e461588db57173edd11e3
 msgid ""
 "To avoid indefinite waiting, you may add ``--enqueue-only`` to return "
 "immediately after posting the session creation request."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:133 3a6f11c09f1244ff9a10c0968afa158f
+#: ../../client/cli/sessions.rst:134 3a6f11c09f1244ff9a10c0968afa158f
 msgid ""
 "When using ``--enqueue-only``, the codes are *NOT* executed and relevant "
 "options are ignored. This makes the ``run`` command to the same of the "
 "``start`` command."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:137 fb67913dd523450aa0e8766f2c379a92
+#: ../../client/cli/sessions.rst:138 fb67913dd523450aa0e8766f2c379a92
 msgid ""
 "Or, you may use ``--max-wait`` option to limit the maximum waiting time. "
 "If the session starts within the given ``--max-wait`` seconds, it works "
@@ -211,35 +223,35 @@ msgid ""
 "``--enqueue-only``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:142 1b47da4f14d84360bfc3280ab5c601e2
+#: ../../client/cli/sessions.rst:143 1b47da4f14d84360bfc3280ab5c601e2
 msgid ""
 "To watch what is happening behind the scene until the session starts, try"
 " ``backend.ai events <sessionID>`` to receive the lifecycle events such "
 "as its scheduling and preparation steps."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:148 114d64c15f1f43409534d0c91ba21795
+#: ../../client/cli/sessions.rst:149 114d64c15f1f43409534d0c91ba21795
 msgid "Running sessions with accelerators"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:150 5f6cc6de93234c4d839369c9185f316e
+#: ../../client/cli/sessions.rst:151 5f6cc6de93234c4d839369c9185f316e
 msgid ""
 "Use one or more ``-r`` options to specify resource requirements when "
 "using ``backend.ai run`` and ``backend.ai start`` commands."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:153 526b569b28424f85b77a91c9e7151927
+#: ../../client/cli/sessions.rst:154 526b569b28424f85b77a91c9e7151927
 msgid ""
 "For instance, the following command spawns a Python TensorFlow session "
 "using a half of virtual GPU device, 4 CPU cores, and 8 GiB of the main "
 "memory to execute ``./mygpucode.py`` file inside it."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:165 21d0d6c1d14b44bdb228b3611f34308f
+#: ../../client/cli/sessions.rst:166 21d0d6c1d14b44bdb228b3611f34308f
 msgid "Terminating or cancelling sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:167 84c719d55671456aa9df08bad8c173ef
+#: ../../client/cli/sessions.rst:168 84c719d55671456aa9df08bad8c173ef
 msgid ""
 "Without ``--rm`` option, your session remains alive for a configured "
 "amount of idle timeout (default is 30 minutes). You can see such sessions"
@@ -248,7 +260,7 @@ msgid ""
 " session IDs to terminate them at once."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:177 b679923c49934d188858c608ff806499
+#: ../../client/cli/sessions.rst:178 b679923c49934d188858c608ff806499
 msgid ""
 "If you terminate ``PENDING`` sessions which are not scheduled yet, they "
 "are cancelled."
@@ -291,5 +303,12 @@ msgstr ""
 #~ "``image``, ``type``, ``task_id``, ``tag``, "
 #~ "``occupied_slots``, ``used_memory``, ``max_used_memory``,"
 #~ " ``cpu_using``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available parameters for this option "
+#~ "are: ``id``, ``status``, ``status_info``, "
+#~ "``created_at``, ``status_changed``, ``result``, "
+#~ "``image``, ``type``, ``tag``, ``occupying_slots``."
 #~ msgstr ""
 
