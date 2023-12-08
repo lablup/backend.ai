@@ -324,7 +324,7 @@ service_fields = FieldSet(
         FieldSpec("url"),
         FieldSpec("model"),
         FieldSpec("model_mount_destiation"),
-        FieldSpec("created_user"),
+        FieldSpec("user_id"),
         FieldSpec("session_owner"),
         FieldSpec("tag"),
         FieldSpec("startup_command"),

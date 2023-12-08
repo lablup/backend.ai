@@ -63,8 +63,8 @@ class EndpointRow(Base):
 
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
-    created_user = sa.Column(
-        "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+    user_id = sa.Column(
+        "user_id", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     session_owner = sa.Column(
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
@@ -151,7 +151,7 @@ class EndpointRow(Base):
     def __init__(
         self,
         name: str,
-        created_user: uuid.UUID,
+        user_id: uuid.UUID,
         session_owner: uuid.UUID,
         desired_session_count: int,
         image: ImageRow,
@@ -173,7 +173,7 @@ class EndpointRow(Base):
     ):
         self.id = uuid.uuid4()
         self.name = name
-        self.created_user = created_user
+        self.user_id = user_id
         self.session_owner = session_owner
         self.desired_session_count = desired_session_count
         self.image = image.id
@@ -368,7 +368,7 @@ class Endpoint(graphene.ObjectType):
     url = graphene.String()
     model = graphene.UUID()
     model_mount_destiation = graphene.String()
-    created_user = graphene.UUID()
+    user_id = graphene.UUID()
     session_owner = graphene.UUID()
     tag = graphene.String()
     startup_command = graphene.String()
@@ -409,7 +409,7 @@ class Endpoint(graphene.ObjectType):
             url=row.url,
             model=row.model,
             model_mount_destiation=row.model_mount_destiation,
-            created_user=row.created_user,
+            user_id=row.user_id,
             session_owner=row.session_owner,
             tag=row.tag,
             startup_command=row.startup_command,

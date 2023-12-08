@@ -3705,10 +3705,10 @@ async def handle_route_creation(
             endpoint = await EndpointRow.get(db_sess, route.endpoint, load_image=True)
 
             query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
-                UserRow.uuid == endpoint.created_user
+                UserRow.uuid == endpoint.user_id
             )
             created_user = (await db_sess.execute(query)).fetchone()
-            if endpoint.session_owner != endpoint.created_user:
+            if endpoint.session_owner != endpoint.user_id:
                 query = sa.select(
                     sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
                 ).where(UserRow.uuid == endpoint.session_owner)
