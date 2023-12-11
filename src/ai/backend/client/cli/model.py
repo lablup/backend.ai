@@ -13,7 +13,11 @@ from ai.backend.client.session import Session
 from ..exceptions import BackendAPIError
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
+from .params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+)
 from .pretty import print_done
 from .types import CLIContext
 
@@ -102,7 +106,6 @@ def info(ctx: CLIContext, model_name):
 @click.option(
     "--unmanaged",
     "host_path",
-    type=bool,
     is_flag=True,
     help=(
         "Treats HOST as a mount point of unmanaged model. "
@@ -136,7 +139,6 @@ def info(ctx: CLIContext, model_name):
 @click.option(
     "--cloneable",
     "--allow-clone",
-    type=bool,
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )

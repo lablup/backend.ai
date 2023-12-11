@@ -13,6 +13,7 @@ from more_itertools import chunked
 from setproctitle import setproctitle
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.params import BoolExprType, OptionalType
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
@@ -207,7 +208,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.option(
     "-v",
     "--vacuum-full",
-    type=bool,
+    type=OptionalType(BoolExprType),
     default=False,
     help=(
         "Reclaim storage occupied by dead tuples."

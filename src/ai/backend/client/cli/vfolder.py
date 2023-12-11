@@ -18,9 +18,11 @@ from ..compat import asyncio_run
 from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .params import (
+    BoolExprType,
     ByteSizeParamCheckType,
     ByteSizeParamType,
     CommaSeparatedKVListParamType,
+    OptionalType,
 )
 from .pretty import (
     ProgressViewer,
@@ -78,7 +80,6 @@ def list_allowed_types():
 @click.option(
     "--unmanaged",
     "host_path",
-    type=bool,
     is_flag=True,
     help=(
         "Treats HOST as a mount point of unmanaged virtual folder. "
@@ -124,7 +125,6 @@ def list_allowed_types():
 @click.option(
     "--cloneable",
     "--allow-clone",
-    type=bool,
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
@@ -846,7 +846,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
 )
 @click.option(
     "--set-cloneable",
-    type=bool,
+    type=OptionalType(BoolExprType),
     metavar="BOOLEXPR",
     help=(
         "A boolean-interpretable string whether a virtual folder can be cloned. "

@@ -6,7 +6,7 @@ import click
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.params import OptionalType
+from ai.backend.client.cli.params import BoolExprType, OptionalType
 
 from ...func.group import _default_detail_fields, _default_list_fields
 from ...session import Session
@@ -168,7 +168,7 @@ def add(
 )
 @click.option(
     "--is-active",
-    type=OptionalType(bool),
+    type=OptionalType(BoolExprType),
     default=undefined,
     help="Set group inactive.",
 )
