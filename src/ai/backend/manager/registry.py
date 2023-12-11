@@ -1193,20 +1193,12 @@ class AgentRegistry:
                         )
 
             # Shared memory.
-            # The minimum-required/maximum-limited resource size(=MM) for images excludes the shared memory size(=S).
-            # However, MOST client's session creation requests set S by default and
-            # our scheduler allocates the sum of the requested main memory size(=M) and S.
-            # That's why we should compare MM to the sum of M and S,
-            # which is the same as comparing MM minus S to M.
-            raw_shmem = (
+            shmem = BinarySize.from_str(
                 resource_opts.get("shmem")
                 or labels.get("ai.backend.resource.preferred.shmem")
                 or DEFAULT_SHARED_MEMORY_SIZE
             )
-            shmem = BinarySize.from_str(raw_shmem)
             resource_opts["shmem"] = shmem
-            image_min_slots["mem"] -= shmem
-            image_max_slots["mem"] -= shmem
 
             # Sanitize user input: does it have resource config?
             if (resources := creation_config.get("resources")) is not None:
@@ -1258,6 +1250,18 @@ class AgentRegistry:
                 tpu = creation_config.get("instanceTPUs")
                 if tpu is not None:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
+
+            # Shared memory.
+            # The minimum-required/maximum-limited resource size(=MM) for images excludes the shared memory size(=S).
+            # However, MOST client's session creation requests set S by default and
+            # our scheduler allocates the sum of the requested main memory size(=M) and S.
+            # That's why we should compare MM to the sum of M and S,
+            # which is the same as comparing MM minus S to M.
+            total_mem = requested_slots["mem"] + shmem
+            log.debug(
+                f"Total memory size ({str(total_mem)}) is allocated to requested main memory size. (original memory: {str(requested_slots['mem'])}, shared memory: {str(shmem)})",
+            )
+            requested_slots["mem"] = total_mem
 
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
