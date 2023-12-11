@@ -6,17 +6,17 @@ from ai.backend.common.types import AgentSelectionStrategy
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_scaling_group(run: ClientRunnerFunc):
+def test_add_scaling_group(run_admin: ClientRunnerFunc):
     # Create scaling group
     with closing(
-        run([
+        run_admin([
             "--output=json",
             "admin",
             "scaling-group",
             "add",
             "-d",
             "Test scaling group",
-            "-i",
+            "--inactive",
             "--driver",
             "static",
             "--driver-opts",
@@ -31,7 +31,7 @@ def test_add_scaling_group(run: ClientRunnerFunc):
         assert response.get("ok") is True, "Test scaling group not created successfully"
 
     # Check if scaling group is created
-    with closing(run(["--output=json", "admin", "scaling-group", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -42,7 +42,9 @@ def test_add_scaling_group(run: ClientRunnerFunc):
     assert bool(test_group), "Test scaling group doesn't exist"
 
     # Get the full detail.
-    with closing(run(["--output=json", "admin", "scaling-group", "info", "test_group1"])) as p:
+    with closing(
+        run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
+    ) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -66,16 +68,18 @@ def test_add_scaling_group(run: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_update_scaling_group(run: ClientRunnerFunc):
+def test_update_scaling_group(run_admin: ClientRunnerFunc):
     # Update scaling group
     with closing(
-        run([
+        run_admin([
             "--output=json",
             "admin",
             "scaling-group",
             "update",
             "-d",
             "Test scaling group updated",
+            "--active",
+            "True",
             "--driver",
             "non-static",
             "--scheduler",
@@ -88,7 +92,9 @@ def test_update_scaling_group(run: ClientRunnerFunc):
         assert response.get("ok") is True, "Test scaling group not updated successfully"
 
     # Check if scaling group is updated
-    with closing(run(["--output=json", "admin", "scaling-group", "info", "test_group1"])) as p:
+    with closing(
+        run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
+    ) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -114,15 +120,17 @@ def test_update_scaling_group(run: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_delete_scaling_group(run: ClientRunnerFunc):
-    with closing(run(["--output=json", "admin", "scaling-group", "delete", "test_group1"])) as p:
+def test_delete_scaling_group(run_admin: ClientRunnerFunc):
+    with closing(
+        run_admin(["--output=json", "admin", "scaling-group", "delete", "test_group1"])
+    ) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get("ok") is True, "Test scaling group deletion unsuccessful"
 
 
-def test_list_scaling_group(run: ClientRunnerFunc):
-    with closing(run(["--output=json", "admin", "scaling-group", "list"])) as p:
+def test_list_scaling_group(run_admin: ClientRunnerFunc):
+    with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
