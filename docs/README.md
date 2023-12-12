@@ -126,6 +126,12 @@ Example:
 
 Please ask the docs maintainer for help.
 
+### Previewing built HTML documentation
+Simply create a nginx server which serves `_build/html` folder. For example (docker required): 
+```bash
+docker run --rm -it -v $(pwd)/_build/html:/usr/share/nginx/html -p 8000:80 nginx
+```
+Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
 
 ## References for newcomers
 
