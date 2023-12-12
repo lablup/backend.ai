@@ -27,7 +27,6 @@ on_rtd = os.environ.get("READTHEDOCS") == "True"
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, str(root_path / "src"))
-sys.path.append(os.path.abspath("_exts"))
 
 # -- General configuration ------------------------------------------------
 
@@ -152,7 +151,7 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
-html_extra_path = ["manager/rest-reference/openapi.json", "manager/rest-reference/openapi.html"]
+html_extra_path = ["manager/rest-reference/openapi.json"]
 
 # Custom sidebar templates, maps document names to template names.
 # html_sidebars = {}
