@@ -45,7 +45,6 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
-    "sphinxcontrib.openapi",
     "sphinx_autodoc_typehints",
     "external_link",
 ]
