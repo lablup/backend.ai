@@ -22,9 +22,9 @@ from typing import (
 import aiohttp
 from multidict import CIMultiDict
 
-from ..cli.types import Sentinel, sentinel
 from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
+from .types import Sentinel, sentinel
 
 __all__ = (
     "BaseSession",
