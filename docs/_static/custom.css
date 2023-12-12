@@ -112,10 +112,3 @@ code, .code, .pre, tt {
     border: 0 none;
     color: inherit;
 }
-
-.external-link-icon {
-    width: 1em;
-    height: 1em;
-    margin-right: 0.25em;
-    vertical-align: baseline;
-}
