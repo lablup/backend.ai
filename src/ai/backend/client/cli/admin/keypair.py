@@ -72,7 +72,6 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
     """
     fields = [
         keypair_fields["user_id"],
-        keypair_fields["projects"],
         keypair_fields["full_name"],
         keypair_fields["access_key"],
         keypair_fields["secret_key"],
