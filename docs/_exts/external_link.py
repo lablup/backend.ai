@@ -19,10 +19,7 @@ class NewTabLinkHTMLTranslator(HTMLTranslator):
         if match:
             atts["target"] = "_blank"
             atts["rel"] = "noopener noreferrer"
-        tag = super().starttag(node, tagname, *args, **atts)
-        if match:
-            tag += '<img class="external-link-icon" src="/_static/icons/icon-external.svg" />'
-        return tag
+        return super().starttag(node, tagname, *args, **atts)
 
 
 def setup(app):
