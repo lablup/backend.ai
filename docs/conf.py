@@ -45,7 +45,6 @@ extensions = [
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
     "sphinx_autodoc_typehints",
-    "external_link",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
