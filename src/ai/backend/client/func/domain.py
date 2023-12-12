@@ -1,10 +1,11 @@
 import textwrap
 from typing import Any, Iterable, Sequence
 
+from ...cli.types import Undefined, undefined
 from ..output.fields import domain_fields
 from ..output.types import FieldSpec
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)

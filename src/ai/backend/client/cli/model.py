@@ -5,6 +5,11 @@ import click
 import humanize
 
 from ai.backend.cli.main import main
+from ai.backend.cli.params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+)
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.output.fields import vfolder_fields
@@ -13,11 +18,6 @@ from ai.backend.client.session import Session
 from ..exceptions import BackendAPIError
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .params import (
-    ByteSizeParamCheckType,
-    ByteSizeParamType,
-    CommaSeparatedKVListParamType,
-)
 from .pretty import print_done
 from .types import CLIContext
 

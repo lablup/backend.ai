@@ -12,8 +12,8 @@ import click
 from more_itertools import chunked
 from setproctitle import setproctitle
 
+from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.params import BoolExprType, OptionalType
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter

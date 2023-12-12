@@ -2,12 +2,11 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 
-from ...cli.params import BoolExprType, OptionalType
 from ...output.fields import keypair_fields
 from ...session import Session
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..types import CLIContext
 from . import admin

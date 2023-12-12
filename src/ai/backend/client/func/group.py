@@ -4,8 +4,9 @@ from typing import Any, Iterable, Optional, Sequence
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 
+from ...cli.types import Undefined, undefined
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Group",)

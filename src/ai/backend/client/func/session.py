@@ -31,6 +31,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import SessionTypes
 
+from ...cli.types import Undefined, undefined
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
@@ -43,7 +44,6 @@ from ..request import (
     WebSocketResponse,
 )
 from ..session import api_session
-from ..types import Undefined, undefined
 from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function

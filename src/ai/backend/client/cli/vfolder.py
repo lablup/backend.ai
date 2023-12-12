@@ -9,6 +9,13 @@ from tabulate import tabulate
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
+from ai.backend.cli.params import (
+    BoolExprType,
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+    OptionalType,
+)
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
@@ -17,13 +24,6 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .extensions import pass_ctx_obj
-from .params import (
-    BoolExprType,
-    ByteSizeParamCheckType,
-    ByteSizeParamType,
-    CommaSeparatedKVListParamType,
-    OptionalType,
-)
 from .pretty import (
     ProgressViewer,
     print_done,

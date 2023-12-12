@@ -23,7 +23,8 @@ from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import CommaSeparatedListType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run
@@ -32,9 +33,7 @@ from ...func.session import ComputeSession
 from ...output.fields import session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
-from ...types import Undefined, undefined
 from .. import events
-from ..params import CommaSeparatedListType, OptionalType
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
 from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
