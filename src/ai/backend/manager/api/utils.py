@@ -226,7 +226,7 @@ def check_api_params_v2(
     def wrap(
         handler: Callable[
             Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel | list]
-        ]
+        ],
     ) -> Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]]:
         @functools.wraps(handler)
         async def wrapped(

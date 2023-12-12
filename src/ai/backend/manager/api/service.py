@@ -151,9 +151,9 @@ async def list_serve(
             id=endpoint.id,
             name=endpoint.name,
             desired_session_count=endpoint.desired_session_count,
-            active_route_count=len(
-                [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-            ),
+            active_route_count=len([
+                r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
+            ]),
             service_endpoint=endpoint.url,
             is_public=endpoint.open_to_public,
         )

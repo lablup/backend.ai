@@ -91,29 +91,25 @@ class _TimeDurationPydanticAnnotation:
         _source_type: Any,
         _handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
-        schema = core_schema.chain_schema(
-            [
-                core_schema.union_schema(
-                    [core_schema.int_schema(), core_schema.float_schema(), core_schema.str_schema()]
-                ),
-                core_schema.no_info_plain_validator_function(cls.time_duration_validator),
-            ]
-        )
+        schema = core_schema.chain_schema([
+            core_schema.union_schema([
+                core_schema.int_schema(),
+                core_schema.float_schema(),
+                core_schema.str_schema(),
+            ]),
+            core_schema.no_info_plain_validator_function(cls.time_duration_validator),
+        ])
 
         return core_schema.json_or_python_schema(
             json_schema=schema,
-            python_schema=core_schema.union_schema(
-                [
-                    # check if it's an instance first before doing any further work
-                    core_schema.union_schema(
-                        [
-                            core_schema.is_instance_schema(datetime.timedelta),
-                            core_schema.is_instance_schema(relativedelta),
-                        ]
-                    ),
-                    schema,
-                ]
-            ),
+            python_schema=core_schema.union_schema([
+                # check if it's an instance first before doing any further work
+                core_schema.union_schema([
+                    core_schema.is_instance_schema(datetime.timedelta),
+                    core_schema.is_instance_schema(relativedelta),
+                ]),
+                schema,
+            ]),
             serialization=core_schema.plain_serializer_function_ser_schema(
                 cls.time_duration_serializer
             ),
@@ -125,9 +121,11 @@ class _TimeDurationPydanticAnnotation:
     ) -> JsonSchemaValue:
         # Use the same schema that would be used for `int`
         return handler(
-            core_schema.union_schema(
-                [core_schema.int_schema(), core_schema.float_schema(), core_schema.str_schema()]
-            )
+            core_schema.union_schema([
+                core_schema.int_schema(),
+                core_schema.float_schema(),
+                core_schema.str_schema(),
+            ])
         )
 
 
