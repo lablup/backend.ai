@@ -42,6 +42,7 @@ Alias keys are also URL-quoted in the same way.
        - timezone: "UTC"  # pytz-compatible timezone names (e.g., "Asia/Seoul")
      + api
        - allow-origins: "*"
+       - allow-openapi-schema-introspection: "yes" | "no"  # (default: no)
        - allow-graphql-schema-introspection: "yes" | "no"  # (default: no)
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
@@ -308,6 +309,7 @@ _config_defaults: Mapping[str, Any] = {
     },
     "api": {
         "allow-origins": "*",
+        "allow-openapi-schema-introspection": False,
         "allow-graphql-schema-introspection": False,
     },
     "redis": config.redis_default_config,
@@ -390,6 +392,10 @@ shared_config_iv = t.Dict({
         t.Key(
             "allow-graphql-schema-introspection",
             default=_config_defaults["api"]["allow-graphql-schema-introspection"],
+        ): t.ToBool,
+        t.Key(
+            "allow-openapi-schema-introspection",
+            default=_config_defaults["api"]["allow-openapi-schema-introspection"],
         ): t.ToBool,
     }).allow_extra("*"),
     t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,

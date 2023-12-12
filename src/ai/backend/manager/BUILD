@@ -91,9 +91,17 @@ run_shell_command(
 resource(name="version", source="VERSION")
 resource(name="buildscript", source="BUILD")
 resources(
+    name="vendor",
+    sources=[
+        "vendor/*",
+        "vendor/**/*",
+    ],
+)
+resources(
     name="resources",
     dependencies=[
         ":version",
+        ":vendor",
     ],
     sources=[
         "**/py.typed",

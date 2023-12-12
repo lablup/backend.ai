@@ -366,6 +366,9 @@ class Context(metaclass=ABCMeta):
         }
         await self.etcd_put_json("", data)
         data = {}
+        # TODO: in dev-mode, enable these.
+        data["api"]["allow-openapi-schema-introspection"] = "no"
+        data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
             assert halfstack.redis_sentinel_addrs
             data["redis"] = {
