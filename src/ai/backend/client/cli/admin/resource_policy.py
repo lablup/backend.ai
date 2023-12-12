@@ -114,11 +114,9 @@ def list(ctx: CLIContext) -> None:
     "--vfhost-perms",
     "--allowed-vfolder-hosts",  # legacy name
     type=str,
-    default=json.dumps(
-        {
-            "local:volume1": [perm.value for perm in VFolderHostPermission],
-        }
-    ),
+    default=json.dumps({
+        "local:volume1": [perm.value for perm in VFolderHostPermission],
+    }),
     help=(
         "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'

@@ -302,33 +302,27 @@ class ComputeSession(BaseFunction):
             params["starts_at"] = starts_at
             params["bootstrap_script"] = bootstrap_script
             if assign_agent is not None:
-                params["config"].update(
-                    {
-                        "mount_map": mount_map,
-                        "preopen_ports": preopen_ports,
-                        "agentList": assign_agent,
-                    }
-                )
+                params["config"].update({
+                    "mount_map": mount_map,
+                    "preopen_ports": preopen_ports,
+                    "agentList": assign_agent,
+                })
             else:
-                params["config"].update(
-                    {
-                        "mount_map": mount_map,
-                        "preopen_ports": preopen_ports,
-                    }
-                )
+                params["config"].update({
+                    "mount_map": mount_map,
+                    "preopen_ports": preopen_ports,
+                })
         if api_session.get().api_version >= (4, "20190615"):
-            params.update(
-                {
-                    "owner_access_key": owner_access_key,
-                    "domain": domain_name,
-                    "group": group_name,
-                    "type": type_,
-                    "enqueueOnly": enqueue_only,
-                    "maxWaitSeconds": max_wait,
-                    "reuseIfExists": not no_reuse,
-                    "startupCommand": startup_command,
-                }
-            )
+            params.update({
+                "owner_access_key": owner_access_key,
+                "domain": domain_name,
+                "group": group_name,
+                "type": type_,
+                "enqueueOnly": enqueue_only,
+                "maxWaitSeconds": max_wait,
+                "reuseIfExists": not no_reuse,
+                "startupCommand": startup_command,
+            })
         if api_session.get().api_version > (4, "20181215"):
             params["image"] = image
         else:
@@ -652,17 +646,15 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/complete",
             params=params,
         )
-        rqst.set_json(
-            {
-                "code": code,
-                "options": {
-                    "row": int(opts.get("row", 0)),
-                    "col": int(opts.get("col", 0)),
-                    "line": opts.get("line", ""),
-                    "post": opts.get("post", ""),
-                },
-            }
-        )
+        rqst.set_json({
+            "code": code,
+            "options": {
+                "row": int(opts.get("row", 0)),
+                "col": int(opts.get("col", 0)),
+                "line": opts.get("line", ""),
+                "post": opts.get("post", ""),
+            },
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -777,49 +769,43 @@ class ComputeSession(BaseFunction):
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "mode": mode,
-                    "code": code,
-                    "runId": run_id,
-                }
-            )
+            rqst.set_json({
+                "mode": mode,
+                "code": code,
+                "runId": run_id,
+            })
         elif mode == "batch":
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "mode": mode,
-                    "code": code,
-                    "runId": run_id,
-                    "options": {
-                        "clean": opts.get("clean", None),
-                        "build": opts.get("build", None),
-                        "buildLog": bool(opts.get("buildLog", False)),
-                        "exec": opts.get("exec", None),
-                    },
-                }
-            )
+            rqst.set_json({
+                "mode": mode,
+                "code": code,
+                "runId": run_id,
+                "options": {
+                    "clean": opts.get("clean", None),
+                    "build": opts.get("build", None),
+                    "buildLog": bool(opts.get("buildLog", False)),
+                    "exec": opts.get("exec", None),
+                },
+            })
         elif mode == "complete":
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "code": code,
-                    "options": {
-                        "row": int(opts.get("row", 0)),
-                        "col": int(opts.get("col", 0)),
-                        "line": opts.get("line", ""),
-                        "post": opts.get("post", ""),
-                    },
-                }
-            )
+            rqst.set_json({
+                "code": code,
+                "options": {
+                    "row": int(opts.get("row", 0)),
+                    "col": int(opts.get("col", 0)),
+                    "line": opts.get("line", ""),
+                    "post": opts.get("post", ""),
+                },
+            })
         else:
             raise BackendClientError("Invalid execution mode: {0}".format(mode))
         async with rqst.fetch() as resp:
@@ -917,11 +903,9 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/download",
             params=params,
         )
-        rqst.set_json(
-            {
-                "files": [*map(str, files)],
-            }
-        )
+        rqst.set_json({
+            "files": [*map(str, files)],
+        })
         file_names = []
         async with rqst.fetch() as resp:
             loop = current_loop()
@@ -975,11 +959,9 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/files",
             params=params,
         )
-        rqst.set_json(
-            {
-                "path": path,
-            }
-        )
+        rqst.set_json({
+            "path": path,
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -1103,13 +1085,11 @@ class ComputeSession(BaseFunction):
         )
 
         async def send_code(ws):
-            await ws.send_json(
-                {
-                    "code": code,
-                    "mode": mode,
-                    "options": opts,
-                }
-            )
+            await ws.send_json({
+                "code": code,
+                "mode": mode,
+                "options": opts,
+            })
 
         return request.connect_websocket(on_enter=send_code)
 
@@ -1391,20 +1371,16 @@ class StreamPty(WebSocketResponse):
 
     async def resize(self, rows, cols):
         await self.ws.send_str(
-            json.dumps(
-                {
-                    "type": "resize",
-                    "rows": rows,
-                    "cols": cols,
-                }
-            )
+            json.dumps({
+                "type": "resize",
+                "rows": rows,
+                "cols": cols,
+            })
         )
 
     async def restart(self):
         await self.ws.send_str(
-            json.dumps(
-                {
-                    "type": "restart",
-                }
-            )
+            json.dumps({
+                "type": "restart",
+            })
         )

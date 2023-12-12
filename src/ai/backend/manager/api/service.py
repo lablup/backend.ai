@@ -568,9 +568,10 @@ async def delete(request: web.Request) -> SuccessResponseModel:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
-                .values(
-                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
-                )
+                .values({
+                    "desired_session_count": 0,
+                    "lifecycle_stage": EndpointLifecycle.DESTROYING,
+                })
             )
         await db_sess.execute(query)
     return SuccessResponseModel()

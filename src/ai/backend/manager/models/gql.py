@@ -60,6 +60,7 @@ from .group import (
     GroupConnection,
     GroupNode,
     ModifyGroup,
+    ProjectType,
     PurgeGroup,
 )
 from .image import (
@@ -130,6 +131,8 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
+    ModelCard,
+    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -327,6 +330,13 @@ class Queries(graphene.ObjectType):
         Group,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=(
+                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
+        ),
     )
 
     image = graphene.Field(
@@ -664,6 +674,11 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    model_card = graphene.Field(
+        ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
@@ -852,6 +867,7 @@ class Queries(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Group:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -886,7 +902,7 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id)
+            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -948,6 +964,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -968,7 +985,12 @@ class Queries(graphene.ObjectType):
             return client_groups
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return await Group.load_all(info.context, domain_name=domain_name, is_active=is_active)
+        return await Group.load_all(
+            info.context,
+            domain_name=domain_name,
+            is_active=is_active,
+            type=[ProjectType[t] for t in type],
+        )
 
     @staticmethod
     async def resolve_image(
@@ -2038,6 +2060,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
+
+    async def resolve_model_card(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelCard.get_node(info, id)
+
+    async def resolve_model_cards(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ModelCard.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
 
 class GQLMutationPrivilegeCheckMiddleware:

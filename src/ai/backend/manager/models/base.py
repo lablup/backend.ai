@@ -446,9 +446,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()
-        return VFolderHostPermissionMap(
-            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
-        )
+        return VFolderHostPermissionMap({
+            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+        })
 
 
 class CurrencyTypes(enum.Enum):
