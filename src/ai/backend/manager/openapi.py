@@ -59,7 +59,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
             x for x in trafarets if not (isinstance(x, t.Null) or isinstance(x, UndefChecker))
         ]
         if len(valid_trafarets) >= 2:
-            return {"oneOf": list(_traverse(s) for s in valid_trafarets)}
+            return {"anyOf": list(_traverse(s) for s in valid_trafarets)}
         else:
             scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
@@ -122,7 +122,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
         return {"type": "string", "pattern": str(scheme._rx_slug.pattern)}
     if isinstance(scheme, tx.TimeDuration):
         return {
-            "oneOf": [
+            "anyOf": [
                 {
                     "type": "string",
                     "description": (
@@ -195,7 +195,7 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict]:
 
 def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str, Any]:
     openapi: dict[str, Any] = {
-        "openapi": "3.0.0",
+        "openapi": "3.1.0",
         "info": {
             "title": "Backend.AI Manager API",
             "description": "Backend.AI Manager REST API specification",
@@ -357,11 +357,12 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                 openapi["components"]["schemas"][schema_name] = response_schema
                 route_def["responses"] = {
                     "200": {
+                        "description": "",
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": f"#/components/schemas/{schema_name}"}
                             }
-                        }
+                        },
                     }
                 }
             openapi["paths"][path][method.lower()] = route_def
