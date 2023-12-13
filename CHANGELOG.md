@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.8.rc1 (2023-12-13)
+
+### Features
+* Use `ui.menu_blocklist` to hide pipeline menu button and delete `pipeline.hide-side-menu-button`. ([#1727](https://github.com/lablup/backend.ai/issues/1727))
+* Use `ui.menu_blocklist` to hide and `ui.menu_inactivelist` to disable menu items. ([#1733](https://github.com/lablup/backend.ai/issues/1733))
+* GraphQL API log Graphql errors. ([#1737](https://github.com/lablup/backend.ai/issues/1737))
+* In order to be able to use not only alt_name but also field_ref when using the --format option of session list, add values to FieldSet. ([#1756](https://github.com/lablup/backend.ai/issues/1756))
+* Implement the concept of the "main" keypair to make it clear which keypair to use by default and which one holds the user-level resource limits ([#1761](https://github.com/lablup/backend.ai/issues/1761))
+
+### Fixes
+* Minimize latency between session insertion and dependency insertion. ([#1720](https://github.com/lablup/backend.ai/issues/1720))
+* Restrict destroy of terminated sessions. ([#1721](https://github.com/lablup/backend.ai/issues/1721))
+* Initialize the `_health_check_task` attribute of the kernel runner explicitly to `None` for safe access. ([#1764](https://github.com/lablup/backend.ai/issues/1764))
+* Remove the `containers` field, which is awkward in table format `session list` output, from the `session list --format` item. ([#1766](https://github.com/lablup/backend.ai/issues/1766))
+
+### Miscellaneous
+* Update the Python development tool versions and restyle the codebase with updated Ruff (0.1.7), replacing Black with Ruff ([#1771](https://github.com/lablup/backend.ai/issues/1771))
+
+
 ## 23.09.6 (2023-11-27)
 
 ### Features
