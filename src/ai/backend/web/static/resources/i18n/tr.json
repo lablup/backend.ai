@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Üst çubuktaki kişi simgesine tıklayın ve \"Hesabım\" menüsüne gidin.",
       "Notifications": "Bildirimler",
       "Tasks": "Görevler",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Veri"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -240,17 +241,19 @@
       "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir.",
       "PreOpenPortMaxCountLimit": "En fazla {{sayı}} ön açık bağlantı noktası ayarlayabilirsiniz.",
       "StartTimeMustBeInTheFuture": "Başlangıç zamanı geçerli saatten sonra olmalıdır.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Mevcut mevcut kaynaklardan daha büyük bir değere ayarlarsanız, oturumun oluşturulması, kullanılabilir hale gelene kadar kuyrukta ertelenecektir.",
+      "SessionName": "Oturum adı",
+      "ResetFormConfirm": "Tüm girişlerinizi sıfırlamak istiyor musunuz?",
+      "TemplateAndHistory": "Şablonlar",
+      "ScheduleTimeSimple": "Başlangıç ​​zamanını ayarla",
       "ResourceAllocationPerContainer": "Konteyner Başına Kaynak Tahsisi",
       "NumberOfContainer": "Konteyner sayısı",
+      "ErrorCanNotExceedRemaining": "Kalan kaynaklardan ({{amount}}) daha büyük bir değere ayarlanamaz.",
       "EnterEnvironmentVariable": "Değişken adını girin",
       "EnvironmentVariableNamePatternError": "Değişken adı bir harf veya alt çizgi ile başlamalıdır ve yalnızca harfler, sayılar ve alt çizgiler içerebilir.",
-      "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı."
+      "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı.",
+      "Template": "Oturum Şablonu",
+      "EnableAutomaticShmem": "Otomatik paylaşılan bellek"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -399,7 +402,9 @@
     "Unset": "Ayarlanmamış",
     "OK": "TAMAM.",
     "Commit": "Taahhüt",
-    "EnterManually": "Manuel Olarak Girin"
+    "EnterManually": "Manuel Olarak Girin",
+    "Download": "İndir",
+    "Clone": "Klon"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -443,7 +448,7 @@
     "Enabled": "Etkin",
     "StorageProxies": "Depolar",
     "None": "Hiçbiri",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Resim"
   },
   "credential": {
     "Permission": "izin",
@@ -521,7 +526,8 @@
     "SignoutSeccessfullyFinished": "Çıkış işlemi başarıyla tamamlandı",
     "Status": "Durum",
     "NoUserToDisplay": "Görüntülenecek Kullanıcı Yok",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Sudo oturumunu etkinleştir",
+    "MainAccessKey": "Ana Erişim Anahtarı"
   },
   "data": {
     "Folders": "klasörler",
@@ -687,7 +693,11 @@
     "Pipeline": "Boru Hattı Klasörleri",
     "DialogDataFolder": "FastTrack'te boru hatları oluşturulurken otomatik olarak oluşturulan boru hattına özel klasörler.",
     "DialogModelFolder": "Modellere hizmet verebilir ve yönetebilirsiniz.",
-    "SearchByName": "Ada göre ara"
+    "SearchByName": "Ada göre ara",
+    "ModelStore": "Model Mağazası",
+    "New": "Yeni",
+    "Add": "Ekle",
+    "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür."
   },
   "dialog": {
     "warning": {
@@ -832,7 +842,9 @@
     "DescAutoLogout": "Uygulamalar için oturum kaynaklı sayfalar (örneğin jupyter notebook, web terminal, vb.)",
     "SSHKeypairEnterManuallyFinished": "SSH Anahtar Çifti başarıyla kaydedildi.",
     "BootstrapScriptDescription": "Bootstrap komut dosyası oturum oluşturulduktan sonra yalnızca bir kez çalıştırılacaktır",
-    "SSHKeypairEnterManually": "SSH Anahtar Çifti"
+    "SSHKeypairEnterManually": "SSH Anahtar Çifti",
+    "MyKeypairInfo": "Anahtar Çifti Bilgilerim",
+    "DescMyKeypairInfo": "Anahtar çifti bilgilerimi görün"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -1056,8 +1068,6 @@
     "Scaling": "ölçekleme",
     "AllowAgentSideRegistration": "Aracı tarafı kaydına izin ver",
     "DescAllowAgentSideRegistration": "Aracının kendisini yöneticiye kaydetmesine izin verin. <br/> Yalnızca Backend.AI kümesi güvenli konumda yönetiliyorsa kullanın.",
-    "Plugins": "Eklentiler",
-    "CUDAGPUsupport": "CUDA GPU desteği",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU desteği. <br/> Backend.AI CUDA Eklentisi gerektirir.",
     "CUDAGPUdisabledByFGPUsupport": "Sistem Kesirli GPU eklentisi kullandığı için devre dışı bırakıldı",
     "ROCMGPUsupport": "ROCm GPU desteği",
@@ -1107,7 +1117,9 @@
     "OverlayNetworkSettings": "Yer Paylaşımlı Ağ ayarları",
     "OverlayNetworkSettingsDescription": "Kaplama ağı, başka bir ağın üzerine katmanlanmış bir bilgisayar ağıdır. Kaplama ağı, Backend.AI yöneticisinin birden fazla Docker daemon ana bilgisayarı arasında dağıtılmış bir ağ oluşturur.",
     "MTUDescription": "Maksimum iletim birimi, bir ağ protokolünün iletebileceği en büyük paketin boyutu.",
-    "OutOfRange": "Menzil dışında."
+    "OutOfRange": "Menzil dışında.",
+    "Plugins": "Eklentiler",
+    "OpenSourceCUDAGPUsupport": "Açık Kaynak CUDA GPU desteği"
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1382,7 +1394,8 @@
     "RoutingsCount": "Güzergah Sayısı",
     "Active/Total": "Aktif/Toplam",
     "Public": "Kamu",
-    "YouAreAboutToTerminate": "Sonlandırmak üzeresiniz"
+    "YouAreAboutToTerminate": "Sonlandırmak üzeresiniz",
+    "Owner": "Mal sahibi"
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
@@ -1438,5 +1451,38 @@
   "OpenVSCodeRemote": "Yerel Visual Studio Kodunu açın",
   "inputLimit": {
     "4to64chars": "(4~64 karakter)"
+  },
+  "modelStore": {
+    "Description": "Tanım",
+    "Model": "Modeli",
+    "FilterByName": "Ada Göre Filtrele",
+    "ServiceDetails": "Hizmet Detayları",
+    "Metadata": "Meta veriler",
+    "ModelPath": "Model Yolu",
+    "SearchModels": "Modelleri Ara",
+    "MinResource": "Minimum Kaynak",
+    "LastModified": "Son düzenleme",
+    "Created": "Oluşturuldu",
+    "Version": "Sürüm",
+    "Author": "Yazar",
+    "MaxRetries": "Maksimum Yeniden Deneme Sayısı",
+    "Path": "Yol",
+    "HealthCheck": "Sağlık kontrolü",
+    "Port": "Liman",
+    "StartCommand": "Komutu Başlat",
+    "PreStartActions": "Başlangıç ​​Öncesi Eylemler",
+    "Framework": "Çerçeve",
+    "Category": "Kategori",
+    "Label": "Etiket",
+    "Task": "Görev",
+    "CloneAsFolder": "Klasör olarak klonla",
+    "CloneSuccess": "Klonlama isteği başarıyla gönderildi.",
+    "CloneInfo": "Kullanıcı tipi klasörünüz olarak klonlanacaktır.",
+    "category": "Kategori"
+  },
+  "table": {
+    "SettingTable": "Tablo Ayarı",
+    "SelectColumnToDisplay": "Görüntülenecek sütunları seçin",
+    "SearchTableColumn": "Tablo sütunlarında arama yapın"
   }
 }

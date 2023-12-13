@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Κάντε κλικ στο εικονίδιο προσώπου στην επάνω μπάρα και μεταβείτε στο μενού \"Ο λογαριασμός μου\".",
       "Notifications": "Ειδοποιήσεις",
       "Tasks": "Εργασίες",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Δεδομένα"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -240,17 +241,19 @@
       "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-).",
       "PreOpenPortMaxCountLimit": "Μπορείτε να ορίσετε έως και {{count}} προ-ανοικτές θύρες.",
       "StartTimeMustBeInTheFuture": "Η ώρα έναρξης πρέπει να είναι μετά την τρέχουσα ώρα.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Εάν το ορίσετε μεγαλύτερο από τους διαθέσιμους πόρους, η δημιουργία συνεδρίας θα καθυστερήσει στην ουρά μέχρι να γίνει διαθέσιμη.",
+      "SessionName": "Όνομα συνεδρίας",
+      "ResetFormConfirm": "Θέλετε να επαναφέρετε όλες τις καταχωρήσεις σας;",
+      "TemplateAndHistory": "Πρότυπα",
+      "ScheduleTimeSimple": "Ρύθμιση ώρας έναρξης",
       "ResourceAllocationPerContainer": "Κατανομή πόρων ανά εμπορευματοκιβώτιο",
       "NumberOfContainer": "Αριθμός εμπορευματοκιβωτίων",
+      "ErrorCanNotExceedRemaining": "Δεν μπορεί να οριστεί σε τιμή μεγαλύτερη από τους υπόλοιπους πόρους ({{amount}}).",
       "EnterEnvironmentVariable": "Εισάγετε το όνομα της μεταβλητής",
       "EnvironmentVariableNamePatternError": "Το όνομα της μεταβλητής πρέπει να αρχίζει με γράμμα ή υπογράμμιση και μπορεί να περιέχει μόνο γράμματα, αριθμούς και υπογράμμιση.",
-      "EnvironmentVariableDuplicateName": "Ένα όνομα μεταβλητής που υπάρχει ήδη."
+      "EnvironmentVariableDuplicateName": "Ένα όνομα μεταβλητής που υπάρχει ήδη.",
+      "Template": "Πρότυπο συνεδρίας",
+      "EnableAutomaticShmem": "Αυτόματη κοινή μνήμη"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -399,7 +402,9 @@
     "Unset": "Μη ρυθμισμένο",
     "OK": "OK",
     "Commit": "Δέσμευση",
-    "EnterManually": "Εισάγετε χειροκίνητα"
+    "EnterManually": "Εισάγετε χειροκίνητα",
+    "Download": "Λήψη",
+    "Clone": "Κλώνος"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -443,7 +448,7 @@
     "Enabled": "Ενεργοποιήθηκε",
     "StorageProxies": "Αποθήκες",
     "None": "Κανένα",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Εικόνα"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -521,7 +526,8 @@
     "SignoutSeccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
     "Status": "Κατάσταση",
     "NoUserToDisplay": "Δεν υπάρχουν χρήστες για εμφάνιση",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Ενεργοποίηση συνεδρίας sudo",
+    "MainAccessKey": "Κύριο κλειδί πρόσβασης"
   },
   "data": {
     "Folders": "Φάκελοι",
@@ -687,7 +693,11 @@
     "Pipeline": "Φάκελοι αγωγών",
     "DialogDataFolder": "Ειδικοί φάκελοι αγωγών που δημιουργούνται αυτόματα κατά τη δημιουργία αγωγών στο FastTrack.",
     "DialogModelFolder": "Μπορείτε να εξυπηρετείτε και να διαχειρίζεστε μοντέλα.",
-    "SearchByName": "Αναζήτηση με όνομα"
+    "SearchByName": "Αναζήτηση με όνομα",
+    "ModelStore": "Κατάστημα μοντέλων",
+    "New": "Νέος",
+    "Add": "Προσθέστε",
+    "CloningIsOnlyPossibleSameHost": "Προς το παρόν, η κλωνοποίηση είναι δυνατή μόνο στον ίδιο κεντρικό υπολογιστή."
   },
   "dialog": {
     "warning": {
@@ -832,7 +842,9 @@
     "DescAutoLogout": "Αποσυνδεθείτε αυτόματα εάν όλες οι συνδεδεμένες σελίδες είναι κλειστές εκτός από τις σελίδες που προέρχονται από περίοδο σύνδεσης για εφαρμογές (π.χ. jupyter notebook, web terminal κ.λπ.)",
     "SSHKeypairEnterManuallyFinished": "Το ζεύγος κλειδιών SSH καταχωρήθηκε με επιτυχία.",
     "BootstrapScriptDescription": "Το σενάριο Bootstrap θα εκτελεστεί μόνο μία φορά μετά τη δημιουργία συνεδρίας",
-    "SSHKeypairEnterManually": "Ζεύγος κλειδιών SSH"
+    "SSHKeypairEnterManually": "Ζεύγος κλειδιών SSH",
+    "MyKeypairInfo": "Πληροφορίες για το ζεύγος κλειδιών μου",
+    "DescMyKeypairInfo": "Δείτε τις πληροφορίες του ζεύγους κλειδιών μου"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -1056,8 +1068,6 @@
     "Scaling": "Απολέπιση",
     "AllowAgentSideRegistration": "Να επιτρέπεται η εγγραφή από τον αντιπρόσωπο",
     "DescAllowAgentSideRegistration": "Επιτρέψτε στον πράκτορα να εγγραφεί στον διαχειριστή. <br/> Χρησιμοποιήστε μόνο εάν το σύμπλεγμα Backend.AI διαχειρίζεται σε ασφαλή τοποθεσία.",
-    "Plugins": "Πρόσθετα",
-    "CUDAGPUsupport": "Υποστήριξη CUDA GPU",
     "DescCUDAGPUsupport": "Υποστήριξη NVIDIA CUDA GPU. <br/> Απαιτείται πρόσθετο Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Απενεργοποιήθηκε επειδή το σύστημα χρησιμοποιεί Fractional GPU plugin",
     "ROCMGPUsupport": "Υποστήριξη ROCm GPU",
@@ -1107,7 +1117,9 @@
     "OverlayNetworkSettings": "Ρυθμίσεις δικτύου επικάλυψης",
     "OverlayNetworkSettingsDescription": "Ένα δίκτυο επικάλυψης είναι ένα δίκτυο υπολογιστών που τοποθετείται πάνω σε ένα άλλο δίκτυο. Το δίκτυο επικάλυψης δημιουργεί ένα κατανεμημένο δίκτυο μεταξύ πολλαπλών υποδοχέων Docker daemon του διαχειριστή Backend.AI.",
     "MTUDescription": "Μέγιστη μονάδα μετάδοσης, το μέγεθος του μεγαλύτερου πακέτου που μπορεί να μεταδώσει ένα πρωτόκολλο δικτύου.",
-    "OutOfRange": "Εκτός εμβέλειας."
+    "OutOfRange": "Εκτός εμβέλειας.",
+    "Plugins": "Πρόσθετα",
+    "OpenSourceCUDAGPUsupport": "Υποστήριξη ανοιχτού κώδικα CUDA GPU"
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1382,7 +1394,8 @@
     "RoutingsCount": "Αριθμός δρομολογίων",
     "Active/Total": "Ενεργό/Σύνολο",
     "Public": "Δημόσιο",
-    "YouAreAboutToTerminate": "Πρόκειται να τερματίσετε"
+    "YouAreAboutToTerminate": "Πρόκειται να τερματίσετε",
+    "Owner": "Ιδιοκτήτης"
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
@@ -1438,5 +1451,38 @@
   "OpenVSCodeRemote": "Ανοίξτε τον τοπικό κώδικα του Visual Studio",
   "inputLimit": {
     "4to64chars": "(4~64 χαρακτήρες)"
+  },
+  "modelStore": {
+    "Description": "Περιγραφή",
+    "Model": "Μοντέλο",
+    "FilterByName": "Φιλτράρισμα κατά όνομα",
+    "ServiceDetails": "Στοιχεία υπηρεσίας",
+    "Metadata": "Μεταδεδομένα",
+    "ModelPath": "Μοντέλο Μονοπάτι",
+    "SearchModels": "Αναζήτηση μοντέλων",
+    "MinResource": "Ελάχιστος πόρος",
+    "LastModified": "Τελευταία τροποποίηση",
+    "Created": "Δημιουργήθηκε",
+    "Version": "Εκδοχή",
+    "Author": "Συγγραφέας",
+    "MaxRetries": "Μέγιστες επαναλήψεις",
+    "Path": "Μονοπάτι",
+    "HealthCheck": "Ελεγχος υγείας",
+    "Port": "Λιμάνι",
+    "StartCommand": "Εκκίνηση Εντολή",
+    "PreStartActions": "Ενέργειες πριν από την έναρξη",
+    "Framework": "Πλαίσιο",
+    "Category": "Κατηγορίες",
+    "Label": "Ετικέτα",
+    "Task": "Εργασία",
+    "CloneAsFolder": "Clone as Folder",
+    "CloneSuccess": "Η αίτηση κλωνοποίησης έχει σταλεί με επιτυχία.",
+    "CloneInfo": "Θα κλωνοποιηθεί ως φάκελος τύπου χρήστη.",
+    "category": "Κατηγορία"
+  },
+  "table": {
+    "SettingTable": "Ρύθμιση πίνακα",
+    "SelectColumnToDisplay": "Επιλέξτε για εμφάνιση στηλών",
+    "SearchTableColumn": "Αναζήτηση στηλών πίνακα"
   }
 }

@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Clique no ícone da pessoa na barra superior e aceda ao menu \"A minha conta\".",
       "Notifications": "Notificações",
       "Tasks": "Tarefas",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Dados"
     },
     "YouAreOffline": "Agora você está offline",
     "YouAreOnline": "Agora você está online",
@@ -240,17 +241,19 @@
       "FolderAliasInvalid": "Somente caracteres alfanuméricos, sublinhado (_), barra (/) e traço (-) são permitidos.",
       "PreOpenPortMaxCountLimit": "Pode definir até {{count}} portas pré-abertas.",
       "StartTimeMustBeInTheFuture": "A hora de início deve ser posterior à hora atual.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Se você definir um valor maior que os recursos atualmente disponíveis, a criação da sessão será atrasada na fila até que fique disponível.",
+      "SessionName": "Nome da sessão",
+      "ResetFormConfirm": "Deseja redefinir todas as suas entradas?",
+      "TemplateAndHistory": "Modelos",
+      "ScheduleTimeSimple": "Definir horário de início",
       "ResourceAllocationPerContainer": "Atribuição de recursos por contentor",
       "NumberOfContainer": "Número de contentores",
+      "ErrorCanNotExceedRemaining": "Não pode ser definido como superior aos recursos restantes ({{amount}}).",
       "EnterEnvironmentVariable": "Introduzir o nome da variável",
       "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
-      "EnvironmentVariableDuplicateName": "Um nome de variável que já existe."
+      "EnvironmentVariableDuplicateName": "Um nome de variável que já existe.",
+      "Template": "Modelo de sessão",
+      "EnableAutomaticShmem": "Memória partilhada automática"
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -399,7 +402,9 @@
     "Unset": "Não definido",
     "OK": "OK",
     "Commit": "Compromisso",
-    "EnterManually": "Introduzir manualmente"
+    "EnterManually": "Introduzir manualmente",
+    "Download": "Descarregar",
+    "Clone": "Clone"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -443,7 +448,7 @@
     "Enabled": "Habilitado",
     "StorageProxies": "Armazéns",
     "None": "Nenhum",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Imagem"
   },
   "credential": {
     "Permission": "Permissão",
@@ -521,7 +526,8 @@
     "SignoutSeccessfullyFinished": "O registo foi concluído com êxito",
     "Status": "Estado",
     "NoUserToDisplay": "Nenhum utilizador a apresentar",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Habilitar sessão sudo",
+    "MainAccessKey": "Chave de acesso principal"
   },
   "data": {
     "Folders": "Pastas",
@@ -687,7 +693,11 @@
     "Pipeline": "Pastas de pipelines",
     "DialogDataFolder": "Pastas dedicadas ao pipeline que são criadas automaticamente ao criar pipelines no FastTrack.",
     "DialogModelFolder": "Pode servir e gerir modelos.",
-    "SearchByName": "Procura por nome"
+    "SearchByName": "Procura por nome",
+    "ModelStore": "Loja de modelos",
+    "New": "Novo",
+    "Add": "Adicionar",
+    "CloningIsOnlyPossibleSameHost": "Atualmente, a clonagem só é possível no mesmo host."
   },
   "dialog": {
     "warning": {
@@ -832,7 +842,9 @@
     "DescAutoLogout": "Saia automaticamente se todas as páginas logadas forem fechadas, exceto as páginas originadas da sessão para aplicativos (por exemplo, notebook jupyter, terminal da web, etc.)",
     "SSHKeypairEnterManuallyFinished": "O par de chaves SSH foi registado com sucesso.",
     "BootstrapScriptDescription": "O script bootstrap será executado apenas uma vez após a criação da sessão",
-    "SSHKeypairEnterManually": "Par de chaves SSH"
+    "SSHKeypairEnterManually": "Par de chaves SSH",
+    "MyKeypairInfo": "Minhas informações de par de chaves",
+    "DescMyKeypairInfo": "Ver as informações do meu par de chaves"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -1056,8 +1068,6 @@
     "Scaling": "Dimensionamento",
     "AllowAgentSideRegistration": "Permitir registro do lado do agente",
     "DescAllowAgentSideRegistration": "Permitir que o agente se registre no gerente. <br/> Use apenas se o cluster Backend.AI for gerenciado em local seguro.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "Suporte para GPU CUDA",
     "DescCUDAGPUsupport": "Suporte para GPU NVIDIA CUDA. <br/> Requer Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Desativado porque o sistema usa o plugin de GPU fracionário",
     "ROCMGPUsupport": "Suporte para GPU ROCm",
@@ -1107,7 +1117,9 @@
     "OverlayNetworkSettings": "Definições de rede de sobreposição",
     "OverlayNetworkSettingsDescription": "Uma rede de sobreposição é uma rede de computadores que é colocada em camadas sobre outra rede. A rede de sobreposição cria uma rede distribuída entre vários hosts daemon do Docker do gerenciador Backend.AI.",
     "MTUDescription": "Unidade máxima de transmissão, o tamanho do maior pacote que um protocolo de rede pode transmitir.",
-    "OutOfRange": "Fora de alcance."
+    "OutOfRange": "Fora de alcance.",
+    "Plugins": "Plug-ins",
+    "OpenSourceCUDAGPUsupport": "Suporte para GPU CUDA de código aberto"
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
@@ -1422,7 +1434,8 @@
     "Active/Total": "Ativo/Total",
     "Public": "Público",
     "YouAreAboutToTerminate": "Está prestes a terminar",
-    "Image": "Imagem"
+    "Image": "Imagem",
+    "Owner": "Proprietário"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1438,5 +1451,37 @@
   "OpenVSCodeRemote": "Abrir o código local do Visual Studio",
   "inputLimit": {
     "4to64chars": "(4~64 caracteres)"
+  },
+  "modelStore": {
+    "Description": "Descrição",
+    "Model": "Modelo",
+    "FilterByName": "Filtrar por nome",
+    "ServiceDetails": "Detalhes do serviço",
+    "Metadata": "Metadados",
+    "ModelPath": "Caminho do modelo",
+    "SearchModels": "Pesquisar modelos",
+    "MinResource": "Recurso mínimo",
+    "LastModified": "Última modificação",
+    "Created": "Criada",
+    "Version": "Versão",
+    "Author": "Autor",
+    "MaxRetries": "Máximo de tentativas",
+    "Path": "Caminho",
+    "HealthCheck": "Exame de saúde",
+    "Port": "Porta",
+    "StartCommand": "Comando Iniciar",
+    "PreStartActions": "Ações pré-início",
+    "Framework": "Enquadramento",
+    "Category": "Categoria",
+    "Label": "Etiqueta",
+    "Task": "Tarefa",
+    "CloneAsFolder": "Clonar como Pasta",
+    "CloneSuccess": "O pedido de clone foi enviado com sucesso.",
+    "category": "Categoria"
+  },
+  "table": {
+    "SettingTable": "Configuração de mesa",
+    "SelectColumnToDisplay": "Selecione as colunas a serem exibidas",
+    "SearchTableColumn": "Pesquisar colunas da tabela"
   }
 }

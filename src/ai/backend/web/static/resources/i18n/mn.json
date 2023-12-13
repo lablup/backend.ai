@@ -61,7 +61,8 @@
       "YouMushChangeYourPassword": "Аюулгүй байдлын үүднээс нууц үгээ үе үе өөрчлөхийг зөвлөж байна. \nТа нууц үгээ хамгийн сүүлд сольсноос хойш тодорхой хугацаа өнгөрсөн тул үйлчилгээгээ үргэлжлүүлэн ашиглахын тулд үүнийг өөрчлөх шаардлагатай.",
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
       "PleaseConfirmYourPassword": "Нууц үгээ баталгаажуулна уу",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Өгөгдөл"
     },
     "YouAreOffline": "Та одоо офлайн байна",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -239,18 +240,20 @@
       "Enable": "Идэвхжүүлэх",
       "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө.",
       "StartTimeMustBeInTheFuture": "Эхлэх цаг нь одоогийн цагаас хойш байх ёстой.",
-      "PreOpenPortMaxCountLimit": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit": "Та {{count}} хүртэл урьдчилан нээлттэй порт тохируулж болно.",
+      "EnqueueComputeSessionWarning": "Хэрэв та үүнийг одоо байгаа нөөцөөс том болговол сесс үүсгэх нь боломжтой болох хүртэл дараалалд саатах болно.",
+      "SessionName": "Сеанс нэр",
+      "ResetFormConfirm": "Та бүх оруулгуудаа дахин тохируулахыг хүсэж байна уу?",
+      "TemplateAndHistory": "Загварууд",
+      "ScheduleTimeSimple": "Эхлэх цагийг тохируулна уу",
       "ResourceAllocationPerContainer": "Нэг контейнерт нөөцийн хуваарилалт",
       "NumberOfContainer": "Савны тоо",
+      "ErrorCanNotExceedRemaining": "Үлдсэн нөөцөөс ({{amount}}) ихийг тохируулах боломжгүй.",
       "EnterEnvironmentVariable": "Хувьсагчийн нэрийг оруулна уу",
       "EnvironmentVariableNamePatternError": "Хувьсагчийн нэр үсэг эсвэл доогуур зураасаар эхлэх ёстой бөгөөд зөвхөн үсэг, тоо, доогуур зураас агуулсан байж болно.",
-      "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна."
+      "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна.",
+      "Template": "Сеанс загвар",
+      "EnableAutomaticShmem": "Автомат хуваалцсан санах ой"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -399,7 +402,9 @@
     "Reset": "Дахин тохируулах",
     "EnterManually": "Гараар оруулна уу",
     "Unset": "Тохируулаагүй",
-    "OK": "БОЛЖ БАЙНА УУ"
+    "OK": "БОЛЖ БАЙНА УУ",
+    "Download": "Татаж авах",
+    "Clone": "Клон"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -443,7 +448,7 @@
     "Enabled": "Идэвхжсэн",
     "StorageProxies": "Хадгалах сан",
     "None": "Байхгүй",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Зураг"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -521,7 +526,8 @@
     "KeySeccessfullyDeleted": "KeyPair амжилттай устгагдсан.",
     "SignoutSeccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
     "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Sudo сессийг идэвхжүүлэх",
+    "MainAccessKey": "Үндсэн хандалтын түлхүүр"
   },
   "data": {
     "Folders": "Фолдерууд",
@@ -687,7 +693,11 @@
     "Used": "Ашигласан",
     "Pipeline": "Дамжуулах хоолойн хавтас",
     "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд.",
-    "SearchByName": "Нэрээр нь хайх"
+    "SearchByName": "Нэрээр нь хайх",
+    "ModelStore": "Загварын дэлгүүр",
+    "New": "Шинэ",
+    "Add": "Нэмэх",
+    "CloningIsOnlyPossibleSameHost": "Одоогоор зөвхөн нэг хост дээр клон хийх боломжтой."
   },
   "dialog": {
     "warning": {
@@ -779,7 +789,7 @@
     "SharedMemory": "Хуваалцсан санах ой (GB)",
     "Deleted": "Нөөцийн урьдчилсан тохируулгыг амжилттай устгалаа.",
     "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй",
-    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
+    "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой"
   },
   "usersettings": {
     "General": "Ерөнхий",
@@ -832,7 +842,9 @@
     "DescAutoLogout": "Аппликешнд зориулж суулгасан хуудсуудаас бусад нэвтэрсэн бүх хуудсыг хаасан тохиолдолд автоматаар гарах болно (ж.нь. Jupyter Notebook, вэб терминал гэх мэт).",
     "BootstrapScriptDescription": "Ачаалагч скрипт нь сесс үүсгэсний дараа зөвхөн нэг удаа хийгдэх болно",
     "SSHKeypairEnterManually": "SSH товчлуурын хослол",
-    "SSHKeypairEnterManuallyFinished": "SSH Keypair амжилттай бүртгэгдлээ."
+    "SSHKeypairEnterManuallyFinished": "SSH Keypair амжилттай бүртгэгдлээ.",
+    "MyKeypairInfo": "Миний товчлуурын мэдээлэл",
+    "DescMyKeypairInfo": "Миний товчлуурын мэдээллийг харна уу"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -916,7 +928,7 @@
     "RegistrySuccessfullyModified": "Бүртгэл амжилттай өөрчлөгдсөн.",
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
     "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
-    "ConfirmNoUserName": "__NOT_TRANSLATED__"
+    "ConfirmNoUserName": "Хэрэглэгч болон нууц үгийг заагаагүй тул хадгалах уу?"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -1056,8 +1068,6 @@
     "Scaling": "Хэмжээ",
     "AllowAgentSideRegistration": "Агент талын бүртгэлийг зөвшөөрөх",
     "DescAllowAgentSideRegistration": "Агентэд өөрийгөө менежерт бүртгүүлэхийг зөвшөөрөх. <br/> Зөвхөн Backend.AI кластерийг аюулгүй байршилд удирдаж байгаа тохиолдолд л ашиглана уу.",
-    "Plugins": "Залгаасууд",
-    "CUDAGPUsupport": "CUDA GPU дэмжлэг",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU дэмжлэг. <br/> Backend.AI CUDA залгаас шаарддаг.",
     "CUDAGPUdisabledByFGPUsupport": "Систем нь бутархай GPU залгаас ашигладаг тул идэвхгүй болгосон",
     "ROCMGPUsupport": "ROCm GPU дэмжлэг",
@@ -1107,7 +1117,9 @@
     "RequireATOMPlugin": "Backend.AI ATOM Plugin шаардлагатай.",
     "Warboysupport": "Дайчин",
     "DescWarboysupport": "Furiosa Warboy дэмжлэгийг ашигла",
-    "RequireWarboyPlugin": "Backend.AI Warboy Plugin шаардлагатай."
+    "RequireWarboyPlugin": "Backend.AI Warboy Plugin шаардлагатай.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Нээлттэй эхийн CUDA GPU дэмжлэг"
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
@@ -1431,12 +1443,46 @@
     "FormValidationFailed": "Маягтын баталгаажуулалт амжилтгүй боллоо",
     "ServiceNameRule": "Зөвхөн 4-24 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
     "resources": "Нөөц",
-    "Image": "Зураг"
+    "Image": "Зураг",
+    "Owner": "Эзэмшигч"
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",
     "reloadPage": "Хуудсыг дахин ачаална уу",
     "resetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
     "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана."
+  },
+  "modelStore": {
+    "Description": "Тодорхойлолт",
+    "Model": "Загвар",
+    "FilterByName": "Нэрээр нь шүүх",
+    "ServiceDetails": "Үйлчилгээний дэлгэрэнгүй мэдээлэл",
+    "Metadata": "Мета өгөгдөл",
+    "ModelPath": "Загварын зам",
+    "SearchModels": "Загвар хайх",
+    "MinResource": "Хамгийн бага нөөц",
+    "LastModified": "Сүүлд өөрчилсөн",
+    "Created": "Үүсгэсэн",
+    "Version": "Хувилбар",
+    "Author": "Зохиогч",
+    "MaxRetries": "Макс дахин оролдоно",
+    "Path": "Зам",
+    "HealthCheck": "Эрүүл мэндийн үзлэг",
+    "Port": "Порт",
+    "StartCommand": "Эхлэх тушаал",
+    "PreStartActions": "Эхлэхийн өмнөх үйлдлүүд",
+    "Framework": "Хүрээ",
+    "Category": "ангилал",
+    "Label": "Шошго",
+    "Task": "Даалгавар",
+    "CloneAsFolder": "Хавтас болгон хуваах",
+    "CloneSuccess": "Хувилах хүсэлтийг амжилттай илгээлээ.",
+    "CloneInfo": "Үүнийг таны хэрэглэгчийн төрлийн хавтас болгон хувилах болно.",
+    "category": "Ангилал"
+  },
+  "table": {
+    "SettingTable": "Хүснэгтийн тохиргоо",
+    "SelectColumnToDisplay": "Харуулах багануудыг сонгоно уу",
+    "SearchTableColumn": "Хүснэгтийн багануудыг хайх"
   }
 }

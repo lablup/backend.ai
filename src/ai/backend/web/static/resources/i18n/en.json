@@ -61,7 +61,8 @@
       "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
       "Notifications": "Notifications",
       "Tasks": "Tasks",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Data & Model"
     },
     "YouAreOffline": "You are now offline",
     "YouAreOnline": "You are now online",
@@ -253,15 +254,17 @@
       "EnqueueComputeSessionWarning": "If you set it larger than the currently available resources, the session creation will be delayed in the queue until it becomes available.",
       "TemplateAndHistory": "Templates & history",
       "StartTimeMustBeInTheFuture": "The start time must be after the current time.",
-      "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit",
-      "SessionName": "SessionName",
-      "ResetFormConfirm": "ResetFormConfirm",
-      "ScheduleTimeSimple": "ScheduleTimeSimple",
+      "SessionName": "Session name",
+      "ResetFormConfirm": "Do you want to reset all your entries?",
+      "ScheduleTimeSimple": "Set start time",
       "ResourceAllocationPerContainer": "Resource Allocation Per Container",
       "NumberOfContainer": "Number of container",
+      "ErrorCanNotExceedRemaining": "Cannot be set to greater than the remaining resources ({{amount}}).",
       "EnterEnvironmentVariable": "Enter Variable name",
       "EnvironmentVariableNamePatternError": "Variable name must start with a letter or underscore, and can only contain letters, numbers, and underscores.",
-      "EnvironmentVariableDuplicateName": "A variable name that already exists."
+      "EnvironmentVariableDuplicateName": "A variable name that already exists.",
+      "Template": "Session Template",
+      "EnableAutomaticShmem": "Automatic shared memory"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -426,7 +429,8 @@
     "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "resources": "Resources",
-    "Image": "Image"
+    "Image": "Image",
+    "Owner": "Owner"
   },
   "button": {
     "Cancel": "Cancel",
@@ -457,7 +461,9 @@
     "Commit": "Commit",
     "Reset": "Reset",
     "EnterManually": "Enter Manually",
-    "Unset": "Unset"
+    "Unset": "Unset",
+    "Download": "Download",
+    "Clone": "Clone"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -613,7 +619,8 @@
     "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
     "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
     "SignoutSeccessfullyFinished": "Signout is seccessfully finished",
-    "EnableSudoSession": "Enable sudo session"
+    "EnableSudoSession": "Enable sudo session",
+    "MainAccessKey": "Main Access Key"
   },
   "data": {
     "Folders": "Folders",
@@ -779,7 +786,11 @@
     "ProjectFolder": "Project Folder",
     "Pipeline": "Pipeline Folders",
     "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack.",
-    "SearchByName": "Search by name"
+    "SearchByName": "Search by name",
+    "ModelStore": "Model Store",
+    "New": "New",
+    "Add": "Add",
+    "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host."
   },
   "dialog": {
     "warning": {
@@ -888,6 +899,8 @@
     "BetaFeatures": "Beta Features",
     "DescBetaFeatures": "Use beta features for Web UI.<br />Beta features may be unstable. Some beta features may not be adopted as official feature.",
     "DescNoBetaFeatures": "No beta feature available now. :)",
+    "MyKeypairInfo": "My Keypair Information",
+    "DescMyKeypairInfo": "See my keypair information",
     "BootstrapScriptDescription": "Bootstrap script will be executed only once after session creation",
     "EditBootstrapScript": "Edit Bootstrap Script",
     "EditUserConfigScript": "Edit User Config Script",
@@ -1148,8 +1161,6 @@
     "Scaling": "Scaling",
     "AllowAgentSideRegistration": "Allow agent-side registration",
     "DescAllowAgentSideRegistration": "Allow agent to register itself to manager.<br/>Use only if Backend.AI cluster is managed on secure location.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "CUDA GPU support",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU support. <br/>Requires Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Disabled because system uses Fractional GPU plugin",
     "ROCMGPUsupport": "ROCm GPU support",
@@ -1199,7 +1210,9 @@
     "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Use Furiosa Warboy support",
-    "RequireWarboyPlugin": "Requires Backend.AI Warboy Plugin."
+    "RequireWarboyPlugin": "Requires Backend.AI Warboy Plugin.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Open Source CUDA GPU support"
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1433,10 +1446,43 @@
     "ValueRequired": "ValueRequired",
     "InputTooShort": "InputTooShort"
   },
+  "table": {
+    "SettingTable": "Table Setting",
+    "SelectColumnToDisplay": "Select for columns to display",
+    "SearchTableColumn": "Search table columns"
+  },
   "ErrorBoundary": {
     "title": "An error has occurred.",
     "reloadPage": "Reload the page",
     "resetErrorBoundary": "Reset ErrorBoundary",
     "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
+  },
+  "modelStore": {
+    "FilterByName": "Filter By Name",
+    "Model": "Model",
+    "Description": "Description",
+    "ServiceDetails": "Service Details",
+    "ModelPath": "Model Path",
+    "PreStartActions": "Pre Start Actions",
+    "Metadata": "Metadata",
+    "Author": "Author",
+    "Version": "Version",
+    "Created": "Created",
+    "LastModified": "Last Modified",
+    "MinResource": "Min Resource",
+    "HealthCheck": "Health Check",
+    "Path": "Path",
+    "MaxRetries": "Max Retries",
+    "Port": "Port",
+    "StartCommand": "Start Command",
+    "SearchModels": "Search Models",
+    "Framework": "Framework",
+    "Category": "Category",
+    "Label": "Label",
+    "Task": "Task",
+    "CloneAsFolder": "Clone as Folder",
+    "CloneSuccess": "The clone request has been sent successfully.",
+    "CloneInfo": "It will be cloned as your user type folder.",
+    "category": "Category"
   }
 }

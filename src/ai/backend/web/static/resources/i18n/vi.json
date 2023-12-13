@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Nhấp vào biểu tượng hình người ở thanh trên cùng và chuyển đến menu \"Tài khoản của tôi\".",
       "Notifications": "Thông báo",
       "Tasks": "Nhiệm vụ",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Dữ liệu"
     },
     "YouAreOffline": "Bạn hiện đang ngoại tuyến",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
@@ -239,17 +240,20 @@
       "Enable": "Cho phép",
       "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
       "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Nếu bạn đặt nó lớn hơn tài nguyên hiện có, việc tạo phiên sẽ bị trì hoãn trong hàng đợi cho đến khi tài nguyên đó có sẵn.",
+      "SessionName": "Tên phiên",
+      "ResetFormConfirm": "Bạn có muốn đặt lại tất cả các mục nhập của mình không?",
+      "TemplateAndHistory": "Mẫu",
+      "ScheduleTimeSimple": "Đặt thời gian bắt đầu",
       "ResourceAllocationPerContainer": "Phân bổ tài nguyên trên mỗi vùng chứa",
       "NumberOfContainer": "Số lượng thùng chứa",
+      "ErrorCanNotExceedRemaining": "Không thể đặt thành lớn hơn các tài nguyên còn lại ({{amount}}).",
       "EnterEnvironmentVariable": "Nhập tên biến",
       "EnvironmentVariableNamePatternError": "Tên biến phải bắt đầu bằng một chữ cái hoặc dấu gạch dưới và chỉ có thể chứa các chữ cái, số và dấu gạch dưới.",
-      "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại."
+      "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại.",
+      "Template": "Mẫu phiên",
+      "EnableAutomaticShmem": "Bộ nhớ chia sẻ tự động",
+      "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -398,7 +402,9 @@
     "Unset": "Bỏ đặt",
     "OK": "ĐƯỢC RỒI",
     "Commit": "Làm",
-    "EnterManually": "Nhập thủ công"
+    "EnterManually": "Nhập thủ công",
+    "Download": "Tải xuống",
+    "Clone": "Dòng vô tính"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -442,7 +448,7 @@
     "Enabled": "Đã bật",
     "StorageProxies": "Kho lưu trữ",
     "None": "Không có",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Hình ảnh"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -520,7 +526,8 @@
     "SignoutSeccessfullyFinished": "Đăng xuất đã hoàn tất thành công",
     "Status": "Trạng thái",
     "NoUserToDisplay": "Không có người dùng để hiển thị",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Kích hoạt phiên sudo",
+    "MainAccessKey": "Khóa truy cập chính"
   },
   "data": {
     "Folders": "Thư mục",
@@ -686,7 +693,11 @@
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
     "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình.",
-    "SearchByName": "Tìm kiếm theo tên"
+    "SearchByName": "Tìm kiếm theo tên",
+    "ModelStore": "Cửa hàng mô hình",
+    "New": "Mới",
+    "Add": "Thêm vào",
+    "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ."
   },
   "dialog": {
     "warning": {
@@ -778,7 +789,7 @@
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
     "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
-    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
+    "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ"
   },
   "usersettings": {
     "General": "Chung",
@@ -831,7 +842,9 @@
     "DescAutoLogout": "Tự động đăng xuất nếu tất cả các trang đã đăng nhập đều bị đóng ngoại trừ các trang gốc phiên cho ứng dụng (ví dụ: sổ ghi chép jupyter, thiết bị đầu cuối web, v.v.)",
     "SSHKeypairEnterManuallyFinished": "Cặp khóa SSH đã được đăng ký thành công.",
     "BootstrapScriptDescription": "Tập lệnh Bootstrap sẽ chỉ được thực thi một lần sau khi tạo phiên",
-    "SSHKeypairEnterManually": "Cặp khóa SSH"
+    "SSHKeypairEnterManually": "Cặp khóa SSH",
+    "MyKeypairInfo": "Thông tin về cặp khóa của tôi",
+    "DescMyKeypairInfo": "Xem thông tin cặp khóa của tôi"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -915,7 +928,7 @@
     "RegistrySuccessfullyModified": "Đã sửa đổi sổ đăng ký thành công.",
     "NoRegistryToDisplay": "Không có đăng ký để hiển thị",
     "ModifyRegistry": "Sửa đổi sổ đăng ký",
-    "ConfirmNoUserName": "__NOT_TRANSLATED__"
+    "ConfirmNoUserName": "Người dùng và mật khẩu không được chỉ định, bạn có muốn lưu không?"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
@@ -1055,8 +1068,6 @@
     "Scaling": "Mở rộng quy mô",
     "AllowAgentSideRegistration": "Cho phép đăng ký phía đại lý",
     "DescAllowAgentSideRegistration": "Cho phép đại lý tự đăng ký với người quản lý. <br/> Chỉ sử dụng nếu cụm Backend.AI được quản lý trên vị trí an toàn.",
-    "Plugins": "bổ sung",
-    "CUDAGPUsupport": "Hỗ trợ GPU CUDA",
     "DescCUDAGPUsupport": "Hỗ trợ GPU NVIDIA CUDA. <br/> Yêu cầu Plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Bị vô hiệu hóa do hệ thống sử dụng plugin GPU Fractional",
     "ROCMGPUsupport": "Hỗ trợ GPU ROCm",
@@ -1106,7 +1117,9 @@
     "OverlayNetworkSettings": "Cài đặt mạng lớp phủ",
     "OverlayNetworkSettingsDescription": "Mạng lớp phủ là mạng máy tính được xếp chồng lên trên một mạng khác. \nMạng lớp phủ tạo ra một mạng phân tán giữa nhiều máy chủ daemon Docker của trình quản lý Backend.AI.",
     "MTUDescription": "Đơn vị truyền tối đa, kích thước của gói lớn nhất mà giao thức mạng có thể truyền.",
-    "OutOfRange": "Ngoài phạm vi."
+    "OutOfRange": "Ngoài phạm vi.",
+    "Plugins": "bổ sung",
+    "OpenSourceCUDAGPUsupport": "Hỗ trợ GPU CUDA mã nguồn mở"
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1421,7 +1434,8 @@
     "RoutingsCount": "Số lượng định tuyến",
     "Active/Total": "Đang hoạt động/Tổng cộng",
     "Public": "Công cộng",
-    "YouAreAboutToTerminate": "Bạn sắp chấm dứt"
+    "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
+    "Owner": "Người sở hữu"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1437,5 +1451,38 @@
   "OpenVSCodeRemote": "Mở mã Visual Studio cục bộ",
   "inputLimit": {
     "4to64chars": "(4~64 ký tự)"
+  },
+  "modelStore": {
+    "Description": "Sự miêu tả",
+    "Model": "Người mẫu",
+    "FilterByName": "Lọc theo tên",
+    "ServiceDetails": "Chi tiết dịch vụ",
+    "Metadata": "metadata",
+    "ModelPath": "Đường dẫn mẫu",
+    "SearchModels": "Tìm kiếm mô hình",
+    "MinResource": "Tài nguyên tối thiểu",
+    "LastModified": "Sửa đổi lần cuối",
+    "Created": "Tạo",
+    "Version": "Phiên bản",
+    "Author": "Tác giả",
+    "MaxRetries": "Số lần thử lại tối đa",
+    "Path": "Con đường",
+    "HealthCheck": "Kiểm tra sức khỏe",
+    "Port": "Hải cảng",
+    "StartCommand": "Bắt đầu lệnh",
+    "PreStartActions": "Hành động trước khi bắt đầu",
+    "Framework": "Khung",
+    "Category": "Loại",
+    "Label": "Nhãn",
+    "Task": "Nhiệm vụ",
+    "CloneAsFolder": "Sao chép dưới dạng Thư mục",
+    "CloneSuccess": "Yêu cầu nhân bản đã được gửi thành công.",
+    "CloneInfo": "Nó sẽ được sao chép thành thư mục loại người dùng của bạn.",
+    "category": "Loại"
+  },
+  "table": {
+    "SettingTable": "Cài đặt bảng",
+    "SelectColumnToDisplay": "Chọn các cột để hiển thị",
+    "SearchTableColumn": "Tìm kiếm các cột trong bảng"
   }
 }

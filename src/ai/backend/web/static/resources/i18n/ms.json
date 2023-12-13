@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Klik ikon orang pada bar atas dan pergi ke menu \"Akaun Saya\".",
       "Notifications": "Pemberitahuan",
       "Tasks": "Tugasan",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Data"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -239,17 +240,20 @@
       "Enable": "Dayakan",
       "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
       "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Jika anda menetapkannya lebih besar daripada sumber yang tersedia pada masa ini, penciptaan sesi akan ditangguhkan dalam baris gilir sehingga ia tersedia.",
+      "SessionName": "Nama sesi",
+      "ResetFormConfirm": "Adakah anda mahu menetapkan semula semua entri anda?",
+      "TemplateAndHistory": "templat",
+      "ScheduleTimeSimple": "Tetapkan masa mula",
       "ResourceAllocationPerContainer": "Peruntukan Sumber Setiap Bekas",
       "NumberOfContainer": "Bilangan bekas",
+      "ErrorCanNotExceedRemaining": "Tidak boleh ditetapkan kepada lebih besar daripada sumber yang selebihnya ({{amount}}).",
       "EnterEnvironmentVariable": "Masukkan nama Pembolehubah",
       "EnvironmentVariableNamePatternError": "Nama pembolehubah mesti bermula dengan huruf atau garis bawah, dan hanya boleh mengandungi huruf, nombor dan garis bawah.",
-      "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud."
+      "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud.",
+      "Template": "Templat Sesi",
+      "EnableAutomaticShmem": "Memori dikongsi automatik",
+      "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -398,7 +402,9 @@
     "Unset": "Tidak ditetapkan",
     "OK": "okey",
     "Commit": "komited",
-    "EnterManually": "Masukkan Secara Manual"
+    "EnterManually": "Masukkan Secara Manual",
+    "Download": "Muat turun",
+    "Clone": "Klon"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -442,7 +448,7 @@
     "Enabled": "Diaktifkan",
     "StorageProxies": "Stor",
     "None": "tiada",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Gambar"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -520,7 +526,8 @@
     "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
     "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Dayakan sesi sudo",
+    "MainAccessKey": "Kunci Akses Utama"
   },
   "data": {
     "Folders": "Folder",
@@ -686,7 +693,11 @@
     "Pipeline": "Folder Saluran Paip",
     "DialogDataFolder": "Folder khusus saluran paip yang dibuat secara automatik apabila membuat saluran paip dalam FastTrack.",
     "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model.",
-    "SearchByName": "Cari mengikut nama"
+    "SearchByName": "Cari mengikut nama",
+    "ModelStore": "Kedai Model",
+    "New": "Baru",
+    "Add": "Tambah",
+    "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama."
   },
   "dialog": {
     "warning": {
@@ -778,7 +789,7 @@
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
     "Deleted": "Pratetap sumber berjaya dipadamkan.",
-    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
+    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori"
   },
   "usersettings": {
     "General": "Am",
@@ -831,7 +842,9 @@
     "DescAutoLogout": "Log keluar secara automatik jika semua halaman log masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Notebook jupyter, terminal web, dll.)",
     "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berjaya didaftarkan.",
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
-    "SSHKeypairEnterManually": "SSH Keypair"
+    "SSHKeypairEnterManually": "SSH Keypair",
+    "MyKeypairInfo": "Maklumat Pasangan Kunci Saya",
+    "DescMyKeypairInfo": "Lihat maklumat pasangan kunci saya"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -915,7 +928,7 @@
     "RegistrySuccessfullyModified": "Pendaftaran berjaya diubah suai.",
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
     "ModifyRegistry": "Ubah suai Pendaftaran",
-    "ConfirmNoUserName": "__NOT_TRANSLATED__"
+    "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1055,8 +1068,6 @@
     "Scaling": "Penskalaan",
     "AllowAgentSideRegistration": "Benarkan pendaftaran pihak ejen",
     "DescAllowAgentSideRegistration": "Benarkan ejen mendaftarkan dirinya kepada pengurus. <br/> Gunakan hanya jika kluster Backend.AI diuruskan di lokasi yang selamat.",
-    "Plugins": "Pemalam",
-    "CUDAGPUsupport": "Sokongan GPU CUDA",
     "DescCUDAGPUsupport": "Sokongan GPU NVIDIA CUDA. <br/> Memerlukan Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Dinyahdayakan kerana sistem menggunakan pemalam GPU pecahan",
     "ROCMGPUsupport": "Sokongan GPU ROCm",
@@ -1106,7 +1117,9 @@
     "OverlayNetworkSettings": "Tetapan Rangkaian Tindanan",
     "OverlayNetworkSettingsDescription": "Rangkaian tindanan ialah rangkaian komputer yang berlapis di atas rangkaian lain. \nRangkaian tindanan mencipta rangkaian teragih di kalangan berbilang hos daemon Docker pengurus Backend.AI.",
     "MTUDescription": "Unit penghantaran maksimum, saiz paket terbesar yang boleh dihantar oleh protokol rangkaian.",
-    "OutOfRange": "Luar kawasan."
+    "OutOfRange": "Luar kawasan.",
+    "Plugins": "Pemalam",
+    "OpenSourceCUDAGPUsupport": "Sokongan GPU CUDA Sumber Terbuka"
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1421,7 +1434,8 @@
     "RoutingsCount": "Kiraan Laluan",
     "Active/Total": "Aktif/Jumlah",
     "Public": "Awam",
-    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan"
+    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
+    "Owner": "Pemilik"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1437,5 +1451,38 @@
   "OpenVSCodeRemote": "Buka Kod Visual Studio tempatan",
   "inputLimit": {
     "4to64chars": "(4~64 aksara)"
+  },
+  "modelStore": {
+    "Description": "Penerangan",
+    "Model": "Model",
+    "FilterByName": "Tapis Mengikut Nama",
+    "ServiceDetails": "Butiran Perkhidmatan",
+    "Metadata": "Metadata",
+    "ModelPath": "Laluan Model",
+    "SearchModels": "Cari Model",
+    "MinResource": "Sumber Min",
+    "LastModified": "Terakhir Diubah Suai",
+    "Created": "Dicipta",
+    "Version": "Versi",
+    "Author": "Pengarang",
+    "MaxRetries": "Max Cuba Semula",
+    "Path": "Laluan",
+    "HealthCheck": "Pemeriksaan kesihatan",
+    "Port": "Pelabuhan",
+    "StartCommand": "Mulakan Perintah",
+    "PreStartActions": "Tindakan Pra Mula",
+    "Framework": "Rangka kerja",
+    "Category": "kategori",
+    "Label": "Label",
+    "Task": "Tugasan",
+    "CloneAsFolder": "Klon sebagai Folder",
+    "CloneSuccess": "Permintaan klon telah berjaya dihantar.",
+    "CloneInfo": "Ia akan diklonkan sebagai folder jenis pengguna anda.",
+    "category": "kategori"
+  },
+  "table": {
+    "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
+    "SettingTable": "Tetapan Meja",
+    "SearchTableColumn": "Cari lajur jadual"
   }
 }

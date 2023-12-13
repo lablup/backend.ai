@@ -61,7 +61,8 @@
       "PasswordChangePlace": "点击顶部栏上的个人图标，进入 \"我的账户 \"菜单。",
       "Notifications": "通知",
       "Tasks": "任务",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "数据"
     },
     "YouAreOffline": "您现在离线",
     "YouAreOnline": "您现在在线",
@@ -240,17 +241,19 @@
       "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "如果将其设置为大于当前可用资源，则会话创建将在队列中延迟，直到可用。",
+      "SessionName": "会话名称",
+      "ResetFormConfirm": "您想重置所有条目吗？",
+      "TemplateAndHistory": "模板",
+      "ScheduleTimeSimple": "设置开始时间",
       "ResourceAllocationPerContainer": "每个集装箱的资源分配",
       "NumberOfContainer": "集装箱数量",
+      "ErrorCanNotExceedRemaining": "不能设置为大于剩余资源（{{amount}}）。",
       "EnterEnvironmentVariable": "输入变量名称",
       "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
-      "EnvironmentVariableDuplicateName": "已经存在的变量名。"
+      "EnvironmentVariableDuplicateName": "已经存在的变量名。",
+      "Template": "会议模板",
+      "EnableAutomaticShmem": "自动共享内存"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -399,7 +402,9 @@
     "Unset": "未设置",
     "OK": "好的",
     "Commit": "承诺",
-    "EnterManually": "手动输入"
+    "EnterManually": "手动输入",
+    "Download": "下载",
+    "Clone": "克隆"
   },
   "agent": {
     "Endpoint": "端点",
@@ -443,7 +448,7 @@
     "Enabled": "启用",
     "StorageProxies": "存储",
     "None": "无",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "图像"
   },
   "credential": {
     "Permission": "允许",
@@ -521,7 +526,8 @@
     "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
     "NoUserToDisplay": "无用户显示",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "启用 sudo 会话",
+    "MainAccessKey": "主访问密钥"
   },
   "data": {
     "Folders": "文件夹",
@@ -687,7 +693,11 @@
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
     "DialogModelFolder": "您可以服务和管理模型。",
-    "SearchByName": "按名称搜索"
+    "SearchByName": "按名称搜索",
+    "ModelStore": "模型店",
+    "New": "新的",
+    "Add": "添加",
+    "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。"
   },
   "dialog": {
     "warning": {
@@ -832,7 +842,9 @@
     "DescAutoLogout": "如果所有登录页面都关闭，除了应用程序的会话发起页面（例如 jupyter 笔记本、网络终端等），则自动注销",
     "SSHKeypairEnterManuallyFinished": "SSH 密钥对已成功注册。",
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
-    "SSHKeypairEnterManually": "SSH 密钥对"
+    "SSHKeypairEnterManually": "SSH 密钥对",
+    "MyKeypairInfo": "我的密钥对信息",
+    "DescMyKeypairInfo": "查看我的密钥对信息"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -1056,8 +1068,6 @@
     "Scaling": "缩放",
     "AllowAgentSideRegistration": "允许代理端注册",
     "DescAllowAgentSideRegistration": "允许代理将自己注册到经理。 <br/> 仅当 Backend.AI 集群在安全位置管理时使用。",
-    "Plugins": "插件",
-    "CUDAGPUsupport": "CUDA GPU 支持",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
     "CUDAGPUdisabledByFGPUsupport": "已禁用，因为系统使用分数 GPU 插件",
     "ROCMGPUsupport": "ROCm GPU 支持",
@@ -1107,7 +1117,9 @@
     "OverlayNetworkSettings": "覆盖网络设置",
     "OverlayNetworkSettingsDescription": "覆盖网络是在另一个网络之上分层的计算机网络。覆盖网络在 Backend.AI 管理器的多个 Docker 守护进程主机之间创建了一个分布式网络。",
     "MTUDescription": "最大传输单位，网络协议可传输的最大数据包的大小。",
-    "OutOfRange": "超出范围。"
+    "OutOfRange": "超出范围。",
+    "Plugins": "插件",
+    "OpenSourceCUDAGPUsupport": "开源 CUDA GPU 支持"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1422,7 +1434,8 @@
     "Active/Total": "活动/总数",
     "Public": "公众",
     "YouAreAboutToTerminate": "您即将终止",
-    "Image": "图片"
+    "Image": "图片",
+    "Owner": "所有者"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1438,5 +1451,38 @@
   "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
   "inputLimit": {
     "4to64chars": "（4 至 64 个字符）"
+  },
+  "modelStore": {
+    "Description": "描述",
+    "Model": "模型",
+    "FilterByName": "按名称过滤",
+    "ServiceDetails": "服务详情",
+    "Metadata": "元数据",
+    "ModelPath": "模型路径",
+    "SearchModels": "搜索型号",
+    "MinResource": "最小资源",
+    "LastModified": "上一次更改",
+    "Created": "已创建",
+    "Version": "版本",
+    "Author": "作者",
+    "MaxRetries": "最大重试次数",
+    "Path": "小路",
+    "HealthCheck": "健康检查",
+    "Port": "港口",
+    "StartCommand": "启动命令",
+    "PreStartActions": "开始前的行动",
+    "Framework": "框架",
+    "Category": "类别",
+    "Label": "标签",
+    "Task": "任务",
+    "CloneAsFolder": "克隆为文件夹",
+    "CloneSuccess": "克隆请求已成功发送。",
+    "CloneInfo": "它将被克隆为用户类型文件夹。",
+    "category": "类别"
+  },
+  "table": {
+    "SettingTable": "桌面设置",
+    "SelectColumnToDisplay": "选择要显示的列",
+    "SearchTableColumn": "搜索表格列"
   }
 }

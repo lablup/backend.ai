@@ -61,7 +61,8 @@
       "YouMushChangeYourPassword": "Disarankan untuk mengubah kata sandi Anda secara berkala untuk alasan keamanan. Karena sejumlah waktu telah berlalu sejak terakhir kali Anda mengubah kata sandi, Anda harus mengubahnya agar dapat terus menggunakan layanan ini.",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
       "PleaseConfirmYourPassword": "Harap konfirmasi kata sandi Anda",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Data"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -240,17 +241,19 @@
       "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
       "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
       "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Jika Anda mengaturnya lebih besar dari sumber daya yang tersedia saat ini, pembuatan sesi akan tertunda dalam antrean hingga tersedia.",
+      "SessionName": "Nama sesi",
+      "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
+      "TemplateAndHistory": "Templat",
+      "ScheduleTimeSimple": "Tetapkan waktu mulai",
       "ResourceAllocationPerContainer": "Alokasi Sumber Daya Per Kontainer",
       "NumberOfContainer": "Jumlah kontainer",
+      "ErrorCanNotExceedRemaining": "Tidak dapat diatur lebih besar dari sumber daya yang tersisa ({{jumlah}}).",
       "EnterEnvironmentVariable": "Masukkan nama variabel",
       "EnvironmentVariableNamePatternError": "Nama variabel harus dimulai dengan huruf atau garis bawah, dan hanya boleh terdiri dari huruf, angka, dan garis bawah.",
-      "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada."
+      "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
+      "Template": "Templat Sesi",
+      "EnableAutomaticShmem": "Memori bersama otomatis"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -399,7 +402,9 @@
     "Reset": "Atur Ulang",
     "EnterManually": "Masukkan Secara Manual",
     "Unset": "Tidak diatur",
-    "OK": "BAIKLAH."
+    "OK": "BAIKLAH.",
+    "Download": "Unduh",
+    "Clone": "Clone"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -443,7 +448,7 @@
     "Enabled": "Diaktifkan",
     "StorageProxies": "Penyimpanan",
     "None": "Tidak ada",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Gambar"
   },
   "credential": {
     "Permission": "Izin",
@@ -521,7 +526,8 @@
     "KeySeccessfullyDeleted": "KeyPair dihapus dengan aman.",
     "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Aktifkan sesi sudo",
+    "MainAccessKey": "Kunci Akses Utama"
   },
   "data": {
     "Folders": "Folder",
@@ -687,7 +693,11 @@
     "Used": "Digunakan",
     "Pipeline": "Folder Pipa",
     "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack.",
-    "SearchByName": "Cari berdasarkan nama"
+    "SearchByName": "Cari berdasarkan nama",
+    "ModelStore": "Toko Model",
+    "New": "Baru",
+    "Add": "Menambahkan",
+    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama."
   },
   "dialog": {
     "warning": {
@@ -832,7 +842,9 @@
     "DescAutoLogout": "Keluar secara otomatis jika semua halaman yang masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Jupyter notebook, terminal web, dll.)",
     "BootstrapScriptDescription": "Skrip bootstrap akan dieksekusi hanya sekali setelah pembuatan sesi",
     "SSHKeypairEnterManually": "SSH Keypair",
-    "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berhasil didaftarkan."
+    "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berhasil didaftarkan.",
+    "MyKeypairInfo": "Informasi Pasangan Kunci Saya",
+    "DescMyKeypairInfo": "Lihat informasi keypair saya"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -1056,8 +1068,6 @@
     "Scaling": "Penskalaan",
     "AllowAgentSideRegistration": "Izinkan pendaftaran sisi agen",
     "DescAllowAgentSideRegistration": "Izinkan agen untuk mendaftarkan dirinya ke manajer. <br/>Gunakan hanya jika klaster Backend.AI dikelola di lokasi yang aman.",
-    "Plugins": "Plugin",
-    "CUDAGPUsupport": "Dukungan GPU CUDA",
     "DescCUDAGPUsupport": "Dukungan GPU NVIDIA CUDA. <br/>Membutuhkan Plugin CUDA Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Dinonaktifkan karena sistem menggunakan plugin GPU Pecahan",
     "ROCMGPUsupport": "Dukungan GPU ROCm",
@@ -1107,7 +1117,9 @@
     "RequireATOMPlugin": "Membutuhkan Plugin Backend.AI ATOM.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Gunakan dukungan Furiosa Warboy",
-    "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy."
+    "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy.",
+    "Plugins": "Plugin",
+    "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1431,12 +1443,46 @@
     "FormValidationFailed": "Validasi formulir gagal",
     "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
-    "Image": "Gambar"
+    "Image": "Gambar",
+    "Owner": "Pemilik"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
     "reloadPage": "Muat ulang halaman",
     "resetErrorBoundary": "Setel Ulang Batas Kesalahan",
     "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI."
+  },
+  "modelStore": {
+    "Description": "Keterangan",
+    "Model": "Model",
+    "FilterByName": "Filter Berdasarkan Nama",
+    "ServiceDetails": "Detail Layanan",
+    "Metadata": "Metadata",
+    "ModelPath": "Jalur Model",
+    "SearchModels": "Model Pencarian",
+    "MinResource": "Sumber Daya Minimal",
+    "LastModified": "Terakhir diubah",
+    "Created": "Dibuat",
+    "Version": "Versi: kapan",
+    "Author": "Pengarang",
+    "MaxRetries": "Percobaan Ulang Maks",
+    "Path": "Jalur",
+    "HealthCheck": "Cek kesehatan",
+    "Port": "Pelabuhan",
+    "StartCommand": "Mulai Perintah",
+    "PreStartActions": "Tindakan Pra Mulai",
+    "Framework": "Kerangka kerja",
+    "Category": "Kategori",
+    "Label": "Label",
+    "Task": "Tugas",
+    "CloneAsFolder": "Mengkloning sebagai Folder",
+    "CloneSuccess": "Permintaan kloning telah berhasil dikirim.",
+    "CloneInfo": "Ini akan dikloning sebagai folder tipe pengguna Anda.",
+    "category": "Kategori"
+  },
+  "table": {
+    "SettingTable": "Penataan meja",
+    "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
+    "SearchTableColumn": "Cari kolom tabel"
   }
 }

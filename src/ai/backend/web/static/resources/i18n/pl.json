@@ -61,7 +61,8 @@
       "PasswordChangePlace": "Kliknij ikonę osoby na górnym pasku i przejdź do menu \"Moje konto\".",
       "Notifications": "Powiadomienia",
       "Tasks": "Zadania",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Dane"
     },
     "YouAreOffline": "Jesteś teraz offline",
     "YouAreOnline": "Jesteś teraz online",
@@ -240,19 +241,19 @@
       "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
       "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
       "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Jeśli ustawisz ją na większą niż aktualnie dostępne zasoby, utworzenie sesji zostanie opóźnione w kolejce do czasu, aż stanie się ona dostępna.",
+      "SessionName": "Nazwa sesji",
+      "ResetFormConfirm": "Czy chcesz zresetować wszystkie swoje wpisy?",
+      "TemplateAndHistory": "Szablony",
+      "ScheduleTimeSimple": "Ustaw godzinę rozpoczęcia",
       "ResourceAllocationPerContainer": "Alokacja zasobów na kontener",
       "NumberOfContainer": "Liczba pojemników",
+      "ErrorCanNotExceedRemaining": "Nie można ustawić wartości większej niż pozostałe zasoby ({{amount}}).",
       "EnterEnvironmentVariable": "Wprowadź nazwę zmiennej",
       "EnvironmentVariableNamePatternError": "Nazwa zmiennej musi zaczynać się od litery lub podkreślenia i może zawierać tylko litery, cyfry i podkreślenia.",
-      "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje."
+      "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje.",
+      "Template": "Szablon sesji",
+      "EnableAutomaticShmem": "Automatyczna pamięć współdzielona"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -401,7 +402,9 @@
     "Unset": "Nieustawiony",
     "OK": "OK",
     "Commit": "Zobowiązanie",
-    "EnterManually": "Wprowadź ręcznie"
+    "EnterManually": "Wprowadź ręcznie",
+    "Download": "Pobierz",
+    "Clone": "Klon"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -445,7 +448,7 @@
     "Enabled": "Włączone",
     "StorageProxies": "Magazyny",
     "None": "Brak",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Obraz"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -523,7 +526,8 @@
     "SignoutSeccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
     "Status": "Status",
     "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Włącz sesję sudo",
+    "MainAccessKey": "Główny klucz dostępu"
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -689,7 +693,11 @@
     "Pipeline": "Foldery rurociągów",
     "DialogDataFolder": "Dedykowane potokom foldery, które są automatycznie tworzone podczas tworzenia potoków w FastTrack.",
     "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi.",
-    "SearchByName": "Szukaj według nazwy"
+    "SearchByName": "Szukaj według nazwy",
+    "ModelStore": "Sklep modelarski",
+    "New": "Nowy",
+    "Add": "Dodaj",
+    "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście."
   },
   "dialog": {
     "warning": {
@@ -834,7 +842,9 @@
     "DescAutoLogout": "Wyloguj się automatycznie, jeśli wszystkie zalogowane strony są zamknięte, z wyjątkiem stron pochodzących z sesji dla aplikacji (np. notatnik jupyter, terminal internetowy itp.)",
     "SSHKeypairEnterManuallyFinished": "Para kluczy SSH została pomyślnie zarejestrowana.",
     "BootstrapScriptDescription": "Skrypt Bootstrap zostanie wykonany tylko raz po utworzeniu sesji.",
-    "SSHKeypairEnterManually": "Para kluczy SSH"
+    "SSHKeypairEnterManually": "Para kluczy SSH",
+    "MyKeypairInfo": "Informacje o mojej parze kluczy",
+    "DescMyKeypairInfo": "Zobacz informacje o mojej parze kluczy"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -1058,8 +1068,6 @@
     "Scaling": "skalowanie",
     "AllowAgentSideRegistration": "Zezwalaj na rejestrację po stronie agenta",
     "DescAllowAgentSideRegistration": "Zezwól agentowi na zarejestrowanie się w menedżerze. <br/> Używaj tylko wtedy, gdy klaster Backend.AI jest zarządzany w bezpiecznej lokalizacji.",
-    "Plugins": "Wtyczki",
-    "CUDAGPUsupport": "Obsługa procesorów graficznych CUDA",
     "DescCUDAGPUsupport": "Obsługa procesorów graficznych NVIDIA CUDA. <br/> Wymaga wtyczki Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Wyłączone, ponieważ system używa ułamkowej wtyczki GPU",
     "ROCMGPUsupport": "Obsługa ROCm GPU",
@@ -1109,7 +1117,9 @@
     "OverlayNetworkSettings": "Ustawienia sieci nakładkowej",
     "OverlayNetworkSettingsDescription": "Sieć nakładkowa to sieć komputerowa, która jest nakładana na inną sieć. Sieć nakładkowa tworzy sieć rozproszoną między wieloma hostami demonów Docker menedżera Backend.AI.",
     "MTUDescription": "Maksymalna jednostka transmisji, rozmiar największego pakietu, jaki może przesłać protokół sieciowy.",
-    "OutOfRange": "Poza zasięgiem."
+    "OutOfRange": "Poza zasięgiem.",
+    "Plugins": "Wtyczki",
+    "OpenSourceCUDAGPUsupport": "Obsługa procesorów graficznych Open Source CUDA"
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
@@ -1384,7 +1394,8 @@
     "RoutingsCount": "Liczba tras",
     "Active/Total": "Aktywny/Ogółem",
     "Public": "Publiczny",
-    "YouAreAboutToTerminate": "Zamierzasz zakończyć"
+    "YouAreAboutToTerminate": "Zamierzasz zakończyć",
+    "Owner": "Właściciel"
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1440,5 +1451,38 @@
   "OpenVSCodeRemote": "Otwórz lokalny kod Visual Studio",
   "inputLimit": {
     "4to64chars": "(4~64 znaki)"
+  },
+  "modelStore": {
+    "Description": "Opis",
+    "Model": "Model",
+    "FilterByName": "Filtruj według nazwy",
+    "ServiceDetails": "Szczegóły usługi",
+    "Metadata": "Metadane",
+    "ModelPath": "Ścieżka modelu",
+    "SearchModels": "Wyszukaj modele",
+    "MinResource": "Minimalny zasób",
+    "LastModified": "Ostatnio zmodyfikowany",
+    "Created": "Utworzony",
+    "Version": "Wersja",
+    "Author": "Autor",
+    "MaxRetries": "Maksymalna liczba ponownych prób",
+    "Path": "Ścieżka",
+    "HealthCheck": "Kontrola zdrowia",
+    "Port": "Port",
+    "StartCommand": "Uruchom polecenie",
+    "PreStartActions": "Działania przed rozpoczęciem",
+    "Framework": "Ramy",
+    "Category": "Kategoria",
+    "Label": "Etykieta",
+    "Task": "Zadanie",
+    "CloneAsFolder": "Sklonuj jako Folder",
+    "CloneSuccess": "Żądanie klonowania zostało wysłane pomyślnie.",
+    "CloneInfo": "Zostanie on sklonowany jako folder typu użytkownika.",
+    "category": "Kategoria"
+  },
+  "table": {
+    "SettingTable": "Nakrycie stołu",
+    "SelectColumnToDisplay": "Wybierz, które kolumny mają być wyświetlane",
+    "SearchTableColumn": "Przeszukaj kolumny tabeli"
   }
 }

@@ -61,7 +61,8 @@
       "YouMushChangeYourPassword": "В целях безопасности рекомендуется периодически менять пароль. Поскольку с момента последней смены пароля прошло определенное время, для продолжения использования сервиса необходимо его сменить.",
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
       "PleaseConfirmYourPassword": "Пожалуйста, подтвердите свой пароль",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Данные"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -240,19 +241,19 @@
       "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
       "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
       "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Если вы установите его больше, чем доступные на данный момент ресурсы, создание сеанса будет отложено в очереди до тех пор, пока он не станет доступным.",
+      "SessionName": "Имя сеанса",
+      "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
+      "TemplateAndHistory": "Шаблоны",
+      "ScheduleTimeSimple": "Установить время начала",
       "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
       "NumberOfContainer": "Количество контейнеров",
+      "ErrorCanNotExceedRemaining": "Не может быть установлено значение, превышающее остаток ресурсов ({{amount}}).",
       "EnterEnvironmentVariable": "Введите имя переменной",
       "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
-      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует."
+      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует.",
+      "Template": "Шаблон сессии",
+      "EnableAutomaticShmem": "Автоматическая разделяемая память"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -401,7 +402,9 @@
     "Reset": "Перезагрузить",
     "EnterManually": "Ввести вручную",
     "Unset": "Unset",
-    "OK": "OK"
+    "OK": "OK",
+    "Download": "Скачать",
+    "Clone": "Клон"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -445,7 +448,7 @@
     "Enabled": "Включено",
     "StorageProxies": "Хранилища данных",
     "None": "Нет",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Изображение"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -523,7 +526,8 @@
     "KeySeccessfullyDeleted": "Пара ключей удалена без последствий.",
     "SignoutSeccessfullyFinished": "Выход из системы завершен",
     "ModifyUserDetail": "Изменение сведений о пользователе",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Включить сеанс sudo",
+    "MainAccessKey": "Главный ключ доступа"
   },
   "data": {
     "Folders": "Папки",
@@ -689,7 +693,11 @@
     "Used": "Используется",
     "Pipeline": "Трубопроводные папки",
     "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack.",
-    "SearchByName": "Поиск по имени"
+    "SearchByName": "Поиск по имени",
+    "ModelStore": "Модельный магазин",
+    "New": "Новый",
+    "Add": "Добавить",
+    "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте."
   },
   "dialog": {
     "warning": {
@@ -834,7 +842,9 @@
     "DescAutoLogout": "Автоматический выход из системы, если все зарегистрированные страницы закрыты, кроме страниц, созданных в сеансе для приложений (например, блокнот jupyter, веб-терминал и т. Д.)",
     "BootstrapScriptDescription": "Bootstrap-скрипт будет выполняться только один раз после создания сессии",
     "SSHKeypairEnterManually": "Пара ключей SSH",
-    "SSHKeypairEnterManuallyFinished": "Пара ключей SSH успешно зарегистрирована."
+    "SSHKeypairEnterManuallyFinished": "Пара ключей SSH успешно зарегистрирована.",
+    "MyKeypairInfo": "Информация о моей паре ключей",
+    "DescMyKeypairInfo": "Посмотреть информацию о моей паре ключей"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -1058,8 +1068,6 @@
     "Scaling": "Масштабирование",
     "AllowAgentSideRegistration": "Разрешить регистрацию на стороне агента",
     "DescAllowAgentSideRegistration": "Разрешить агенту зарегистрироваться в качестве менеджера. <br/> Используйте, только если кластер Backend.AI управляется в безопасном месте.",
-    "Plugins": "Плагины",
-    "CUDAGPUsupport": "Поддержка CUDA GPU",
     "DescCUDAGPUsupport": "Поддержка графического процессора NVIDIA CUDA. <br/> Требуется подключаемый модуль Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Отключено, поскольку в системе используется плагин Fractional GPU.",
     "ROCMGPUsupport": "Поддержка графического процессора ROCm",
@@ -1109,7 +1117,9 @@
     "RequireATOMPlugin": "Требуется наличие плагина Backend.AI ATOM Plugin.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Используйте поддержку Furiosa Warboy",
-    "RequireWarboyPlugin": "Требуется плагин Backend.AI Warboy Plugin."
+    "RequireWarboyPlugin": "Требуется плагин Backend.AI Warboy Plugin.",
+    "Plugins": "Плагины",
+    "OpenSourceCUDAGPUsupport": "Поддержка графического процессора CUDA с открытым исходным кодом"
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1433,12 +1443,46 @@
     "FormValidationFailed": "Не удалось выполнить валидацию формы",
     "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
-    "Image": "Изображение"
+    "Image": "Изображение",
+    "Owner": "Владелец"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
     "reloadPage": "Перезагрузить страницу",
     "resetErrorBoundary": "Сброс границы ошибки",
     "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI."
+  },
+  "modelStore": {
+    "Description": "Описание",
+    "Model": "Модель",
+    "FilterByName": "Фильтровать по имени",
+    "ServiceDetails": "Детали услуги",
+    "Metadata": "Метаданные",
+    "ModelPath": "Путь модели",
+    "SearchModels": "Поиск моделей",
+    "MinResource": "Минимальный ресурс",
+    "LastModified": "Последнее изменение",
+    "Created": "Созданный",
+    "Version": "Версия",
+    "Author": "Автор",
+    "MaxRetries": "Макс. повторов",
+    "Path": "Путь",
+    "HealthCheck": "Проверка здоровья",
+    "Port": "Порт",
+    "StartCommand": "Запустить команду",
+    "PreStartActions": "Предстартовые действия",
+    "Framework": "Рамка",
+    "Category": "Категория",
+    "Label": "Этикетка",
+    "Task": "Задание",
+    "CloneAsFolder": "клонировать как папку",
+    "CloneSuccess": "Запрос на клонирование успешно отправлен.",
+    "CloneInfo": "Она будет клонирована как папка вашего типа пользователя.",
+    "category": "Категория"
+  },
+  "table": {
+    "SettingTable": "Сервировка стола",
+    "SelectColumnToDisplay": "Выберите столбцы для отображения",
+    "SearchTableColumn": "Поиск по столбцам таблицы"
   }
 }
