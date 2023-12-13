@@ -509,6 +509,7 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             data["session"]["redis"] = redis_table  # type: ignore
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -745,6 +746,7 @@ class DevContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["statistics", "pipeline"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
@@ -830,6 +832,7 @@ class PackageContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["statistics", "pipeline"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
