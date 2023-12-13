@@ -1075,6 +1075,7 @@ def set_if_set(
 async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, Sequence[Dict[str, Any]]],
+    override: bool,
     *,
     ignore_unique_violation: bool = False,
 ) -> None:
@@ -1094,7 +1095,23 @@ async def populate_fixture(
                 ):
                     for row in rows:
                         row[col.name] = col.type._schema.from_json(row[col.name])
-            await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+            insert_stmt = sa.dialects.postgresql.insert(table, rows)
+            if override:
+                primary_key_columns = [col.name for col in table.primary_key]
+                update_columns = create_update_columns(table, insert_stmt, primary_key_columns)
+                exec_action = insert_stmt.on_conflict_do_update(
+                    index_elements=primary_key_columns, set_=update_columns
+                )
+            else:
+                exec_action = insert_stmt.on_conflict_do_nothing()
+            await conn.execute(exec_action)
+
+
+def create_update_columns(
+    table: sa.Table, insert_stmt: sa.dialects.postgresql.Insert, primary_key_columns: list[str]
+):
+    non_primary_key_columns = [col for col in table.columns if col.name not in primary_key_columns]
+    return {col.name: getattr(insert_stmt.excluded, col.name) for col in non_primary_key_columns}
 
 
 class InferenceSessionError(graphene.ObjectType):
