@@ -164,7 +164,9 @@ class InstallReport(Static):
 
     def compose(self) -> ComposeResult:
         service = self.install_info.service_config
-        yield Markdown(textwrap.dedent(f"""
+        yield Markdown(
+            textwrap.dedent(
+                f"""
         Follow each tab's instructions.  Once all 5 service daemons are ready, you may connect to
         `http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}`.
 
@@ -173,10 +175,14 @@ class InstallReport(Static):
         - Password: `wJalrXUt`
 
         To see this guide again, run './backendai-install-<platform> install --show-guide'.
-        """))
+        """
+            )
+        )
         with TabbedContent():
             with TabPane("Web Server", id="webserver"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -191,9 +197,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Manager", id="manager"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -209,9 +219,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Agent", id="agent"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -225,9 +239,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Storage Proxy", id="storage-proxy"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -242,9 +260,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Local Proxy", id="local-proxy"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -259,7 +281,9 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
 
 
 class ModeMenu(Static):
@@ -411,13 +435,15 @@ class InstallerApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        logo_text = textwrap.dedent(r"""
+        logo_text = textwrap.dedent(
+            r"""
         ____             _                  _      _    ___
         | __ )  __ _  ___| | _____ _ __   __| |    / \  |_ _|
         |  _ \ / _` |/ __| |/ / _ \ '_ \ / _` |   / _ \  | |
         | |_) | (_| | (__|   <  __/ | | | (_| |_ / ___ \ | |
         |____/ \__,_|\___|_|\_\___|_| |_|\__,_(_)_/   \_\___|
-        """)
+        """
+        )
         yield Static(logo_text, id="logo")
         if self._args.show_guide:
             try:

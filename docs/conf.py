@@ -44,7 +44,6 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
-    "sphinxcontrib.openapi",
     "sphinx_autodoc_typehints",
 ]
 
@@ -151,6 +150,7 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_extra_path = ["manager/rest-reference/openapi.json"]
 
 # Custom sidebar templates, maps document names to template names.
 # html_sidebars = {}

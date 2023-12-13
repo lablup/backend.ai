@@ -366,6 +366,9 @@ class Context(metaclass=ABCMeta):
         }
         await self.etcd_put_json("", data)
         data = {}
+        # TODO: in dev-mode, enable these.
+        data["api"]["allow-openapi-schema-introspection"] = "no"
+        data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
             assert halfstack.redis_sentinel_addrs
             data["redis"] = {
@@ -478,9 +481,9 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
             wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable["url"] = (
-                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
-            )
+            wsproxy_itable[
+                "url"
+            ] = f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
             data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
@@ -502,9 +505,9 @@ class Context(metaclass=ABCMeta):
             else:
                 assert halfstack.redis_addr
                 redis_table = tomlkit.table()
-                redis_table["addr"] = (
-                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
-                )
+                redis_table[
+                    "addr"
+                ] = f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
@@ -640,16 +643,14 @@ class Context(metaclass=ABCMeta):
             )
 
     async def alias_image(self, alias: str, target_ref: str, arch: str) -> None:
-        await self.run_manager_cli(
-            [
-                "mgr",
-                "image",
-                "alias",
-                alias,
-                target_ref,
-                arch,
-            ]
-        )
+        await self.run_manager_cli([
+            "mgr",
+            "image",
+            "alias",
+            alias,
+            target_ref,
+            arch,
+        ])
 
     async def populate_images(self) -> None:
         data: Any
@@ -717,9 +718,13 @@ class Context(metaclass=ABCMeta):
                     self.log_header("Populating local container images...")
                     for src in self.dist_info.image_payloads:
                         # TODO: Ensure src.ref
-                        await self.run_exec(
-                            [*self.docker_sudo, "docker", "load", "-i", str(src.file)]
-                        )
+                        await self.run_exec([
+                            *self.docker_sudo,
+                            "docker",
+                            "load",
+                            "-i",
+                            str(src.file),
+                        ])
                 case ImageSource.LOCAL_REGISTRY:
                     raise NotImplementedError()
 
