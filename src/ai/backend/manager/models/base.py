@@ -1095,6 +1095,7 @@ async def populate_fixture(
                 ):
                     for row in rows:
                         row[col.name] = col.type._schema.from_json(row[col.name])
+
             insert_stmt = sa.dialects.postgresql.insert(table, rows)
             if override:
                 primary_key_columns = [col.name for col in table.primary_key]
@@ -1104,6 +1105,7 @@ async def populate_fixture(
                 )
             else:
                 exec_action = insert_stmt.on_conflict_do_nothing()
+
             await conn.execute(exec_action)
 
 
