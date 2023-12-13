@@ -111,6 +111,8 @@ class KeyPairRow(Base):
         back_populates="keypairs",
     )
 
+    user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+
 
 class UserInfo(graphene.ObjectType):
     email = graphene.String()
@@ -373,14 +375,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
@@ -425,14 +425,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -468,14 +466,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -630,11 +626,13 @@ class DeleteKeyPair(graphene.Mutation):
     ) -> DeleteKeyPair:
         ctx: GraphQueryContext = info.context
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-        await redis_helper.execute(
-            ctx.redis_stat,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        result = await simple_db_mutate(cls, ctx, delete_query)
+        if result.ok:
+            await redis_helper.execute(
+                ctx.redis_stat,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
+        return result
 
 
 class Dotfile(TypedDict):

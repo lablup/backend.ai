@@ -115,203 +115,193 @@ async def get_import_image_form(request: web.Request) -> web.Response:
         )
         accessible_scaling_groups = [row["name"] for row in rows]
 
-    return web.json_response(
-        {
-            "fieldGroups": [
-                {
-                    "name": "Import options",
-                    "fields": [
-                        {
-                            "name": "src",
-                            "type": "string",
-                            "label": "Source Docker image",
-                            "placeholder": "index.docker.io/lablup/tensorflow:2.0-source",
-                            "help": (
-                                "The full Docker image name to import from. "
-                                "The registry must be accessible by the client."
-                            ),
-                        },
-                        {
-                            "name": "target",
-                            "type": "string",
-                            "label": "Target Docker image",
-                            "placeholder": "index.docker.io/lablup/tensorflow:2.0-target",
-                            "help": (
-                                "The full Docker image name of the imported image."
-                                "The registry must be accessible by the client."
-                            ),
-                        },
-                        {
-                            "name": "brand",
-                            "type": "string",
-                            "label": "Name of Jupyter kernel",
-                            "placeholder": "TensorFlow 2.0",
-                            "help": (
-                                "The name of kernel to be shown in the Jupyter's kernel menu. "
-                                'This will be suffixed with "on Backend.AI".'
-                            ),
-                        },
-                        {
-                            "name": "baseDistro",
-                            "type": "choice",
-                            "choices": ["ubuntu", "centos"],
-                            "default": "ubuntu",
-                            "label": "Base LINUX distribution",
-                            "help": "The base Linux distribution used by the source image",
-                        },
-                        {
-                            "name": "minCPU",
-                            "type": "number",
-                            "min": 1,
-                            "max": None,
-                            "label": "Minimum required CPU core(s)",
-                            "help": "The minimum number of CPU cores required by the image",
-                        },
-                        {
-                            "name": "minMemory",
-                            "type": "binarysize",
-                            "min": "64m",
-                            "max": None,
-                            "label": "Minimum required memory size",
-                            "help": "The minimum size of the main memory required by the image",
-                        },
-                        {
-                            "name": "preferredSharedMemory",
-                            "type": "binarysize",
-                            "min": "64m",
-                            "max": None,
-                            "label": "Preferred shared memory size",
-                            "help": "The preferred (default) size of the shared memory",
-                        },
-                        {
-                            "name": "supportedAccelerators",
-                            "type": "multichoice[str]",
-                            "choices": ["cuda"],
-                            "default": "cuda",
-                            "label": "Supported accelerators",
-                            "help": "The list of accelerators supported by the image",
-                        },
-                        {
-                            "name": "runtimeType",
-                            "type": "choice",
-                            "choices": ["python"],
-                            "default": "python",
-                            "label": "Runtime type of the image",
-                            "help": (
-                                "The runtime type of the image. Currently, the source image must"
-                                " have installed Python 2.7, 3.5, 3.6, or 3.7 at least to import."
-                                " This will be used as the kernel of Jupyter service in this image."
-                            ),
-                        },
-                        {
-                            "name": "runtimePath",
-                            "type": "string",
-                            "default": "/usr/local/bin/python",
-                            "label": "Path of the runtime",
-                            "placeholder": "/usr/local/bin/python",
-                            "help": (
-                                "The path to the main executalbe of runtime language of the image."
-                                ' Even for the same "python"-based images, this may differ'
-                                " significantly image by image. (e.g., /usr/bin/python,"
-                                " /usr/local/bin/python, /opt/something/bin/python, ...) Please"
-                                " check this carefully not to get confused with OS-default ones and"
-                                " custom-installed ones."
-                            ),
-                        },
-                        {
-                            "name": "CPUCountEnvs",
-                            "type": "list[string]",
-                            "default": ["NPROC", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS"],
-                            "label": "CPU count environment variables",
-                            "help": (
-                                "The name of environment variables to be overriden to the number of"
-                                " CPU cores actually allocated to the container. Required for"
-                                " legacy computation libraries."
-                            ),
-                        },
-                        {
-                            "name": "servicePorts",
-                            "type": "multichoice[template]",
-                            "templates": [
-                                {"name": "jupyter", "protocol": "http", "ports": [8080]},
-                                {"name": "jupyterlab", "protocol": "http", "ports": [8090]},
-                                {"name": "tensorboard", "protocol": "http", "ports": [6006]},
-                                {"name": "digits", "protocol": "http", "ports": [5000]},
-                                {"name": "vscode", "protocol": "http", "ports": [8180]},
-                                {"name": "h2o-dai", "protocol": "http", "ports": [12345]},
-                            ],
-                            "label": "Supported service ports",
-                            "help": (
-                                "The list of service ports supported by this image. "
-                                "Note that sshd (port 2200) and ttyd (port 7681) are intrinsic; "
-                                "they are always included regardless of the source image. "
-                                "The port number 2000-2003 are reserved by Backend.AI, and "
-                                "all port numbers must be larger than 1024 and smaller than 65535."
-                            ),
-                        },
-                    ],
-                },
-                {
-                    "name": "Import Task Options",
-                    "help": "The import task uses 1 CPU core and 2 GiB of memory.",
-                    "fields": [
-                        {
-                            "name": "group",
-                            "type": "choice",
-                            "choices": accessible_groups,
-                            "label": "Group to build image",
-                            "help": "The user group where the import task will be executed.",
-                        },
-                        {
-                            "name": "scalingGroup",
-                            "type": "choice",
-                            "choices": accessible_scaling_groups,
-                            "label": "Scaling group to build image",
-                            "help": (
-                                "The scaling group where the import task will take resources from."
-                            ),
-                        },
-                    ],
-                },
-            ],
-        }
-    )
+    return web.json_response({
+        "fieldGroups": [
+            {
+                "name": "Import options",
+                "fields": [
+                    {
+                        "name": "src",
+                        "type": "string",
+                        "label": "Source Docker image",
+                        "placeholder": "index.docker.io/lablup/tensorflow:2.0-source",
+                        "help": (
+                            "The full Docker image name to import from. "
+                            "The registry must be accessible by the client."
+                        ),
+                    },
+                    {
+                        "name": "target",
+                        "type": "string",
+                        "label": "Target Docker image",
+                        "placeholder": "index.docker.io/lablup/tensorflow:2.0-target",
+                        "help": (
+                            "The full Docker image name of the imported image."
+                            "The registry must be accessible by the client."
+                        ),
+                    },
+                    {
+                        "name": "brand",
+                        "type": "string",
+                        "label": "Name of Jupyter kernel",
+                        "placeholder": "TensorFlow 2.0",
+                        "help": (
+                            "The name of kernel to be shown in the Jupyter's kernel menu. "
+                            'This will be suffixed with "on Backend.AI".'
+                        ),
+                    },
+                    {
+                        "name": "baseDistro",
+                        "type": "choice",
+                        "choices": ["ubuntu", "centos"],
+                        "default": "ubuntu",
+                        "label": "Base LINUX distribution",
+                        "help": "The base Linux distribution used by the source image",
+                    },
+                    {
+                        "name": "minCPU",
+                        "type": "number",
+                        "min": 1,
+                        "max": None,
+                        "label": "Minimum required CPU core(s)",
+                        "help": "The minimum number of CPU cores required by the image",
+                    },
+                    {
+                        "name": "minMemory",
+                        "type": "binarysize",
+                        "min": "64m",
+                        "max": None,
+                        "label": "Minimum required memory size",
+                        "help": "The minimum size of the main memory required by the image",
+                    },
+                    {
+                        "name": "preferredSharedMemory",
+                        "type": "binarysize",
+                        "min": "64m",
+                        "max": None,
+                        "label": "Preferred shared memory size",
+                        "help": "The preferred (default) size of the shared memory",
+                    },
+                    {
+                        "name": "supportedAccelerators",
+                        "type": "multichoice[str]",
+                        "choices": ["cuda"],
+                        "default": "cuda",
+                        "label": "Supported accelerators",
+                        "help": "The list of accelerators supported by the image",
+                    },
+                    {
+                        "name": "runtimeType",
+                        "type": "choice",
+                        "choices": ["python"],
+                        "default": "python",
+                        "label": "Runtime type of the image",
+                        "help": (
+                            "The runtime type of the image. Currently, the source image must"
+                            " have installed Python 2.7, 3.5, 3.6, or 3.7 at least to import."
+                            " This will be used as the kernel of Jupyter service in this image."
+                        ),
+                    },
+                    {
+                        "name": "runtimePath",
+                        "type": "string",
+                        "default": "/usr/local/bin/python",
+                        "label": "Path of the runtime",
+                        "placeholder": "/usr/local/bin/python",
+                        "help": (
+                            "The path to the main executalbe of runtime language of the image."
+                            ' Even for the same "python"-based images, this may differ'
+                            " significantly image by image. (e.g., /usr/bin/python,"
+                            " /usr/local/bin/python, /opt/something/bin/python, ...) Please"
+                            " check this carefully not to get confused with OS-default ones and"
+                            " custom-installed ones."
+                        ),
+                    },
+                    {
+                        "name": "CPUCountEnvs",
+                        "type": "list[string]",
+                        "default": ["NPROC", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS"],
+                        "label": "CPU count environment variables",
+                        "help": (
+                            "The name of environment variables to be overriden to the number of"
+                            " CPU cores actually allocated to the container. Required for"
+                            " legacy computation libraries."
+                        ),
+                    },
+                    {
+                        "name": "servicePorts",
+                        "type": "multichoice[template]",
+                        "templates": [
+                            {"name": "jupyter", "protocol": "http", "ports": [8080]},
+                            {"name": "jupyterlab", "protocol": "http", "ports": [8090]},
+                            {"name": "tensorboard", "protocol": "http", "ports": [6006]},
+                            {"name": "digits", "protocol": "http", "ports": [5000]},
+                            {"name": "vscode", "protocol": "http", "ports": [8180]},
+                            {"name": "h2o-dai", "protocol": "http", "ports": [12345]},
+                        ],
+                        "label": "Supported service ports",
+                        "help": (
+                            "The list of service ports supported by this image. "
+                            "Note that sshd (port 2200) and ttyd (port 7681) are intrinsic; "
+                            "they are always included regardless of the source image. "
+                            "The port number 2000-2003 are reserved by Backend.AI, and "
+                            "all port numbers must be larger than 1024 and smaller than 65535."
+                        ),
+                    },
+                ],
+            },
+            {
+                "name": "Import Task Options",
+                "help": "The import task uses 1 CPU core and 2 GiB of memory.",
+                "fields": [
+                    {
+                        "name": "group",
+                        "type": "choice",
+                        "choices": accessible_groups,
+                        "label": "Group to build image",
+                        "help": "The user group where the import task will be executed.",
+                    },
+                    {
+                        "name": "scalingGroup",
+                        "type": "choice",
+                        "choices": accessible_scaling_groups,
+                        "label": "Scaling group to build image",
+                        "help": "The scaling group where the import task will take resources from.",
+                    },
+                ],
+            },
+        ],
+    })
 
 
 @server_status_required(ALL_ALLOWED)
 @admin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("src"): t.String,
-            t.Key("target"): t.String,
-            t.Key("architecture", default=DEFAULT_IMAGE_ARCH): t.String,
-            t.Key("launchOptions", default={}): t.Dict(
-                {
-                    t.Key("scalingGroup", default="default"): t.String,
-                    t.Key("group", default="default"): t.String,
-                }
-            ).allow_extra("*"),
-            t.Key("brand"): t.String,
-            t.Key("baseDistro"): t.Enum("ubuntu", "centos"),
-            t.Key("minCPU", default=1): t.Int[1:],
-            t.Key("minMemory", default="64m"): tx.BinarySize,
-            t.Key("preferredSharedMemory", default="64m"): tx.BinarySize,
-            t.Key("supportedAccelerators"): t.List(t.String),
-            t.Key("runtimeType"): t.Enum("python"),
-            t.Key("runtimePath"): tx.Path(type="file", allow_nonexisting=True, resolve=False),
-            t.Key("CPUCountEnvs"): t.List(t.String),
-            t.Key("servicePorts", default=[]): t.List(
-                t.Dict(
-                    {
-                        t.Key("name"): t.String,
-                        t.Key("protocol"): t.Enum("http", "tcp", "pty"),
-                        t.Key("ports"): t.List(t.Int[1:65535], min_length=1),
-                    }
-                )
-            ),
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("src"): t.String,
+        t.Key("target"): t.String,
+        t.Key("architecture", default=DEFAULT_IMAGE_ARCH): t.String,
+        t.Key("launchOptions", default={}): t.Dict({
+            t.Key("scalingGroup", default="default"): t.String,
+            t.Key("group", default="default"): t.String,
+        }).allow_extra("*"),
+        t.Key("brand"): t.String,
+        t.Key("baseDistro"): t.Enum("ubuntu", "centos"),
+        t.Key("minCPU", default=1): t.Int[1:],
+        t.Key("minMemory", default="64m"): tx.BinarySize,
+        t.Key("preferredSharedMemory", default="64m"): tx.BinarySize,
+        t.Key("supportedAccelerators"): t.List(t.String),
+        t.Key("runtimeType"): t.Enum("python"),
+        t.Key("runtimePath"): tx.Path(type="file", allow_nonexisting=True, resolve=False),
+        t.Key("CPUCountEnvs"): t.List(t.String),
+        t.Key("servicePorts", default=[]): t.List(
+            t.Dict({
+                t.Key("name"): t.String,
+                t.Key("protocol"): t.Enum("http", "tcp", "pty"),
+                t.Key("ports"): t.List(t.Int[1:65535], min_length=1),
+            })
+        ),
+    }).allow_extra("*")
 )
 async def import_image(request: web.Request, params: Any) -> web.Response:
     """
@@ -352,24 +342,22 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
     target_image = ImageRef(params["target"], allowed_docker_registries, params["architecture"])
 
     # TODO: validate and convert arguments to template variables
-    dockerfile_content = tpl.render(
-        {
-            "base_distro": params["baseDistro"],
-            "cpucount_envvars": ["NPROC", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS"],
-            "runtime_type": params["runtimeType"],
-            "runtime_path": params["runtimePath"],
-            "service_ports": params["servicePorts"],
-            "min_cpu": params["minCPU"],
-            "min_mem": params["minMemory"],
-            "pref_shmem": params["preferredSharedMemory"],
-            "accelerators": params["supportedAccelerators"],
-            "src": params["src"],
-            "brand": params["brand"],
-            "has_ipykernel": (
-                True
-            ),  # TODO: in the future, we may allow import of service-port only kernels.
-        }
-    )
+    dockerfile_content = tpl.render({
+        "base_distro": params["baseDistro"],
+        "cpucount_envvars": ["NPROC", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS"],
+        "runtime_type": params["runtimeType"],
+        "runtime_path": params["runtimePath"],
+        "service_ports": params["servicePorts"],
+        "min_cpu": params["minCPU"],
+        "min_mem": params["minMemory"],
+        "pref_shmem": params["preferredSharedMemory"],
+        "accelerators": params["supportedAccelerators"],
+        "src": params["src"],
+        "brand": params["brand"],
+        "has_ipykernel": (
+            True
+        ),  # TODO: in the future, we may allow import of service-port only kernels.
+    })
 
     session_creation_id = secrets.token_urlsafe(32)
     session_id = f"image-import-{secrets.token_urlsafe(8)}"

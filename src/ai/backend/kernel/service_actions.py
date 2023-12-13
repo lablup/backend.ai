@@ -46,7 +46,7 @@ async def run_command(
     proc = await create_subprocess_exec(
         *(str(piece).format_map(variables) for piece in command),
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
     )
     out, err = await proc.communicate()
     if echo:

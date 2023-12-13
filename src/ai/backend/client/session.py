@@ -49,11 +49,9 @@ async def _negotiate_api_version(
             sock_connect=config.connection_timeout,
             sock_read=config.read_timeout,
         )
-        headers = CIMultiDict(
-            [
-                ("User-Agent", config.user_agent),
-            ]
-        )
+        headers = CIMultiDict([
+            ("User-Agent", config.user_agent),
+        ])
         probe_url = (
             config.endpoint / "func/" if config.endpoint_type == "session" else config.endpoint
         )

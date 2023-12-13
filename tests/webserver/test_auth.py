@@ -15,17 +15,15 @@ class DummyRequest:
 
 @pytest.mark.asyncio
 async def test_get_api_session(mocker):
-    mock_request = DummyRequest(
-        {
-            "config": {
-                "api": {
-                    "domain": "default",
-                    "endpoint": [yarl.URL("https://api.backend.ai")],
-                    "ssl_verify": False,
-                },
-            }
+    mock_request = DummyRequest({
+        "config": {
+            "api": {
+                "domain": "default",
+                "endpoint": [yarl.URL("https://api.backend.ai")],
+                "ssl_verify": False,
+            },
         }
-    )
+    })
 
     mock_get_session = AsyncMock(
         return_value={
@@ -67,17 +65,15 @@ async def test_get_api_session(mocker):
 
 @pytest.mark.asyncio
 async def test_get_api_session_with_specific_api_endpoint(mocker):
-    mock_request = DummyRequest(
-        {
-            "config": {
-                "api": {
-                    "domain": "default",
-                    "endpoint": [yarl.URL("https://api.backend.ai")],
-                    "ssl_verify": False,
-                },
-            }
+    mock_request = DummyRequest({
+        "config": {
+            "api": {
+                "domain": "default",
+                "endpoint": [yarl.URL("https://api.backend.ai")],
+                "ssl_verify": False,
+            },
         }
-    )
+    })
     mock_get_session = AsyncMock(
         return_value={
             "authenticated": True,
@@ -94,17 +90,15 @@ async def test_get_api_session_with_specific_api_endpoint(mocker):
 
 @pytest.mark.asyncio
 async def test_get_anonymous_session(mocker):
-    mock_request = DummyRequest(
-        {
-            "config": {
-                "api": {
-                    "domain": "default",
-                    "endpoint": [yarl.URL("https://api.backend.ai")],
-                    "ssl_verify": False,
-                },
-            }
+    mock_request = DummyRequest({
+        "config": {
+            "api": {
+                "domain": "default",
+                "endpoint": [yarl.URL("https://api.backend.ai")],
+                "ssl_verify": False,
+            },
         }
-    )
+    })
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
     api_session = await get_anonymous_session(mock_request)
@@ -119,17 +113,15 @@ async def test_get_anonymous_session(mocker):
 
 @pytest.mark.asyncio
 async def test_get_anonymous_session_with_specific_api_endpoint(mocker):
-    mock_request = DummyRequest(
-        {
-            "config": {
-                "api": {
-                    "domain": "default",
-                    "endpoint": [yarl.URL("https://api.backend.ai")],
-                    "ssl_verify": False,
-                },
-            }
+    mock_request = DummyRequest({
+        "config": {
+            "api": {
+                "domain": "default",
+                "endpoint": [yarl.URL("https://api.backend.ai")],
+                "ssl_verify": False,
+            },
         }
-    )
+    })
     specific_api_endpoint = "https://alternative.backend.ai"
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
