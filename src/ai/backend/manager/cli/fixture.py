@@ -27,8 +27,9 @@ def cli():
 
 @cli.command()
 @click.argument("fixture_path", type=Path)
+@click.option("--override", is_flag=True, help="Force to overwrite existing rows.")
 @click.pass_obj
-def populate(cli_ctx: CLIContext, fixture_path) -> None:
+def populate(cli_ctx: CLIContext, fixture_path, override) -> None:
     async def _impl():
         log.info("Populating fixture '{0}' ...", fixture_path)
         try:
@@ -44,7 +45,7 @@ def populate(cli_ctx: CLIContext, fixture_path) -> None:
             f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
         )
         try:
-            await populate_fixture(engine, fixture)
+            await populate_fixture(engine, fixture, override)
         except Exception:
             log.exception("Failed to populate fixtures due to the following error:")
         else:
