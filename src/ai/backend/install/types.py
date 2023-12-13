@@ -141,6 +141,7 @@ class ServiceConfig:
     webserver_ipc_base_path: str
     webserver_var_base_path: str
     webui_menu_blocklist: list[str]
+    webui_menu_inactivelist: list[str]
     local_proxy_addr: ServerAddr
     agent_rpc_addr: ServerAddr
     agent_watcher_addr: ServerAddr
