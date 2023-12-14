@@ -424,7 +424,19 @@ def database_fixture(local_config, test_db, database):
     #       Normal dicts on Python 3.6 or later guarantees the update ordering.
     fixtures.update(
         json.loads(
+            (Path(__file__).parent / "fixtures" / "example-users.json").read_text(),
+        )
+    )
+    fixtures.update(
+        json.loads(
             (Path(__file__).parent / "fixtures" / "example-keypairs.json").read_text(),
+        )
+    )
+    fixtures.update(
+        json.loads(
+            (
+                Path(__file__).parent / "fixtures" / "example-set-user-main-access-keys.json.json"
+            ).read_text(),
         )
     )
     fixtures.update(
@@ -439,7 +451,7 @@ def database_fixture(local_config, test_db, database):
             connect_args=pgsql_connect_opts,
         )
         try:
-            await populate_fixture(engine, fixtures)
+            await populate_fixture(engine, fixtures, True)
         finally:
             await engine.dispose()
 
