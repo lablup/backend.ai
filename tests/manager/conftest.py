@@ -453,7 +453,7 @@ def database_fixture(local_config, test_db, database):
         )
         try:
             await populate_fixture(engine, fixtures, False)
-            await populate_fixture(engine, fixtures, True)
+            await populate_fixture(engine, update_fixtures, True)
         finally:
             await engine.dispose()
 
