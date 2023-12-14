@@ -420,6 +420,7 @@ def database_fixture(local_config, test_db, database):
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     fixtures = {}
+    update_fixtures = {}
     # NOTE: The fixtures must be loaded in the order that they are present.
     #       Normal dicts on Python 3.6 or later guarantees the update ordering.
     fixtures.update(
@@ -437,7 +438,7 @@ def database_fixture(local_config, test_db, database):
             (Path(__file__).parent / "fixtures" / "example-resource-presets.json").read_text(),
         )
     )
-    fixtures.update(
+    update_fixtures.update(
         json.loads(
             (
                 Path(__file__).parent / "fixtures" / "example-set-user-main-access-keys.json"
@@ -451,6 +452,7 @@ def database_fixture(local_config, test_db, database):
             connect_args=pgsql_connect_opts,
         )
         try:
+            await populate_fixture(engine, fixtures, False)
             await populate_fixture(engine, fixtures, True)
         finally:
             await engine.dispose()
