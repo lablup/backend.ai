@@ -16,7 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 23.09.8.rc1 (2023-12-13)
+## 23.09.8rc1 (2023-12-13)
 
 ### Features
 * Use `ui.menu_blocklist` to hide pipeline menu button and delete `pipeline.hide-side-menu-button`. ([#1727](https://github.com/lablup/backend.ai/issues/1727))
