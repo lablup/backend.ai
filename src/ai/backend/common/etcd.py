@@ -118,13 +118,11 @@ class AsyncEtcd:
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:
-        self.scope_prefix_map = t.Dict(
-            {
-                t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
-                t.Key(ConfigScopes.SGROUP, optional=True): t.String,
-                t.Key(ConfigScopes.NODE, optional=True): t.String,
-            }
-        ).check(scope_prefix_map)
+        self.scope_prefix_map = t.Dict({
+            t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
+            t.Key(ConfigScopes.SGROUP, optional=True): t.String,
+            t.Key(ConfigScopes.NODE, optional=True): t.String,
+        }).check(scope_prefix_map)
         if credentials is not None:
             self._creds = EtcdCredential(credentials["user"], credentials["password"])
         else:

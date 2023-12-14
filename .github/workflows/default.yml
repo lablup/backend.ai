@@ -459,6 +459,14 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
 
 
   build-conda-pack-for-windows:

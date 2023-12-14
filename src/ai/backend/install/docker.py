@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
-import json
 import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
 from rich.text import Text
 
+from ai.backend.common.docker import get_docker_connector
 from ai.backend.install.types import PrerequisiteError
 
 from .http import request_unix
@@ -66,16 +68,20 @@ async def detect_snap_docker():
                 return pkg_data["version"]
 
 
-async def detect_system_docker(ctx: Context):
-    # Well-known docker socket paths
-    sock_paths = [
-        Path("/run/docker.sock"),  # Linux default
-        Path("/var/run/docker.sock"),  # macOS default
-    ]
+async def detect_system_docker(ctx: Context) -> str:
+    if ctx.docker_sudo:
+        ctx.log.write(
+            Text.from_markup("[yellow]Docker commands require sudo. We will use sudo.[/]")
+        )
+    try:
+        connector = get_docker_connector()
+    except RuntimeError as e:
+        raise PrerequisiteError(f"Could not find the docker socket ({e})") from e
+    ctx.log.write(Text.from_markup(f"[cyan]{connector=}[/]"))
 
-    # Read from context
+    # Test a docker command to ensure passwordless sudo.
     proc = await asyncio.create_subprocess_exec(
-        *(*ctx.docker_sudo, "docker", "context", "show"),
+        *(*ctx.docker_sudo, "docker", "version"),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
@@ -83,8 +89,7 @@ async def detect_system_docker(ctx: Context):
     stdout = ""
     try:
         async with asyncio.timeout(0.5):
-            stdout = (await proc.stdout.read()).decode().strip()
-            await proc.wait()
+            await proc.communicate()
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
@@ -92,52 +97,33 @@ async def detect_system_docker(ctx: Context):
             "sudo requires prompt.",
             instruction="Please make sudo available without password prompts.",
         )
-    context_name = stdout
-    proc = await asyncio.create_subprocess_exec(
-        *(*ctx.docker_sudo, "docker", "context", "inspect", context_name),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    assert proc.stdout is not None
-    stdout = (await proc.stdout.read()).decode()
-    await proc.wait()
-    context_info = json.loads(stdout)
-    context_sock_path = context_info[0]["Endpoints"]["docker"]["Host"].removeprefix("unix://")
-    sock_paths.insert(0, Path(context_sock_path))
 
-    # Read from environment variable
-    if env_sock_path := os.environ.get("DOCKER_HOST", None):
-        # Some special setups like OrbStack may have a custom DOCKER_HOST.
-        env_sock_path = env_sock_path.removeprefix("unix://")
-        sock_paths.insert(0, Path(env_sock_path))
-
-    for sock_path in sock_paths:
-        if sock_path.is_socket():
-            break
-    else:
-        raise RuntimeError(
-            "Failed to find Docker daemon socket ("
-            + ", ".join(str(sock_path) for sock_path in sock_paths)
-            + ")"
-        )
-    ctx.log.write(Text.from_markup(f"[yellow]{sock_path=}[/]"))
     if ctx.docker_sudo:
-        # change the docker socket permission (temporarily)
+        # Change the docker socket permission (temporarily)
         # so that we could access the docker daemon API directly.
-        proc = await asyncio.create_subprocess_exec(
-            *["sudo", "chmod", "666", str(sock_path)],
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        assert proc.stdout is not None
-        stdout = (await proc.stdout.read()).decode()
-        if (await proc.wait()) != 0:
-            raise RuntimeError("Failed to set the docker socket permission", stdout)
-    async with request_unix("GET", str(sock_path), "http://localhost/version") as r:
-        if r.status != 200:
-            raise RuntimeError("Failed to query the Docker daemon API")
-        response_data = await r.json()
-        return response_data["Version"]
+        # NOTE: For TCP URLs (e.g., remote Docker), we don't have the socket file.
+        if connector.sock_path is not None and not connector.sock_path.resolve().is_relative_to(
+            Path.home()
+        ):
+            proc = await asyncio.create_subprocess_exec(
+                *["sudo", "chmod", "666", str(connector.sock_path)],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            assert proc.stdout is not None
+            stdout = (await proc.stdout.read()).decode()
+            if (await proc.wait()) != 0:
+                raise RuntimeError("Failed to set the docker socket permission", stdout)
+
+    async with aiohttp.ClientSession(connector=connector.connector) as sess:
+        async with sess.get(connector.docker_host / "version") as r:
+            if r.status != 200:
+                raise RuntimeError(
+                    "The Docker daemon API responded with unexpected response:"
+                    f" {r.status} {r.reason}"
+                )
+            response_data = await r.json()
+            return response_data["Version"]
 
 
 def fail_with_snap_docker_refresh_request() -> None:
@@ -175,19 +161,17 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
 
 
 async def determine_docker_sudo() -> bool:
-    proc = await asyncio.create_subprocess_exec(
-        *("docker", "version"),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    assert proc.stdout is not None
-    stdout = (await proc.stdout.read()).decode()
-    if (await proc.wait()) != 0:
-        if "permission denied" in stdout.lower():
-            # installed, requires sudo
+    connector = get_docker_connector()
+    try:
+        async with aiohttp.ClientSession(connector=connector.connector) as sess:
+            async with sess.get(connector.docker_host / "version") as r:
+                await r.json()
+    except ClientConnectorError as e:
+        if isinstance(e.os_error, PermissionError):
             return True
-        raise RuntimeError("Docker client command is not available in the host.")
-    # installed, does not require sudo
+        raise
+    except PermissionError:
+        return True
     return False
 
 
@@ -206,6 +190,8 @@ async def check_docker(ctx: Context) -> None:
         else:
             fail_with_system_docker_install_request()
 
+    # Compose is not a part of the docker API but a client-side plugin.
+    # We need to execute the client command to get information about it.
     proc = await asyncio.create_subprocess_exec(
         *ctx.docker_sudo, "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
     )

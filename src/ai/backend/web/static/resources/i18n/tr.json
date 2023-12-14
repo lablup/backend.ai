@@ -245,7 +245,12 @@
       "SessionName": "__NOT_TRANSLATED__",
       "ResetFormConfirm": "__NOT_TRANSLATED__",
       "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Konteyner Başına Kaynak Tahsisi",
+      "NumberOfContainer": "Konteyner sayısı",
+      "EnterEnvironmentVariable": "Değişken adını girin",
+      "EnvironmentVariableNamePatternError": "Değişken adı bir harf veya alt çizgi ile başlamalıdır ve yalnızca harfler, sayılar ve alt çizgiler içerebilir.",
+      "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",

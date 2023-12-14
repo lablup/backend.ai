@@ -5,6 +5,7 @@ Revises: 4b7b650bc30e
 Create Date: 2019-12-12 07:19:48.052928
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
