@@ -142,9 +142,9 @@ but the REST API reference (as of 24.03) which uses a dedicated Javascript-based
 
 To preview the full documentation including the REST API reference seamlessly, you need to run a local nginx server.
 
-1. Simply create a nginx server which serves `_build/html` folder. For example (docker required):
+1. Create a HTTP server which serves `_build/html` folder. For example:
    ```bash
-   docker run --rm -it -v $(pwd)/_build/html:/usr/share/nginx/html -p 8000:80 nginx
+   python -m http.server --directory _build/html 8000
    ```
 2. Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
 
