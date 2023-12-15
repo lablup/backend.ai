@@ -115,8 +115,10 @@ Creating and destroying a compute session
 
 
 
-Retrieving the app proxy address to a container application
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Accessing Container Applications
+--------------------------------
+
+TODO: Retrieving the app proxy address to a container application
 
 .. code-block:: python
 
@@ -127,11 +129,14 @@ Retrieving the app proxy address to a container application
         print(...)
 
 
-Synchronous-mode execution
---------------------------
+Code Execution via API
+----------------------
 
-Query mode
-~~~~~~~~~~
+Synchronous mode
+~~~~~~~~~~~~~~~~
+
+Snippet execution (query mode)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is the minimal code to execute a code snippet with this client SDK.
 
@@ -172,8 +177,8 @@ but within the timeout, any kernel creation requests with the same ``client_toke
 let Backend.AI cloud to reuse the kernel.
 
 
-Batch mode
-~~~~~~~~~~
+Script execution (batch mode)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You first need to upload the files after creating the session and construct a
 ``opts`` struct.
@@ -216,7 +221,7 @@ You first need to upload the files after creating the session and construct a
 
 
 Handling user inputs
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 Inside the while-loop for ``kern.execute()`` above,
 change the if-block for ``result['status']`` as follows:
@@ -241,7 +246,7 @@ A common gotcha is to miss setting ``mode = "input"``. Be careful!
 
 
 Handling multi-media outputs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``handle_media()`` function used above examples would look like:
 
@@ -262,8 +267,8 @@ Currently the following behaviors are well-defined:
   browsers)
 
 
-Asynchronous-mode Execution
----------------------------
+Asynchronous mode
+~~~~~~~~~~~~~~~~~
 
 The async version has all sync-version interfaces as coroutines but comes with additional
 features such as ``stream_execute()`` which streams the execution results via websockets and
