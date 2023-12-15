@@ -1,6 +1,132 @@
 Examples
 ========
 
+Here are several examples to demonstrate the functional API usage.
+
+Initialization of the API Client
+--------------------------------
+
+Implicit configuration from environment variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.session import Session
+
+    def main():
+        with Session() as api_session:
+            print(api_session.System.get_versions())
+
+    if __name__ == "__main__":
+        main()
+
+.. seealso:: :doc:`/client/gsg/config`
+
+
+Explicit configuration
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.config import APIConfig
+    from ai.backend.client.session import Session
+
+    def main():
+        config = APIConfig(
+            endpoint="https://api.backend.ai.local",
+            endpoint_type="api",
+            domain="default",
+            group="default",  # the default project name to use
+        )
+        with Session(config=config) as api_session:
+            print(api_session.System.get_versions())
+
+    if __name__ == "__main__":
+        main()
+
+.. seealso:: :class:`ai.backend.client.config.APIConfig`
+
+Asyncio-native API session
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import asyncio
+    from ai.backend.client.session import AsyncSession
+
+    async def main():
+        async with AsyncSession() as api_session:
+            print(api_session.System.get_versions())
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+
+.. seealso:: The interface of API client session objects: :mod:`ai.backend.client.session`
+
+
+Working with Compute Sessions
+-----------------------------
+
+.. note::
+
+   From here, we omit the ``main()`` function structure in the sample codes.
+
+Listing currently running compute sessions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import functools
+    from ai.backend.client import Session
+
+    with Session() as api_session:
+        fetch_func = functools.partial(
+            api_session.ComputeSession.paginated_list,
+            status="RUNNING",
+        )
+        current_offset = 0
+        while True:
+            result = fetch_func(page_offset=current_offset, page_size=20)
+            if result.total_count == 0:
+                # no items found
+                break
+            current_offset += len(result.items)
+            for item in result.items:
+               print(item)
+            if current_offset >= result.total_count:
+                # end of list
+                break
+
+Creating and destroying a compute session
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        my_session = api_session.ComputeSession.get_or_create(
+            "python:3.9-ubuntu20.04",      # registered container image name
+            mounts=["mydata", "mymodel"],  # vfolder names
+            resources={"cpu": 8, "mem": "32g", "cuda.device": 2},
+        )
+        print(my_session.id)
+        my_session.destroy()
+
+
+
+Retrieving the app proxy address to a container application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        my_session = api_session.ComputeSession.get_or_create(...)
+        print(...)
+
+
 Synchronous-mode execution
 --------------------------
 
@@ -9,33 +135,33 @@ Query mode
 
 This is the minimal code to execute a code snippet with this client SDK.
 
-.. code-block:: python3
+.. code-block:: python
 
-  import sys
-  from ai.backend.client import Session
+    import sys
+    from ai.backend.client.session import Session
 
-  with Session() as session:
-      kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
-      code = 'print("hello world")'
-      mode = 'query'
-      run_id = None
-      while True:
-          result = kern.execute(run_id, code, mode=mode)
-          run_id = result['runId']  # keeps track of this particular run loop
-          for rec in result.get('console', []):
-              if rec[0] == 'stdout':
-                  print(rec[1], end='', file=sys.stdout)
-              elif rec[0] == 'stderr':
-                  print(rec[1], end='', file=sys.stderr)
-              else:
-                  handle_media(rec)
-          sys.stdout.flush()
-          if result['status'] == 'finished':
-              break
-          else:
-              mode = 'continued'
-              code = ''
-      kern.destroy()
+    with Session() as api_session:
+        my_session = api_session.ComputeSession.get_or_create("python:3.9-ubuntu20.04")
+        code = 'print("hello world")'
+        mode = "query"
+        run_id = None
+        while True:
+            result = my_session.execute(run_id, code, mode=mode)
+            run_id = result["runId"]  # keeps track of this particular run loop
+            for rec in result.get("console", []):
+                if rec[0] == "stdout":
+                    print(rec[1], end="", file=sys.stdout)
+                elif rec[0] == "stderr":
+                    print(rec[1], end="", file=sys.stderr)
+                else:
+                    handle_media(rec)
+            sys.stdout.flush()
+            if result["status"] == "finished":
+                break
+            else:
+                mode = "continued"
+                code = ""
+        my_session.destroy()
 
 You need to take care of ``client_token`` because it determines whether to
 reuse kernel sessions or not.
@@ -50,39 +176,39 @@ Batch mode
 You first need to upload the files after creating the session and construct a
 ``opts`` struct.
 
-.. code-block:: python3
+.. code-block:: python
 
-  import sys
-  from ai.backend.client import Session
+    import sys
+    from ai.backend.client.session import Session
 
-  with Session() as session:
-      kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
-      kern.upload(['mycode.py', 'setup.py'])
-      code = ''
-      mode = 'batch'
-      run_id = None
-      opts = {
-          'build': '*',  # calls "python setup.py install"
-          'exec': 'python mycode.py arg1 arg2',
-      }
-      while True:
-          result = kern.execute(run_id, code, mode=mode, opts=opts)
-          opts.clear()
-          run_id = result['runId']
-          for rec in result.get('console', []):
-              if rec[0] == 'stdout':
-                  print(rec[1], end='', file=sys.stdout)
-              elif rec[0] == 'stderr':
-                  print(rec[1], end='', file=sys.stderr)
-              else:
-                  handle_media(rec)
-          sys.stdout.flush()
-          if result['status'] == 'finished':
-              break
-          else:
-              mode = 'continued'
-              code = ''
-      kern.destroy()
+    with Session() as session:
+        kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
+        kern.upload(['mycode.py', 'setup.py'])
+        code = ''
+        mode = 'batch'
+        run_id = None
+        opts = {
+            'build': '*',  # calls "python setup.py install"
+            'exec': 'python mycode.py arg1 arg2',
+        }
+        while True:
+            result = kern.execute(run_id, code, mode=mode, opts=opts)
+            opts.clear()
+            run_id = result['runId']
+            for rec in result.get('console', []):
+                if rec[0] == 'stdout':
+                    print(rec[1], end='', file=sys.stdout)
+                elif rec[0] == 'stderr':
+                    print(rec[1], end='', file=sys.stderr)
+                else:
+                    handle_media(rec)
+            sys.stdout.flush()
+            if result['status'] == 'finished':
+                break
+            else:
+                mode = 'continued'
+                code = ''
+        kern.destroy()
 
 
 Handling user inputs
