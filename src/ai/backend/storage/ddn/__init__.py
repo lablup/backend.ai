@@ -145,7 +145,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 except asyncio.IncompleteReadError:
                     break
                 words = line.split()
-                if words[0] == str(qspath):
+                target_dir = Path(words[0].decode())
+                if target_dir == qspath:
                     return QuotaUsage(used_bytes=int(words[1]), limit_bytes=int(words[3]))
             return None
         finally:
