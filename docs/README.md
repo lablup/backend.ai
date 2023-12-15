@@ -135,23 +135,29 @@ Please ask the docs maintainer for help.
 
 ### The HTML documentation
 
-Simply create a nginx server which serves `_build/html` folder. For example (docker required):
-```bash
-docker run --rm -it -v $(pwd)/_build/html:/usr/share/nginx/html -p 8000:80 nginx
-```
-Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
+You may open `_build/html/index.html` from the local filesystem directly on your browser,
+but the REST API reference (as of 23.09) which uses a dedicated Javascript-based viewer won't work.
+
+To preview the full documentation including the REST API reference seamlessly, you need to run a local nginx server.
+
+1. Simply create a nginx server which serves `_build/html` folder. For example (docker required):
+   ```bash
+   docker run --rm -it -v $(pwd)/_build/html:/usr/share/nginx/html -p 8000:80 nginx
+   ```
+2. Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
 
 ### Interactive GraphQL browser
 
-1. Ensure you have the access to the manager server.
-   The manager's etcd configuration should say `config/api/allow-graphql-schema-introspection` is true.
-1. Run `backend.ai proxy` command of the client SDK.
-   Depending on your setup, adjust `--bind` and `--port` options.
+You may use GraphiQL to interact and inspect the Backend.AI Manager's GraphQL API.
+
+1. Ensure you have the access to the manager server.  
+   The manager's *etcd* configuration should say `config/api/allow-graphql-schema-introspection` is true.
+2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
    Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
-1. Copy `index.html` from https://gist.github.com/achimnol/dc9996aeffc7cf15e96478e635eb0699
-1. Replace `"<proxy-address>"` with the real address (host:port) of the proxy, which can be accessed from your browser as well.
-1. Run `python -m http.server` command in the directory where `index.html` is located.
-1. Open the page served by the HTTP server in the step 3 in your web browser.
+3. Copy `index.html` from https://gist.github.com/achimnol/dc9996aeffc7cf15e96478e635eb0699
+4. Replace `"<proxy-address>"` with the real address (host:port) of the proxy, which can be accessed from your browser as well.
+5. Run `python -m http.server` command in the directory where `index.html` is located.
+6. Open the page served by the HTTP server in the previous step in your web browser.  
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
 For more details about GraphiQL, check out https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql.
