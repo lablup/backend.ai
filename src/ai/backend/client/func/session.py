@@ -997,6 +997,39 @@ class ComputeSession(BaseFunction):
         async with rqst.fetch() as resp:
             return await resp.json()
 
+    @api_function
+    async def start_service(
+        self,
+        app: str,
+        *,
+        port: int | Undefined = undefined,
+        envs: dict[str, Any] | Undefined = undefined,
+        arguments: dict[str, Any] | Undefined = undefined,
+        login_session_token: str | Undefined = undefined,
+    ) -> Mapping[str, Any]:
+        """
+        Starts application from Backend.AI session and returns access credentials
+        to access AppProxy endpoint.
+        """
+        body: dict[str, Any] = {"app": app}
+        if not isinstance(port, Undefined):
+            body["port"] = port
+        if not isinstance(envs, Undefined):
+            body["envs"] = json.dumps(envs)
+        if not isinstance(arguments, Undefined):
+            body["arguments"] = json.dumps(arguments)
+        if not isinstance(login_session_token, Undefined):
+            body["login_session_token"] = login_session_token
+
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/start-service",
+        )
+        rqst.set_json(body)
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
     # only supported in AsyncAPISession
     def listen_events(self, scope: Literal["*", "session", "kernel"] = "*") -> SSEContextManager:
         """

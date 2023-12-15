@@ -118,15 +118,75 @@ Creating and destroying a compute session
 Accessing Container Applications
 --------------------------------
 
-TODO: Retrieving the app proxy address to a container application
+    Launchable apps may vary for sessions. From here we illustrate 
+    an example to create a ttyd (web-based terminal) app, 
+    which is available for all Backend.AI sessions.
+
+.. note::
+
+    This example is only applicable for the Backend.AI cluster with 
+    AppProxy v2 enabled and configured. AppProxy v2 only ships with 
+    enterprise version of Backend.AI.
+
+For Backend.AI Client 23.09.8 and onwards
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
+    import requests
+
+    from ai.backend.client.request import Request
     from ai.backend.client.session import Session
 
-    with Session() as api_session:
-        my_session = api_session.ComputeSession.get_or_create(...)
-        print(...)
+    app_name = "ttyd"
+
+    with Session() as session:
+        sess = session.ComputeSession.get_or_create(...)
+        service_info = sess.start_service(app_name, login_session_token="aaaa")
+        app_proxy_url = f"{service_info['wsproxy_addr']}/v2/proxy/{service_info['token']}/{sess.id}/add?app={app_name}"
+
+        resp = requests.get(app_proxy_url)
+        body = resp.json()
+        auth_url = body["url"]
+        print(auth_url)  # opening this link from browser will navigate user to the terminal session
+
+.. versionadded:: 23.09.8
+
+
+For Backend.AI Client before 23.09.8
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import asyncio
+
+    import aiohttp
+
+    from ai.backend.client.request import Request
+    from ai.backend.client.session import APISession
+
+    app_name = "ttyd"
+
+    async def main():
+        async with APISession() as session:
+            sess = session.ComputeSession.get_or_create(...)
+            rqst = APIRequest(
+                "POST",
+                f"/session/{sess.id}/start-service",
+            )
+            rqst.set_json({"app": app_name, "login_session_token": "aaaa"})
+            async with rqst.fetch() as resp:
+                body = await resp.json()
+                app_proxy_url = f"{body['wsproxy_addr']}/v2/proxy/{body['token']}/{sess.id}/add?app={app_name}"
+
+            async with aiohttp.ClientSession() as client:
+                async with client.get(app_proxy_url) as resp:
+                    body = await resp.json()
+                    auth_url = body["url"]
+                    print(auth_url)  # opening this link from browser will navigate user to the terminal session
+
+    if __name__ == "__main__":
+        asyncio.run(main())
 
 
 Code Execution via API
@@ -324,3 +384,49 @@ features such as ``stream_execute()`` which streams the execution results via we
       asyncio.run(main())
 
 .. versionadded:: 19.03
+
+
+Working with model service
+--------------------------
+
+Along with working AppProxy v2 deployments, model service 
+requires a resource group configured to accept ``inference`` workload. 
+
+Starting model service
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.session import Session
+
+    with Session() as session:
+        compute_sess = session.Service.create(
+            "python:3.6-ubuntu18.04",
+            "Llama2-70B",
+            1,
+            service_name="Llama2-service",
+            resources={"cuda.shares": 2, "cpu": 8, "mem": "64g"},
+            open_to_public=False,  # setting this to True will allow service endpoint to accept requests without API token
+        )
+
+
+Making request to model service endpoint
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from ai.backend.client.session import Session
+
+    with Session() as session:
+        compute_sess = session.Service.create(...)
+
+        service_info = compute_sess.info()
+        endpoint = service_info["url"]  # this value can be None if no successful inference service deployment has been made
+
+        token_info = compute_sess.generate_api_token("3600s")
+        token = token_info["token"]
+        headers = {"Authorization": f"BackendAI {token}"}  # providing token is not required for public model services
+        resp = requests.get(f"{endpoint}/v1/models", headers=headers)
+
+
+.. versionadded:: 23.09
