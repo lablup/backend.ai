@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.8rc2 (2023-12-14)
+
+### Fixes
+* Fix `modify_user` mutation not working ([#1787](https://github.com/lablup/backend.ai/issues/1787))
+
+
 ## 23.09.8rc1 (2023-12-13)
 
 ### Features
