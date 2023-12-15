@@ -5,7 +5,6 @@ High-level Function Reference
    :maxdepth: 1
    :caption: Table of contents
 
-   examples
    admin
    agent
    auth
