@@ -77,7 +77,7 @@ Listing currently running compute sessions
 .. code-block:: python
 
     import functools
-    from ai.backend.client import Session
+    from ai.backend.client.session import Session
 
     with Session() as api_session:
         fetch_func = functools.partial(
@@ -145,23 +145,25 @@ This is the minimal code to execute a code snippet with this client SDK.
         code = 'print("hello world")'
         mode = "query"
         run_id = None
-        while True:
-            result = my_session.execute(run_id, code, mode=mode)
-            run_id = result["runId"]  # keeps track of this particular run loop
-            for rec in result.get("console", []):
-                if rec[0] == "stdout":
-                    print(rec[1], end="", file=sys.stdout)
-                elif rec[0] == "stderr":
-                    print(rec[1], end="", file=sys.stderr)
+        try:
+            while True:
+                result = my_session.execute(run_id, code, mode=mode)
+                run_id = result["runId"]  # keeps track of this particular run loop
+                for rec in result.get("console", []):
+                    if rec[0] == "stdout":
+                        print(rec[1], end="", file=sys.stdout)
+                    elif rec[0] == "stderr":
+                        print(rec[1], end="", file=sys.stderr)
+                    else:
+                        handle_media(rec)
+                sys.stdout.flush()
+                if result["status"] == "finished":
+                    break
                 else:
-                    handle_media(rec)
-            sys.stdout.flush()
-            if result["status"] == "finished":
-                break
-            else:
-                mode = "continued"
-                code = ""
-        my_session.destroy()
+                    mode = "continued"
+                    code = ""
+        finally:
+            my_session.destroy()
 
 You need to take care of ``client_token`` because it determines whether to
 reuse kernel sessions or not.
@@ -182,33 +184,35 @@ You first need to upload the files after creating the session and construct a
     from ai.backend.client.session import Session
 
     with Session() as session:
-        kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
-        kern.upload(['mycode.py', 'setup.py'])
-        code = ''
-        mode = 'batch'
+        compute_sess = session.ComputeSession.get_or_create("python:3.6-ubuntu18.04")
+        compute_sess.upload(["mycode.py", "setup.py"])
+        code = ""
+        mode = "batch"
         run_id = None
         opts = {
-            'build': '*',  # calls "python setup.py install"
-            'exec': 'python mycode.py arg1 arg2',
+            "build": "*",  # calls "python setup.py install"
+            "exec": "python mycode.py arg1 arg2",
         }
-        while True:
-            result = kern.execute(run_id, code, mode=mode, opts=opts)
-            opts.clear()
-            run_id = result['runId']
-            for rec in result.get('console', []):
-                if rec[0] == 'stdout':
-                    print(rec[1], end='', file=sys.stdout)
-                elif rec[0] == 'stderr':
-                    print(rec[1], end='', file=sys.stderr)
+        try:
+            while True:
+                result = kern.execute(run_id, code, mode=mode, opts=opts)
+                opts.clear()
+                run_id = result["runId"]
+                for rec in result.get("console", []):
+                    if rec[0] == "stdout":
+                        print(rec[1], end="", file=sys.stdout)
+                    elif rec[0] == "stderr":
+                        print(rec[1], end="", file=sys.stderr)
+                    else:
+                        handle_media(rec)
+                sys.stdout.flush()
+                if result["status"] == "finished":
+                    break
                 else:
-                    handle_media(rec)
-            sys.stdout.flush()
-            if result['status'] == 'finished':
-                break
-            else:
-                mode = 'continued'
-                code = ''
-        kern.destroy()
+                    mode = "continued"
+                    code = ""
+        finally:
+            compute_sess.destroy()
 
 
 Handling user inputs
@@ -217,23 +221,23 @@ Handling user inputs
 Inside the while-loop for ``kern.execute()`` above,
 change the if-block for ``result['status']`` as follows:
 
-.. code:: python3
+.. code:: python
 
   ...
-  if result['status'] == 'finished':
+  if result["status"] == "finished":
       break
-  elif result['status'] == 'waiting-input':
-      mode = 'input'
-      if result['options'].get('is_password', False):
+  elif result["status"] == "waiting-input":
+      mode = "input"
+      if result["options"].get("is_password", False):
           code = getpass.getpass()
       else:
           code = input()
   else:
-      mode = 'continued'
-      code = ''
+      mode = "continued"
+      code = ""
   ...
 
-A common gotcha is to miss setting ``mode = 'input'``. Be careful!
+A common gotcha is to miss setting ``mode = "input"``. Be careful!
 
 
 Handling multi-media outputs
@@ -241,7 +245,7 @@ Handling multi-media outputs
 
 The ``handle_media()`` function used above examples would look like:
 
-.. code-block:: python3
+.. code-block:: python
 
   def handle_media(record):
       media_type = record[0]  # MIME-Type string
@@ -265,52 +269,53 @@ The async version has all sync-version interfaces as coroutines but comes with a
 features such as ``stream_execute()`` which streams the execution results via websockets and
 ``stream_pty()`` for interactive terminal streaming.
 
-.. code-block:: python3
+.. code-block:: python
 
   import asyncio
   import json
   import sys
   import aiohttp
-  from ai.backend.client import AsyncSession
+  from ai.backend.client.session import AsyncSession
 
   async def main():
-      async with AsyncSession() as session:
-          kern = await session.ComputeSession.get_or_create('python:3.6-ubuntu18.04',
-                                                    client_token='mysession')
+      async with AsyncSession() as api_session:
+          compute_sess = await api_session.ComputeSession.get_or_create(
+              "python:3.6-ubuntu18.04",
+              client_token="mysession",
+          )
           code = 'print("hello world")'
-          mode = 'query'
-          async with kern.stream_execute(code, mode=mode) as stream:
-              # no need for explicit run_id since WebSocket connection represents it!
-              async for result in stream:
-                  if result.type != aiohttp.WSMsgType.TEXT:
-                      continue
-                  result = json.loads(result.data)
-                  for rec in result.get('console', []):
-                      if rec[0] == 'stdout':
-                          print(rec[1], end='', file=sys.stdout)
-                      elif rec[0] == 'stderr':
-                          print(rec[1], end='', file=sys.stderr)
+          mode = "query"
+          try:
+              async with compute_sess.stream_execute(code, mode=mode) as stream:
+                  # no need for explicit run_id since WebSocket connection represents it!
+                  async for result in stream:
+                      if result.type != aiohttp.WSMsgType.TEXT:
+                          continue
+                      result = json.loads(result.data)
+                      for rec in result.get("console", []):
+                          if rec[0] == "stdout":
+                              print(rec[1], end="", file=sys.stdout)
+                          elif rec[0] == "stderr":
+                              print(rec[1], end="", file=sys.stderr)
+                          else:
+                              handle_media(rec)
+                      sys.stdout.flush()
+                      if result["status"] == "finished":
+                          break
+                      elif result["status"] == "waiting-input":
+                          mode = "input"
+                          if result["options"].get("is_password", False):
+                              code = getpass.getpass()
+                          else:
+                              code = input()
+                          await stream.send_text(code)
                       else:
-                          handle_media(rec)
-                  sys.stdout.flush()
-                  if result['status'] == 'finished':
-                      break
-                  elif result['status'] == 'waiting-input':
-                      mode = 'input'
-                      if result['options'].get('is_password', False):
-                          code = getpass.getpass()
-                      else:
-                          code = input()
-                      await stream.send_text(code)
-                  else:
-                      mode = 'continued'
-                      code = ''
-          await kern.destroy()
+                          mode = "continued"
+                          code = ""
+          finally:
+              await compute_sess.destroy()
 
-  loop = asyncio.get_event_loop()
-  try:
-      loop.run_until_complete(main())
-  finally:
-      loop.stop()
+  if __name__ == "__main__":
+      asyncio.run(main())
 
-.. versionadded:: 1.5
+.. versionadded:: 19.03
