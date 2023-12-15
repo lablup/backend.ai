@@ -29,12 +29,14 @@ $ pip install -U \
     -r requirements.txt
 ```
 
+
 ## Building API Reference JSON file
 ```console
 $ ./py -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
 ```
 This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
 Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
+
 
 ## Building HTML document
 
@@ -49,15 +51,16 @@ $ make html
 The compiled documentation is under `_build/html/index.html`.
 You may serve it for local inspection using `python -m http.server --directory _build/html`.
 
+
 ## Translation
 
-#### Generate/update pot (Portable Object Template) files
+### Generate/update pot (Portable Object Template) files
 
 ```console
 $ make gettext
 ```
 
-#### Build po (Portable Object) files using sphinx-intl
+### Build po (Portable Object) files using sphinx-intl
 
 ```console
 $ sphinx-intl update -p _build/locale/ -l ko
@@ -66,7 +69,7 @@ $ sphinx-intl update -p _build/locale/ -l ko
 The `.po` message files are under `locales/ko/LC_MESSAGES/`.
 Edit them by filling missing translations.
 
-#### Build HTML files with translated version
+### Build HTML files with translated version
 
 ```console
 $ sphinx-intl build
@@ -84,7 +87,7 @@ The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
 
 Building PDF requires following libraries to be present on your system.
 
-* TeX Live 
+* TeX Live
   - ko.TeX (texlive-lang-korean)
   - latexmk
 * ImageMagick
@@ -93,11 +96,12 @@ Building PDF requires following libraries to be present on your system.
 ### Installing dependencies on macOS
 1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
 2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
-3. Exceute following command to install missing dependencies.   
+3. Exceute following command to install missing dependencies.
 ```console
 sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
 ```
 4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
+
 
 ## Advanced Settings
 
@@ -126,12 +130,32 @@ Example:
 
 Please ask the docs maintainer for help.
 
-### Previewing built HTML documentation
-Simply create a nginx server which serves `_build/html` folder. For example (docker required): 
+
+## Preview
+
+### The HTML documentation
+
+Simply create a nginx server which serves `_build/html` folder. For example (docker required):
 ```bash
 docker run --rm -it -v $(pwd)/_build/html:/usr/share/nginx/html -p 8000:80 nginx
 ```
 Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
+
+### Interactive GraphQL browser
+
+1. Ensure you have the access to the manager server.
+   The manager's etcd configuration should say `config/api/allow-graphql-schema-introspection` is true.
+1. Run `backend.ai proxy` command of the client SDK.
+   Depending on your setup, adjust `--bind` and `--port` options.
+   Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
+1. Copy `index.html` from https://gist.github.com/achimnol/dc9996aeffc7cf15e96478e635eb0699
+1. Replace `"<proxy-address>"` with the real address (host:port) of the proxy, which can be accessed from your browser as well.
+1. Run `python -m http.server` command in the directory where `index.html` is located.
+1. Open the page served by the HTTP server in the step 3 in your web browser.
+   Enjoy auto-completion and schema introspection of Backend.AI admin API!
+
+For more details about GraphiQL, check out https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql.
+
 
 ## References for newcomers
 
