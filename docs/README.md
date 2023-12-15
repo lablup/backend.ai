@@ -21,12 +21,7 @@ $ git clone https://github.com/lablup/backend.ai bai-dev
 $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
-$ pip install -U \
-    --find-links=https://dist.backend.ai/pypi/simple/grpcio \
-    --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
-    --find-links=https://dist.backend.ai/pypi/simple/hiredis \
-    --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
-    -r requirements.txt
+$ pip install -U -r requirements.txt
 ```
 
 
@@ -40,7 +35,8 @@ Generated OpenAPI JSON file will be located at under `manager/rest-reference/ope
 
 ## Building HTML document
 
-> 📌 NOTE: Please ensure that you are inside the `docs` directory and the virtualenv is activated.
+> [!NOTE]
+> Please ensure that you are inside the `docs` directory and the virtualenv is activated.
 
 ### Make the html version
 
@@ -133,10 +129,16 @@ Please ask the docs maintainer for help.
 
 ## Preview
 
+### The PR previews
+
+Our ReadTheDocs bot automatically builds the HTML preview for each commit of a PR that changes
+the contents of the `docs` directory.
+You may simply click the link in the PR comment written by the bot.
+
 ### The HTML documentation
 
 You may open `_build/html/index.html` from the local filesystem directly on your browser,
-but the REST API reference (as of 23.09) which uses a dedicated Javascript-based viewer won't work.
+but the REST API reference (as of 24.03) which uses a dedicated Javascript-based viewer won't work.
 
 To preview the full documentation including the REST API reference seamlessly, you need to run a local nginx server.
 
@@ -148,7 +150,8 @@ To preview the full documentation including the REST API reference seamlessly, y
 
 ### Interactive GraphQL browser
 
-You may use GraphiQL to interact and inspect the Backend.AI Manager's GraphQL API.
+You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
+to interact and inspect the Backend.AI Manager's GraphQL API.
 
 1. Ensure you have the access to the manager server.  
    The manager's *etcd* configuration should say `config/api/allow-graphql-schema-introspection` is true.
@@ -159,8 +162,6 @@ You may use GraphiQL to interact and inspect the Backend.AI Manager's GraphQL AP
 5. Run `python -m http.server` command in the directory where `index.html` is located.
 6. Open the page served by the HTTP server in the previous step in your web browser.  
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
-
-For more details about GraphiQL, check out https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql.
 
 
 ## References for newcomers
