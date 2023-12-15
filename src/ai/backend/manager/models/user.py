@@ -708,6 +708,8 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "sudo_session_enabled")
         set_if_set(props, data, "main_access_key")
+        if data.get("password") is None:
+            data.pop("password", None)
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
