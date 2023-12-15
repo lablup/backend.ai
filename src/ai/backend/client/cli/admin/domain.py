@@ -4,12 +4,11 @@ from typing import Sequence
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 
-from ...cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ...func.domain import _default_detail_fields, _default_list_fields
 from ...session import Session
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
