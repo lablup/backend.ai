@@ -263,7 +263,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     if raw_labels:
                         labels.update(raw_labels)
                     else:
-                        log.warn(
+                        log.warning(
                             "label not found on image {}:{}/{}",
                             image,
                             tag,
@@ -274,7 +274,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     if raw_labels:
                         labels.update(raw_labels)
                     else:
-                        log.warn(
+                        log.warning(
                             "label not found on image {}:{}/{}",
                             image,
                             tag,

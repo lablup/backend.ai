@@ -699,7 +699,7 @@ async def update_route(
                 db_sess, endpoint, [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY]
             )
         except aiohttp.ClientError as e:
-            log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+            log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
         return SuccessResponseModel()
 
 

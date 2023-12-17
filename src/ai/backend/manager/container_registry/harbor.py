@@ -170,7 +170,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                     )
                         finally:
                             if skip_reason:
-                                log.warn("Skipped image - {}:{} ({})", image, tag, skip_reason)
+                                log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
                     artifact_url = None
                     next_page_link = resp.links.get("next")
                     if next_page_link:
@@ -321,7 +321,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -332,7 +332,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -383,7 +383,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -394,7 +394,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
