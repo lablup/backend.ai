@@ -1382,12 +1382,10 @@ class AbstractAgent(
             except Exception as e:
                 return key, e
 
-        keys = []
         for key, plugin in self.computers.items():
-            keys.append(key)
             tasks.append(_get(key, plugin.instance))
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for key, result in zip(keys, results):
+        for key, result in results:
             match result:
                 case NotImplementedError():
                     continue
