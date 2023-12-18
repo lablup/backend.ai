@@ -25,17 +25,17 @@ from textual.widgets import (
     ListItem,
     ListView,
     Markdown,
-    RichLog,
     Static,
     TabbedContent,
     TabPane,
 )
 
 from ai.backend.install.utils import shorten_path
-from ai.backend.install.widgets import InputDialog
+from ai.backend.install.widgets import InputDialog, SetupLog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
+from .common import detect_os
 from .context import DevContext, PackageContext, current_log
 from .types import CliArgs, DistInfo, InstallInfo, InstallModes, PrerequisiteError
 
@@ -51,15 +51,16 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield RichLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log")
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
+        self.query_one("SetupLog.log").focus()
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
         ctx = DevContext(dist_info, self.app)
         try:
@@ -102,15 +103,16 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield RichLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log")
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
+        self.query_one("SetupLog.log").focus()
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
         ctx = PackageContext(dist_info, self.app)
         try:
@@ -162,7 +164,9 @@ class InstallReport(Static):
 
     def compose(self) -> ComposeResult:
         service = self.install_info.service_config
-        yield Markdown(textwrap.dedent(f"""
+        yield Markdown(
+            textwrap.dedent(
+                f"""
         Follow each tab's instructions.  Once all 5 service daemons are ready, you may connect to
         `http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}`.
 
@@ -171,10 +175,14 @@ class InstallReport(Static):
         - Password: `wJalrXUt`
 
         To see this guide again, run './backendai-install-<platform> install --show-guide'.
-        """))
+        """
+            )
+        )
         with TabbedContent():
             with TabPane("Web Server", id="webserver"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -189,9 +197,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Manager", id="manager"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -207,9 +219,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Agent", id="agent"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -223,9 +239,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Storage Proxy", id="storage-proxy"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -240,9 +260,13 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
             with TabPane("Local Proxy", id="local-proxy"):
-                yield Markdown(textwrap.dedent(f"""
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
@@ -257,7 +281,9 @@ class InstallReport(Static):
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
-                """))
+                """
+                    )
+                )
 
 
 class ModeMenu(Static):
@@ -303,7 +329,7 @@ class ModeMenu(Static):
         self._mode = mode
 
     def compose(self) -> ComposeResult:
-        yield Label("The installation mode:\n(arrow keys to change, enter to select)")
+        yield Label(id="heading")
         if self._dist_info_path is None:
             package_desc = "Install using release packages"
         else:
@@ -339,6 +365,15 @@ class ModeMenu(Static):
                     id=f"mode-{mode.value.lower()}",
                 )
         yield Label(id="mode-desc")
+
+    async def on_mount(self) -> None:
+        os_info = await detect_os()
+        text = Text()
+        text.append("Platform: ")
+        text.append_text(os_info.__rich__())  # type: ignore
+        text.append("\n\n")
+        text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
+        cast(Static, self.query_one("#heading")).update(text)
 
     def action_cursor_up(self) -> None:
         self.lv.action_cursor_up()
@@ -400,20 +435,22 @@ class InstallerApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        logo_text = textwrap.dedent(r"""
+        logo_text = textwrap.dedent(
+            r"""
         ____             _                  _      _    ___
         | __ )  __ _  ___| | _____ _ __   __| |    / \  |_ _|
         |  _ \ / _` |/ __| |/ / _ \ '_ \ / _` |   / _ \  | |
         | |_) | (_| | (__|   <  __/ | | | (_| |_ / ___ \ | |
         |____/ \__,_|\___|_|\_\___|_| |_|\__,_(_)_/   \_\___|
-        """)
+        """
+        )
         yield Static(logo_text, id="logo")
         if self._args.show_guide:
             try:
                 install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
                 yield InstallReport(install_info)
             except IOError as e:
-                log = RichLog()
+                log = SetupLog()
                 log.write("Failed to read INSTALL-INFO!")
                 log.write(e)
                 yield log
@@ -424,7 +461,7 @@ class InstallerApp(App):
                 yield PackageSetup(id="pkg-setup")
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         header: Header = cast(Header, self.query_one("Header"))
         header.tall = True
         self.title = "Backend.AI Installer"

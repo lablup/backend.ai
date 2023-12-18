@@ -4,8 +4,9 @@ from typing import Any, Iterable, Optional, Sequence
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 
+from ...cli.types import Undefined, undefined
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Group",)
@@ -59,11 +60,13 @@ class Group(BaseFunction):
         :param domain_name: Name of domain to get groups from.
         :param fields: Per-group query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($name: String!, $domain_name: String) {
                 groups_by_name(name: $name, domain_name: $domain_name) {$fields}
             }
-        """)
+        """
+        )
         resolved_fields = resolve_fields(fields, group_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -88,11 +91,13 @@ class Group(BaseFunction):
         """
         if fields is None:
             fields = _default_list_fields
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($domain_name: String) {
                 groups(domain_name: $domain_name) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
@@ -113,11 +118,13 @@ class Group(BaseFunction):
         """
         if fields is None:
             fields = _default_detail_fields
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($gid: UUID!) {
                 group(id: $gid) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
@@ -141,13 +148,15 @@ class Group(BaseFunction):
         Creates a new group with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: GroupInput!) {
                 create_group(name: $name, props: $input) {
                     ok msg group {$fields}
                 }
             }
-        """)
+        """
+        )
         resolved_fields = resolve_fields(
             fields,
             group_fields,
@@ -186,13 +195,15 @@ class Group(BaseFunction):
         Update existing group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "name", name)
         set_if_set(inputs, "description", description)
@@ -213,13 +224,15 @@ class Group(BaseFunction):
         """
         Inactivates the existing group. Does not actually delete it for safety.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($gid: UUID!) {
                 delete_group(gid: $gid) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_group"]
@@ -230,13 +243,15 @@ class Group(BaseFunction):
         """
         Delete the existing group. This action cannot be undone.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($gid: UUID!) {
                 purge_group(gid: $gid) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_group"]
@@ -250,13 +265,15 @@ class Group(BaseFunction):
         Add users to a group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
             "gid": gid,
             "input": {
@@ -276,13 +293,15 @@ class Group(BaseFunction):
         Remove users from a group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
             "gid": gid,
             "input": {

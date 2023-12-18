@@ -107,3 +107,8 @@ code, .code, .pre, tt {
 .rst-content .descclassname {
     font-weight: normal !important;
 }
+
+.highlight .err {
+    border: 0 none;
+    color: inherit;
+}

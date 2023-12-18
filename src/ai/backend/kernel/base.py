@@ -113,16 +113,14 @@ class BaseRunner(metaclass=ABCMeta):
         "SSH_AUTH_SOCK": os.environ.get("SSH_AUTH_SOCK", ""),
         "SSH_AGENT_PID": os.environ.get("SSH_AGENT_PID", ""),
     }
-    default_child_env_path = ":".join(
-        [
-            "/usr/local/sbin",
-            "/usr/local/bin",
-            "/usr/sbin",
-            "/usr/bin",
-            "/sbin",
-            "/bin",
-        ]
-    )
+    default_child_env_path = ":".join([
+        "/usr/local/sbin",
+        "/usr/local/bin",
+        "/usr/sbin",
+        "/usr/bin",
+        "/sbin",
+        "/bin",
+    ])
     default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
     kernel_mgr: Optional[AsyncKernelManager] = None
@@ -190,6 +188,10 @@ class BaseRunner(metaclass=ABCMeta):
         # build status tracker to skip the execute step
         self._build_success = None
 
+        # A reference to the health check task for model-serving kernels.
+        # It will be cancelled gracefully on kernel shutdown.
+        self._health_check_task = None
+
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
         loop = current_loop()
@@ -230,11 +232,9 @@ class BaseRunner(metaclass=ABCMeta):
 
         service_def_folder = Path("/etc/backend.ai/service-defs")
         if service_def_folder.is_dir():
-            self.service_parser = ServiceParser(
-                {
-                    "runtime_path": str(self.runtime_path),
-                }
-            )
+            self.service_parser = ServiceParser({
+                "runtime_path": str(self.runtime_path),
+            })
             await self.service_parser.parse(service_def_folder)
             log.debug("Loaded new-style service definitions.")
         else:
@@ -251,9 +251,9 @@ class BaseRunner(metaclass=ABCMeta):
             self._main_task.cancel()
             await self._run_task
             await self._main_task
-            if self._health_check_task:
-                self._health_check_task.cancel()
-                await self._health_check_task
+            if health_check_task := self._health_check_task:
+                health_check_task.cancel()
+                await health_check_task
             log.debug("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
@@ -352,11 +352,9 @@ class BaseRunner(metaclass=ABCMeta):
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"clean-finished", payload])
 
     async def clean_heuristic(self) -> int:
@@ -394,11 +392,9 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
             self._build_success = ret == 0
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"build-finished", payload])
 
     @abstractmethod
@@ -420,11 +416,9 @@ class BaseRunner(metaclass=ABCMeta):
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
     @abstractmethod
@@ -439,11 +433,9 @@ class BaseRunner(metaclass=ABCMeta):
             log.exception("unexpected error")
             ret = -1
         finally:
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
     async def query(self, code_text) -> int:
@@ -463,9 +455,10 @@ class BaseRunner(metaclass=ABCMeta):
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
                 # content['name'] will be 'stdout' or 'stderr'.
-                await self.outsock.send_multipart(
-                    [content["name"].encode("ascii"), content["text"].encode("utf-8")]
-                )
+                await self.outsock.send_multipart([
+                    content["name"].encode("ascii"),
+                    content["text"].encode("utf-8"),
+                ])
             elif msg["msg_type"] == "error":
                 tbs = "\n".join(content["traceback"])
                 await self.outsock.send_multipart([b"stderr", tbs.encode("utf-8")])
@@ -488,24 +481,18 @@ class BaseRunner(metaclass=ABCMeta):
                 # elif dtype in ['application/json', 'application/javascript']:
                 #     NotImplementedError
                 elif dtype in ["image/png", "image/jpeg"]:
-                    await self.outsock.send_multipart(
-                        [
-                            b"media",
-                            json.dumps(
-                                {
-                                    "type": dtype,
-                                    "data": f"data:{dtype};base64,{dval}",
-                                }
-                            ).encode("utf-8"),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"media",
+                        json.dumps({
+                            "type": dtype,
+                            "data": f"data:{dtype};base64,{dval}",
+                        }).encode("utf-8"),
+                    ])
                 elif dtype == "image/svg+xml":
-                    await self.outsock.send_multipart(
-                        [
-                            b"media",
-                            json.dumps({"type": dtype, "data": dval}).encode("utf8"),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"media",
+                        json.dumps({"type": dtype, "data": dval}).encode("utf8"),
+                    ])
 
         async def stdin_hook(msg):
             assert self.kernel_client is not None
@@ -515,9 +502,10 @@ class BaseRunner(metaclass=ABCMeta):
                 password = msg["content"]["password"]
                 if prompt:
                     await self.outsock.send_multipart([b"stdout", prompt.encode("utf-8")])
-                await self.outsock.send_multipart(
-                    [b"waiting-input", json.dumps({"is_password": password}).encode("utf-8")]
-                )
+                await self.outsock.send_multipart([
+                    b"waiting-input",
+                    json.dumps({"is_password": password}).encode("utf-8"),
+                ])
                 user_input = await self.user_input_queue.get()
                 self.kernel_client.input(user_input)
 
@@ -646,12 +634,10 @@ class BaseRunner(metaclass=ABCMeta):
         data = {
             "started_at": self.started_at,
         }
-        await self.outsock.send_multipart(
-            [
-                b"status",
-                msgpack.packb(data, use_bin_type=True),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"status",
+            msgpack.packb(data, use_bin_type=True),
+        ])
 
     @abstractmethod
     async def start_service(self, service_info):
@@ -683,26 +669,22 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             if not started:
                 result = {"status": "failed", "error": "service failed to start"}
-            await self.outsock.send_multipart(
-                [
-                    b"model-service-result",
-                    json.dumps(result).encode("utf8"),
-                ]
-            )
+            await self.outsock.send_multipart([
+                b"model-service-result",
+                json.dumps(result).encode("utf8"),
+            ])
             if started:
                 if model_service_info.get("health_check"):
                     self._health_check_task = asyncio.create_task(
                         self.check_model_health(model_info["name"], model_service_info)
                     )
                 else:
-                    await self.outsock.send_multipart(
-                        [
-                            b"model-service-status",
-                            json.dumps(
-                                {"model_name": model_info["name"], "is_healthy": True}
-                            ).encode("utf8"),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"model-service-status",
+                        json.dumps({"model_name": model_info["name"], "is_healthy": True}).encode(
+                            "utf8"
+                        ),
+                    ])
 
     async def check_model_health(self, model_name, model_service_info):
         health_check_info = model_service_info.get("health_check")
@@ -732,35 +714,27 @@ class BaseRunner(metaclass=ABCMeta):
                 if new_is_healthy and not is_healthy:
                     is_healthy = True
                     retries = 0
-                    await self.outsock.send_multipart(
-                        [
-                            b"model-service-status",
-                            json.dumps({"model_name": model_name, "is_healthy": True}).encode(
-                                "utf8"
-                            ),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"model-service-status",
+                        json.dumps({"model_name": model_name, "is_healthy": True}).encode("utf8"),
+                    ])
                 elif not new_is_healthy:
                     if retries > health_check_info["max_retries"] and is_healthy:
                         is_healthy = False
-                        await self.outsock.send_multipart(
-                            [
-                                b"model-service-status",
-                                json.dumps({"model_name": model_name, "is_healthy": False}).encode(
-                                    "utf8"
-                                ),
-                            ]
-                        )
+                        await self.outsock.send_multipart([
+                            b"model-service-status",
+                            json.dumps({"model_name": model_name, "is_healthy": False}).encode(
+                                "utf8"
+                            ),
+                        ])
                     retries += 1
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
-        await self.outsock.send_multipart(
-            [
-                b"service-result",
-                json.dumps(result).encode("utf8"),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"service-result",
+            json.dumps(result).encode("utf8"),
+        ])
 
     async def _start_service(self, service_info, *, cwd: Optional[str] = None, do_not_wait=False):
         async with self._service_lock:
@@ -962,11 +936,9 @@ class BaseRunner(metaclass=ABCMeta):
                 ):
                     self._build_success = None
                     # skip exec step with "command not found" exit code
-                    payload = json.dumps(
-                        {
-                            "exitCode": 127,
-                        }
-                    ).encode("utf8")
+                    payload = json.dumps({
+                        "exitCode": 127,
+                    }).encode("utf8")
                     await self.outsock.send_multipart([b"finished", payload])
                     self.task_queue.task_done()
                     continue
@@ -995,12 +967,10 @@ class BaseRunner(metaclass=ABCMeta):
             else:
                 apps = await self.service_parser.get_apps()
             result["data"] = apps
-        await self.outsock.send_multipart(
-            [
-                b"apps-result",
-                json.dumps(result).encode("utf8"),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"apps-result",
+            json.dumps(result).encode("utf8"),
+        ])
 
     async def _monitor_processes(self):
         while True:

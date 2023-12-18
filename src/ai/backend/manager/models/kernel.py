@@ -757,9 +757,10 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                await pipe.mget(
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
-                )
+                await pipe.mget([
+                    f"session.{sess_id}.requests",
+                    f"session.{sess_id}.last_response_time",
+                ])
             return pipe
 
         stats = []
@@ -1004,7 +1005,8 @@ class ComputeContainer(graphene.ObjectType):
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[ComputeContainer]]:
         query = (
-            sa.select([kernels]).select_from(kernels)
+            sa.select([kernels])
+            .select_from(kernels)
             # TODO: use "owner session ID" when we implement multi-container session
             .where(kernels.c.session_id.in_(session_ids))
         )

@@ -68,16 +68,14 @@ ConsoleItemType = Literal[
     "log",
     "completion",
 ]
-outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset(
-    [
-        "stdout",
-        "stderr",
-        "media",
-        "html",
-        "log",
-        "completion",
-    ]
-)
+outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
+    "stdout",
+    "stderr",
+    "media",
+    "html",
+    "log",
+    "completion",
+])
 ResultType = Union[
     ConsoleItemType,
     Literal[
@@ -105,12 +103,10 @@ class ClientFeatures(StringSetFlag):
 
 
 # TODO: use Python 3.7 contextvars for per-client feature selection
-default_client_features = frozenset(
-    {
-        ClientFeatures.INPUT.value,
-        ClientFeatures.CONTINUATION.value,
-    }
-)
+default_client_features = frozenset({
+    ClientFeatures.INPUT.value,
+    ClientFeatures.CONTINUATION.value,
+})
 default_api_version = 4
 
 
@@ -560,30 +556,24 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
             clean_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"clean",
-                clean_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"clean",
+            clean_cmd.encode("utf8"),
+        ])
         build_cmd = opts.get("build", "")
         if build_cmd is None:
             build_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"build",
-                build_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"build",
+            build_cmd.encode("utf8"),
+        ])
         exec_cmd = opts.get("exec", "")
         if exec_cmd is None:
             exec_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"exec",
-                exec_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"exec",
+            exec_cmd.encode("utf8"),
+        ])
 
     async def feed_code(self, text: str):
         if self.input_sock.closed:
@@ -627,12 +617,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             "code": code_text,
         }
         payload.update(opts)
-        await self.input_sock.send_multipart(
-            [
-                b"complete",
-                json.dumps(payload).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"complete",
+            json.dumps(payload).encode("utf8"),
+        ])
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
@@ -643,12 +631,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_start_model_service(self, model_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"start-model-service",
-                json.dumps(model_info).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"start-model-service",
+            json.dumps(model_info).encode("utf8"),
+        ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
@@ -668,12 +654,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"start-service",
-                json.dumps(service_info).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"start-service",
+            json.dumps(service_info).encode("utf8"),
+        ])
         try:
             with timeout(10):
                 result = await self.service_queue.get()
@@ -687,20 +671,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_shutdown_service(self, service_name: str):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"shutdown-service",
-                json.dumps(service_name).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"shutdown-service",
+            json.dumps(service_name).encode("utf8"),
+        ])
 
     async def feed_service_apps(self):
-        await self.input_sock.send_multipart(
-            [
-                b"get-apps",
-                "".encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"get-apps",
+            "".encode("utf8"),
+        ])
         try:
             with timeout(10):
                 result = await self.service_apps_info_queue.get()

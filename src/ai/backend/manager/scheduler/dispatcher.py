@@ -94,6 +94,7 @@ from .predicates import (
     check_group_resource_limit,
     check_keypair_resource_limit,
     check_reserved_batch_session,
+    check_user_resource_limit,
 )
 from .types import (
     AbstractScheduler,
@@ -483,6 +484,10 @@ class SchedulerDispatcher(aobject):
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
+                                "user_resource_limit",
+                                check_user_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
                                 "user_group_resource_limit",
                                 check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
@@ -506,26 +511,20 @@ class SchedulerDispatcher(aobject):
             passed_predicates = []
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": repr(result),
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": repr(result),
+                    })
                     continue
                 if result.passed:
-                    passed_predicates.append(
-                        {
-                            "name": predicate_name,
-                        }
-                    )
+                    passed_predicates.append({
+                        "name": predicate_name,
+                    })
                 else:
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": result.message or "",
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": result.message or "",
+                    })
 
             async def _check_predicates_hook() -> HookResult:
                 async with self.db.begin_readonly_session() as db_sess:
@@ -552,12 +551,10 @@ class SchedulerDispatcher(aobject):
                     # Append result only when plugin exists.
                     passed_predicates.append({"name": hook_name})
             else:
-                failed_predicates.append(
-                    {
-                        "name": hook_name,
-                        "msg": hook_result.reason or "",
-                    }
-                )
+                failed_predicates.append({
+                    "name": hook_name,
+                    "msg": hook_result.reason or "",
+                })
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
@@ -997,9 +994,10 @@ class SchedulerDispatcher(aobject):
                         # Check the resource availability of the manually designated agent
                         result = (
                             await agent_db_sess.execute(
-                                sa.select(
-                                    [AgentRow.available_slots, AgentRow.occupied_slots]
-                                ).where(AgentRow.id == agent.id)
+                                sa.select([
+                                    AgentRow.available_slots,
+                                    AgentRow.occupied_slots,
+                                ]).where(AgentRow.id == agent.id)
                             )
                         ).fecthall()[0]
 
@@ -1497,12 +1495,10 @@ class SchedulerDispatcher(aobject):
             async with self.db.begin_session() as db_sess:
                 query = (
                     sa.update(EndpointRow)
-                    .values(
-                        {
-                            "destroyed_at": sa.func.now(),
-                            "lifecycle_stage": EndpointLifecycle.DESTROYED,
-                        }
-                    )
+                    .values({
+                        "destroyed_at": sa.func.now(),
+                        "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                    })
                     .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
                 )
                 await db_sess.execute(query)

@@ -245,7 +245,12 @@
       "SessionName": "__NOT_TRANSLATED__",
       "ResetFormConfirm": "__NOT_TRANSLATED__",
       "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Ressourcenzuweisung pro Container",
+      "NumberOfContainer": "Nummer des Behälters",
+      "EnterEnvironmentVariable": "Variablenname eingeben",
+      "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+      "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",

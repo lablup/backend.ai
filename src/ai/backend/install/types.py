@@ -94,9 +94,12 @@ class InstallInfo(BaseModel):
 class OSInfo(RichCast):
     platform: Platform
     distro: str
+    distro_variants: set[str]
 
     def __rich__(self) -> ConsoleRenderable:
-        return Text.from_markup(f"[bold cyan]{self.platform} [not bold](variant: {self.distro})[/]")
+        variants = [self.distro, *sorted(self.distro_variants)]
+        variant = ", ".join(variants)
+        return Text.from_markup(f"[bold cyan]{self.platform} [not bold](variant: {variant})[/]")
 
 
 @dataclasses.dataclass()
@@ -137,6 +140,8 @@ class ServiceConfig:
     webserver_addr: ServerAddr
     webserver_ipc_base_path: str
     webserver_var_base_path: str
+    webui_menu_blocklist: list[str]
+    webui_menu_inactivelist: list[str]
     local_proxy_addr: ServerAddr
     agent_rpc_addr: ServerAddr
     agent_watcher_addr: ServerAddr

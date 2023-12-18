@@ -247,7 +247,12 @@
       "SessionName": "__NOT_TRANSLATED__",
       "ResetFormConfirm": "__NOT_TRANSLATED__",
       "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
+      "NumberOfContainer": "Количество контейнеров",
+      "EnterEnvironmentVariable": "Введите имя переменной",
+      "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
+      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
