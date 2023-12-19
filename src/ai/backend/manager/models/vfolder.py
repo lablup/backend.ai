@@ -1643,6 +1643,7 @@ class QuotaDetails(graphene.ObjectType):
     usage_bytes = BigInt(required=False)
     usage_count = BigInt(required=False)
     hard_limit_bytes = BigInt(required=False)
+    hard_limit_inodes = BigInt(required=False)
 
 
 class QuotaScope(graphene.ObjectType):
@@ -1685,7 +1686,8 @@ class QuotaScope(graphene.ObjectType):
                     # FIXME: limit scaning this only for fast scan capable volumes
                     usage_bytes=usage_bytes,
                     hard_limit_bytes=quota_config["limit_bytes"] or None,
-                    usage_count=None,  # TODO: Implement
+                    usage_count=quota_config["used_inodes"] or None,  # TODO: Implement
+                    hard_limit_inodes=quota_config["limit_inodes"] or None,
                 )
         except aiohttp.ClientResponseError:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
@@ -1712,11 +1714,13 @@ class QuotaScope(graphene.ObjectType):
                 usage_bytes=None,
                 hard_limit_bytes=resource_policy_constraint,
                 usage_count=None,  # TODO: Implement
+                hard_limit_inodes=None,
             )
 
 
 class QuotaScopeInput(graphene.InputObjectType):
     hard_limit_bytes = BigInt(required=False)
+    hard_limit_inodes = BigInt(required=False)
 
 
 class SetQuotaScope(graphene.Mutation):
@@ -1745,7 +1749,7 @@ class SetQuotaScope(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-        if props.hard_limit_bytes is Undefined:
+        if props.hard_limit_bytes is Undefined and props.hard_limit_inodes is Undefined:
             # Do nothing but just return the quota scope object.
             return cls(
                 QuotaScope(
@@ -1753,12 +1757,20 @@ class SetQuotaScope(graphene.Mutation):
                     storage_host_name=storage_host_name,
                 )
             )
-        max_vfolder_size = props.hard_limit_bytes
+        max_vfolder_size = (
+            props.hard_limit_bytes if props.hard_limit_bytes is not Undefined else None
+        )
+        max_inode_count = (
+            props.hard_limit_inodes if props.hard_limit_inodes is not Undefined else None
+        )
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
         request_body = {
             "volume": volume_name,
             "qsid": str(qsid),
-            "options": {"limit_bytes": max_vfolder_size},
+            "options": {
+                "limit_bytes": max_vfolder_size,
+                "limit_inode_count": max_inode_count,
+            },
         }
         async with graph_ctx.storage_manager.request(
             proxy_name,

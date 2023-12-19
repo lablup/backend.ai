@@ -254,6 +254,8 @@ async def get_quota_scope(request: web.Request) -> web.Response:
             return web.json_response({
                 "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
                 "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+                "used_inodes": quota_usage.used_inodes,
+                "limit_inodes": quota_usage.limit_inodes,
             })
 
 

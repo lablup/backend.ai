@@ -62,13 +62,18 @@ class CephDirQuotaModel(BaseQuotaModel):
         if not qspath.exists():
             raise QuotaScopeNotFoundError
 
+        # TODO: Support inode quota
+        if config.limit_bytes is None:
+            return
+        limit_bytes = config.limit_bytes
+
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
             lambda: os.setxattr(  # type: ignore[attr-defined]
-                qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()
+                qspath, "ceph.quota.max_bytes", str(int(limit_bytes)).encode()
             ),
         )
 
