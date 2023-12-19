@@ -22,7 +22,7 @@ refer
    services:
       backendai-pg-active:
          <<: *base
-         image: postgres:13.2-alpine
+         image: postgres:15.1-alpine
          restart: unless-stopped
          command: >
             postgres
