@@ -89,6 +89,65 @@ would be:
 
    [license]
 
+   [webserver]
+
+   [logging]
+   # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+   # Set the global logging level.
+   level = "INFO"
+
+   # Multi-choice of: "console", "logstash", "file"
+   # For each choice, there must be a "logging.<driver>" section
+   # in this config file as exemplified below.
+   drivers = ["console", "file"]
+
+   [logging.console]
+   # If set true, use ANSI colors if the console is a terminal.
+   # If set false, always disable the colored output in console logs.
+   colored = true
+
+   # One of: "simple", "verbose"
+   format = "verbose"
+
+   [logging.file]
+   # The log file path and filename pattern.
+   # All messages are wrapped in single-line JSON objects.
+   # Rotated logs may have additional suffixes.
+   # For production, "/var/log/backend.ai" is recommended.
+   path = "./logs"
+   filename = "webserver.log"
+
+   # Set the maximum number of recent container coredumps in the coredump directory.
+   # Oldest coredumps are deleted if there is more than this number of coredumps.
+   backup-count = 10
+
+   # The log file size to begin rotation.
+   rotation-size = "10M"
+
+   [logging.logstash]
+   # The endpoint to publish logstash records.
+   endpoint = { host = "localhost", port = 9300 }
+
+   # One of: "zmq.push", "zmq.pub", "tcp", "udp"
+   protocol = "tcp"
+
+   # SSL configs when protocol = "tcp"
+   ssl-enabled = true
+   ssl-verify = true
+
+   # Specify additional package namespaces to include in the logs
+   # and their individual log levels.
+   # Note that the actual logging level applied is the conjunction of the global logging level and the
+   # logging levels specified here for each namespace.
+   [logging.pkg-ns]
+   "" = "WARNING"
+   "aiotools" = "INFO"
+   "aiohttp" = "INFO"
+   "ai.backend" = "INFO"
+
+   [debug]
+   enabled = false
+
    [plugin]
 
    [pipeline]

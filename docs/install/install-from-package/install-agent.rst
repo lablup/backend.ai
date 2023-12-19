@@ -87,7 +87,7 @@ would be:
    scratch-size = "1G"
 
    [watcher]
-   service-addr = { host = "bai-m1", port = 6009 }
+   service-addr = { host = "127.0.0.1"", port = 6009 }
    ssl-enabled = false
    target-service = "backendai-agent.service"
    soft-reset-available = false
