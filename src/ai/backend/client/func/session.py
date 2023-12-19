@@ -1012,13 +1012,13 @@ class ComputeSession(BaseFunction):
         to access AppProxy endpoint.
         """
         body: dict[str, Any] = {"app": app}
-        if not isinstance(port, Undefined):
+        if port is not undefined):
             body["port"] = port
-        if not isinstance(envs, Undefined):
+        if envs is not undefined:
             body["envs"] = json.dumps(envs)
-        if not isinstance(arguments, Undefined):
+        if arguments is not undefined:
             body["arguments"] = json.dumps(arguments)
-        if not isinstance(login_session_token, Undefined):
+        if login_session_token is not undefined:
             body["login_session_token"] = login_session_token
 
         prefix = get_naming(api_session.get().api_version, "path")
