@@ -1012,7 +1012,7 @@ class ComputeSession(BaseFunction):
         to access AppProxy endpoint.
         """
         body: dict[str, Any] = {"app": app}
-        if port is not undefined):
+        if port is not undefined:
             body["port"] = port
         if envs is not undefined:
             body["envs"] = json.dumps(envs)
