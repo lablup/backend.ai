@@ -407,8 +407,10 @@ Starting model service
             1,
             service_name="Llama2-service",
             resources={"cuda.shares": 2, "cpu": 8, "mem": "64g"},
-            open_to_public=False,  # setting this to True will allow service endpoint to accept requests without API token
+            open_to_public=False,
         )
+
+If you set ``open_to_public=True``, the endpoint accepts anonymous traffic without the authentication token (see below).
 
 
 Making request to model service endpoint
@@ -428,5 +430,8 @@ Making request to model service endpoint
         headers = {"Authorization": f"BackendAI {token}"}  # providing token is not required for public model services
         resp = requests.get(f"{endpoint}/v1/models", headers=headers)
 
+The token returned by the ``generate_api_token()`` method is a JSON web token (JWT), which conveys all required information to authenticate the inference request.
+Once generated, it cannot be revoked.  A token may have its own expiration date/time.
+The lifetime of a token is configured by the user who deploys the inference model, and currently there is no intrinsic minimum/maximum limits of the lifetime.
 
 .. versionadded:: 23.09
