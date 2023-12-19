@@ -118,18 +118,19 @@ Creating and destroying a compute session
 Accessing Container Applications
 --------------------------------
 
-    Launchable apps may vary for sessions. From here we illustrate 
-    an example to create a ttyd (web-based terminal) app, 
+    Launchable apps may vary for sessions. From here we illustrate
+    an example to create a ttyd (web-based terminal) app,
     which is available for all Backend.AI sessions.
 
 .. note::
 
-    This example is only applicable for the Backend.AI cluster with 
-    AppProxy v2 enabled and configured. AppProxy v2 only ships with 
+    This example is only applicable for the Backend.AI cluster with
+    AppProxy v2 enabled and configured. AppProxy v2 only ships with
     enterprise version of Backend.AI.
 
-For Backend.AI Client 23.09.8 and onwards
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``ComputeSession.start_service()`` API
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -140,11 +141,10 @@ For Backend.AI Client 23.09.8 and onwards
 
     app_name = "ttyd"
 
-    with Session() as session:
-        sess = session.ComputeSession.get_or_create(...)
-        service_info = sess.start_service(app_name, login_session_token="aaaa")
+    with Session() as api_session:
+        sess = api_session.ComputeSession.get_or_create(...)
+        service_info = sess.start_service(app_name, login_session_token="dummy")
         app_proxy_url = f"{service_info['wsproxy_addr']}/v2/proxy/{service_info['token']}/{sess.id}/add?app={app_name}"
-
         resp = requests.get(app_proxy_url)
         body = resp.json()
         auth_url = body["url"]
@@ -152,9 +152,11 @@ For Backend.AI Client 23.09.8 and onwards
 
 .. versionadded:: 23.09.8
 
+   :meth:`ai.backend.client.func.session.ComputeSession.start_service()`
 
-For Backend.AI Client before 23.09.8
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Set the value ``login_session_token`` to a dummy string like ``"dummy"`` as it is a trace of the legacy interface, which is no longer used.
+
+Alternatively, in versions before 23.09.8, you may use the raw :class:`ai.backend.client.Request` to call the server-side ``start_service`` API.
 
 .. code-block:: python
 
@@ -163,18 +165,18 @@ For Backend.AI Client before 23.09.8
     import aiohttp
 
     from ai.backend.client.request import Request
-    from ai.backend.client.session import APISession
+    from ai.backend.client.session import AsyncSession
 
     app_name = "ttyd"
 
     async def main():
-        async with APISession() as session:
-            sess = session.ComputeSession.get_or_create(...)
-            rqst = APIRequest(
+        async with AsyncSession() as api_session:
+            sess = api_session.ComputeSession.get_or_create(...)
+            rqst = Request(
                 "POST",
                 f"/session/{sess.id}/start-service",
             )
-            rqst.set_json({"app": app_name, "login_session_token": "aaaa"})
+            rqst.set_json({"app": app_name, "login_session_token": "dummy"})
             async with rqst.fetch() as resp:
                 body = await resp.json()
                 app_proxy_url = f"{body['wsproxy_addr']}/v2/proxy/{body['token']}/{sess.id}/add?app={app_name}"
@@ -389,8 +391,7 @@ features such as ``stream_execute()`` which streams the execution results via we
 Working with model service
 --------------------------
 
-Along with working AppProxy v2 deployments, model service 
-requires a resource group configured to accept ``inference`` workload. 
+Along with working AppProxy v2 deployments, model service requires a resource group configured to accept the inference workload.
 
 Starting model service
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -399,8 +400,8 @@ Starting model service
 
     from ai.backend.client.session import Session
 
-    with Session() as session:
-        compute_sess = session.Service.create(
+    with Session() as api_session:
+        compute_sess = api_session.Service.create(
             "python:3.6-ubuntu18.04",
             "Llama2-70B",
             1,
@@ -417,9 +418,8 @@ Making request to model service endpoint
 
     from ai.backend.client.session import Session
 
-    with Session() as session:
-        compute_sess = session.Service.create(...)
-
+    with Session() as api_session:
+        compute_sess = api_session.Service.create(...)
         service_info = compute_sess.info()
         endpoint = service_info["url"]  # this value can be None if no successful inference service deployment has been made
 
