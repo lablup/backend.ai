@@ -17,6 +17,7 @@ from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
+from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
@@ -24,7 +25,6 @@ from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
 from ...session import AsyncSession
-from ..params import CommaSeparatedListType, RangeExprOptionType
 from ..pretty import (
     format_info,
     print_done,

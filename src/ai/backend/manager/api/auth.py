@@ -612,11 +612,9 @@ def superadmin_required(handler):
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("echo"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("echo"): t.String,
+    })
 )
 async def test(request: web.Request, params: Any) -> web.Response:
     log.info("AUTH.TEST(ak:{})", request["keypair"]["access_key"])
@@ -628,11 +626,9 @@ async def test(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("group", default=None): t.Null | tx.UUID,
-        }
-    )
+    t.Dict({
+        t.Key("group", default=None): t.Null | tx.UUID,
+    })
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
     group_role = None
@@ -671,14 +667,12 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("type"): t.Enum("keypair", "jwt"),
-            t.Key("domain"): t.String,
-            t.Key("username"): t.String,
-            t.Key("password"): t.String,
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("type"): t.Enum("keypair", "jwt"),
+        t.Key("domain"): t.String,
+        t.Key("username"): t.String,
+        t.Key("password"): t.String,
+    }).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.Response:
     if params["type"] != "keypair":
@@ -739,26 +733,22 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     )
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
-    return web.json_response(
-        {
-            "data": {
-                "access_key": keypair["access_key"],
-                "secret_key": keypair["secret_key"],
-                "role": user["role"],
-                "status": user["status"],
-            },
-        }
-    )
+    return web.json_response({
+        "data": {
+            "access_key": keypair["access_key"],
+            "secret_key": keypair["secret_key"],
+            "role": user["role"],
+            "status": user["status"],
+        },
+    })
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("domain"): t.String,
-            t.Key("email"): t.String,
-            t.Key("password"): t.String,
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("domain"): t.String,
+        t.Key("email"): t.String,
+        t.Key("password"): t.String,
+    }).allow_extra("*")
 )
 async def signup(request: web.Request, params: Any) -> web.Response:
     log_fmt = "AUTH.SIGNUP(d:{}, email:{}, passwd:****)"
@@ -887,12 +877,10 @@ async def signup(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["email", "username"]): t.String,
-            t.Key("password"): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["email", "username"]): t.String,
+        t.Key("password"): t.String,
+    })
 )
 async def signout(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
@@ -921,12 +909,10 @@ async def signout(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("email"): t.String,
-            t.Key("full_name"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("email"): t.String,
+        t.Key("full_name"): t.String,
+    })
 )
 async def update_full_name(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -960,13 +946,11 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("old_password"): t.String,
-            t.Key("new_password"): t.String,
-            t.Key("new_password2"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("old_password"): t.String,
+        t.Key("new_password"): t.String,
+        t.Key("new_password2"): t.String,
+    })
 )
 async def update_password(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1010,14 +994,12 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("domain"): t.String,
-            t.Key("username"): t.String,
-            t.Key("current_password"): t.String,
-            t.Key("new_password"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("domain"): t.String,
+        t.Key("username"): t.String,
+        t.Key("current_password"): t.String,
+        t.Key("new_password"): t.String,
+    })
 )
 async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
     """
@@ -1115,12 +1097,10 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("pubkey"): t.String,
-            t.Key("privkey"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("pubkey"): t.String,
+        t.Key("privkey"): t.String,
+    })
 )
 async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]

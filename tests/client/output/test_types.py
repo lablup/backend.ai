@@ -37,12 +37,10 @@ def test_fieldspec_init():
 
     f = FieldSpec(
         "key_foo",
-        subfields=FieldSet(
-            [
-                FieldSpec("bar"),
-                FieldSpec("baz", alt_name="bbb"),
-            ]
-        ),
+        subfields=FieldSet([
+            FieldSpec("bar"),
+            FieldSpec("baz", alt_name="bbb"),
+        ]),
     )
     assert f.field_ref == "key_foo { bar baz baz }"
     assert f.field_name == "key_foo"
@@ -52,18 +50,14 @@ def test_fieldspec_init():
 
     f = FieldSpec(
         "key_foo",
-        subfields=FieldSet(
-            [
-                FieldSpec(
-                    "bar",
-                    subfields=FieldSet(
-                        [
-                            FieldSpec("kaz"),
-                        ]
-                    ),
-                ),
-            ]
-        ),
+        subfields=FieldSet([
+            FieldSpec(
+                "bar",
+                subfields=FieldSet([
+                    FieldSpec("kaz"),
+                ]),
+            ),
+        ]),
     )
     assert f.field_ref == "key_foo { bar { kaz } bar { kaz } }"
     assert f.field_name == "key_foo"

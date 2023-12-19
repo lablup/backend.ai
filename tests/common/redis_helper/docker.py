@@ -294,9 +294,9 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 )
 
             for container in inspect_output:
-                cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
-                    container["Id"]
-                )
+                cid_mapping[
+                    container["Config"]["Labels"]["com.docker.compose.service"]
+                ] = container["Id"]
                 print(f"--- logs of {container['Id']} ---")
                 try:
                     p = await simple_run_cmd(["docker", "logs", container["Id"]])

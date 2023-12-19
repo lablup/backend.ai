@@ -2,12 +2,11 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 
-from ...cli.params import OptionalType
 from ...output.fields import keypair_fields
 from ...session import Session
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..types import CLIContext
 from . import admin
@@ -58,7 +57,12 @@ def info(ctx: CLIContext) -> None:
     default=None,
     help="Show keypairs of this given user. [default: show all]",
 )
-@click.option("--is-active", type=bool, default=None, help="Filter keypairs by activation.")
+@click.option(
+    "--is-active",
+    type=OptionalType(BoolExprType),
+    default=None,
+    help="Filter keypairs by activation.",
+)
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
@@ -186,13 +190,13 @@ def add(
 )
 @click.option(
     "--is-admin",
-    type=OptionalType(bool),
+    type=OptionalType(BoolExprType),
     default=undefined,
     help="Set admin privilege.",
 )
 @click.option(
     "--is-active",
-    type=OptionalType(bool),
+    type=OptionalType(BoolExprType),
     default=undefined,
     help="Set key pair active or not.",
 )

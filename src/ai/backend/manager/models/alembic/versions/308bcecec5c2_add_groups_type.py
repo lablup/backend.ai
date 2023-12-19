@@ -5,6 +5,7 @@ Revises: 8c74e7df26f8
 Create Date: 2023-11-30 14:18:59.565099
 
 """
+
 import enum
 from uuid import uuid4
 
@@ -125,15 +126,13 @@ def upgrade():
 
     model_store_gid = uuid4()
     conn.execute(
-        sa.insert(groups).values(
-            {
-                "id": model_store_gid,
-                "name": "model-store",
-                "domain_name": "default",
-                "resource_policy": "default",
-                "type": ProjectType.MODEL_STORE,
-            }
-        )
+        sa.insert(groups).values({
+            "id": model_store_gid,
+            "name": "model-store",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "type": ProjectType.MODEL_STORE,
+        })
     )
 
     uids = conn.execute(sa.select([users.c.uuid]).where(users.c.domain_name == "default")).all()
