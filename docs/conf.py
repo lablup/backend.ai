@@ -17,8 +17,6 @@ import os
 import sys
 from pathlib import Path
 
-import sphinx_rtd_theme
-
 root_path = Path(__file__).parent.parent
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
@@ -63,6 +61,7 @@ master_doc = "index"
 
 # General information about the project.
 from datetime import date
+
 project = "Backend.AI Documentation"
 copyright = f"2015-{date.today().year}, Lablup Inc."
 author = "Lablup Inc."
@@ -128,10 +127,10 @@ todo_include_todos = False
 numfig = True
 
 intersphinx_mapping = {
-    "python": ("http://docs.python.org/3", None),
-    "multidict": ("https://multidict.readthedocs.io/en/stable/", None),
-    "yarl": ("https://yarl.readthedocs.io/en/stable/", None),
-    "aiohttp": ("https://aiohttp.readthedocs.io/en/stable/", None),
+    "python": ("https://docs.python.org/3", None),
+    "multidict": ("https://multidict.aio-libs.org/en/stable/", None),
+    "yarl": ("https://yarl.aio-libs.org/en/stable/", None),
+    "aiohttp": ("https://docs.aiohttp.org/en/stable/", None),
 }
 
 
@@ -242,3 +241,4 @@ html_style = 'css/customTheme.css'
 html_js_files = [
     'js/custom.js',
 ]
+
