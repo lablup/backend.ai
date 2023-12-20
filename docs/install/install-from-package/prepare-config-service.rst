@@ -60,8 +60,8 @@ Execute the following command to start the service container. The project
 .. code-block:: console
 
    $ cd ${HOME}/halfstack/etcd-cluster-default
-   $ docker compose -p ${USER} up -d
+   $ docker compose up -d
    $ # -- To terminate the container:
-   $ # docker compose -p ${USER} down
+   $ # docker compose down
    $ # -- To see the container logs:
-   $ # docker compose -p ${USER} logs -f
+   $ # docker compose logs -f
