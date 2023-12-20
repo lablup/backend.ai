@@ -185,6 +185,9 @@ First, create a runner script at ``${HOME}/bin/run-webserver.sh``:
       export HOME="/home/bai"
    fi
 
+   # -- If you have installed using static python --
+   source .venv/bin/activate
+
    # -- If you have installed using pyenv --
    if [ -z "$PYENV_ROOT" ]; then
       export PYENV_ROOT="$HOME/.pyenv"
