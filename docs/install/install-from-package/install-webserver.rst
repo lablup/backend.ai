@@ -67,8 +67,7 @@ would be:
 
    [ui]
    brand = "Backend.AI"
-   default_environment = "cr.backend.ai/stable/python"
-   default_import_environment = "cr.backend.ai/filebrowser:21.02-ubuntu20.04"
+   menu_blocklist = "pipeline"
 
    [api]
    domain = "default"
