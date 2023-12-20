@@ -52,6 +52,7 @@ connectionMode = "SESSION"
 
 [menu]
 {% toml_strlist_field "blocklist" config["ui"]["menu_blocklist"] %}
+{% toml_strlist_field "inactivelist" config["ui"]["menu_inactivelist"] %}
 
 [plugin]
 {% toml_strlist_field "page" config["plugin"]["page"] %}
@@ -69,4 +70,3 @@ connectionMode = "SESSION"
 [pipeline]
 {% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}
 {% toml_field "frontendEndpoint" config["pipeline"]["frontend_endpoint"]|string %}
-{% toml_field "hideSideMenuButton" config["pipeline"]["hide_side_menu_button"] %}

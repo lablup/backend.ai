@@ -31,6 +31,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import SessionTypes
 
+from ...cli.types import Undefined, undefined
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
@@ -43,7 +44,6 @@ from ..request import (
     WebSocketResponse,
 )
 from ..session import api_session
-from ..types import Undefined, undefined
 from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -994,6 +994,39 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/abusing-report",
             params=params,
         )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def start_service(
+        self,
+        app: str,
+        *,
+        port: int | Undefined = undefined,
+        envs: dict[str, Any] | Undefined = undefined,
+        arguments: dict[str, Any] | Undefined = undefined,
+        login_session_token: str | Undefined = undefined,
+    ) -> Mapping[str, Any]:
+        """
+        Starts application from Backend.AI session and returns access credentials
+        to access AppProxy endpoint.
+        """
+        body: dict[str, Any] = {"app": app}
+        if port is not undefined:
+            body["port"] = port
+        if envs is not undefined:
+            body["envs"] = json.dumps(envs)
+        if arguments is not undefined:
+            body["arguments"] = json.dumps(arguments)
+        if login_session_token is not undefined:
+            body["login_session_token"] = login_session_token
+
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/start-service",
+        )
+        rqst.set_json(body)
         async with rqst.fetch() as resp:
             return await resp.json()
 
