@@ -124,7 +124,7 @@ to a directory of your choice.
 
 .. code-block:: console
 
-   $ curl "https://github.com/indygreg/python-build-standalone/releases/download/${PYTHON_RELEASE_DATE}/cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz > cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz"
+   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/${PYTHON_RELEASE_DATE}/cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz" > cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz
    $ tar -xf "cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz"
    $ mkdir -p "/home/${USERNAME}/.static-python/versions"
    $ mv python "/home/${USERNAME}/.static-python/versions/${PYTHON_VERSION}"
@@ -133,16 +133,25 @@ For example,
 
 .. code-block:: console
 
-   $ curl "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz > cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz"
+   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz
    $ tar -xf "cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz"
    $ mkdir -p "/home/bai/.static-python/versions"
    $ mv python "/home/bai/.static-python/versions/3.11.6"
 
-Update your PATH depending on your shell, restart your shell for the PATH changes to take effect.
+Then, you can create multiple virtual environments per service. To create a
+virtual environment for Backend.AI Manager and activate it, for example, you may run:
 
 .. code-block:: console
 
-   $ echo 'export PATH=".static-python/versions/${PYTHON_VERSION}/bin:$PATH"' >> ~/.bashrc
+   $ mkdir "${HOME}/manager"
+   $ cd "${HOME}/manager"
+   $ ~/.static-python/versions/3.11.6/bin/python3 -m venv .venv
+   $ source .venv/bin/activate
+   $ pip install -U pip setuptools wheel
+
+You also need to make ``pip`` available to the Python installation with the
+latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension
+packages can be compiled and installed on your system.
 
 
 
