@@ -1686,7 +1686,7 @@ class QuotaScope(graphene.ObjectType):
                     # FIXME: limit scaning this only for fast scan capable volumes
                     usage_bytes=usage_bytes,
                     hard_limit_bytes=quota_config["limit_bytes"] or None,
-                    usage_count=quota_config["used_inodes"] or None,  # TODO: Implement
+                    usage_count=quota_config["used_inodes"] or None,
                     hard_limit_inodes=quota_config["limit_inodes"] or None,
                 )
         except aiohttp.ClientResponseError:
