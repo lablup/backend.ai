@@ -94,6 +94,8 @@ class VASTQuotaModel(BaseQuotaModel):
                     qspath,
                     soft_limit=options.limit_bytes,
                     hard_limit=options.limit_bytes,
+                    soft_limit_inodes=options.limit_inode_count,
+                    hard_limit_inodes=options.limit_inode_count,
                 )
             except VASTInvalidParameterError:
                 raise InvalidQuotaConfig
@@ -127,6 +129,8 @@ class VASTQuotaModel(BaseQuotaModel):
         return QuotaUsage(
             used_bytes=quota.used_capacity,
             limit_bytes=quota.hard_limit,
+            used_inodes=quota.used_inodes,
+            limit_inodes=quota.soft_limit_inodes,
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
