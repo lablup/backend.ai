@@ -30,7 +30,7 @@ from typing import (
 import sqlalchemy as sa
 import trafaret as t
 import yaml
-from aiohttp import web
+from aiohttp import web, web_response
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -215,6 +215,18 @@ TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 
+def convert_response(response: TResponseModel | list | TAnyResponse) -> web.StreamResponse:
+    match response:
+        case BaseModel():
+            return web.json_response(response.model_dump())
+        case list():
+            return web.json_response(TypeAdapter(list[TResponseModel]).dump_python(response))
+        case web_response.StreamResponse():
+            return response
+        case _:
+            raise RuntimeError(f"Unsupported response type ({type(response)})")
+
+
 def check_api_params_v2(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
@@ -255,13 +267,7 @@ def check_api_params_v2(
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             response = await handler(request, checked_params, *args, **kwargs)
-            match response:
-                case BaseModel():
-                    return web.json_response(response.model_dump_json())
-                case list():
-                    return web.json_response(TypeAdapter(list[TResponseModel]).dump_json(response))
-                case _:
-                    raise RuntimeError("Unsupported response type")
+            return convert_response(response)
 
         set_handler_attr(wrapped, "request_scheme", checker)
 
