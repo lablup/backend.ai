@@ -430,7 +430,7 @@ def cp(filenames):
 
 @vfolder.command()
 @click.argument("name", type=str)
-@click.argument("path", type=str)
+@click.argument("paths", type=str, nargs=-1)
 @click.option(
     "-p",
     "--parents",
@@ -445,17 +445,20 @@ def cp(filenames):
     is_flag=True,
     help="Skip an error caused by file not found",
 )
-def mkdir(name, path, parents, exist_ok):
+def mkdir(name, paths, parents, exist_ok):
     """Create an empty directory in the virtual folder.
 
     \b
     NAME: Name of a virtual folder.
-    PATH: The name or path of directory. Parent directories are created automatically
-          if they do not exist.
+    PATH: Mutliple arguments of name or path of directory seperated by space. Parent directories are created automatically
+          if they do not exist. (e.g. "dir1" "dir2" "dir3")
+
+    Example: backend.ai vfolder mkdir my_vfolder "dir1" "dir2" "dir3"
     """
     with Session() as session:
         try:
-            session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
+            for path in paths:
+                session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
             print_done("Done.")
         except Exception as e:
             print_error(e)
