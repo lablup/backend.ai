@@ -457,8 +457,7 @@ def mkdir(name, paths, parents, exist_ok):
     """
     with Session() as session:
         try:
-            for path in paths:
-                session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
+            session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
             print_done("Done.")
         except Exception as e:
             print_error(e)

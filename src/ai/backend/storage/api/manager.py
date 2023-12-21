@@ -4,6 +4,7 @@ Manager-facing API
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -755,7 +756,7 @@ async def mkdir(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        relpath: PurePosixPath
+        relpaths: List[PurePosixPath]
         parents: bool
         exist_ok: bool
 
@@ -767,7 +768,7 @@ async def mkdir(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("relpaths"): t.List(tx.PurePath(relative_only=True)),
                     t.Key("parents", default=True): t.ToBool,
                     t.Key("exist_ok", default=False): t.ToBool,
                 },
@@ -776,14 +777,18 @@ async def mkdir(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "mkdir", params)
         ctx: RootContext = request.app["ctx"]
+        relpaths = params["relpaths"]
+        vfid = params["vfid"]
+        parents = params["parents"]
+        exist_ok = params["exist_ok"]
+
         async with ctx.get_volume(params["volume"]) as volume:
-            with handle_fs_errors(volume, params["vfid"]):
-                await volume.mkdir(
-                    params["vfid"],
-                    params["relpath"],
-                    parents=params["parents"],
-                    exist_ok=params["exist_ok"],
-                )
+            with handle_fs_errors(volume, vfid):
+                mkdir_tasks = [
+                    volume.mkdir(vfid, relpath, parents=parents, exist_ok=exist_ok)
+                    for relpath in relpaths
+                ]
+                await asyncio.gather(*mkdir_tasks)
         return web.Response(status=204)
 
 

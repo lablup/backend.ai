@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -475,7 +475,7 @@ class VFolder(BaseFunction):
             if path.is_file():
                 file_list.append(path)
             else:
-                await self._mkdir(path.relative_to(base_path))
+                await self._mkdir([path.relative_to(base_path)])
                 dir_list.append(path)
         await self._upload_files(file_list, basedir, dst_dir, chunk_size, address_map)
         for dir in dir_list:
@@ -506,13 +506,13 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: Union[str, Path],
+        paths: List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
         rqst = Request("POST", "/folders/{}/mkdir".format(self.name))
         rqst.set_json({
-            "path": path,
+            "paths": paths,
             "parents": parents,
             "exist_ok": exist_ok,
         })
@@ -522,11 +522,11 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        path: Union[str, Path],
+        paths: List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
-        return await self._mkdir(path, parents, exist_ok)
+        return await self._mkdir(paths, parents, exist_ok)
 
     @api_function
     async def rename_file(self, target_path: str, new_name: str):
