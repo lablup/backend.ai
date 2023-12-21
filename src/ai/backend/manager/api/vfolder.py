@@ -1228,7 +1228,7 @@ async def update_vfolder_options(
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict({
-        t.Key("paths"): t.List(str),
+        t.Key("paths"): t.List(t.String),
         t.Key("parents", default=True): t.ToBool,
         t.Key("exist_ok", default=False): t.ToBool,
     })
