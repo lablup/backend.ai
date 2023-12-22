@@ -1,4 +1,5 @@
 spectaql:
+  targetDir: ./src/ai/backend/web/graphql
   logoFile: ./src/ai/backend/web/static/manifest/backend.ai-text.svg
   faviconFile: ./src/ai/backend/web/static/manifest/favicon.ico
 
