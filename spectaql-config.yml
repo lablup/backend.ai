@@ -1,0 +1,30 @@
+spectaql:
+  logoFile: ./src/ai/backend/web/static/manifest/backend.ai-text.svg
+  faviconFile: ./src/ai/backend/web/static/manifest/favicon.ico
+
+introspection:
+  removeTrailingPeriodFromDescriptions: false
+  schemaFile: ./src/ai/backend/manager/api/schema.graphql
+  queryNameStrategy: capitalizeFirst
+  fieldExpansionDepth: 2
+
+  spectaqlDirective:
+    enable: true
+
+extensions:
+  graphqlScalarExamples: true
+
+info:
+  title: GraphQL API Reference
+  description: Welcome to the party!
+  contact:
+    name: API Support
+    url: https://www.lablup.com/contact
+    email: contact@lablup.com
+  license:
+    name: LGPL-3.0
+    url: https://github.com/lablup/backend.ai?tab=LGPL-3.0-1-ov-file#readme
+
+servers:
+  - url: https://manager.backendai.local/admin/gql
+
