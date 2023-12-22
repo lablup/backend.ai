@@ -1228,7 +1228,7 @@ async def update_vfolder_options(
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict({
-        t.Key("paths"): t.List(t.String),
+        t.Key("path"): t.String | t.List(t.String),
         t.Key("parents", default=True): t.ToBool,
         t.Key("exist_ok", default=False): t.ToBool,
     })
@@ -1243,7 +1243,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         request["user"]["email"],
         access_key,
         folder_name,
-        params["paths"],
+        params["path"],
     )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
     async with root_ctx.storage_manager.request(
@@ -1253,7 +1253,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         json={
             "volume": volume_name,
             "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
-            "relpaths": params["paths"],
+            "relpath": params["path"],
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
         },

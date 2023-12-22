@@ -451,7 +451,7 @@ def mkdir(name, paths, parents, exist_ok):
     \b
     NAME: Name of a virtual folder.
     PATH: Mutliple arguments of name or path of directory seperated by space. Parent directories are created automatically
-          if they do not exist. (e.g. "dir1" "dir2" "dir3")
+          if they do not exist.
 
     Example: backend.ai vfolder mkdir my_vfolder "dir1" "dir2" "dir3"
     """

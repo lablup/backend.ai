@@ -506,13 +506,13 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        paths: List[str | Path],
+        path: str | Path | List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
         rqst = Request("POST", "/folders/{}/mkdir".format(self.name))
         rqst.set_json({
-            "paths": paths,
+            "path": path,
             "parents": parents,
             "exist_ok": exist_ok,
         })
@@ -522,11 +522,11 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        paths: List[str | Path],
+        path: str | Path | List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
-        return await self._mkdir(paths, parents, exist_ok)
+        return await self._mkdir(path, parents, exist_ok)
 
     @api_function
     async def rename_file(self, target_path: str, new_name: str):
