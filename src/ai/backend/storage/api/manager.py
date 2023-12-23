@@ -790,7 +790,20 @@ async def mkdir(request: web.Request) -> web.Response:
                     volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok)
                     for rpath in relpaths
                 ]
-                await asyncio.gather(*mkdir_tasks)
+                result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
+
+                # if result group is all false throw error.
+                if all([isinstance(res, FileExistsError) for res in result_group]):
+                    raise FileExistsError("None of directories created because they already exist")
+
+                for result_or_exception in result_group:
+                    if isinstance(result_or_exception, BaseException):
+                        log.error(
+                            "%s",
+                            repr(result_or_exception),
+                            exc_info=result_or_exception,
+                        )
+
         return web.Response(status=204)
 
 
