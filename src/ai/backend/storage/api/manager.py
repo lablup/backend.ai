@@ -5,6 +5,7 @@ Manager-facing API
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import logging
 import os
@@ -783,26 +784,48 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok = params["exist_ok"]
         relpath = params["relpath"]
         relpaths = relpath if isinstance(relpath, list) else [relpath]
+        error_file_list: List[str] = []
+        success_file_list: List[str] = []
 
         async with ctx.get_volume(params["volume"]) as volume:
-            with handle_fs_errors(volume, vfid):
-                mkdir_tasks = [
-                    volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok)
-                    for rpath in relpaths
-                ]
-                result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
+            mkdir_tasks = [
+                volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok) for rpath in relpaths
+            ]
+            result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
 
-                # if result group is all false throw error.
-                if all([isinstance(res, FileExistsError) for res in result_group]):
-                    raise FileExistsError("None of directories created because they already exist")
+            # if result group is all false throw error.
+            if all([isinstance(res, FileExistsError) for res in result_group]):
+                raise web.HTTPBadRequest(
+                    body=json.dumps(
+                        {
+                            "msg": "FileExistsError None of directories created because they already exist",
+                            "errno": errno.EEXIST,
+                        },
+                    ),
+                    content_type="application/json",
+                )
 
-                for result_or_exception in result_group:
+            if any([isinstance(res, BaseException) for res in result_group]):
+                for relpath, result_or_exception in zip(relpaths, result_group):
                     if isinstance(result_or_exception, BaseException):
                         log.error(
-                            "%s",
+                            "{}",
                             repr(result_or_exception),
                             exc_info=result_or_exception,
                         )
+                        error_file_list.append(f"[Errno {errno.EEXIST}] File exists: {relpath}")
+                    else:
+                        success_file_list.append(str(relpath))
+
+                raise web.HTTPBadRequest(
+                    body=json.dumps(
+                        {
+                            "error_file_list": error_file_list,
+                            "success_file_list": success_file_list,
+                        },
+                    ),
+                    content_type="application/json",
+                )
 
         return web.Response(status=204)
 
