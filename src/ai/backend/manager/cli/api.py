@@ -15,7 +15,7 @@ import click
 import graphene
 
 from ai.backend.manager import __version__
-from ai.backend.manager.openapi import get_path_parameters, parse_traferet_definition
+from ai.backend.manager.openapi import get_path_parameters, parse_trafaret_definition
 from ai.backend.manager.server import global_subapp_pkgs
 
 from ..models.gql import Mutations, Queries
@@ -118,7 +118,7 @@ async def generate_openapi(output_path: Path) -> None:
                         description.append(f"* {item}")
                     description.append("")
                 if request_scheme := handler_attrs.get("request_scheme"):
-                    parsed_definition = parse_traferet_definition(request_scheme)
+                    parsed_definition = parse_trafaret_definition(request_scheme)
                     if method == "GET" or method == "DELETE":
                         parameters.extend([{**d, "in": "query"} for d in parsed_definition])
                     else:

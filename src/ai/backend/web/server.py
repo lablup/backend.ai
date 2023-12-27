@@ -108,23 +108,19 @@ async def graphql_docs_handler(request: web.Request) -> web.StreamResponse:
         file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError):
         return web.HTTPNotFound(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-not-found",
-                    "title": "Not Found",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }),
             content_type="application/problem+json",
         )
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     return web.HTTPNotFound(
-        text=json.dumps(
-            {
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }
-        ),
+        text=json.dumps({
+            "type": "https://api.backend.ai/probs/generic-not-found",
+            "title": "Not Found",
+        }),
         content_type="application/problem+json",
     )
 
