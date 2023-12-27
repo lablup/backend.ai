@@ -5,6 +5,7 @@ Revises: 02950808ca3d
 Create Date: 2019-06-17 15:57:39.442741
 
 """
+
 import textwrap
 
 import sqlalchemy as sa
@@ -37,9 +38,11 @@ def upgrade():
     # ### end Alembic commandk ###
 
     print("\nSet group's total_resource_slots with empty dictionary.")
-    query = textwrap.dedent("""\
+    query = textwrap.dedent(
+        """\
         UPDATE groups SET total_resource_slots = '{}'::jsonb;
-    """)
+    """
+    )
     connection = op.get_bind()
     connection.execute(text(query))
 

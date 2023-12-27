@@ -81,23 +81,19 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError):
         return web.HTTPNotFound(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-not-found",
-                    "title": "Not Found",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }),
             content_type="application/problem+json",
         )
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     return web.HTTPNotFound(
-        text=json.dumps(
-            {
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }
-        ),
+        text=json.dumps({
+            "type": "https://api.backend.ai/probs/generic-not-found",
+            "title": "Not Found",
+        }),
         content_type="application/problem+json",
     )
 
@@ -142,12 +138,10 @@ async def config_ini_handler(request: web.Request) -> web.Response:
         scheme = request.scheme
     j2env: jinja2.Environment = request.app["j2env"]
     tpl = j2env.get_template("config_ini.toml.j2")
-    config_content = tpl.render(
-        {
-            "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-            "config": config,
-        }
-    )
+    config_content = tpl.render({
+        "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
+        "config": config,
+    })
     return web.Response(text=config_content, content_type="text/plain")
 
 
@@ -160,12 +154,10 @@ async def config_toml_handler(request: web.Request) -> web.Response:
         scheme = request.scheme
     j2env: jinja2.Environment = request.app["j2env"]
     tpl = j2env.get_template("config.toml.j2")
-    config_content = tpl.render(
-        {
-            "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-            "config": config,
-        }
-    )
+    config_content = tpl.render({
+        "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
+        "config": config,
+    })
     return web.Response(text=config_content, content_type="text/plain")
 
 
@@ -181,12 +173,10 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError):
         return web.HTTPNotFound(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-not-found",
-                    "title": "Not Found",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }),
             content_type="application/problem+json",
         )
     if file_path.is_file():
@@ -209,12 +199,10 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         for param in param_names:
             if creds.get(param) is None:
                 return web.HTTPBadRequest(
-                    text=json.dumps(
-                        {
-                            "type": "https://api.backend.ai/probs/invalid-api-params",
-                            "title": f"You must provide the {param} field.",
-                        }
-                    ),
+                    text=json.dumps({
+                        "type": "https://api.backend.ai/probs/invalid-api-params",
+                        "title": f"You must provide the {param} field.",
+                    }),
                     content_type="application/problem+json",
                 )
         return None
@@ -253,13 +241,11 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                    "details": str(e),
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+                "details": str(e),
+            }),
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
@@ -290,13 +276,11 @@ async def login_check_handler(request: web.Request) -> web.Response:
             "role": stored_token["role"],
             "status": stored_token.get("status"),
         }
-    return web.json_response(
-        {
-            "authenticated": authenticated,
-            "data": public_data,
-            "session_id": session.identity,  # temporary wsproxy interop patch
-        }
-    )
+    return web.json_response({
+        "authenticated": authenticated,
+        "data": public_data,
+        "session_id": session.identity,  # temporary wsproxy interop patch
+    })
 
 
 async def login_handler(request: web.Request) -> web.Response:
@@ -306,12 +290,10 @@ async def login_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
     if session.get("authenticated", False):
         return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-bad-request",
-                    "title": "You have already logged in.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-bad-request",
+                "title": "You have already logged in.",
+            }),
             content_type="application/problem+json",
         )
     request_headers = extra_config_headers.check(request.headers)
@@ -328,22 +310,18 @@ async def login_handler(request: web.Request) -> web.Response:
         creds = {}
     if "username" not in creds or not creds["username"]:
         return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/invalid-api-params",
-                    "title": "You must provide the username field.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/invalid-api-params",
+                "title": "You must provide the username field.",
+            }),
             content_type="application/problem+json",
         )
     if "password" not in creds or not creds["password"]:
         return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/invalid-api-params",
-                    "title": "You must provide the password field.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/invalid-api-params",
+                "title": "You must provide the password field.",
+            }),
             content_type="application/problem+json",
         )
     result: MutableMapping[str, Any] = {
@@ -373,12 +351,10 @@ async def login_handler(request: web.Request) -> web.Response:
         Set login history per email (not in browser session).
         """
         key = f'login_history_{creds["username"]}'
-        value = json.dumps(
-            {
-                "last_login_attempt": last_login_attempt,
-                "login_fail_count": login_fail_count,
-            }
-        )
+        value = json.dumps({
+            "last_login_attempt": last_login_attempt,
+            "login_fail_count": login_fail_count,
+        })
         await request.app["redis"].set(key, value)
 
     # Block login if there are too many consecutive failed login attempts.
@@ -401,12 +377,10 @@ async def login_handler(request: web.Request) -> web.Response:
         )
         await _set_login_history(last_login_attempt, login_fail_count)
         return web.HTTPTooManyRequests(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/too-many-requests",
-                    "title": "Too many failed login attempts",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/too-many-requests",
+                "title": "Too many failed login attempts",
+            }),
             content_type="application/problem+json",
         )
 
@@ -455,13 +429,11 @@ async def login_handler(request: web.Request) -> web.Response:
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                    "details": str(e),
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+                "details": str(e),
+            }),
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
@@ -510,12 +482,10 @@ async def token_login_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
     if session.get("authenticated", False):
         return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-bad-request",
-                    "title": "You have already logged in.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-bad-request",
+                "title": "You have already logged in.",
+            }),
             content_type="application/problem+json",
         )
 
@@ -527,12 +497,10 @@ async def token_login_handler(request: web.Request) -> web.Response:
         auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
         return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/invalid-api-params",
-                    "title": "You must provide cookie-based authentication token",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/invalid-api-params",
+                "title": "You must provide cookie-based authentication token",
+            }),
             content_type="application/problem+json",
         )
 
@@ -586,13 +554,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
             result["data"] = public_return  # store public info from token
     except BackendClientError as e:
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                    "details": str(e),
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+                "details": str(e),
+            }),
             content_type="application/problem+json",
         )
     except BackendAPIError as e:

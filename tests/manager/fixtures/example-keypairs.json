@@ -34,7 +34,8 @@
             "domain_name": "default",
             "resource_policy": "default",
             "total_resource_slots": {},
-            "allowed_vfolder_hosts": {}
+            "allowed_vfolder_hosts": {},
+            "type": "general"
         }
     ],
     "scaling_groups": [

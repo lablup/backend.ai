@@ -14,9 +14,7 @@ from .base import privileged_mutation, set_if_set
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(
-    logging.getLogger("ai.backend.manager.models.etcd")
-)  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "ContainerRegistry",
@@ -166,6 +164,8 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        if "url" in input_config:
+            input_config[""] = input_config.pop("url")
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,

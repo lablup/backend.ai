@@ -61,11 +61,9 @@ class PollyInprocRunner(threading.Thread):
                 except Exception as e:
                     log.error(str(e))
 
-            self.output_queue.put(
-                [
-                    b"media",
-                    b'{"type":"%s","data":"%s"}' % (content_type, encoded_audio),
-                ]
-            )
+            self.output_queue.put([
+                b"media",
+                b'{"type":"%s","data":"%s"}' % (content_type, encoded_audio),
+            ])
             self.output_queue.put(self.sentinel)
             self.input_queue.task_done()

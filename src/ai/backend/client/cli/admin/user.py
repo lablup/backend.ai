@@ -6,13 +6,12 @@ from typing import Sequence
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
-from ..params import BoolExprType, CommaSeparatedListType, OptionalType
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
@@ -47,6 +46,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
+        user_fields["main_access_key"],
     ]
     with Session() as session:
         try:
@@ -148,6 +148,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
+        user_fields["main_access_key"],
     ]
     try:
         with Session() as session:
@@ -348,6 +349,12 @@ def add(
         "Note that this feature does not automatically install sudo for the session."
     ),
 )
+@click.option(
+    "--main-access-key",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set main access key which works as default.",
+)
 def update(
     ctx: CLIContext,
     email: str,
@@ -361,6 +368,7 @@ def update(
     allowed_ip: Sequence[str] | Undefined,
     description: str | Undefined,
     sudo_session_enabled: bool | Undefined,
+    main_access_key: str | Undefined,
 ):
     """
     Update an existing user.
@@ -382,6 +390,7 @@ def update(
                 allowed_client_ip=allowed_ip,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
+                main_access_key=main_access_key,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
