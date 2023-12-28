@@ -1257,9 +1257,18 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
         },
-    ):
-        pass
-    return web.Response(status=201)
+    ) as (_, storage_resp):
+        storage_reply = await storage_resp.json()
+        resp_code = storage_resp.status
+        resp = {
+            "failure_tasks": storage_reply["failure_tasks"],
+            "success_tasks": storage_reply["success_tasks"],
+        }
+
+    return web.json_response(
+        resp,
+        status=resp_code,
+    )
 
 
 @auth_required

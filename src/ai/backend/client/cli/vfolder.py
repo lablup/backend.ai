@@ -450,15 +450,18 @@ def mkdir(name, paths, parents, exist_ok):
 
     \b
     NAME: Name of a virtual folder.
-    PATH: Mutliple arguments of name or path of directory seperated by space. Parent directories are created automatically
+    PATH: Multiple arguments of name or path of directory seperated by space. Parent directories are created automatically
           if they do not exist.
 
     Example: backend.ai vfolder mkdir my_vfolder "dir1" "dir2" "dir3"
     """
     with Session() as session:
         try:
-            session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
+            result = json.loads(
+                session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
+            )
             print_done("Done.")
+            print(tabulate(result, headers="keys"))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

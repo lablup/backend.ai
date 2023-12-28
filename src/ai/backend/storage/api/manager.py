@@ -784,50 +784,48 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok = params["exist_ok"]
         relpath = params["relpath"]
         relpaths = relpath if isinstance(relpath, list) else [relpath]
-        error_file_list: List[str] = []
-        success_file_list: List[str] = []
+        failure_tasks: List[str] = []
+        success_tasks: List[str] = []
 
         async with ctx.get_volume(params["volume"]) as volume:
             mkdir_tasks = [
                 volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok) for rpath in relpaths
             ]
             result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
+            exception_flags = [isinstance(res, BaseException) for res in result_group]
 
             # if result group is all false throw error.
-            if all([isinstance(res, FileExistsError) for res in result_group]):
-                raise web.HTTPBadRequest(
+            if all(exception_flags):
+                raise web.HTTPInternalServerError(
                     body=json.dumps(
                         {
-                            "msg": "FileExistsError None of directories created because they already exist",
+                            "msg": "FileExistsError None of directories created!",
                             "errno": errno.EEXIST,
                         },
                     ),
                     content_type="application/json",
                 )
 
-            if any([isinstance(res, BaseException) for res in result_group]):
-                for relpath, result_or_exception in zip(relpaths, result_group):
-                    if isinstance(result_or_exception, BaseException):
-                        log.error(
-                            "{}",
-                            repr(result_or_exception),
-                            exc_info=result_or_exception,
-                        )
-                        error_file_list.append(f"[Errno {errno.EEXIST}] File exists: {relpath}")
-                    else:
-                        success_file_list.append(str(relpath))
+            for relpath, result_or_exception in zip(relpaths, result_group):
+                if isinstance(result_or_exception, BaseException):
+                    log.error(
+                        "{}",
+                        repr(result_or_exception),
+                        exc_info=result_or_exception,
+                    )
+                    failure_tasks.append(str(relpath))
+                else:
+                    success_tasks.append(str(relpath))
 
-                raise web.HTTPBadRequest(
-                    body=json.dumps(
-                        {
-                            "error_file_list": error_file_list,
-                            "success_file_list": success_file_list,
-                        },
-                    ),
-                    content_type="application/json",
-                )
+            status_code = 207 if any(exception_flags) else 200
 
-        return web.Response(status=204)
+        return web.json_response(
+            {
+                "failure_tasks": failure_tasks,
+                "success_tasks": success_tasks,
+            },
+            status=status_code,
+        )
 
 
 async def list_files(request: web.Request) -> web.Response:
