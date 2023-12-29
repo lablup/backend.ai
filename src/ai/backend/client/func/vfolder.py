@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -468,8 +468,8 @@ class VFolder(BaseFunction):
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
-        dir_list: list[Path] = []
-        file_list: list[Path] = []
+        dir_list: List[Path] = []
+        file_list: List[Path] = []
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         for path in source:
             if path.is_file():
@@ -506,7 +506,7 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: str | Path,
+        path: str | Path | List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
@@ -522,7 +522,7 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        path: str | Path,
+        path: str | Path | List[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
