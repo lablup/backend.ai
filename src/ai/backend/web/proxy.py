@@ -217,8 +217,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                         "iat": now,
                         # Private claims
                         "aiohttp_session": aiohttp_session,
-                        "access_key": api_session.config.access_key,
-                        # "secret_key": api_session.config.secret_key,
+                        "access_key": api_session.config.access_key,  # since 23.03.10
                     }
                     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
@@ -251,23 +250,19 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
     except BackendClientError:
         log.exception("web_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("web_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )
     finally:
@@ -334,23 +329,19 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     except BackendClientError:
         log.exception("web_plugin_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("web_plugin_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )
 
@@ -422,22 +413,18 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     except BackendClientError:
         log.exception("websocket_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("websocket_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )

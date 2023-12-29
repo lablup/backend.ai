@@ -23,6 +23,7 @@ async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=None,
+        name="test",
         service_name=None,
     )
 
@@ -48,6 +49,7 @@ async def test_pipeline_single_instance_retries(redis_container: Tuple[str, Host
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=None,
+        name="test",
         service_name=None,
     )
 
@@ -92,6 +94,7 @@ async def test_pipeline_sentinel_cluster(redis_cluster: RedisClusterInfo) -> Non
         s.master_for(service_name="mymaster"),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=s,
+        name="test",
         service_name="mymaster",
     )
 

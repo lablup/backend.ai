@@ -26,6 +26,7 @@ from .base import (
     EnumValueType,
     ForeignKeyIDColumn,
     IDColumn,
+    InferenceSessionError,
     Item,
     PaginatedList,
     ResourceSlotColumn,
@@ -354,17 +355,6 @@ class EndpointTokenRow(Base):
         return row
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
-        src = graphene.String(required=True)
-        name = graphene.String(required=True)
-        repr = graphene.String(required=True)
-
-    session_id = graphene.UUID()
-
-    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
-
-
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -452,9 +442,10 @@ class Endpoint(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(EndpointRow)
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -488,9 +479,10 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.routings))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:

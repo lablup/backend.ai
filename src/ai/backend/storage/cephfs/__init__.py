@@ -67,7 +67,9 @@ class CephDirQuotaModel(BaseQuotaModel):
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
-            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()),  # type: ignore[attr-defined]
+            lambda: os.setxattr(  # type: ignore[attr-defined]
+                qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()
+            ),
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:

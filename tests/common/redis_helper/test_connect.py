@@ -53,12 +53,10 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
     async for attempt in AsyncRetrying(
         wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
         stop=stop_after_attempt(10),
-        retry=retry_if_exception_type(
-            (
-                redis.exceptions.ConnectionError,
-                redis.exceptions.TimeoutError,
-            )
-        ),
+        retry=retry_if_exception_type((
+            redis.exceptions.ConnectionError,
+            redis.exceptions.TimeoutError,
+        )),
     ):
         with attempt:
             await r.ping()
@@ -74,7 +72,8 @@ async def test_instantiate_redisconninfo() -> None:
             "service_name": "mymaster",
             "password": "develove",
             "redis_helper_config": config.redis_helper_default_config,
-        }
+        },
+        name="test",
     )
 
     assert isinstance(r1.client, Redis)
@@ -93,6 +92,7 @@ async def test_instantiate_redisconninfo() -> None:
             "password": "develove",
             "redis_helper_config": config.redis_helper_default_config,
         },
+        name="test",
     )
 
     assert isinstance(r2.client, Redis)

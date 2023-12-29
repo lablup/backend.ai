@@ -36,9 +36,21 @@ from ai.backend.common import msgpack
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventProducer,
+    KernelLifecycleEventReason,
+    ModelServiceStatusEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
+from ai.backend.common.types import (
+    AgentId,
+    CommitStatus,
+    KernelId,
+    ModelServiceStatus,
+    ServicePort,
+    SessionId,
+    aobject,
+)
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -57,16 +69,14 @@ ConsoleItemType = Literal[
     "log",
     "completion",
 ]
-outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset(
-    [
-        "stdout",
-        "stderr",
-        "media",
-        "html",
-        "log",
-        "completion",
-    ]
-)
+outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
+    "stdout",
+    "stderr",
+    "media",
+    "html",
+    "log",
+    "completion",
+])
 ResultType = Union[
     ConsoleItemType,
     Literal[
@@ -94,12 +104,10 @@ class ClientFeatures(StringSetFlag):
 
 
 # TODO: use Python 3.7 contextvars for per-client feature selection
-default_client_features = frozenset(
-    {
-        ClientFeatures.INPUT.value,
-        ClientFeatures.CONTINUATION.value,
-    }
-)
+default_client_features = frozenset({
+    ClientFeatures.INPUT.value,
+    ClientFeatures.CONTINUATION.value,
+})
 default_api_version = 4
 
 
@@ -205,7 +213,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
 
-    async def init(self) -> None:
+    async def init(self, event_producer: EventProducer) -> None:
         log.debug(
             "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
@@ -213,7 +221,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             default_client_features,
         )
         self.runner = await self.create_code_runner(
-            client_features=default_client_features, api_version=default_api_version
+            event_producer, client_features=default_client_features, api_version=default_api_version
         )
 
     def __getstate__(self) -> Mapping[str, Any]:
@@ -254,6 +262,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     @abstractmethod
     async def create_code_runner(
         self,
+        event_producer: EventProducer,
         *,
         client_features: FrozenSet[str],
         api_version: int,
@@ -369,11 +378,14 @@ _zctx = None
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     kernel_id: KernelId
+    session_id: SessionId
     started_at: float
     finished_at: Optional[float]
     exec_timeout: float
     max_record_size: int
     client_features: FrozenSet[str]
+
+    event_producer: EventProducer
 
     input_sock: zmq.asyncio.Socket
     output_sock: zmq.asyncio.Socket
@@ -396,17 +408,20 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
         client_features: FrozenSet[str] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.event_producer = event_producer
         self.started_at = time.monotonic()
         self.finished_at = None
         if not math.isfinite(exec_timeout) or exec_timeout < 0:
             raise ValueError("execution timeout must be a zero or finite positive number.")
-        self.kernel_id = kernel_id
         self.exec_timeout = exec_timeout
         self.max_record_size = 10 * (2**20)  # 10 MBytes
         self.client_features = client_features or frozenset()
@@ -457,6 +472,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["status_task"]
         del props["watchdog_task"]
         del props["_closed"]
+        del props["event_producer"]
         return props
 
     def __setstate__(self, props):
@@ -541,30 +557,24 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
             clean_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"clean",
-                clean_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"clean",
+            clean_cmd.encode("utf8"),
+        ])
         build_cmd = opts.get("build", "")
         if build_cmd is None:
             build_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"build",
-                build_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"build",
+            build_cmd.encode("utf8"),
+        ])
         exec_cmd = opts.get("exec", "")
         if exec_cmd is None:
             exec_cmd = ""
-        await self.input_sock.send_multipart(
-            [
-                b"exec",
-                exec_cmd.encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"exec",
+            exec_cmd.encode("utf8"),
+        ])
 
     async def feed_code(self, text: str):
         if self.input_sock.closed:
@@ -608,12 +618,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             "code": code_text,
         }
         payload.update(opts)
-        await self.input_sock.send_multipart(
-            [
-                b"complete",
-                json.dumps(payload).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"complete",
+            json.dumps(payload).encode("utf8"),
+        ])
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
@@ -624,12 +632,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_start_model_service(self, model_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"start-model-service",
-                json.dumps(model_info).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"start-model-service",
+            json.dumps(model_info).encode("utf8"),
+        ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
@@ -649,12 +655,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"start-service",
-                json.dumps(service_info).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"start-service",
+            json.dumps(service_info).encode("utf8"),
+        ])
         try:
             with timeout(10):
                 result = await self.service_queue.get()
@@ -668,20 +672,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_shutdown_service(self, service_name: str):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart(
-            [
-                b"shutdown-service",
-                json.dumps(service_name).encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"shutdown-service",
+            json.dumps(service_name).encode("utf8"),
+        ])
 
     async def feed_service_apps(self):
-        await self.input_sock.send_multipart(
-            [
-                b"get-apps",
-                "".encode("utf8"),
-            ]
-        )
+        await self.input_sock.send_multipart([
+            b"get-apps",
+            "".encode("utf8"),
+        ])
         try:
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
@@ -926,49 +926,63 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 msg_type, msg_data = await self.output_sock.recv_multipart()
                 try:
-                    if msg_type == b"status":
-                        await self.status_queue.put(msg_data)
-                    elif msg_type == b"completion":
-                        await self.completion_queue.put(msg_data)
-                    elif msg_type == b"service-result":
-                        await self.service_queue.put(msg_data)
-                    elif msg_type == b"model-service-result":
-                        await self.model_service_queue.put(msg_data)
-                    elif msg_type == b"apps-result":
-                        await self.service_apps_info_queue.put(msg_data)
-                    elif msg_type == b"stdout":
-                        if self.output_queue is None:
-                            continue
-                        if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[: self.max_record_size]
-                        await self.output_queue.put(
-                            ResultRecord(
-                                "stdout",
-                                decoders[0].decode(msg_data),
+                    match msg_type:
+                        case b"status":
+                            await self.status_queue.put(msg_data)
+                        case b"completion":
+                            await self.completion_queue.put(msg_data)
+                        case b"service-result":
+                            await self.service_queue.put(msg_data)
+                        case b"model-service-result":
+                            await self.model_service_queue.put(msg_data)
+                        case b"model-service-status":
+                            response = json.loads(msg_data)
+                            event = ModelServiceStatusEvent(
+                                self.kernel_id,
+                                self.session_id,
+                                response["model_name"],
+                                (
+                                    ModelServiceStatus.HEALTHY
+                                    if response["is_healthy"]
+                                    else ModelServiceStatus.UNHEALTHY
+                                ),
                             )
-                        )
-                    elif msg_type == b"stderr":
-                        if self.output_queue is None:
-                            continue
-                        if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[: self.max_record_size]
-                        await self.output_queue.put(
-                            ResultRecord(
-                                "stderr",
-                                decoders[1].decode(msg_data),
+                            await self.event_producer.produce_event(event)
+                        case b"apps-result":
+                            await self.service_apps_info_queue.put(msg_data)
+                        case b"stdout":
+                            if self.output_queue is None:
+                                continue
+                            if len(msg_data) > self.max_record_size:
+                                msg_data = msg_data[: self.max_record_size]
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    "stdout",
+                                    decoders[0].decode(msg_data),
+                                )
                             )
-                        )
-                    else:
-                        # Normal outputs should go to the current
-                        # output queue.
-                        if self.output_queue is None:
-                            continue
-                        await self.output_queue.put(
-                            ResultRecord(
-                                cast(ResultType, msg_type.decode("ascii")),
-                                msg_data.decode("utf8"),
+                        case b"stderr":
+                            if self.output_queue is None:
+                                continue
+                            if len(msg_data) > self.max_record_size:
+                                msg_data = msg_data[: self.max_record_size]
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    "stderr",
+                                    decoders[1].decode(msg_data),
+                                )
                             )
-                        )
+                        case _:
+                            # Normal outputs should go to the current
+                            # output queue.
+                            if self.output_queue is None:
+                                continue
+                            await self.output_queue.put(
+                                ResultRecord(
+                                    cast(ResultType, msg_type.decode("ascii")),
+                                    msg_data.decode("utf8"),
+                                )
+                            )
                 except asyncio.QueueFull:
                     pass
                 if msg_type == b"build-finished":

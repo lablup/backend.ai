@@ -4,25 +4,20 @@ python_sources(
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
         "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
+        "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
+        "src/ai/backend/manager/scheduler:src",
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
 )
 
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
+visibility_private_component(
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/cli/**",
     ],
-    entry_point="server.py",
-)
-
-pex_binary(
-    name="cli",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="cli/__main__.py",
 )
 
 python_distribution(
@@ -55,12 +50,58 @@ python_distribution(
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-manager",
+    fat=False,
+    dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-manager-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+run_shell_command(
+    name="checksum",
+    command=(
+        "find . -name 'backendai-manager-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
+    workdir="/dist",
+    execution_dependencies=[
+        ":backendai-manager",
+        ":backendai-manager-fat",
+    ],
+    tags=["checksum"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
+resources(
+    name="vendor",
+    sources=[
+        "vendor/*",
+        "vendor/**/*",
+    ],
+)
 resources(
     name="resources",
     dependencies=[
         ":version",
+        ":vendor",
     ],
     sources=[
         "**/py.typed",

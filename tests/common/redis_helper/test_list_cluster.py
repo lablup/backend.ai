@@ -54,6 +54,7 @@ async def test_blist_cluster_sentinel(
         s.master_for(service_name="mymaster"),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=s,
+        name="test",
         service_name="mymaster",
     )
     await redis_helper.execute(r, lambda r: r.delete("bl1"))

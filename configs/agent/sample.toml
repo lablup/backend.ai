@@ -162,8 +162,9 @@ sandbox-type = "docker"
 # Additional arguments passed to the jail executable in containers.
 jail-args = []
 
-# One of: "hostdir", "memory", "k8s-nfs"
+# One of: "hostdir", "hostfile", "memory", "k8s-nfs"
 # "hostdir": creates an empty host directory and mount it as /home/work of containers.
+# "hostfile": creates an empty sparse file and mount it as /home/work of containers using loop. But this requires the agent to be run as root.
 # "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
 # "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
 scratch-type = "hostdir"        # env: BACKEND_SANDBOX_TYPE
@@ -175,7 +176,7 @@ scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
 
 # Limit the maximum size of the scratch space.
 # If set zero, it is unlimited.
-scratch-size = "1G"
+scratch-size = "10G"
 
 # Enable legacy swarm mode.
 # This should be true to let this agent handles multi-container session.

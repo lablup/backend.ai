@@ -232,7 +232,25 @@
       "PreOpenPortPanelTitle": "Porte pre-aperte da impostare (opzionale)",
       "PortsTitleWithRange": "Valore della porta (tra 1024 e 65535)",
       "PrePortConfigWillDisappear": "Tutte le porte preaperture non salvate scompariranno.",
-      "StartModelServing": "Avvio del modello di servizio"
+      "StartModelServing": "Avvio del modello di servizio",
+      "PreOpenPortRangeGuide": "Inserisci più valori separati da una virgola (,) o da uno spazio.",
+      "preopen": "preaperto",
+      "Network": "Rete",
+      "Enable": "Abilitare",
+      "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-).",
+      "PreOpenPortMaxCountLimit": "È possibile impostare fino a {{count}} porte pre-aperte.",
+      "StartTimeMustBeInTheFuture": "L'ora di inizio deve essere successiva all'ora corrente.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Allocazione delle risorse per contenitore",
+      "NumberOfContainer": "Numero di contenitori",
+      "EnterEnvironmentVariable": "Inserire il nome della variabile",
+      "EnvironmentVariableNamePatternError": "Il nome della variabile deve iniziare con una lettera o un trattino basso e può contenere solo lettere, numeri e trattini bassi.",
+      "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -288,7 +306,9 @@
       "EnterValidSessionName": "Inserire un nome di sessione valido",
       "SessionNameRequired": "Il nome della sessione è obbligatorio",
       "SluggedStrings": "Stringhe con slugged (>3 caratteri)",
-      "SessionNameAlreadyExist": "Il nome della sessione esiste già"
+      "SessionNameAlreadyExist": "Il nome della sessione esiste già",
+      "SessionNameTooLong64": "Inserisci 64 caratteri o meno.",
+      "PleaseFollowSessionNameRule": "Inserisci una combinazione di almeno 4 lettere, numeri, \".\", \"_\" e \"-\"."
     },
     "Interactive": "Interattivo",
     "Batch": "Lotto",
@@ -369,7 +389,6 @@
     "DeleteAll": "Cancella tutto",
     "Update": "Aggiornare",
     "Delete": "Elimina",
-    "Dismiss": "Respingere",
     "DismissAndProceed": "Ignora e procedi",
     "Close": "Vicino",
     "Confirm": "Confermare",
@@ -422,7 +441,9 @@
     "Control": "Controllo",
     "NewPassword": "nuova password",
     "Enabled": "Abilitato",
-    "StorageProxies": "Depositi"
+    "StorageProxies": "Depositi",
+    "None": "Nessuno",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -499,7 +520,8 @@
     "KeypairDetail": "Dettaglio coppia di chiavi",
     "SignoutSeccessfullyFinished": "Il signout è terminato in modo sicuro",
     "Status": "Stato",
-    "NoUserToDisplay": "Nessun utente da visualizzare"
+    "NoUserToDisplay": "Nessun utente da visualizzare",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "cartelle",
@@ -664,7 +686,8 @@
     "Used": "Usato",
     "Pipeline": "Cartelle della pipeline",
     "DialogDataFolder": "Cartelle dedicate alle pipeline che vengono create automaticamente quando si creano le pipeline in FastTrack.",
-    "DialogModelFolder": "È possibile servire e gestire i modelli."
+    "DialogModelFolder": "È possibile servire e gestire i modelli.",
+    "SearchByName": "Ricerca per nome"
   },
   "dialog": {
     "warning": {
@@ -755,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memoria condivisa (GB)",
     "NoResourcePresetToDisplay": "Nessuna preimpostazione di risorse da visualizzare",
-    "Deleted": "La preimpostazione della risorsa è stata eliminata con successo."
+    "Deleted": "La preimpostazione della risorsa è stata eliminata con successo.",
+    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria"
   },
   "usersettings": {
     "General": "Generale",
@@ -891,7 +915,8 @@
     "PleaseSelectOption": "Seleziona un'opzione.",
     "RegistrySuccessfullyModified": "Registro modificato con successo.",
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
-    "ModifyRegistry": "Modificare il registro"
+    "ModifyRegistry": "Modificare il registro",
+    "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",
@@ -1329,7 +1354,7 @@
     "FormValidationFailed": "Convalida del modulo non riuscita",
     "StartNewServing": "Iniziare un nuovo servizio",
     "ServiceName": "Nome del servizio",
-    "ServiceNameRule": "Sono consentiti solo da 4 a 64 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
+    "ServiceNameRule": "Sono consentiti solo da 4 a 24 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
     "OpenToPublic": "Aperto al pubblico",
     "DesiredRoutingCount": "Conteggio dell'instradamento desiderato",
     "ServingRouteErrorModalTitle": "Errore del percorso di servizio",
