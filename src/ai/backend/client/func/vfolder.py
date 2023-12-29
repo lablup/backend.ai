@@ -506,7 +506,7 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: str | Path | list[str | Path],
+        path: str | Path,
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
@@ -522,7 +522,7 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        path: str | Path | list[str | Path],
+        path: str | Path,
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
