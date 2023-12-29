@@ -8,6 +8,7 @@ import sys
 import uuid
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import IO, List, Literal, Optional, Sequence
 
@@ -18,7 +19,6 @@ from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from faker import Faker
-from graphlib import TopologicalSorter
 from humanize import naturalsize
 from tabulate import tabulate
 
