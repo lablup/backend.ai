@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -506,7 +506,7 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: str | Path | List[str | Path],
+        path: str | Path | list[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
@@ -522,7 +522,7 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        path: str | Path | List[str | Path],
+        path: str | Path | list[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:

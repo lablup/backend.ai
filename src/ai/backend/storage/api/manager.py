@@ -757,7 +757,7 @@ async def mkdir(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        relpath: PurePosixPath | List[PurePosixPath]
+        relpath: PurePosixPath | list[PurePosixPath]
         parents: bool
         exist_ok: bool
 
@@ -784,8 +784,8 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok = params["exist_ok"]
         relpath = params["relpath"]
         relpaths = relpath if isinstance(relpath, list) else [relpath]
-        failure_tasks: List[str] = []
-        success_tasks: List[str] = []
+        failure_tasks: list[str] = []
+        success_tasks: list[str] = []
 
         async with ctx.get_volume(params["volume"]) as volume:
             mkdir_tasks = [
