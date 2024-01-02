@@ -217,12 +217,12 @@ TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 def convert_response(response: TResponseModel | list | TAnyResponse) -> web.StreamResponse:
     match response:
-        case web_response.StreamResponse():
-            return response
         case BaseModel():
             return web.json_response(response.model_dump())
         case list():
             return web.json_response(TypeAdapter(list[TResponseModel]).dump_python(response))
+        case web_response.StreamResponse():
+            return response
         case _:
             raise RuntimeError(f"Unsupported response type ({type(response)})")
 

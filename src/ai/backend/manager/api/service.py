@@ -61,6 +61,7 @@ from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
     check_api_params_v2,
+    convert_response,
     get_access_key_scopes,
     get_user_uuid_scopes,
     undefined,
@@ -912,6 +913,12 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+@web.middleware
+async def response_middleware(request: web.Request, handler) -> web.StreamResponse:
+    result = await handler(request)
+    return convert_response(result)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -950,4 +957,4 @@ def create_app(
     cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))
     cors.add(add_route("DELETE", "/{service_id}/routings/{route_id}", delete_route))
     cors.add(add_route("POST", "/{service_id}/token", generate_token))
-    return app, []
+    return app, [response_middleware]
