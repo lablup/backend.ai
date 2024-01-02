@@ -71,8 +71,8 @@ ssl-verify = false
 [logging.graylog]
 host = "0.0.0.0"
 port = 12201
-validate = false
-ca_certs = ""
+ssl-verify = false
+ca-certs = ""
 keyfile = ""
 certfile = ""
 

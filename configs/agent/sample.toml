@@ -262,8 +262,8 @@ host = "0.0.0.0"
 port = 12201
 
 # If True, validate the Graylog server’s certificate. In this case specifying ca_certs is also required.
-validate = false
-ca_certs = ""
+ssl-verify = false
+ca-certs = ""
 keyfile = ""
 certfile = ""
 
