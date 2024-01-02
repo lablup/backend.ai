@@ -228,7 +228,6 @@ class SchedulerDispatcher(aobject):
         await self.prepare_timer.join()
         await self.scale_timer.join()
         log.info("Session scheduler started")
-        # mgr_logger.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
@@ -237,7 +236,6 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.schedule_timer.leave())
         await self.redis_live.close()
         log.info("Session scheduler stopped")
-        # mgr_logger.info("Session scheduler stopped")
 
     async def schedule(
         self,
@@ -1295,7 +1293,6 @@ class SchedulerDispatcher(aobject):
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
 
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
-                # mgr_logger.debug(f"prepare(): preparing {len(scheduled_sessions)} session(s)")
 
                 async with (
                     async_timeout.timeout(delay=50.0),
