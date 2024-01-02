@@ -80,7 +80,8 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "resource_policy": "default",
-            "role": "superadmin"
+            "role": "superadmin",
+            "main_access_key": "AKIAIOSFODNN7EXAMPLE"
         },
         {
             "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
@@ -94,7 +95,8 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "resource_policy": "default",
-            "role": "admin"
+            "role": "admin",
+            "main_access_key": "AKIAHUKCHDEZGEXAMPLE"
         },
         {
             "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
@@ -108,7 +110,8 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "resource_policy": "default",
-            "role": "user"
+            "role": "user",
+            "main_access_key": "AKIANABBDUSEREXAMPLE"
         },
         {
             "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
@@ -122,7 +125,8 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "resource_policy": "default",
-            "role": "user"
+            "role": "user",
+            "main_access_key": "AKIANATWOUSEREXAMPLE"
         },
         {
             "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
@@ -136,7 +140,8 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "resource_policy": "default",
-            "role": "monitor"
+            "role": "monitor",
+            "main_access_key": "AKIANAMONITOREXAMPLE"
         }
     ],
     "association_groups_users": [
