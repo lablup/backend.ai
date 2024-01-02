@@ -1,6 +1,9 @@
 Client Session
 ==============
 
+Client Session Objects
+----------------------
+
 .. module:: ai.backend.client.session
 .. currentmodule:: ai.backend.client.session
 
