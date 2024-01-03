@@ -105,6 +105,7 @@ association_groups_users = sa.Table(
         nullable=False,
         primary_key=True,
     ),
+    sa.UniqueConstraint("user_id", "group_id", name="uq_user_id_group_id"),
 )
 
 
