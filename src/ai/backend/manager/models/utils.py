@@ -61,21 +61,37 @@ class ExtendedAsyncSAEngine(SAEngine):
         self._generic_txn_count = 0
         self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
 
+    def _check_generic_txn_cnt(self) -> None:
+        if (
+            self._txn_concurrency_threshold > 0
+            and self._generic_txn_count >= self._txn_concurrency_threshold
+        ):
+            log.warning(
+                "The number of concurrent generic transactions ({}) "
+                "looks too high (warning threshold: {}).",
+                self._generic_txn_count,
+                self._txn_concurrency_threshold,
+                stack_info=False,
+            )
+
+    def _check_readonly_txn_cnt(self) -> None:
+        if (
+            self._txn_concurrency_threshold > 0
+            and self._readonly_txn_count >= self._txn_concurrency_threshold
+        ):
+            log.warning(
+                "The number of concurrent read-only transactions ({}) "
+                "looks too high (warning threshold: {}).",
+                self._readonly_txn_count,
+                self._txn_concurrency_threshold,
+                stack_info=False,
+            )
+
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:
         async with super().begin() as conn:
             self._generic_txn_count += 1
-            if (
-                self._txn_concurrency_threshold > 0
-                and self._generic_txn_count >= self._txn_concurrency_threshold
-            ):
-                log.warning(
-                    "The number of concurrent generic transactions ({}) "
-                    "looks too high (warning threshold: {}).",
-                    self._generic_txn_count,
-                    self._txn_concurrency_threshold,
-                    stack_info=False,
-                )
+            self._check_generic_txn_cnt()
             try:
                 yield conn
             finally:
@@ -85,17 +101,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     async def begin_readonly(self, deferrable: bool = False) -> AsyncIterator[SAConnection]:
         async with self.connect() as conn:
             self._readonly_txn_count += 1
-            if (
-                self._txn_concurrency_threshold > 0
-                and self._readonly_txn_count >= self._txn_concurrency_threshold
-            ):
-                log.warning(
-                    "The number of concurrent read-only transactions ({}) "
-                    "looks too high (warning threshold: {}).",
-                    self._readonly_txn_count,
-                    self._txn_concurrency_threshold,
-                    stack_info=False,
-                )
+            self._check_readonly_txn_cnt()
             conn_with_exec_opts = await conn.execution_options(
                 postgresql_readonly=True,
                 postgresql_deferrable=deferrable,
@@ -107,25 +113,67 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
-        async with self.begin() as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            try:
-                yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise e
+    async def begin_session(
+        self,
+        bind: SAConnection | None = None,
+        expire_on_commit: bool = False,
+    ) -> AsyncIterator[SASession]:
+        @actxmgr
+        async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
+            async with connection.begin():
+                self._sess_factory.configure(bind=connection, expire_on_commit=expire_on_commit)
+                session = self._sess_factory()
+
+                self._generic_txn_count += 1
+                self._check_generic_txn_cnt()
+                try:
+                    yield session
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    raise e
+                finally:
+                    self._generic_txn_count -= 1
+
+        if bind is None:
+            async with self.connect() as _conn:
+                async with _begin(_conn) as sess:
+                    yield sess
+        else:
+            async with _begin(bind) as sess:
+                yield sess
 
     @actxmgr
     async def begin_readonly_session(
-        self, deferrable: bool = False, expire_on_commit=False
+        self,
+        bind: SAConnection | None = None,
+        deferrable: bool = False,
     ) -> AsyncIterator[SASession]:
-        async with self.begin_readonly(deferrable=deferrable) as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            yield session
+        @actxmgr
+        async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
+            conn_with_exec_opts = await connection.execution_options(
+                postgresql_readonly=True,
+                postgresql_deferrable=deferrable,
+            )
+
+            async with conn_with_exec_opts.begin():
+                self._sess_factory.configure(bind=conn_with_exec_opts)
+                session = self._sess_factory()
+
+                self._readonly_txn_count += 1
+                self._check_readonly_txn_cnt()
+                try:
+                    yield session
+                finally:
+                    self._readonly_txn_count -= 1
+
+        if bind is None:
+            async with self.connect() as _conn:
+                async with _begin(_conn) as sess:
+                    yield sess
+        else:
+            async with _begin(bind) as sess:
+                yield sess
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -267,6 +315,38 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                     raise
     except RetryError:
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+    assert result is not Sentinel.token
+    return result
+
+
+async def execute_with_retry_v2(
+    sa_engine: ExtendedAsyncSAEngine,
+    txn_func: Callable[[SASession], Awaitable[TQueryResult]],
+    conn: SAConnection | None = None,
+) -> TQueryResult:
+    max_attempts = 20
+    result: TQueryResult | Sentinel = Sentinel.token
+
+    _conn = conn or (await sa_engine.connect())
+    try:
+        async for attempt in AsyncRetrying(
+            wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+            stop=stop_after_attempt(max_attempts),
+            retry=retry_if_exception_type(TryAgain),
+        ):
+            with attempt:
+                async with sa_engine.begin_session(_conn) as db_session:
+                    try:
+                        result = await txn_func(db_session)
+                    except DBAPIError as e:
+                        if is_db_retry_error(e):
+                            raise TryAgain
+                        raise
+    except RetryError:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+    finally:
+        if conn is None:
+            await _conn.__aexit__(None, None, None)
     assert result is not Sentinel.token
     return result
 
