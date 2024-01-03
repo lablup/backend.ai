@@ -4,6 +4,7 @@ import asyncio
 import functools
 import grp
 import importlib
+import importlib.resources
 import logging
 import os
 import pwd
@@ -62,7 +63,12 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
+from .api.types import (
+    AppCreator,
+    CleanupContext,
+    WebMiddleware,
+    WebRequestHandler,
+)
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
@@ -150,6 +156,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".ratelimit",
     ".vfolder",
     ".admin",
+    ".spec",
     ".service",
     ".session",
     ".stream",
@@ -679,6 +686,7 @@ def _init_subapp(
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
+        subapp["_root_app"] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
@@ -824,6 +832,10 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+
+    vendor_path = importlib.resources.files("ai.backend.manager.vendor")
+    assert isinstance(vendor_path, Path)
+    app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 
 

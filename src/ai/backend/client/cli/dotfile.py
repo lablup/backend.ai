@@ -232,7 +232,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
 
 @dotfile.command()
 @click.argument("path", metavar="PATH")
-@click.option("-f", "--force", type=bool, is_flag=True, help="Delete dotfile without confirmation.")
+@click.option("-f", "--force", is_flag=True, help="Delete dotfile without confirmation.")
 @click.option(
     "-o",
     "--owner",

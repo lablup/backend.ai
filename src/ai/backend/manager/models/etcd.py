@@ -164,6 +164,8 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        if "url" in input_config:
+            input_config[""] = input_config.pop("url")
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,
