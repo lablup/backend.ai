@@ -70,11 +70,13 @@ class Service(BaseFunction):
         service_id: str,
         fields: Sequence[FieldSpec] = _default_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($endpoint_id: UUID!) {
                 endpoint(endpoint_id: $endpoint_id) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
@@ -142,32 +144,30 @@ class Service(BaseFunction):
             service_name = f"bai-serve-{faker.user_name()}"
 
         rqst = Request("POST", "/services")
-        rqst.set_json(
-            {
-                "name": service_name,
-                "desired_session_count": initial_session_count,
-                "image": image,
-                "arch": architecture,
-                "group": group_name,
-                "domain": domain_name,
-                "cluster_size": cluster_size,
-                "cluster_mode": cluster_mode,
-                "tag": tag,
-                "startup_command": startup_command,
-                "bootstrap_script": bootstrap_script,
-                "owner_access_key": owner_access_key,
-                "open_to_public": expose_to_public,
-                "config": {
-                    "model": model_id_or_name,
-                    "model_version": model_version,
-                    "model_mount_destination": model_mount_destination,
-                    "environ": envs,
-                    "scaling_group": scaling_group,
-                    "resources": resources,
-                    "resource_opts": resource_opts,
-                },
-            }
-        )
+        rqst.set_json({
+            "name": service_name,
+            "desired_session_count": initial_session_count,
+            "image": image,
+            "arch": architecture,
+            "group": group_name,
+            "domain": domain_name,
+            "cluster_size": cluster_size,
+            "cluster_mode": cluster_mode,
+            "tag": tag,
+            "startup_command": startup_command,
+            "bootstrap_script": bootstrap_script,
+            "owner_access_key": owner_access_key,
+            "open_to_public": expose_to_public,
+            "config": {
+                "model": model_id_or_name,
+                "model_version": model_version,
+                "model_mount_destination": model_mount_destination,
+                "environ": envs,
+                "scaling_group": scaling_group,
+                "resources": resources,
+                "resource_opts": resource_opts,
+            },
+        })
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {
@@ -238,32 +238,30 @@ class Service(BaseFunction):
             service_name = f"bai-serve-{faker.user_name()}"
 
         rqst = Request("POST", "/services/_/try")
-        rqst.set_json(
-            {
-                "name": service_name,
-                "desired_session_count": 1,
-                "image": image,
-                "arch": architecture,
-                "group": group_name,
-                "domain": domain_name,
-                "cluster_size": cluster_size,
-                "cluster_mode": cluster_mode,
-                "tag": tag,
-                "startup_command": startup_command,
-                "bootstrap_script": bootstrap_script,
-                "owner_access_key": owner_access_key,
-                "open_to_public": expose_to_public,
-                "config": {
-                    "model": model_id_or_name,
-                    "model_version": model_version,
-                    "model_mount_destination": model_mount_destination,
-                    "environ": envs,
-                    "scaling_group": scaling_group,
-                    "resources": resources,
-                    "resource_opts": resource_opts,
-                },
-            }
-        )
+        rqst.set_json({
+            "name": service_name,
+            "desired_session_count": 1,
+            "image": image,
+            "arch": architecture,
+            "group": group_name,
+            "domain": domain_name,
+            "cluster_size": cluster_size,
+            "cluster_mode": cluster_mode,
+            "tag": tag,
+            "startup_command": startup_command,
+            "bootstrap_script": bootstrap_script,
+            "owner_access_key": owner_access_key,
+            "open_to_public": expose_to_public,
+            "config": {
+                "model": model_id_or_name,
+                "model_version": model_version,
+                "model_mount_destination": model_mount_destination,
+                "environ": envs,
+                "scaling_group": scaling_group,
+                "resources": resources,
+                "resource_opts": resource_opts,
+            },
+        })
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {

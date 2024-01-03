@@ -5,6 +5,7 @@ Revises: 01456c812164
 Create Date: 2019-03-30 01:45:07.525096
 
 """
+
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -79,12 +80,10 @@ def upgrade():
         converted = ResourceSlot(row["total_resource_slots"])
         if "mem" in converted:
             converted["mem"] = Decimal(BinarySize.from_str(converted["mem"]))
-            updates.append(
-                (
-                    row["name"],
-                    converted,
-                )
-            )
+            updates.append((
+                row["name"],
+                converted,
+            ))
     for name, slots in updates:
         query = (
             sa.update(keypair_resource_policies)

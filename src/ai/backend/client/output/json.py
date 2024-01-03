@@ -18,13 +18,11 @@ class JsonOutputHandler(BaseOutputHandler):
     ) -> None:
         if item is None:
             print(
-                json.dumps(
-                    {
-                        "count": 0,
-                        "total_count": 0,
-                        "items": [],
-                    }
-                )
+                json.dumps({
+                    "count": 0,
+                    "total_count": 0,
+                    "items": [],
+                })
             )
             return
         field_map = {f.field_name: f for f in fields}
