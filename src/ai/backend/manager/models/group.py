@@ -91,21 +91,20 @@ _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "user_id",
         GUID,
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "group_id",
         GUID,
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-        primary_key=True,
     ),
-    sa.UniqueConstraint("user_id", "group_id", name="uq_user_id_group_id"),
+    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
 
 
