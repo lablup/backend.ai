@@ -325,30 +325,33 @@ async def execute_with_retry_v2(
     conn: SAConnection | None = None,
 ) -> TQueryResult:
     max_attempts = 20
-    result: TQueryResult | Sentinel = Sentinel.token
 
-    _conn = conn or (await sa_engine.connect())
-    try:
-        async for attempt in AsyncRetrying(
-            wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
-            stop=stop_after_attempt(max_attempts),
-            retry=retry_if_exception_type(TryAgain),
-        ):
-            with attempt:
-                async with sa_engine.begin_session(_conn) as db_session:
-                    try:
-                        result = await txn_func(db_session)
-                    except DBAPIError as e:
-                        if is_db_retry_error(e):
-                            raise TryAgain
-                        raise
-    except RetryError:
-        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
-    finally:
-        if conn is None:
-            await _conn.__aexit__(None, None, None)
-    assert result is not Sentinel.token
-    return result
+    async def _execute(connection: SAConnection) -> TQueryResult:
+        result: TQueryResult | Sentinel = Sentinel.token
+        try:
+            async for attempt in AsyncRetrying(
+                wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+                stop=stop_after_attempt(max_attempts),
+                retry=retry_if_exception_type(TryAgain),
+            ):
+                with attempt:
+                    async with sa_engine.begin_session(connection) as db_session:
+                        try:
+                            result = await txn_func(db_session)
+                        except DBAPIError as e:
+                            if is_db_retry_error(e):
+                                raise TryAgain
+                            raise
+        except RetryError:
+            raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+        assert result is not Sentinel.token
+        return result
+
+    if conn is None:
+        async with sa_engine.connect() as _conn:
+            return await _execute(_conn)
+    else:
+        return await _execute(conn)
 
 
 def sql_json_merge(
