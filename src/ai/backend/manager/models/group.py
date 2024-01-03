@@ -427,21 +427,21 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use `added_users` and `removed_users` fields"
+            "Deprecated since 24.03.0. Recommend to use `add_users` and `remove_users` fields"
         )
     )
     user_uuids = graphene.List(
         lambda: graphene.String,
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use `added_users` and `removed_users` fields"
+            "Deprecated since 24.03.0. Recommend to use `add_users` and `remove_users` fields"
         ),
     )
-    added_users = graphene.List(
+    add_users = graphene.List(
         lambda: graphene.String,
         required=False,
         description="Added since 24.03.0. ID array of the users to be added to the group.",
     )
-    removed_users = graphene.List(
+    remove_users = graphene.List(
         lambda: graphene.String,
         required=False,
         description="Added since 24.03.0. ID array of the users to be removed from the group.",
@@ -538,8 +538,8 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "integration_id")
         set_if_set(props, data, "resource_policy")
 
-        set_if_set(props, user_data, "added_users", clean_func=set)
-        set_if_set(props, user_data, "removed_users", clean_func=set)
+        set_if_set(props, user_data, "add_users", clean_func=set)
+        set_if_set(props, user_data, "remove_users", clean_func=set)
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
@@ -566,22 +566,26 @@ class ModifyGroup(graphene.Mutation):
                         ),
                     )
 
-                added_users = user_data.get("added_users") or set()
-                removed_users = user_data.get("removed_users") or set()
-                if union := (added_users & removed_users):
+                add_users = user_data.get("add_users") or set()
+                remove_users = user_data.get("remove_users") or set()
+                if union := (add_users & remove_users):
                     raise ValueError(
-                        "Should be no duplicate user id in `added_users` and `removed_users`."
+                        "Should be no duplicate user id in `add_users` and `remove_users`."
                         f" (ids: {list(union)})"
                     )
-                if added_users:
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in added_users]
+                if add_users:
+                    values = [{"user_id": uuid, "group_id": gid} for uuid in add_users]
                     await db_session.execute(
                         sa.insert(association_groups_users).values(values),
                     )
-                if removed_users:
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in removed_users]
+                if remove_users:
                     await db_session.execute(
-                        sa.insert(association_groups_users).values(values),
+                        (
+                            sa.delete(association_groups_users).where(
+                                (association_groups_users.c.group_id == gid)
+                                & (association_groups_users.c.user_id.in_(remove_users))
+                            )
+                        )
                     )
 
                 if data:
