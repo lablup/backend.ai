@@ -266,6 +266,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "VFolder",
         "Dotfile",
         "ServerLog",
+        "AuditLog",
         "Permission",
         "Service",
         "Model",
@@ -292,6 +293,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.acl import Permission
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
+        from .func.audit_logs import AuditLog
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.domain import Domain
@@ -336,6 +338,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.VFolder = VFolder
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
+        self.AuditLog = AuditLog
         self.Permission = Permission
         self.Service = Service
         self.Model = Model

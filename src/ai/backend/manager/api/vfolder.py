@@ -603,6 +603,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
+
     return web.json_response(resp, status=201)
 
 

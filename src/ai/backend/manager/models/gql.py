@@ -50,6 +50,7 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
+from .audit_logs import AuditLog, AuditLogList, CreateAuditLog
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
@@ -239,6 +240,8 @@ class Mutations(graphene.ObjectType):
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
+    create_audit_logs = CreateAuditLog.Field()
+
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
@@ -277,6 +280,20 @@ class Queries(graphene.ObjectType):
         Agent,
         scaling_group=graphene.String(),
         status=graphene.String(),
+    )
+
+    auditlog_list = graphene.Field(
+        AuditLogList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        user_id=graphene.String(),
+    )
+
+    auditlog = graphene.List(
+        AuditLog,
+        user_id=graphene.ID(),
     )
 
     agent_summary = graphene.Field(
@@ -369,6 +386,11 @@ class Queries(graphene.ObjectType):
         group_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
+    )
+
+    user_from_email = graphene.Field(
+        User,
+        email=graphene.String(),
     )
 
     user_list = graphene.Field(
@@ -805,6 +827,34 @@ class Queries(graphene.ObjectType):
         return AgentSummaryList(agent_list, total_count)
 
     @staticmethod
+    async def resolve_auditlog_list(
+        root: Any,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: str = None,
+        user_id: Optional[str],
+        order: str = None,
+    ) -> AuditLogList:
+        total_count = await AuditLog.load_count(
+            info.context,
+            user_id=user_id,
+            filter=filter,
+        )
+
+        auditlog_list = await AuditLog.load_slice(
+            info.context,
+            limit,
+            offset,
+            filter=filter,
+            order=order,
+            user_id=user_id,
+        )
+
+        return AuditLogList(auditlog_list, total_count)
+
+    @staticmethod
     async def resolve_domain(
         root: Any,
         info: graphene.ResolveInfo,
@@ -819,6 +869,23 @@ class Queries(graphene.ObjectType):
                 raise ObjectNotFound(object_name="domain")
         loader = ctx.dataloader_manager.get_loader(ctx, "Domain.by_name")
         return await loader.load(name)
+
+    @staticmethod
+    @scoped_query(autofill_user=True, user_key="email")
+    async def resolve_user_from_email(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        domain_name: str = None,
+        email: str = None,
+    ) -> User:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "User.by_email",
+        )
+
+        return await loader.load(email)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

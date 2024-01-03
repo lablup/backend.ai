@@ -57,6 +57,15 @@ _default_detail_fields = (
     user_fields["main_access_key"],
 )
 
+_user_info_fields = (
+    user_fields["username"],
+    user_fields["full_name"],
+    user_fields["domain_name"],
+    user_fields["role"],
+    user_fields["status"],
+    user_fields["description"],
+)
+
 
 class UserRole(str, enum.Enum):
     """
@@ -256,6 +265,42 @@ class User(BaseFunction):
             query, variables if user_uuid is not None else None
         )
         return data["user_from_uuid"]
+
+    @api_function
+    @classmethod
+    async def detail_by_email(
+        cls,
+        email: str = None,
+        fields: Sequence[FieldSpec] = _user_info_fields,
+    ) -> Sequence[dict]:
+        """
+        Fetch basic information of a user by user's email. If email is not specified,
+        requester's information will be returned.
+        :param email: email of the user to fetch.
+        :param fields: Additional per-user query fields to fetch.
+        """
+        if email is None:
+            query = textwrap.dedent(
+                """\
+                    query {
+                        user {$fields}
+                    }
+                """
+            )
+        else:
+            query = textwrap.dedent(
+                """\
+                    query($email: String!) {
+                        user_from_email(email: $email) {$fields}
+                    }
+                """
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        print("query{0}", query)
+        variables = {"email": email}
+        data = await api_session.get().Admin._query(query, variables if email is not None else None)
+        print("data from func", data["user_from_email"])
+        return data["user_from_email"]
 
     @api_function
     @classmethod
