@@ -60,12 +60,10 @@ local_config_iv = (
                         ["aiomonitor-termui-port", "aiomonitor-port"], default=48300
                     ): t.ToInt[1:65535],
                     t.Key("aiomonitor-webui-port", default=49300): t.ToInt[1:65535],
-                    t.Key("watcher-insock-path-prefix", default=None): t.Null | t.String(
-                        allow_blank=False
-                    ),
-                    t.Key("watcher-outsock-path-prefix", default=None): t.Null | t.String(
-                        allow_blank=False
-                    ),
+                    t.Key("watcher-insock-path-prefix", default=None): t.Null
+                    | t.String(allow_blank=False),
+                    t.Key("watcher-outsock-path-prefix", default=None): t.Null
+                    | t.String(allow_blank=False),
                     t.Key("use-watcher", default=False): t.Bool(),
                 },
             ),

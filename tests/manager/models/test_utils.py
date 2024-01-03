@@ -43,18 +43,16 @@ async def test_sql_json_merge__deeper_object(session_info):
     }
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel", "session"),
-                    {
-                        "PENDING": timestamp,
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
@@ -79,35 +77,31 @@ async def test_sql_json_merge__append_values(session_info):
     }
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel", "session"),
-                    {
-                        "PENDING": timestamp,
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel", "session"),
-                    {
-                        "TERMINATING": timestamp,
-                        "TERMINATED": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "TERMINATING": timestamp,
+                    "TERMINATED": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
@@ -128,41 +122,37 @@ async def test_sql_json_merge__kernel_status_history(session_info):
     }
     query = (
         kernels.update()
-        .values(
-            {
-                # "status_history": sqlalchemy.func.coalesce(sqlalchemy.text("'{}'::jsonb")).concat(
-                #     sqlalchemy.func.cast(
-                #         {"PENDING": timestamp, "PREPARING": timestamp},
-                #         sqlalchemy.dialects.postgresql.JSONB,
-                #     ),
-                # ),
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    (),
-                    {
-                        "PENDING": timestamp,
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            # "status_history": sqlalchemy.func.coalesce(sqlalchemy.text("'{}'::jsonb")).concat(
+            #     sqlalchemy.func.cast(
+            #         {"PENDING": timestamp, "PREPARING": timestamp},
+            #         sqlalchemy.dialects.postgresql.JSONB,
+            #     ),
+            # ),
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    (),
-                    {
-                        "TERMINATING": timestamp,
-                        "TERMINATED": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    "TERMINATING": timestamp,
+                    "TERMINATED": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
@@ -183,34 +173,30 @@ async def test_sql_json_merge__mixed_formats(session_info):
     }
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    (),
-                    {
-                        "PENDING": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    "PENDING": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
     kernel = await _select_kernel_row(conn, session_id)
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel",),
-                    {
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel",),
+                {
+                    "PREPARING": timestamp,
+                },
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)
@@ -238,15 +224,13 @@ async def test_sql_json_merge__json_serializable_types(session_info):
     }
     query = (
         kernels.update()
-        .values(
-            {
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    (),
-                    expected,
-                ),
-            }
-        )
+        .values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                (),
+                expected,
+            ),
+        })
         .where(kernels.c.session_id == session_id)
     )
     await conn.execute(query)

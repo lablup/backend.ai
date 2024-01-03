@@ -5,7 +5,16 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+    Tuple,
+    TypeVar,
+)
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
