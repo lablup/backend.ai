@@ -43,6 +43,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     ClusterMode,
     ImageAlias,
@@ -338,9 +339,9 @@ class NewServiceRequestModel(BaseModel):
 
 @dataclass
 class ValidationResult:
-    model_id: str
-    requester_access_key: str
-    owner_access_key: str
+    model_id: uuid.UUID
+    requester_access_key: AccessKey
+    owner_access_key: AccessKey
     owner_uuid: uuid.UUID
     group_id: uuid.UUID
     resource_policy: dict
@@ -582,10 +583,14 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
     return SuccessResponseModel()
 
 
+class TryStartResponseModel(BaseModel):
+    task_id: str
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params_v2(NewServiceRequestModel)
-async def try_start(request: web.Request, params: NewServiceRequestModel) -> web.Response:
+async def try_start(request: web.Request, params: NewServiceRequestModel) -> TryStartResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
     background_task_manager = root_ctx.background_task_manager
 
@@ -596,7 +601,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> web
             session,
             [
                 ImageRef(params.image, ["*"], params.architecture),
-                params.image,
+                ImageAlias(params.image),
             ],
         )
         query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
@@ -618,7 +623,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> web
             image_row.name,
             image_row.architecture,
             UserScope(
-                domain_name=params["domain"],
+                domain_name=params.domain,
                 group_id=validation_result.group_id,
                 user_uuid=created_user.uuid,
                 user_role=created_user.role,
@@ -638,12 +643,12 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> web
                 "preopen_ports": None,
                 "agent_list": None,
             },
-            params["cluster_mode"],
-            params["cluster_size"],
-            bootstrap_script=params["bootstrap_script"],
-            startup_command=params["startup_command"],
-            tag=params["tag"],
-            callback_url=params["callback_url"],
+            params.cluster_mode,
+            params.cluster_size,
+            bootstrap_script=params.bootstrap_script,
+            startup_command=params.startup_command,
+            tag=params.tag,
+            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
             enqueue_only=True,
             sudo_session_enabled=sudo_session_enabled,
         )
@@ -721,7 +726,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> web
                 root_ctx.event_dispatcher.unsubscribe(handler)
 
     task_id = await background_task_manager.start(_task)
-    return web.json_response({"task_id": str(task_id)})
+    return TryStartResponseModel(task_id=str(task_id))
 
 
 @auth_required
