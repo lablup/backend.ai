@@ -258,7 +258,7 @@ ssl-verify = true
 
 
 [logging.graylog]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 12201
 
 # If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.

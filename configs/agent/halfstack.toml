@@ -69,7 +69,7 @@ ssl-enabled = true
 ssl-verify = false
 
 [logging.graylog]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 12201
 ssl-verify = false
 ca-certs = ""
