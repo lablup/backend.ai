@@ -36,8 +36,18 @@ def upgrade():
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
     )
 
+    op.create_primary_key("pk_association_groups_users", "association_groups_users", ["id"])
+    op.create_primary_key("pk_sgroups_for_domains", "sgroups_for_domains", ["id"])
+    op.create_primary_key("pk_sgroups_for_groups", "sgroups_for_groups", ["id"])
+    op.create_primary_key("pk_sgroups_for_keypairs", "sgroups_for_keypairs", ["id"])
+
 
 def downgrade():
+    op.drop_constraint("pk_association_groups_users", "association_groups_users", type_="primary")
+    op.drop_constraint("pk_sgroups_for_domains", "sgroups_for_domains", type_="primary")
+    op.drop_constraint("pk_sgroups_for_groups", "sgroups_for_groups", type_="primary")
+    op.drop_constraint("pk_sgroups_for_keypairs", "sgroups_for_keypairs", type_="primary")
+
     op.drop_column("sgroups_for_keypairs", "id")
     op.drop_column("sgroups_for_groups", "id")
     op.drop_column("sgroups_for_domains", "id")

@@ -119,6 +119,7 @@ def upgrade():
     )
 
     def ensure_unique(table, field_1: str, field_2: str) -> None:
+        # Leave only one duplicate record and delete all of it
         t1 = table.alias("t1")
         t2 = table.alias("t2")
         subq = (
