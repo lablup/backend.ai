@@ -773,7 +773,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
-    slot_resource_map: Mapping[str, Set[str]] = {
+    slot_prefix_to_utilization_metric_map: Mapping[str, Set[str]] = {
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
@@ -789,7 +789,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             }
         else:
             resources: list[str] = []
-            for r in self.slot_resource_map.values():
+            for r in self.slot_prefix_to_utilization_metric_map.values():
                 resources = [*resources, *r]
             self.resource_thresholds = {r: None for r in resources}
         self.thresholds_check_operator: ThresholdOperator = config.get("thresholds-check-operator")
@@ -896,9 +896,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for slot_prefix, resources in self.slot_resource_map.items():
+        for slot_prefix, util_metric in self.slot_prefix_to_utilization_metric_map.items():
             if unique_res_map.get(slot_prefix, 0) == 0:
-                unavailable_resources.update(resources)
+                unavailable_resources.update(util_metric)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
