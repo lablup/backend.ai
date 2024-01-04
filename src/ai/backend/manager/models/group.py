@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
+
 __all__: Sequence[str] = (
     "groups",
     "GroupRow",

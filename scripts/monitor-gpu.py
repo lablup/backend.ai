@@ -20,6 +20,7 @@ NOTIFY_INTERVAL = 6 * 3600  # in seconds
 
 log = logging.getLogger("ai.backend.agent.monitor")
 
+
 def check_lspci():
     proc = subprocess.run("lspci", capture_output=True)
     faulty_gpus = []

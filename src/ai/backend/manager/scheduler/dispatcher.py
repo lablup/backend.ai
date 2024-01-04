@@ -1291,9 +1291,7 @@ class SchedulerDispatcher(aobject):
 
                 scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
-
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
-
                 async with (
                     async_timeout.timeout(delay=50.0),
                     aiotools.PersistentTaskGroup() as tg,

@@ -33,7 +33,6 @@ from .utils import deprecation_reason_msg, description_msg
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (

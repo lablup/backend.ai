@@ -104,7 +104,6 @@ __all__ = (
     "recalc_concurrency_used",
 )
 
-
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
