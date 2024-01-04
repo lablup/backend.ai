@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import logging
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -12,7 +13,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .base import Item, PaginatedList, metadata, simple_db_mutate
+from .base import EnumValueType, Item, PaginatedList, metadata, simple_db_mutate
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
@@ -28,25 +29,40 @@ __all__: Sequence[str] = (
     "CreateAuditLog",
 )
 
+
+class AuditLogAction(str, enum.Enum):
+    """AuditLog Action's Enum"""
+
+    CREATE = "CREATE"
+    CHANGE = "CHANGE"
+    DELETE = "DELETE"
+
+
+class AuditLogTargetType(str, enum.Enum):
+    """ """
+
+    USER = "user"
+    KEYS = "keypairs"
+    VFOLDER = "vfolder"
+
+
 audit_logs = sa.Table(
     "audit_logs",
     metadata,
-    sa.Column("user_id", sa.String(length=256), index=True),
-    sa.Column("access_key", sa.String(length=20), index=True),
-    sa.Column("email", sa.String(length=64), index=True),
-    sa.Column(
-        "action",
-        sa.Enum("CREATE", "CHANGE", "DELETE", name="auditlogs_action", create_type=False),
-        index=True,
-    ),
-    sa.Column("data", pgsql.JSONB()),
+    sa.Column("user_id", sa.String(length=256), index=True, nullable=False),
+    sa.Column("access_key", sa.String(length=20), index=True, nullable=False),
+    sa.Column("email", sa.String(length=64), index=True, nullable=False),
+    sa.Column("action", EnumValueType(AuditLogAction), index=True, nullable=False),
+    sa.Column("data", pgsql.JSONB(), nullable=True),
     sa.Column(
         "target_type",
-        sa.Enum("user", "keypairs", "vfolder", name="auditlogs_targettype", create_type=False),
+        EnumValueType(AuditLogTargetType),
         index=True,
+        nullable=False,
     ),
-    sa.Column("target", sa.String(length=64), index=True),
+    sa.Column("target", sa.String(length=64), index=True, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
+    sa.Column("success", sa.Boolean(), server_default=sa.true(), index=True, nullable=False),
 )
 
 
