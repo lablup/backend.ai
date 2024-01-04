@@ -889,16 +889,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
         # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
-        unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
-        for k, v in occupied_slots.items():
-            unique_key = k.split(".")[0]
-            unique_res_map[unique_key] += v
+        unique_res_map: DefaultDict[str, Decimal] = defaultdict(Decimal)
+        for slot_name, alloc in occupied_slots.items():
+            unique_key = slot_name.split(".")[0]
+            unique_res_map[unique_key] += alloc
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for slot in unique_res_map:
-            if unique_res_map[slot] == 0:
-                unavailable_resources.update(self.slot_resource_map[slot])
+        for slot_prefix, resources in self.slot_resource_map.items():
+            if unique_res_map.get(slot_prefix, 0) == 0:
+                unavailable_resources.update(resources)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
