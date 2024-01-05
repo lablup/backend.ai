@@ -109,13 +109,13 @@ class AuditLog(graphene.ObjectType):
     }
 
     _queryorder_colmap = {
-        "user_id": "user_id",
-        "access_key": "access_key",
-        "email": "email",
-        "action": "action",
-        "target_type": "target_type",
-        "target": "target",
-        "created_at": "created_at",
+        "user_id": ("user_id", None),
+        "access_key": ("access_key", None),
+        "email": ("email", None),
+        "action": ("action", None),
+        "target_type": ("target_type", None),
+        "target": ("target", None),
+        "created_at": ("created_at", None),
     }
 
     @classmethod

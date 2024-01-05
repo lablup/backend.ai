@@ -89,6 +89,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
+from ..models.audit_logs import AuditLogAction, AuditLogTargetType
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -335,42 +336,64 @@ async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
+    user_email = request["user"]["email"]
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
+    vfolder_name = params["name"]
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
         access_key,
-        params["name"],
+        vfolder_name,
         params["folder_host"],
         params["usage_mode"].value,
         params["permission"].value,
     )
     folder_host = params["folder_host"]
     unmanaged_path = params["unmanaged_path"]
+
+    audit_log_data = {
+        "user_id": str(user_uuid),
+        "access_key": access_key,
+        "email": user_email,
+        "action": AuditLogAction.CREATE,
+        "data": {"before": {}, "after": {}},
+        "target_type": AuditLogTargetType.VFOLDER,
+        "target": folder_host,
+        "created_at": str(request["date"]),
+        "success": False,
+    }
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            raise GenericForbidden("Insufficient permission")
+            raise GenericForbidden(
+                "Insufficient permission", extra_data={"audit_log_data": audit_log_data}
+            )
     else:
         # Resolve host for the new virtual folder.
         if not folder_host:
             folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
             if not folder_host:
                 raise InvalidAPIParameters(
-                    "You must specify the vfolder host because the default host is not configured."
+                    "You must specify the vfolder host because the default host is not configured.",
+                    extra_data={"audit_log_data": audit_log_data},
                 )
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
-    if not verify_vfolder_name(params["name"]):
-        raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
-    if params["name"].startswith(".") and params["name"] != ".local":
+    if not verify_vfolder_name(vfolder_name):
+        raise InvalidAPIParameters(
+            f"{vfolder_name} is reserved for internal operations.",
+            extra_data={"audit_log_data": audit_log_data},
+        )
+    if vfolder_name.startswith(".") and vfolder_name != ".local":
         if params["group"] is not None:
-            raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
+            raise InvalidAPIParameters(
+                "dot-prefixed vfolders cannot be a group folder.", extra_data=audit_log_data
+            )
 
     group_uuid: uuid.UUID | None = None
     group_type: ProjectType | None = None
@@ -395,7 +418,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     group_row.resource_policy_row.max_quota_scope_size,
                 )
                 if _gid is None:
-                    raise GroupNotFound(extra_data=group_id_or_name)
+                    raise GroupNotFound(
+                        extra_data={
+                            "group_id_or_name": group_id_or_name,
+                            "audit_log_data": audit_log_data,
+                        }
+                    )
                 group_uuid = _gid
                 group_type = group_row.type
             case uuid.UUID():
@@ -416,7 +444,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     group_row.resource_policy_row.max_quota_scope_size,
                 )
                 if _gid is None:
-                    raise GroupNotFound(extra_data=group_id_or_name)
+                    raise GroupNotFound(
+                        extra_data={
+                            "group_id_or_name": group_id_or_name,
+                            "audit_log_data": audit_log_data,
+                        }
+                    )
                 group_uuid = group_id_or_name
                 group_type = group_row.type
             case None:
@@ -432,7 +465,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     user_row.resource_policy_row.max_quota_scope_size,
                 )
             case _:
-                raise GroupNotFound(extra_data=group_id_or_name)
+                raise GroupNotFound(
+                    extra_data={
+                        "group_id_or_name": group_id_or_name,
+                        "audit_log_data": audit_log_data,
+                    }
+                )
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
@@ -455,11 +493,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
     if group_type == ProjectType.MODEL_STORE:
         if params["permission"] != VFolderPermission.READ_WRITE:
             raise InvalidAPIParameters(
-                "Setting custom permission is not supported for model store vfolder"
+                "Setting custom permission is not supported for model store vfolder",
+                extra_data={"audit_log_data": audit_log_data},
             )
         if params["usage_mode"] != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
-                "Only Model VFolder can be created under the model store project"
+                "Only Model VFolder can be created under the model store project",
+                extra_data={"audit_log_data": audit_log_data},
             )
 
     async with root_ctx.db.begin() as conn:
@@ -473,6 +513,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 domain_name=domain_name,
                 group_id=group_uuid,
                 permission=VFolderHostPermission.CREATE,
+                audit_log_data=audit_log_data,
             )
 
         # Check resource policy's max_vfolder_count
@@ -486,7 +527,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             result = await conn.scalar(query)
             if result >= max_vfolder_count and ownership_type == "user":
-                raise InvalidAPIParameters("You cannot create more vfolders.")
+                raise InvalidAPIParameters(
+                    "You cannot create more vfolders.",
+                    extra_data={"audit_log_data": audit_log_data},
+                )
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
         # max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
@@ -496,7 +540,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         #     params["quota"] = max_vfolder_size
 
         # Prevent creation of vfolder with duplicated name on all hosts.
-        extra_vf_conds = [vfolders.c.name == params["name"]]
+        extra_vf_conds = [vfolders.c.name == vfolder_name]
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -506,7 +550,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
         if len(entries) > 0:
-            raise VFolderAlreadyExists(extra_data=params["name"])
+            raise VFolderAlreadyExists(
+                extra_data={"vfolder_name": vfolder_name, "audit_log_data": audit_log_data}
+            )
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
@@ -542,7 +588,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 ):
                     pass
         except aiohttp.ClientResponseError as e:
-            raise VFolderCreationFailed from e
+            raise VFolderCreationFailed(extra_data={"audit_log_data": audit_log_data}) from e
 
         # By default model store VFolder should be considered as read only for every users but without the creator
         if group_type == ProjectType.MODEL_STORE:
@@ -601,8 +647,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 })
                 await conn.execute(query)
         except sa.exc.DataError:
-            raise InvalidAPIParameters
+            raise InvalidAPIParameters(extra_data={"audit_log_data": audit_log_data})
         assert result.rowcount == 1
+
+    audit_log_data["data"]["after"] = {k: str(v) for k, v in resp.items()}
+    audit_log_data["success"] = True
+    resp["audit_log_data"] = audit_log_data
 
     return web.json_response(resp, status=201)
 

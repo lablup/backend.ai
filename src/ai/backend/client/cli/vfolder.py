@@ -67,6 +67,7 @@ def list_allowed_types():
 
 
 @vfolder.command()
+@pass_ctx_obj
 @click.argument("name", type=str)
 @click.argument("host", type=str, default=None)
 @click.option(
@@ -157,10 +158,15 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     quota=quota,
                     cloneable=cloneable,
                 )
+            audit_log_data = result["audit_log_data"]
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:
-            print_error(e)
+            print(e)
+            audit_log_data = e.__getattribute__("data").get("data").get("audit_log_data")
             sys.exit(ExitCode.FAILURE)
+        finally:
+            print(audit_log_data)
+            # TODO: Implement audit log creation
 
 
 @vfolder.command()
