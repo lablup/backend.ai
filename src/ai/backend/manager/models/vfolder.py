@@ -854,8 +854,6 @@ async def ensure_host_permission_allowed(
     resource_policy: Mapping[str, Any],
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
-    # TODO : whether to user None or empty dict
-    audit_log_data: dict[str, Any] = {},
 ) -> None:
     allowed_hosts = await filter_host_allowed_permission(
         db_conn,
@@ -866,10 +864,7 @@ async def ensure_host_permission_allowed(
         group_id=group_id,
     )
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters(
-            f"`{permission}` Not allowed in vfolder host(`{folder_host}`)",
-            extra_data={"audit_log_data": audit_log_data},
-        )
+        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
 
 
 async def filter_host_allowed_permission(
