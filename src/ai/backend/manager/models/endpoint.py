@@ -147,12 +147,6 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
-    created_user_row = relationship(
-        "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
-    )
-    session_owner_row = relationship(
-        "UserRow", back_populates="owned_endpoints", foreign_keys="EndpointRow.session_owner"
-    )
 
     def __init__(
         self,
@@ -374,12 +368,8 @@ class Endpoint(graphene.ObjectType):
     url = graphene.String()
     model = graphene.UUID()
     model_mount_destiation = graphene.String()
-    created_user = graphene.UUID(description="Deprecated since 23.09.8; use `created_user_id`")
-    created_user_email = graphene.String(description="Added at 23.09.8")
-    created_user_id = graphene.UUID(description="Added at 23.09.8")
-    session_owner = graphene.UUID(description="Deprecated since 23.09.8; use `session_owner_id`")
-    session_owner_email = graphene.String(description="Added at 23.09.8")
-    session_owner_id = graphene.UUID(description="Added at 23.09.8")
+    created_user = graphene.UUID()
+    session_owner = graphene.UUID()
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -420,11 +410,7 @@ class Endpoint(graphene.ObjectType):
             model=row.model,
             model_mount_destiation=row.model_mount_destiation,
             created_user=row.created_user,
-            created_user_id=row.created_user,
-            created_user_email=row.created_user_row.email,
             session_owner=row.session_owner,
-            session_owner_id=row.session_owner,
-            session_owner_email=row.session_owner_row.email,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,
@@ -491,8 +477,6 @@ class Endpoint(graphene.ObjectType):
             .offset(offset)
             .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
-            .options(selectinload(EndpointRow.created_user_row))
-            .options(selectinload(EndpointRow.session_owner_row))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
                 EndpointRow.lifecycle_stage.in_([
