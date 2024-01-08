@@ -262,6 +262,8 @@ Set the workspace settings for the Python extension for code navigation and auto
      - ``"relative"``
    * - ``editor.formatOnSave``
      - ``true``
+   * - ``editor.codeActionsOnSave``
+     - ``{"source.fixAll": true}``
 
 Set the following keys in the workspace settings to configure Python tools:
 
@@ -270,14 +272,14 @@ Set the following keys in the workspace settings to configure Python tools:
 
    * - Setting ID
      - Example value
-   * - ``{mypy-type-checker,black-formatter}.interpreter``
-     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.6/bin/python"]``
-   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+   * - ``mypy-type-checker.interpreter``
+     - ``["dist/export/python/virtualenvs/mypy/3.11.6/bin/python"]``
+   * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
      - ``["dist/export/python/virtualenvs/ruff/3.11.6/bin/python"]``
-   * - ``ruff.path``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff"]``
+   * - ``ruff.importStrategy``
+     - ``"fromEnvironment"``
 
 .. note:: **Changed in July 2023**
 
