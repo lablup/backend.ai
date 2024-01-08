@@ -209,22 +209,19 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
 * ``ruff``: Provides a fast linting (combining pylint, flake8, and isort)
-  and formatting (auto-fix for some linting rules and isort)
+  fixing (auto-fix for some linting rules and isort) and formatting (black)
 
 * ``mypy``: Validates the type annotations and performs a static analysis
-
-* ``black``: Validates and reformats all Python codes by reconstructing it from AST,
-  just like ``gofmt``.
 
   .. tip::
 
      For a long list of arguments or list/tuple items, you could explicitly add a
-     trailing comma to force Black to insert line-breaks after every item even when
+     trailing comma to force Ruff/Black to insert line-breaks after every item even when
      the line length does not exceed the limit (100 characters).
 
   .. tip::
@@ -246,9 +243,11 @@ Install the following extensions:
 
    * Python (``ms-python.python``)
    * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
-   * Black (``ms-python.black-formatter``)
    * Mypy (``ms-python.mypy-type-checker``)
    * Ruff (``charliermarsh.ruff``)
+   * For other standard Python extensions like Flake8, isort, and Black,
+     *disable* them for the Backend.AI workspace only to prevent interference
+     with Ruff's own linting, fixing and formatting.
 
 Set the workspace settings for the Python extension for code navigation and auto-completion:
 
@@ -260,11 +259,13 @@ Set the workspace settings for the Python extension for code navigation and auto
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+     - ``["dist/export/python/virtualenvs/python-default/3.11.6/lib/python3.11/site-packages"]``
    * - ``python.analysis.importFormat``
      - ``"relative"``
    * - ``editor.formatOnSave``
      - ``true``
+   * - ``editor.codeActionsOnSave``
+     - ``{"source.fixAll": true}``
 
 Set the following keys in the workspace settings to configure Python tools:
 
@@ -273,14 +274,14 @@ Set the following keys in the workspace settings to configure Python tools:
 
    * - Setting ID
      - Example value
-   * - ``{mypy-type-checker,black-formatter}.interpreter``
-     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.4/bin/python"]``
-   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+   * - ``mypy-type-checker.interpreter``
+     - ``["dist/export/python/virtualenvs/mypy/3.11.6/bin/python"]``
+   * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/python"]``
-   * - ``ruff.path``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.11.6/bin/python"]``
+   * - ``ruff.importStrategy``
+     - ``"fromEnvironment"``
 
 .. note:: **Changed in July 2023**
 
@@ -308,11 +309,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
-   let g:ale_linters = { "python": ['ruff', 'black', 'mypy'] }
-   let g:ale_fixers = {'python': ['ruff', 'black']}
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.6/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff'
+   let g:ale_linters = { "python": ['ruff', 'mypy'] }
+   let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
 
 When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
@@ -323,42 +323,20 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 .. code-block:: json
 
    {
-     "coc.preferences.formatOnType": true,
-     "coc.preferences.formatOnSaveFiletypes": [],  // Use the autocmd config
+     "coc.preferences.formatOnType": false,
      "coc.preferences.willSaveHandlerTimeout": 5000,
      "ruff.enabled": true,
-     "ruff.autoFixOnSave": false,  // Use the autocmd config
+     "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
-     "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.6/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.6/bin/python",
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.6/bin/mypy",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
 after opening any Python source file to install the ``ruff-lsp`` server.
-
-Unfortunately, CoC does not support applying multiple formatters on save, we should call
-them serially using ``autocmd``.
-To configure it, put the following vimscript as ``.exrc`` in the working copy root:
-
-.. code-block:: vim
-
-   function! OrganizeAndFormat()
-       CocCommand ruff.executeOrganizeImports
-       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
-       sleep 50m  " to avoid races
-       call CocAction('format')
-       sleep 50m
-   endfunction
-
-   augroup autofix
-       autocmd!
-       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | endif
-   augroup END
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
