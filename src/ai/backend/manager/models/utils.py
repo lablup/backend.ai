@@ -18,6 +18,7 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
+from async_timeout import timeout as _timeout
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -56,6 +57,7 @@ class ExtendedAsyncSAEngine(SAEngine):
 
     def __init__(self, *args, **kwargs) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
+        self._lock_conn_timeout = kwargs.pop("_lock_conn_timeout", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
@@ -139,9 +141,19 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # but in this case:
                 #  - The lock ID is only given from trusted codes.
                 #  - asyncpg does not support parameter interpolation with raw SQL statements.
-                await lock_conn.exec_driver_sql(
-                    f"SELECT pg_advisory_lock({lock_id:d});",
-                )
+                if self._lock_conn_timeout > 0:
+                    with _timeout(self._lock_conn_timeout):
+                        await lock_conn.exec_driver_sql(
+                            f"SELECT pg_advisory_lock({lock_id:d});",
+                        )
+                        lock_acquired = True
+                        yield
+                else:
+                    await lock_conn.exec_driver_sql(
+                        f"SELECT pg_advisory_lock({lock_id:d});",
+                    )
+                    lock_acquired = True
+                    yield
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
@@ -149,19 +161,22 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise
             except asyncio.CancelledError:
                 raise
-            else:
-                lock_acquired = True
-                yield
             finally:
                 if lock_acquired and not lock_conn.closed:
-                    await lock_conn.exec_driver_sql(
-                        f"SELECT pg_advisory_unlock({lock_id:d})",
-                    )
+                    try:
+                        await lock_conn.exec_driver_sql(
+                            f"SELECT pg_advisory_unlock({lock_id:d})",
+                        )
+                    except sa.exc.InterfaceError:
+                        log.warning(
+                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                        )
 
 
 def create_async_engine(
     *args,
     _txn_concurrency_threshold: int = 0,
+    _lock_conn_timeout: int = 0,
     **kwargs,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
@@ -169,6 +184,7 @@ def create_async_engine(
     return ExtendedAsyncSAEngine(
         sync_engine,
         _txn_concurrency_threshold=_txn_concurrency_threshold,
+        _lock_conn_timeout=_lock_conn_timeout,
     )
 
 
@@ -206,6 +222,7 @@ async def connect_database(
             int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
             2,
         ),
+        _lock_conn_timeout=local_config["db"]["lock-conn-timeout"],
     )
     yield db
     await db.dispose()
