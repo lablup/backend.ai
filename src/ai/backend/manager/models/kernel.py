@@ -77,7 +77,7 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_retry_v2, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -665,46 +665,45 @@ class KernelRow(Base):
 
         now = datetime.now(tzutc())
 
-        async def _update() -> bool:
-            async with db.begin_session() as db_session:
-                kernel_query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kernel_id)
-                    .with_for_update()
-                    .options(
-                        noload("*"),
-                        load_only(KernelRow.status, KernelRow.session_id),
-                    )
+        async def _update(db_session: SASession) -> bool:
+            kernel_query = (
+                sa.select(KernelRow)
+                .where(KernelRow.id == kernel_id)
+                .with_for_update()
+                .options(
+                    noload("*"),
+                    load_only(KernelRow.status, KernelRow.session_id),
                 )
-                kernel_row = (await db_session.scalars(kernel_query)).first()
+            )
+            kernel_row = (await db_session.scalars(kernel_query)).first()
 
-                if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
-                    # TODO: log or raise error
-                    return False
-                if update_data is None:
-                    update_values = {
-                        "status": new_status,
-                        "status_history": sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                new_status.name: now.isoformat(),
-                            },
-                        ),
-                    }
-                else:
-                    update_values = {
-                        **update_data,
-                        "status": new_status,
-                    }
+            if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
+                # TODO: log or raise error
+                return False
+            if update_data is None:
+                update_values = {
+                    "status": new_status,
+                    "status_history": sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {
+                            new_status.name: now.isoformat(),
+                        },
+                    ),
+                }
+            else:
+                update_values = {
+                    **update_data,
+                    "status": new_status,
+                }
 
-                update_query = (
-                    sa.update(KernelRow).where(KernelRow.id == kernel_id).values(**update_values)
-                )
-                await db_session.execute(update_query)
+            update_query = (
+                sa.update(KernelRow).where(KernelRow.id == kernel_id).values(**update_values)
+            )
+            await db_session.execute(update_query)
             return True
 
-        return await execute_with_retry(_update)
+        return await execute_with_retry_v2(db, _update, timeout=db.conn_timeout)
 
 
 DEFAULT_KERNEL_ORDERING = [
