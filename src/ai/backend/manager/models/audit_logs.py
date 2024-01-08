@@ -63,6 +63,8 @@ audit_logs = sa.Table(
     sa.Column("target", sa.String(length=64), index=True, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column("success", sa.Boolean(), server_default=sa.true(), index=True, nullable=False),
+    sa.Column("rest_api_path", sa.String(length=256), nullable=True),
+    sa.Column("gql_query", sa.String(length=256), nullable=True),
 )
 
 
@@ -78,6 +80,8 @@ class AuditLog(graphene.ObjectType):
     target_type = graphene.String()
     target = graphene.String()
     created_at = GQLDateTime()
+    rest_api_path = graphene.String()
+    gql_query = graphene.String()
 
     @classmethod
     def from_row(
@@ -96,6 +100,8 @@ class AuditLog(graphene.ObjectType):
             target_type=row["target_type"],
             target=row["target"],
             created_at=row["created_at"],
+            rest_api_path=row["rest_api_path"],
+            gql_query=row["gql_query"],
         )
 
     _queryfilter_fieldspec = {
@@ -106,6 +112,8 @@ class AuditLog(graphene.ObjectType):
         "target_type": ("target_type", None),
         "target": ("target", None),
         "created_at": ("created_at", dtparse),
+        "rest_api": ("rest_api", None),
+        "gql_query": ("gql_query", None),
     }
 
     _queryorder_colmap = {
@@ -116,6 +124,8 @@ class AuditLog(graphene.ObjectType):
         "target_type": ("target_type", None),
         "target": ("target", None),
         "created_at": ("created_at", None),
+        "rest_api": ("rest_api", None),
+        "gql_query": ("gql_query", None),
     }
 
     @classmethod

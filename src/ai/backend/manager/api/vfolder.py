@@ -325,6 +325,11 @@ def vfolder_check_exists(
 
 @web.middleware
 async def audit_log_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    # TODO: in near future we can change this condition to dict so we can add more conditions
+
+    if request.method == "GET":
+        return await handler(request)
+
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = str(request["user"]["uuid"])
     access_key = request["keypair"]["access_key"]
@@ -340,6 +345,7 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
         "target": None,
         "created_at": datetime.utcnow(),
         "success": False,
+        "rest_api_path": request.path,
     })
 
     try:
@@ -351,8 +357,8 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
             log.info("AUDIT_LOG: {}", audit_log_data.get())
             async with root_ctx.db.begin_session() as sess:
                 await sess.execute(sa.insert(audit_logs).values(audit_log_data.get()))
-        except Exception:
-            log.error("Failed to write audit log", exc_info=True)
+        except Exception as e:
+            log.error("Failed to write audit log {}", e, exc_info=True)
 
 
 def updated_data(new_data: dict[str, Any]) -> dict[str, Any]:
@@ -3346,7 +3352,7 @@ async def shutdown(app: web.Application) -> None:
 
 
 def create_app(default_cors_options):
-    app = web.Application(middlewares=[audit_log_middleware])
+    app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
@@ -3401,4 +3407,4 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
     cors.add(add_route("GET", r"/_/used-bytes", get_used_bytes))
-    return app, []
+    return app, [audit_log_middleware]
