@@ -253,8 +253,8 @@ class ServiceConfigModel(BaseModel):
         description="Name of the resource group to spawn inference sessions",
         examples=["nvidia-H100"],
     )
-    resources: dict[str, str] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
-    resource_opts: dict[str, str] = Field(examples=[{"shmem": "2g"}], default={})
+    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
 
 class NewServiceRequestModel(BaseModel):
