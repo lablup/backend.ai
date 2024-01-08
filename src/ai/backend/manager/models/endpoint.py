@@ -210,6 +210,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_tokens=False,
         load_image=False,
+        load_created_user=False,
+        load_session_owner=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -221,6 +223,10 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -243,6 +249,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_image=False,
         load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
     ) -> List["EndpointRow"]:
         query = (
@@ -256,6 +264,10 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -534,9 +546,15 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
-                session, project=project, domain=domain_name, user_uuid=user_uuid, load_image=True
+                session,
+                project=project,
+                domain=domain_name,
+                user_uuid=user_uuid,
+                load_image=True,
+                load_created_user=True,
+                load_session_owner=True,
             )
-        return [await Endpoint.from_row(ctx, row) for row in rows]
+            return [await Endpoint.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -561,10 +579,12 @@ class Endpoint(graphene.ObjectType):
                     project=project,
                     load_image=True,
                     load_routes=True,
+                    load_created_user=True,
+                    load_session_owner=True,
                 )
+                return await Endpoint.from_row(ctx, row)
         except NoResultFound:
             raise EndpointNotFound
-        return await Endpoint.from_row(ctx, row)
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
