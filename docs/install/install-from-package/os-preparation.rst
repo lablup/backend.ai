@@ -113,11 +113,51 @@ information on the Python version compatibility can be found at
 `here <https://github.com/lablup/backend.ai#package-installation-guide#python-version-compatibility>`_.
 
 There can be several ways to prepare a specific Python version. Here, we will be
-using pyenv and pyenv-virtualenv.
+using a standalone static built Python.
+
+Use a standalone static built Python (Recommended)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Obtain distribution of `a standalone static built Python <https://github.com/indygreg/python-build-standalone/releases>`_ according to required 
+python version, target machine architecture and etc. Then extract the distribution 
+to a directory of your choice.
+
+.. code-block:: console
+
+   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/${PYTHON_RELEASE_DATE}/cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz" > cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz
+   $ tar -xf "cpython-${PYTHON_VERSION}+${PYTHON_RELEASE_DATE}-${TARGET_MACHINE_ARCHITECTURE}-${ARCHIVE_FLAVOR}.tar.gz"
+   $ mkdir -p "/home/${USERNAME}/.static-python/versions"
+   $ mv python "/home/${USERNAME}/.static-python/versions/${PYTHON_VERSION}"
+
+For example,
+
+.. code-block:: console
+
+   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz
+   $ tar -xf "cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz"
+   $ mkdir -p "/home/bai/.static-python/versions"
+   $ mv python "/home/bai/.static-python/versions/3.11.6"
+
+Then, you can create multiple virtual environments per service. To create a
+virtual environment for Backend.AI Manager and activate it, for example, you may run:
+
+.. code-block:: console
+
+   $ mkdir "${HOME}/manager"
+   $ cd "${HOME}/manager"
+   $ ~/.static-python/versions/3.11.6/bin/python3 -m venv .venv
+   $ source .venv/bin/activate
+   $ pip install -U pip setuptools wheel
+
+You also need to make ``pip`` available to the Python installation with the
+latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension
+packages can be compiled and installed on your system.
 
 
-Use pyenv to manually build and select a specific Python version
+
+(Alternative) Use pyenv to manually build and select a specific Python version
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If you prefer, there is no problem using pyenv and pyenv-virtualenv.
 
 Install `pyenv <https://github.com/pyenv/pyenv>`_ and
 `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. Then, install
@@ -148,14 +188,6 @@ it, for example, you may run:
 You also need to make ``pip`` available to the Python installation with the
 latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension
 packages can be compiled and installed on your system.
-
-
-Use a standalone static built Python
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-We can `use a standalone static built Python <https://github.com/indygreg/python-build-standalone/releases>`_.
-
-.. warning:: Details will be added later.
 
 
 Configure network aliases
