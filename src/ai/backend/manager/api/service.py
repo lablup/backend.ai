@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import secrets
 import uuid
@@ -37,6 +38,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
     SessionCancelledEvent,
+    SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
@@ -656,37 +658,49 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         async def _handle_event(
             context: None,
             source: AgentId,
-            event: SessionPreparingEvent
+            event: SessionEnqueuedEvent
+            | SessionPreparingEvent
             | SessionStartedEvent
             | SessionCancelledEvent
             | SessionTerminatedEvent
             | ModelServiceStatusEvent,
         ) -> None:
-            log.debug("_handle_event(): {}", event.name)
-            await reporter.update(message=event.name)
+            message_body = {
+                "event": event.name,
+            }
+            match event:
+                case SessionEnqueuedEvent():
+                    message_body["session_id"] = str(event.session_id)
 
-            if isinstance(event, SessionTerminatedEvent) or isinstance(
-                event, SessionCancelledEvent
-            ):
-                terminated_event.set()
-            elif isinstance(event, ModelServiceStatusEvent):
-                await reporter.update(message=event.new_status.value)
-                async with root_ctx.db.begin_readonly_session() as db_sess:
-                    session = await SessionRow.get_session(
-                        db_sess,
-                        result["sessionId"],
-                        None,
-                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+            await reporter.update(message=json.dumps(message_body))
+
+            match event:
+                case SessionEnqueuedEvent() | SessionCancelledEvent():
+                    terminated_event.set()
+                case ModelServiceStatusEvent():
+                    await reporter.update(message=event.new_status.value)
+                    async with root_ctx.db.begin_readonly_session() as db_sess:
+                        session = await SessionRow.get_session(
+                            db_sess,
+                            result["sessionId"],
+                            None,
+                            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                        )
+                    await root_ctx.registry.destroy_session(
+                        session,
+                        forced=True,
                     )
-                await root_ctx.registry.destroy_session(
-                    session,
-                    forced=True,
-                )
 
         session_event_matcher = lambda args: args[0] == str(result["sessionId"])
         model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
 
         handlers: list[EventHandler] = [
+            root_ctx.event_dispatcher.subscribe(
+                SessionEnqueuedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
             root_ctx.event_dispatcher.subscribe(
                 SessionPreparingEvent,
                 None,
