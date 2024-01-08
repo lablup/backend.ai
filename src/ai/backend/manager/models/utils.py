@@ -57,7 +57,9 @@ class ExtendedAsyncSAEngine(SAEngine):
 
     def __init__(self, *args, **kwargs) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
-        self._lock_conn_timeout = kwargs.pop("_lock_conn_timeout", 0)
+        self.lock_conn_timeout: float | None = (
+            kwargs.pop("_lock_conn_timeout", 0) or None
+        )  # Convert 0 to `None`
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
@@ -141,14 +143,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # but in this case:
                 #  - The lock ID is only given from trusted codes.
                 #  - asyncpg does not support parameter interpolation with raw SQL statements.
-                if self._lock_conn_timeout > 0:
-                    with _timeout(self._lock_conn_timeout):
-                        await lock_conn.exec_driver_sql(
-                            f"SELECT pg_advisory_lock({lock_id:d});",
-                        )
-                        lock_acquired = True
-                        yield
-                else:
+                async with _timeout(self.lock_conn_timeout):
                     await lock_conn.exec_driver_sql(
                         f"SELECT pg_advisory_lock({lock_id:d});",
                     )
