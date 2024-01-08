@@ -221,7 +221,7 @@ Currently we have the following Python tools to configure in this way:
   .. tip::
 
      For a long list of arguments or list/tuple items, you could explicitly add a
-     trailing comma to force Black to insert line-breaks after every item even when
+     trailing comma to force Ruff/Black to insert line-breaks after every item even when
      the line length does not exceed the limit (100 characters).
 
   .. tip::
@@ -243,9 +243,11 @@ Install the following extensions:
 
    * Python (``ms-python.python``)
    * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
-   * Black (``ms-python.black-formatter``)
    * Mypy (``ms-python.mypy-type-checker``)
    * Ruff (``charliermarsh.ruff``)
+   * For other standard Python extensions like Flake8, isort, and Black,
+     *disable* them for the Backend.AI workspace only to prevent interference
+     with Ruff's own linting, fixing and formatting.
 
 Set the workspace settings for the Python extension for code navigation and auto-completion:
 
