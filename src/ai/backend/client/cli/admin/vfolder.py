@@ -268,7 +268,6 @@ def umount_host(name, edit_fstab):
             print(" ", aid)
             for k, v in data.items():
                 print("   ", k, ":", v)
-        # TODO: add audit log
 
 
 @vfolder.command
@@ -352,7 +351,6 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
-            # TODO: add audit log
             print("Updated.")
         except Exception as e:
             print_error(e)
@@ -374,7 +372,6 @@ def remove_shared_vf_permission(vfolder_id, user_id):
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
-            # TODO: add audit log
             print("Removed.")
         except Exception as e:
             print_error(e)
@@ -396,7 +393,6 @@ def change_vfolder_ownership(vfolder_id, user_email):
     with Session() as session:
         try:
             session.VFolder.change_vfolder_ownership(vfolder_id, user_email)
-            # TODO: add audit log
             print(f"Now ownership of VFolder:{vfolder_id} goes to User:{user_email}")
         except Exception as e:
             print_error(e)
