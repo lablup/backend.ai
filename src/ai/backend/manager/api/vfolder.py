@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import functools
 import json
 import logging
@@ -34,6 +35,8 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
+from pydantic.v1.utils import deep_update
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -89,7 +92,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
-from ..models.audit_logs import AuditLogAction, AuditLogTargetType
+from ..models.audit_logs import AuditLogAction, AuditLogTargetType, audit_logs
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -118,6 +121,9 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow: TypeAlias = Mapping[str, Any]
+audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "audit_log_data_partial", default={}
+)
 P = ParamSpec("P")
 
 
@@ -317,6 +323,43 @@ def vfolder_check_exists(
     return _wrapped
 
 
+@web.middleware
+async def audit_log_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    user_uuid = str(request["user"]["uuid"])
+    access_key = request["keypair"]["access_key"]
+    user_email = request["user"]["email"]
+
+    audit_log_data.set({
+        "user_id": user_uuid,
+        "access_key": access_key,
+        "email": user_email,
+        "action": None,
+        "data": {"before": {}, "after": {}},
+        "target_type": None,
+        "target": None,
+        "created_at": datetime.utcnow(),
+        "success": False,
+    })
+
+    try:
+        return await handler(request)
+    except Exception:
+        raise
+    finally:
+        try:
+            log.info("AUDIT_LOG: {}", audit_log_data.get())
+            async with root_ctx.db.begin_session() as sess:
+                await sess.execute(sa.insert(audit_logs).values(audit_log_data.get()))
+        except Exception:
+            log.error("Failed to write audit log", exc_info=True)
+
+
+def updated_data(new_data: dict[str, Any]) -> dict[str, Any]:
+    current_audit_log_data = audit_log_data.get().copy()
+    return deep_update(current_audit_log_data, new_data)
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params(
@@ -336,7 +379,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
-    user_email = request["user"]["email"]
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
@@ -354,17 +396,16 @@ async def create(request: web.Request, params: Any) -> web.Response:
     folder_host = params["folder_host"]
     unmanaged_path = params["unmanaged_path"]
 
-    audit_log_data = {
-        "user_id": str(user_uuid),
-        "access_key": access_key,
-        "email": user_email,
-        "action": AuditLogAction.CREATE,
-        "data": {"before": {}, "after": {}},
-        "target_type": AuditLogTargetType.VFOLDER,
-        "target": folder_host,
-        "created_at": str(request["date"]),
-        "success": False,
-    }
+    audit_log_data.set(
+        updated_data(
+            new_data={
+                "action": AuditLogAction.CREATE,
+                "target_type": AuditLogTargetType.VFOLDER,
+                "target": folder_host,
+            }
+        )
+    )
+
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
@@ -623,8 +664,14 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters
         assert result.rowcount == 1
 
-    audit_log_data["data"]["after"] = {k: str(v) for k, v in resp.items()}
-    audit_log_data["success"] = True
+    audit_log_data.set(
+        updated_data(
+            new_data={
+                "data": {"after": {k: str(v) for k, v in resp.items()}},
+                "success": True,
+            }
+        )
+    )
 
     return web.json_response(resp, status=201)
 
@@ -3299,7 +3346,7 @@ async def shutdown(app: web.Application) -> None:
 
 
 def create_app(default_cors_options):
-    app = web.Application()
+    app = web.Application(middlewares=[audit_log_middleware])
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
