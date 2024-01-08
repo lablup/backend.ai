@@ -18,6 +18,7 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
+from async_timeout import timeout as _timeout
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -55,6 +56,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     """
 
     def __init__(self, *args, **kwargs) -> None:
+        self.conn_timeout: float | None = kwargs.pop("_conn_timeout") or None  # Convert 0 to `None`
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
@@ -117,6 +119,7 @@ class ExtendedAsyncSAEngine(SAEngine):
         self,
         bind: SAConnection | None = None,
         expire_on_commit: bool = False,
+        commit_on_end: bool = True,
     ) -> AsyncIterator[SASession]:
         @actxmgr
         async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
@@ -127,11 +130,13 @@ class ExtendedAsyncSAEngine(SAEngine):
                 self._generic_txn_count += 1
                 self._check_generic_txn_cnt()
                 try:
-                    yield session
-                    await session.commit()
-                except Exception as e:
-                    await session.rollback()
-                    raise e
+                    async with _timeout(self.conn_timeout):
+                        yield session
+                        if commit_on_end:
+                            await session.commit()
+                except asyncio.TimeoutError:
+                    log.exception("DB Connection timeout in generic session")
+                    raise
                 finally:
                     self._generic_txn_count -= 1
 
@@ -163,7 +168,11 @@ class ExtendedAsyncSAEngine(SAEngine):
                 self._readonly_txn_count += 1
                 self._check_readonly_txn_cnt()
                 try:
-                    yield session
+                    async with _timeout(self.conn_timeout):
+                        yield session
+                except asyncio.TimeoutError:
+                    log.exception("DB Connection timeout in read-only session")
+                    raise
                 finally:
                     self._readonly_txn_count -= 1
 
@@ -210,6 +219,7 @@ class ExtendedAsyncSAEngine(SAEngine):
 def create_async_engine(
     *args,
     _txn_concurrency_threshold: int = 0,
+    _conn_timeout: int = 0,
     **kwargs,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
@@ -217,6 +227,7 @@ def create_async_engine(
     return ExtendedAsyncSAEngine(
         sync_engine,
         _txn_concurrency_threshold=_txn_concurrency_threshold,
+        _conn_timeout=_conn_timeout,
     )
 
 
@@ -254,6 +265,7 @@ async def connect_database(
             int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
             2,
         ),
+        _conn_timeout=local_config["db"]["conn-timeout"],
     )
     yield db
     await db.dispose()
@@ -323,27 +335,33 @@ async def execute_with_retry_v2(
     sa_engine: ExtendedAsyncSAEngine,
     txn_func: Callable[[SASession], Awaitable[TQueryResult]],
     conn: SAConnection | None = None,
+    *,
+    timeout: float | None = None,
 ) -> TQueryResult:
     max_attempts = 20
 
     async def _execute(connection: SAConnection) -> TQueryResult:
         result: TQueryResult | Sentinel = Sentinel.token
         try:
-            async for attempt in AsyncRetrying(
-                wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
-                stop=stop_after_attempt(max_attempts),
-                retry=retry_if_exception_type(TryAgain),
-            ):
-                with attempt:
-                    async with sa_engine.begin_session(connection) as db_session:
-                        try:
-                            result = await txn_func(db_session)
-                        except DBAPIError as e:
-                            if is_db_retry_error(e):
-                                raise TryAgain
-                            raise
+            async with _timeout(timeout):
+                async for attempt in AsyncRetrying(
+                    wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+                    stop=stop_after_attempt(max_attempts),
+                    retry=retry_if_exception_type(TryAgain),
+                ):
+                    with attempt:
+                        async with sa_engine.begin_session(connection) as db_session:
+                            try:
+                                result = await txn_func(db_session)
+                            except DBAPIError as e:
+                                if is_db_retry_error(e):
+                                    raise TryAgain
+                                raise
         except RetryError:
             raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+        except asyncio.TimeoutError:
+            log.exception("DB Connection timeout retrying connection")
+            raise
         assert result is not Sentinel.token
         return result
 
