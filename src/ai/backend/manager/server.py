@@ -4,6 +4,7 @@ import asyncio
 import functools
 import grp
 import importlib
+import importlib.resources
 import logging
 import os
 import pwd
@@ -30,20 +31,28 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+)
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
@@ -54,54 +63,56 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
+from .api.types import (
+    AppCreator,
+    CleanupContext,
+    WebMiddleware,
+    WebRequestHandler,
+)
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .models import SessionRow
 from .types import DistributedLockFactory
 
-VALID_VERSIONS: Final = frozenset(
-    [
-        # 'v1.20160915',  # deprecated
-        # 'v2.20170315',  # deprecated
-        # 'v3.20170615',  # deprecated
-        # authentication changed not to use request bodies
-        "v4.20181215",
-        # added & enabled streaming-execute API
-        "v4.20190115",
-        # changed resource/image formats
-        "v4.20190315",
-        # added user mgmt and ID/password authentication
-        # added domain/group/scaling-group
-        # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
-        "v4.20190615",
-        # added mount_map parameter when creating kernel
-        # changed GraphQL query structures for multi-container bundled sessions
-        "v5.20191215",
-        # rewrote vfolder upload/download APIs to migrate to external storage proxies
-        "v6.20200815",
-        # added standard-compliant /admin/gql endpoint
-        # deprecated /admin/graphql endpoint (still present for backward compatibility)
-        # added "groups_by_name" GQL query
-        # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
-        # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
-        "v6.20210815",
-        # added session dependencies and state callback URLs configs when creating sessions
-        # added session event webhook option to session creation API
-        # added architecture option when making image aliases
-        "v6.20220315",
-        # added payload encryption / decryption on selected transfer
-        "v6.20220615",
-        # added config/resource-slots/details, model mgmt & serving APIs
-        "v6.20230315",
-        # added quota scopes (per-user/per-project quota configs)
-        # added user & project resource policies
-        # deprecated per-vfolder quota configs (BREAKING)
-        "v7.20230615",
-    ]
-)
+VALID_VERSIONS: Final = frozenset([
+    # 'v1.20160915',  # deprecated
+    # 'v2.20170315',  # deprecated
+    # 'v3.20170615',  # deprecated
+    # authentication changed not to use request bodies
+    "v4.20181215",
+    # added & enabled streaming-execute API
+    "v4.20190115",
+    # changed resource/image formats
+    "v4.20190315",
+    # added user mgmt and ID/password authentication
+    # added domain/group/scaling-group
+    # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
+    "v4.20190615",
+    # added mount_map parameter when creating kernel
+    # changed GraphQL query structures for multi-container bundled sessions
+    "v5.20191215",
+    # rewrote vfolder upload/download APIs to migrate to external storage proxies
+    "v6.20200815",
+    # added standard-compliant /admin/gql endpoint
+    # deprecated /admin/graphql endpoint (still present for backward compatibility)
+    # added "groups_by_name" GQL query
+    # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
+    # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
+    "v6.20210815",
+    # added session dependencies and state callback URLs configs when creating sessions
+    # added session event webhook option to session creation API
+    # added architecture option when making image aliases
+    "v6.20220315",
+    # added payload encryption / decryption on selected transfer
+    "v6.20220615",
+    # added config/resource-slots/details, model mgmt & serving APIs
+    "v6.20230315",
+    # added quota scopes (per-user/per-project quota configs)
+    # added user & project resource policies
+    # deprecated per-vfolder quota configs (BREAKING)
+    "v7.20230615",
+])
 LATEST_REV_DATES: Final = {
     1: "20160915",
     2: "20170915",
@@ -145,6 +156,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".ratelimit",
     ".vfolder",
     ".admin",
+    ".spec",
     ".service",
     ".session",
     ".stream",
@@ -160,17 +172,17 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
 ]
 
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
+
 
 async def hello(request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
-    return web.json_response(
-        {
-            "version": LATEST_API_VERSION,
-            "manager": __version__,
-        }
-    )
+    return web.json_response({
+        "version": LATEST_API_VERSION,
+        "manager": __version__,
+    })
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -246,7 +258,9 @@ async def exception_middleware(
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(concrete_ex.method, concrete_ex.allowed_methods)
+            raise MethodNotAllowed(
+                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
+            )
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
@@ -316,24 +330,31 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.shared_config.data["redis"]
+
     root_ctx.redis_live = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
     for redis_info in (
@@ -343,7 +364,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
-        assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
     yield
     await root_ctx.redis_stream.close()
@@ -378,6 +398,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
     )
     yield
@@ -418,6 +439,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
+        context=ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
@@ -434,20 +456,33 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from zmq.auth.certs import load_certificate
+
     from .registry import AgentRegistry
 
+    manager_pkey, manager_skey = load_certificate(
+        root_ctx.local_config["manager"]["rpc-auth-manager-keypair"]
+    )
+    assert manager_skey is not None
+    manager_public_key = PublicKey(manager_pkey)
+    manager_secret_key = SecretKey(manager_skey)
+    root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
     root_ctx.registry = AgentRegistry(
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
+        root_ctx.agent_cache,
         root_ctx.redis_stat,
         root_ctx.redis_live,
         root_ctx.redis_image,
+        root_ctx.redis_stream,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
+        manager_public_key=manager_public_key,
+        manager_secret_key=manager_secret_key,
     )
     await root_ctx.registry.init()
     yield
@@ -651,6 +686,7 @@ def _init_subapp(
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
+        subapp["_root_app"] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
@@ -735,6 +771,7 @@ def build_root_app(
         "limit": 2048,
         "close_timeout": 30,
         "exception_handler": global_exception_handler,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }
     app["scheduler_opts"] = {
         **default_scheduler_opts,
@@ -795,6 +832,10 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+
+    vendor_path = importlib.resources.files("ai.backend.manager.vendor")
+    assert isinstance(vendor_path, Path)
+    app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 
 
@@ -812,7 +853,8 @@ async def server_main(
     loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
-        port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,
+        termui_port=root_ctx.local_config["manager"]["aiomonitor-termui-port"] + pidx,
+        webui_port=root_ctx.local_config["manager"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
@@ -858,9 +900,9 @@ async def server_main(
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
                 gid = root_ctx.local_config["manager"]["group"]
-                os.setgroups(
-                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem]
-                )
+                os.setgroups([
+                    g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+                ])
                 os.setgid(gid)
                 os.setuid(uid)
                 log.info("changed process uid and gid to {}:{}", uid, gid)
@@ -909,23 +951,16 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
-) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
     """
     Start the manager service as a foreground process.
     """
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
-    cfg = load_config(config_path, log_level.value)
+    cfg = load_config(config_path, "DEBUG" if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

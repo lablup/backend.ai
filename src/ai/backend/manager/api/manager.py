@@ -16,14 +16,15 @@ import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
 
+from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import DoScheduleEvent
+from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
-from . import ManagerStatus
+from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
 from .exceptions import (
     GenericBadRequest,
@@ -133,13 +134,11 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
                     "api_version": request["api_version"],
                 },
             ]
-            return web.json_response(
-                {
-                    "nodes": nodes,
-                    "status": status.value,  # legacy?
-                    "active_sessions": active_sessions_num,  # legacy?
-                }
-            )
+            return web.json_response({
+                "nodes": nodes,
+                "status": status.value,  # legacy?
+                "active_sessions": active_sessions_num,  # legacy?
+            })
     except Exception:
         log.exception("GET_MANAGER_STATUS: exception")
         raise
@@ -147,12 +146,10 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("status"): tx.Enum(ManagerStatus),
-            t.Key("force_kill", default=False): t.ToBool,
-        }
-    )
+    t.Dict({
+        t.Key("status"): tx.Enum(ManagerStatus),
+        t.Key("force_kill", default=False): t.ToBool,
+    })
 )
 async def update_manager_status(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -188,12 +185,10 @@ async def get_announcement(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("enabled", default="false"): t.ToBool,
-            t.Key("message", default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("enabled", default="false"): t.ToBool,
+        t.Key("message", default=None): t.Null | t.String,
+    })
 )
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -214,12 +209,10 @@ iv_scheduler_ops_args = {
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("op"): tx.Enum(SchedulerOps),
-            t.Key("args"): t.Any,
-        }
-    )
+    t.Dict({
+        t.Key("op"): tx.Enum(SchedulerOps),
+        t.Key("args"): t.Any,
+    })
 )
 async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -243,6 +236,40 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
     else:
         raise GenericBadRequest("Unknown scheduler operation")
     return web.Response(status=204)
+
+
+@superadmin_required
+@check_api_params(
+    t.Dict({
+        t.Key("event"): tx.Enum(SchedulerEvent),
+    })
+)
+async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    match params["event"]:
+        case SchedulerEvent.SCHEDULE:
+            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+        case SchedulerEvent.PREPARE:
+            await root_ctx.event_producer.produce_event(DoPrepareEvent())
+        case SchedulerEvent.SCALE_SERVICES:
+            await root_ctx.event_producer.produce_event(DoScaleEvent())
+    return web.Response(status=204)
+
+
+@superadmin_required
+async def scheduler_healthcheck(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    manager_id = root_ctx.local_config["manager"]["id"]
+
+    scheduler_status = {}
+    for event in SchedulerEvent:
+        scheduler_status[event.value] = await redis_helper.execute(
+            root_ctx.redis_live,
+            lambda r: r.hgetall(f"manager.{manager_id}.{event.value}"),
+            encoding="utf-8",
+        )
+
+    return web.json_response(scheduler_status)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -278,6 +305,8 @@ def create_app(
     cors.add(announcement_resource.add_route("GET", get_announcement))
     cors.add(announcement_resource.add_route("POST", update_announcement))
     cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
+    cors.add(app.router.add_route("POST", "/scheduler/trigger", scheduler_trigger))
+    cors.add(app.router.add_route("GET", "/scheduler/status", scheduler_healthcheck))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []

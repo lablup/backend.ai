@@ -43,7 +43,7 @@ from async_timeout import timeout
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -76,6 +76,7 @@ from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
 from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
@@ -87,10 +88,11 @@ from ..utils import (
 )
 from .kernel import DockerKernel
 from .metadata.server import MetadataServer
-from .resources import detect_resources
+from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -151,9 +153,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -165,6 +168,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
             local_config,
             computers,
@@ -231,13 +235,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         loop = current_loop()
 
         # Create the scratch, config, and work directories.
-        if (
-            sys.platform.startswith("linux")
-            and self.local_config["container"]["scratch-type"] == "memory"
-        ):
+        scratch_type = self.local_config["container"]["scratch-type"]
+        scratch_root = self.local_config["container"]["scratch-root"]
+        scratch_size = self.local_config["container"]["scratch-size"]
+
+        if sys.platform.startswith("linux") and scratch_type == "memory":
             await loop.run_in_executor(None, partial(self.tmp_dir.mkdir, exist_ok=True))
             await create_scratch_filesystem(self.scratch_dir, 64)
             await create_scratch_filesystem(self.tmp_dir, 64)
+        elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+            await create_loop_filesystem(scratch_root, scratch_size, self.kernel_id)
         else:
             await loop.run_in_executor(None, partial(self.scratch_dir.mkdir, exist_ok=True))
 
@@ -432,58 +439,48 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         if cluster_info["network_name"] == "host":
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": "host",
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            })
         elif cluster_info["network_name"] is not None:
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": cluster_info["network_name"],
-                    },
-                    "NetworkingConfig": {
-                        "EndpointsConfig": {
-                            cluster_info["network_name"]: {
-                                "Aliases": [self.kernel_config["cluster_hostname"]],
-                            },
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": cluster_info["network_name"],
+                },
+                "NetworkingConfig": {
+                    "EndpointsConfig": {
+                        cluster_info["network_name"]: {
+                            "Aliases": [self.kernel_config["cluster_hostname"]],
                         },
                     },
-                }
-            )
+                },
+            })
             if self.gwbridge_subnet is not None:
-                self.container_configs.append(
-                    {
-                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
-                    }
-                )
+                self.container_configs.append({
+                    "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                })
         elif self.local_config["container"].get("alternative-bridge") is not None:
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                },
+            })
         # RDMA mounts
         ib_root = Path("/dev/infiniband")
         if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "Devices": [
-                            {
-                                "PathOnHost": "/dev/infiniband",
-                                "PathInContainer": "/dev/infiniband",
-                                "CgroupPermissions": "rwm",
-                            },
-                        ],
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "Devices": [
+                        {
+                            "PathOnHost": "/dev/infiniband",
+                            "PathInContainer": "/dev/infiniband",
+                            "CgroupPermissions": "rwm",
+                        },
+                    ],
+                },
+            })
 
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -758,6 +755,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
                     "IPC_LOCK",  # for hugepages and RDMA
+                    "SYS_NICE",  # for NFS based GPUDirect Storage
                 ],
                 "Ulimits": [
                     {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
@@ -832,8 +830,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
-        if self.local_config["debug"]["log-kernel-config"]:
-            log.debug("full container config: {!r}", pretty(container_config))
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -848,6 +844,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass
+
+        # The final container config is settled down here.
+        if self.local_config["debug"]["log-kernel-config"]:
+            log.debug("full container config: {!r}", pretty(container_config))
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
@@ -875,24 +875,29 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await container.start()
             except asyncio.CancelledError:
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(
+                        container_id=cid, message="Container creation cancelled"
+                    )
                 raise
             except Exception:
                 # Oops, we have to restore the allocated resources!
-                if (
-                    sys.platform.startswith("linux")
-                    and self.local_config["container"]["scratch-type"] == "memory"
-                ):
+                scratch_type = self.local_config["container"]["scratch-type"]
+                scratch_root = self.local_config["container"]["scratch-root"]
+                if sys.platform.startswith("linux") and scratch_type == "memory":
                     await destroy_scratch_filesystem(self.scratch_dir)
                     await destroy_scratch_filesystem(self.tmp_dir)
+                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
                     await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
+                elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+                    await destroy_loop_filesystem(scratch_root, self.kernel_id)
+                else:
+                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
                 self.port_pool.update(host_ports)
                 async with self.resource_lock:
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(container_id=cid, message="unknown")
                 raise
 
             additional_network_names: Set[str] = set()
@@ -911,7 +916,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    host_port = int((await container.port(port))[0]["HostPort"])
+                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    if ports is None:
+                        raise ContainerCreationError(
+                            container_id=cid, message="Container port not found"
+                        )
+                    host_port = int(ports[0]["HostPort"])
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
@@ -962,6 +972,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
         super().__init__(
             etcd,
@@ -969,6 +980,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             stats_monitor=stats_monitor,
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
+            agent_public_key=agent_public_key,
         )
 
     async def __ainit__(self) -> None:
@@ -1085,10 +1097,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"system.slice/docker-{container_id}.scope"
         return mount_point / cgroup
 
-    async def detect_resources(
-        self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        return await detect_resources(self.etcd, self.local_config)
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await load_resources(self.etcd, self.local_config)
+
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await scan_available_resources(
+            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+        )
 
     async def enumerate_containers(
         self,
@@ -1210,6 +1225,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 struct.pack("i", 0),
                                 struct.pack("i", host_pid),
                             ]
+                        elif msg[0] == b"is-jail-enabled":
+                            reply = [
+                                struct.pack("i", 0),
+                                struct.pack(
+                                    "i",
+                                    (
+                                        1
+                                        if self.local_config["container"]["sandbox-type"] == "jail"
+                                        else 0
+                                    ),
+                                ),
+                            ]
                         else:
                             reply = [struct.pack("i", -2), b"Invalid action"]
                     except asyncio.CancelledError:
@@ -1282,6 +1309,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
             self.local_config,
             self.computers,
@@ -1338,13 +1366,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()
@@ -1430,18 +1458,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
+                scratch_type = self.local_config["container"]["scratch-type"]
                 scratch_root = self.local_config["container"]["scratch-root"]
                 scratch_dir = scratch_root / str(kernel_id)
                 tmp_dir = scratch_root / f"{kernel_id}_tmp"
                 try:
-                    if (
-                        sys.platform.startswith("linux")
-                        and self.local_config["container"]["scratch-type"] == "memory"
-                    ):
+                    if sys.platform.startswith("linux") and scratch_type == "memory":
                         await destroy_scratch_filesystem(scratch_dir)
                         await destroy_scratch_filesystem(tmp_dir)
+                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
                         await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+                    elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+                        await destroy_loop_filesystem(scratch_root, kernel_id)
+                    else:
+                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
                 except CalledProcessError:
                     pass
                 except FileNotFoundError:
@@ -1449,15 +1479,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            await docker.networks.create(
-                {
-                    "Name": network_name,
-                    "Driver": "bridge",
-                    "Labels": {
-                        "ai.backend.cluster-network": "1",
-                    },
-                }
-            )
+            await docker.networks.create({
+                "Name": network_name,
+                "Driver": "bridge",
+                "Labels": {
+                    "ai.backend.cluster-network": "1",
+                },
+            })
 
     async def destroy_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:

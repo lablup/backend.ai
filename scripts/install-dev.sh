@@ -114,6 +114,10 @@ usage() {
   echo "    The port for the agent's watcher service."
   echo "    (default: 6019)"
   echo ""
+  echo "  ${LWHITE}--agent-backend mode${NC}"
+  echo "    Mode for backend agent(docker, kubernetes)."
+  echo "    (default: docker)"
+  echo ""
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
   echo "    (default: /tmp/backend.ai/ipc)"
@@ -121,6 +125,10 @@ usage() {
   echo "  ${LWHITE}--var-base-path PATH${NC}"
   echo "    The base path for shared data files."
   echo "    (default: ./var/lib/backend.ai)"
+  echo ""
+  echo "  ${LWHITE}--configure-ha${NC}"
+  echo "    Configure HA dev environment."
+  echo "    (default: false)"
 }
 
 show_error() {
@@ -280,15 +288,18 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
-REDIS_PORT="8111"
-ETCD_PORT="8121"
+[[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
+[[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
+
 MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
+AGENT_BACKEND="docker"
 IPC_BASE_PATH="/tmp/backend.ai/ipc"
 VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
 VFOLDER_REL_PATH="vfroot/local"
@@ -299,6 +310,14 @@ CODESPACES_ON_CREATE=0
 CODESPACES_POST_CREATE=0
 CODESPACES=${CODESPACES:-"false"}
 _INSTALLED_PYENV=0
+
+# Only Used in HA mode
+REDIS_MASTER_PORT="9500"
+REDIS_SLAVE1_PORT="9501"
+REDIS_SLAVE2_PORT="9502"
+REDIS_SENTINEL1_PORT="9503"
+REDIS_SENTINEL2_PORT="9504"
+REDIS_SENTINEL3_PORT="9505"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -329,6 +348,9 @@ while [ $# -gt 0 ]; do
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+    --agent-backend)        AGENT_BACKEND=$2; shift ;;
+    --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
+    --configure-ha)         CONFIGURE_HA=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -433,6 +455,20 @@ install_system_pkg() {
   Darwin)
     brew install $3
   esac
+}
+
+install_node() {
+  if ! command -v nvm &> /dev/null; then
+    show_info "Installing latest version of NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+  fi
+
+  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+  show_info "Installing Node.js v${node_version} via NVM..."
+  nvm install $node_version
+  nvm use node
 }
 
 set_brew_python_build_flags() {
@@ -540,8 +576,8 @@ bootstrap_pants() {
       curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
       bash /tmp/get-pants.sh
       if ! command -v pants &> /dev/null ; then
-        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
-        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+        $sudo ln -s $HOME/.local/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/.local/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
       fi
       ;;
     esac
@@ -556,6 +592,9 @@ bootstrap_pants() {
 }
 
 install_editable_webui() {
+  if ! command -v node &> /dev/null; then
+    install_node
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
@@ -726,17 +765,66 @@ setup_environment() {
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
-  SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-  if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
+
+    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
+    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+
+    mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
+
+    sentinel01_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel01.conf"
+    sentinel02_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel02.conf"
+    sentinel03_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel03.conf"
+
+    cp ./configs/redis/sentinel.conf $sentinel01_cfg_path
+    cp ./configs/redis/sentinel.conf $sentinel02_cfg_path
+    cp ./configs/redis/sentinel.conf $sentinel03_cfg_path
+
+    sed_inplace "s/\${COMPOSE_PATH}/${ROOT_PATH//\//\\/}\/tmp\/backend\.ai-halfstack-ha\/configs\//g" "docker-compose.halfstack.current.yml"
+
+    # Appends the given text to sentinel01.conf
+    echo "" >> $sentinel01_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9503/g" "$sentinel01_cfg_path"
+
+    # Appends the given text to sentinel02.conf
+    echo "" >> $sentinel02_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9504/g" "$sentinel02_cfg_path"
+
+    # Appends the given text to sentinel03.conf
+    echo "" >> $sentinel03_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+  else
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+    if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+      SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+    fi
+    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   fi
-  cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -767,7 +855,17 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
   cp configs/manager/halfstack.alembic.ini ./alembic.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-  ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
+    ./backend.ai mgr etcd put config/redis/service_name "mymaster"
+    ./backend.ai mgr etcd put config/redis/password "develove"
+  else
+    ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+  fi
+
+  ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
@@ -781,6 +879,16 @@ configure_backendai() {
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+
+  # configure backend mode
+  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then 
+    sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
+    sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
+  elif [ $AGENT_BACKEND = "docker" ]; then
+    sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
+    mv ./agent.toml.sed ./agent.toml
+  fi
+  sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -795,6 +903,7 @@ configure_backendai() {
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+  sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
@@ -806,15 +915,23 @@ configure_backendai() {
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
   sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
+  sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
   # configure webserver
-  cp configs/webserver/sample.conf ./webserver.conf
-  sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+  cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-  sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
-  sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
+    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
+    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
+    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+  else
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+  fi
+
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
@@ -977,6 +1094,14 @@ configure_backendai() {
 
   show_info "Installation finished."
   echo "${GREEN}Development environment is now ready.${NC}"
+
+  # TODO: Automate the following steps
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    echo "${RED}[NOTE] Please add the following lines to \"/etc/hosts\" file in your host OS.${NC}"
+    echo "${RED}127.0.0.1 node01${NC}"
+    echo "${RED}127.0.0.1 node02${NC}"
+    echo "${RED}127.0.0.1 node03${NC}"
+  fi
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then

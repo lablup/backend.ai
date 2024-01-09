@@ -17,7 +17,6 @@ python_requirements(
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],
-        "types-click": ["click"],
         "types-cachetools": ["cachetools"],
         "types-Jinja2": ["jinja2"],
         "types-PyYAML": ["yaml"],

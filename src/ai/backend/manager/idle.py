@@ -34,6 +34,7 @@ from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -50,10 +51,15 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.common.utils import nmget
 
-from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
+from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -182,10 +188,12 @@ class IdleCheckerHost:
         self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.stat",
             db=REDIS_STAT_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
@@ -215,6 +223,7 @@ class IdleCheckerHost:
             self._event_producer,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
+            task_name="idle_checker",
         )
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,
@@ -250,18 +259,16 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.access_key,
-                        kernels.c.session_id,
-                        kernels.c.session_type,
-                        kernels.c.created_at,
-                        kernels.c.occupied_slots,
-                        kernels.c.cluster_size,
-                        users.c.created_at.label("user_created_at"),
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.access_key,
+                    kernels.c.session_id,
+                    kernels.c.session_type,
+                    kernels.c.created_at,
+                    kernels.c.occupied_slots,
+                    kernels.c.cluster_size,
+                    users.c.created_at.label("user_created_at"),
+                ])
                 .select_from(j)
                 .where(
                     (kernels.c.status.in_(LIVE_STATUS))
@@ -276,12 +283,10 @@ class IdleCheckerHost:
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
-                        sa.select(
-                            [
-                                keypair_resource_policies.c.max_session_lifetime,
-                                keypair_resource_policies.c.idle_timeout,
-                            ]
-                        )
+                        sa.select([
+                            keypair_resource_policies.c.max_session_lifetime,
+                            keypair_resource_policies.c.idle_timeout,
+                        ])
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -530,7 +535,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
-        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
+        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
         self._evhandlers = [
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
@@ -750,7 +755,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds", default=None): t.Null | t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -790,9 +796,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join(
-            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
-        )
+        thresholds_log = " ".join([
+            f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()
+        ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '

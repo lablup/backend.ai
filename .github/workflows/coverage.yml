@@ -12,9 +12,9 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: ubuntu-latest-8-cores
+    runs-on: [ubuntu-latest-8-cores]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 2
     - name: Create LFS file hash list
@@ -33,7 +33,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
@@ -47,9 +47,9 @@ jobs:
       timeout-minutes: 15
       run: |
         # configure redis sentinel cluster hostnames for testing
-        echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
-        echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
-        echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
       uses: codecov/codecov-action@v3

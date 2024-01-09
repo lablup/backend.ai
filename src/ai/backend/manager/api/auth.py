@@ -477,11 +477,17 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if row is None:
                 raise AuthorizationFailed("Access key not found")
 
+            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
+            now = now[0] + (now[1] / (10**6))
+
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f"kp:{access_key}:num_queries"
                 await pipe.incr(num_queries_key)
                 await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                last_call_time_key = f"kp:{access_key}:last_call_time"
+                await pipe.set(last_call_time_key, now)
+                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
@@ -519,11 +525,17 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
 
+            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
+            now = now[0] + (now[1] / (10**6))
+
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f"kp:{access_key}:num_queries"
                 await pipe.incr(num_queries_key)
                 await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                last_call_time_key = f"kp:{access_key}:last_call_time"
+                await pipe.set(last_call_time_key, now)
+                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
@@ -600,11 +612,9 @@ def superadmin_required(handler):
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("echo"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("echo"): t.String,
+    })
 )
 async def test(request: web.Request, params: Any) -> web.Response:
     log.info("AUTH.TEST(ak:{})", request["keypair"]["access_key"])
@@ -616,11 +626,9 @@ async def test(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("group", default=None): t.Null | tx.UUID,
-        }
-    )
+    t.Dict({
+        t.Key("group", default=None): t.Null | tx.UUID,
+    })
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
     group_role = None
@@ -659,14 +667,12 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("type"): t.Enum("keypair", "jwt"),
-            t.Key("domain"): t.String,
-            t.Key("username"): t.String,
-            t.Key("password"): t.String,
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("type"): t.Enum("keypair", "jwt"),
+        t.Key("domain"): t.String,
+        t.Key("username"): t.String,
+        t.Key("password"): t.String,
+    }).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.Response:
     if params["type"] != "keypair":
@@ -727,26 +733,22 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     )
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
-    return web.json_response(
-        {
-            "data": {
-                "access_key": keypair["access_key"],
-                "secret_key": keypair["secret_key"],
-                "role": user["role"],
-                "status": user["status"],
-            },
-        }
-    )
+    return web.json_response({
+        "data": {
+            "access_key": keypair["access_key"],
+            "secret_key": keypair["secret_key"],
+            "role": user["role"],
+            "status": user["status"],
+        },
+    })
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("domain"): t.String,
-            t.Key("email"): t.String,
-            t.Key("password"): t.String,
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("domain"): t.String,
+        t.Key("email"): t.String,
+        t.Key("password"): t.String,
+    }).allow_extra("*")
 )
 async def signup(request: web.Request, params: Any) -> web.Response:
     log_fmt = "AUTH.SIGNUP(d:{}, email:{}, passwd:****)"
@@ -806,6 +808,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "role": UserRole.USER,
             "integration_id": None,
             "resource_policy": "default",
+            "sudo_session_enabled": False,
         }
         if user_data_overriden:
             for key, val in user_data_overriden.items():
@@ -874,12 +877,10 @@ async def signup(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["email", "username"]): t.String,
-            t.Key("password"): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["email", "username"]): t.String,
+        t.Key("password"): t.String,
+    })
 )
 async def signout(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
@@ -908,12 +909,10 @@ async def signout(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("email"): t.String,
-            t.Key("full_name"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("email"): t.String,
+        t.Key("full_name"): t.String,
+    })
 )
 async def update_full_name(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -947,13 +946,11 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("old_password"): t.String,
-            t.Key("new_password"): t.String,
-            t.Key("new_password2"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("old_password"): t.String,
+        t.Key("new_password"): t.String,
+        t.Key("new_password2"): t.String,
+    })
 )
 async def update_password(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -997,14 +994,12 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
 
 
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("domain"): t.String,
-            t.Key("username"): t.String,
-            t.Key("current_password"): t.String,
-            t.Key("new_password"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("domain"): t.String,
+        t.Key("username"): t.String,
+        t.Key("current_password"): t.String,
+        t.Key("new_password"): t.String,
+    })
 )
 async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
     """
@@ -1102,12 +1097,10 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("pubkey"): t.String,
-            t.Key("privkey"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("pubkey"): t.String,
+        t.Key("privkey"): t.String,
+    })
 )
 async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]

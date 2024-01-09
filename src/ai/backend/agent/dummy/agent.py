@@ -1,10 +1,20 @@
 import asyncio
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    FrozenSet,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -31,7 +41,7 @@ from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_
 from ..types import Container, ContainerStatus, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
-from .resources import detect_resources
+from .resources import load_resources, scan_available_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -42,9 +52,10 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],
@@ -53,6 +64,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
             local_config,
             computers,
@@ -228,10 +240,13 @@ class DummyAgent(
     ) -> Sequence[Tuple[KernelId, Container]]:
         return []
 
-    async def detect_resources(
-        self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        return await detect_resources(self.etcd, self.local_config, self.dummy_config)
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await load_resources(self.etcd, self.local_config, self.dummy_config)
+
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await scan_available_resources(
+            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+        )
 
     async def scan_images(self) -> Mapping[str, str]:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
@@ -264,6 +279,7 @@ class DummyAgent(
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
             self.local_config,
             self.computers,

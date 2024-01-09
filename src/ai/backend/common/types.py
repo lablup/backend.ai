@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import ipaddress
 import itertools
@@ -10,6 +11,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
+from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
@@ -22,10 +24,12 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
     Type,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -63,6 +67,7 @@ __all__ = (
     "ResourceSlot",
     "ReadableCIDR",
     "HardwareMetadata",
+    "ModelServiceStatus",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
@@ -140,32 +145,28 @@ T4 = TypeVar("T4")
 def check_typed_tuple(
     value: Tuple[Any],
     types: Tuple[Type[T1]],
-) -> Tuple[T1]:
-    ...
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any],
     types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]:
-    ...
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]:
-    ...
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]:
-    ...
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
@@ -594,14 +595,17 @@ class ResourceSlot(UserDict):
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
         self.sync_keys(other)
-        return type(self)(
-            {k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())}
-        )
+        return type(self)({
+            k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
+        })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
+
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:
         if other is self:
@@ -894,19 +898,16 @@ class VFolderMount(JSONSerializableMixin):
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
 
-        return t.Dict(
-            {
-                t.Key("name"): t.String,
-                t.Key("vfid"): tx.VFolderID,
-                t.Key("vfsubpath", default="."): tx.PurePath,
-                t.Key("host_path"): tx.PurePath,
-                t.Key("kernel_path"): tx.PurePath,
-                t.Key("mount_perm"): tx.Enum(MountPermission),
-                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
-                    VFolderUsageMode
-                ),
-            }
-        )
+        return t.Dict({
+            t.Key("name"): t.String,
+            t.Key("vfid"): tx.VFolderID,
+            t.Key("vfsubpath", default="."): tx.PurePath,
+            t.Key("host_path"): tx.PurePath,
+            t.Key("kernel_path"): tx.PurePath,
+            t.Key("mount_perm"): tx.Enum(MountPermission),
+            t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null
+            | tx.Enum(VFolderUsageMode),
+        })
 
 
 class VFolderHostPermissionMap(dict, JSONSerializableMixin):
@@ -944,11 +945,9 @@ class QuotaConfig:
 
     class Validator(t.Trafaret):
         def check_and_return(self, value: Any) -> QuotaConfig:
-            validator = t.Dict(
-                {
-                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
-                }
-            )
+            validator = t.Dict({
+                t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+            })
             converted = validator.check(value)
             return QuotaConfig(
                 limit_bytes=converted["limit_bytes"],
@@ -1101,16 +1100,27 @@ class EtcdRedisConfig(TypedDict, total=False):
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
+    redis_helper_config: RedisHelperConfig
+
+
+class RedisHelperConfig(TypedDict, total=False):
+    socket_timeout: float
+    socket_connect_timeout: float
+    reconnect_poll_timeout: float
+    max_connections: int
+    connection_ready_timeout: float
 
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | redis.asyncio.sentinel.Sentinel
+    client: Redis
+    name: str  # connection pool name
     service_name: Optional[str]
+    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    redis_helper_config: RedisHelperConfig
 
-    async def close(self) -> None:
-        if isinstance(self.client, Redis):
-            await self.client.close()
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):
@@ -1125,3 +1135,53 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
+    LEGACY = "legacy"
+
+
+class SchedulerStatus(TypedDict):
+    trigger_event: str
+    execution_time: str
+    finish_time: NotRequired[str]
+    resource_group: NotRequired[str]
+    endpoint_name: NotRequired[str]
+    action: NotRequired[str]
+
+
+class VolumeMountableNodeType(enum.StrEnum):
+    AGENT = enum.auto()
+    STORAGE_PROXY = enum.auto()
+
+
+@dataclass
+class RoundRobinState(JSONSerializableMixin):
+    schedulable_group_id: str
+    next_index: int
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("schedulable_group_id"): t.String,
+            t.Key("next_index"): t.Int,
+        })
+
+
+# States of the round-robin scheduler for each resource group and architecture.
+RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+
+class ModelServiceStatus(enum.Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"

@@ -55,12 +55,11 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
         print(f"Current database revision: {current_rev}")
         print(f"The head revision of available migrations: {head_rev}")
 
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        assert sa_url is not None
-        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-        asyncio.run(_show(sa_url))
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    assert sa_url is not None
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_show(sa_url))
 
 
 @cli.command()
@@ -68,17 +67,18 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     "-f",
     "--alembic-config",
     default="alembic.ini",
+    type=click.Path(exists=True, dir_okay=False),
     metavar="PATH",
     help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
-def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
+def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.
     It uses alembic.ini to configure database connection.
 
-    Reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
+    Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
 
@@ -124,9 +124,8 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
             '"down_revision" value in the earliest migration to "None".'
         )
 
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        assert sa_url is not None
-        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-        asyncio.run(_oneshot(sa_url))
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    assert sa_url is not None
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_oneshot(sa_url))

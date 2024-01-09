@@ -31,6 +31,7 @@ async def agent(local_config, test_id, mocker):
         stats_monitor=None,
         error_monitor=None,
         skip_initial_scan=True,
+        agent_public_key=None,
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:

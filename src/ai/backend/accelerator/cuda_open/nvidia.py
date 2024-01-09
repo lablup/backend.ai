@@ -3,7 +3,7 @@ import platform
 from abc import ABCMeta, abstractmethod
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, MutableMapping, NamedTuple, Tuple, Type, TypeAlias
+from typing import Any, MutableMapping, NamedTuple, Tuple, TypeAlias
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
@@ -502,23 +502,18 @@ class libcudart(LibraryBase):
 
     @classmethod
     def get_device_props(cls, device_idx: int):
-        prop_type: Type[cudaDeviceProp_t]
         props_struct: cudaDeviceProp_t
         if cls.get_version() >= (12, 0):
-            prop_type = cudaDeviceProp_v12
             props_struct = cudaDeviceProp_v12()
         elif cls.get_version() >= (11, 0):
-            prop_type = cudaDeviceProp_v11
             props_struct = cudaDeviceProp_v11()
         elif cls.get_version() >= (10, 0):
-            prop_type = cudaDeviceProp_v10
             props_struct = cudaDeviceProp_v10()
         else:
-            prop_type = cudaDeviceProp
             props_struct = cudaDeviceProp()
         cls.invoke("cudaGetDeviceProperties", ctypes.byref(props_struct), device_idx)
         props: MutableMapping[str, Any] = {
-            k: getattr(props_struct, k) for k, _ in prop_type._fields_
+            k: getattr(props_struct, k) for k, _ in props_struct._fields_
         }
         pci_bus_id = b" " * 16
         cls.invoke("cudaDeviceGetPCIBusId", ctypes.c_char_p(pci_bus_id), 16, device_idx)

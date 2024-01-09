@@ -19,6 +19,7 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
@@ -75,10 +76,12 @@ class DockerKernel(AbstractKernel):
         super().__setstate__(props)
 
     async def create_code_runner(
-        self, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
+            self.session_id,
+            event_producer,
             kernel_host=self.data["kernel_host"],
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
@@ -120,15 +123,13 @@ class DockerKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service(
-            {
-                "name": service,
-                "port": sport["container_ports"][0],  # primary port
-                "ports": sport["container_ports"],
-                "protocol": sport["protocol"],
-                "options": opts,
-            }
-        )
+        result = await self.runner.feed_start_service({
+            "name": service,
+            "port": sport["container_ports"][0],  # primary port
+            "ports": sport["container_ports"],
+            "protocol": sport["protocol"],
+            "options": opts,
+        })
         return result
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
@@ -301,7 +302,8 @@ class DockerKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
         import json
         import os
         import stat
@@ -309,7 +311,8 @@ class DockerKernel(AbstractKernel):
 
         files = []
         for f in os.scandir(sys.argv[1]):
-            fstat = f.stat()
+            fstat = f.stat(follow_symlinks=False)
+
             ctime = fstat.st_ctime  # TODO: way to get concrete create time?
             mtime = fstat.st_mtime
             atime = fstat.st_atime
@@ -322,7 +325,8 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """)
+        """
+        )
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -354,6 +358,8 @@ class DockerCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -361,7 +367,13 @@ class DockerCodeRunner(AbstractCodeRunner):
         exec_timeout=0,
         client_features=None,
     ) -> None:
-        super().__init__(kernel_id, exec_timeout=exec_timeout, client_features=client_features)
+        super().__init__(
+            kernel_id,
+            session_id,
+            event_producer,
+            exec_timeout=exec_timeout,
+            client_features=client_features,
+        )
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
@@ -427,33 +439,29 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
             else:
                 log.info("populating {} volume version {}", volume_name, current_version)
-                await docker.volumes.create(
-                    {
-                        "Name": volume_name,
-                        "Driver": "local",
-                    }
-                )
+                await docker.volumes.create({
+                    "Name": volume_name,
+                    "Driver": "local",
+                })
                 extractor_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", "krunner-extractor.sh")
                 ).resolve()
-                proc = await asyncio.create_subprocess_exec(
-                    *[
-                        "docker",
-                        "run",
-                        "--rm",
-                        "-i",
-                        "-v",
-                        f"{archive_path}:/root/archive.tar.xz",
-                        "-v",
-                        f"{extractor_path}:/root/krunner-extractor.sh",
-                        "-v",
-                        f"{volume_name}:/root/volume",
-                        "-e",
-                        f"KRUNNER_VERSION={current_version}",
-                        extractor_image,
-                        "/root/krunner-extractor.sh",
-                    ]
-                )
+                proc = await asyncio.create_subprocess_exec(*[
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-i",
+                    "-v",
+                    f"{archive_path}:/root/archive.tar.xz",
+                    "-v",
+                    f"{extractor_path}:/root/krunner-extractor.sh",
+                    "-v",
+                    f"{volume_name}:/root/volume",
+                    "-e",
+                    f"KRUNNER_VERSION={current_version}",
+                    extractor_image,
+                    "/root/krunner-extractor.sh",
+                ])
                 if await proc.wait() != 0:
                     raise RuntimeError("extracting krunner environment has failed!")
     except Exception:

@@ -31,6 +31,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import SessionTypes
 
+from ...cli.types import Undefined, undefined
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
@@ -43,7 +44,6 @@ from ..request import (
     WebSocketResponse,
 )
 from ..session import api_session
-from ..types import Undefined, undefined
 from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -179,8 +179,8 @@ class ComputeSession(BaseFunction):
         mount_map: Mapping[str, str] = None,
         envs: Mapping[str, str] = None,
         startup_command: str = None,
-        resources: Mapping[str, int] = None,
-        resource_opts: Mapping[str, int] = None,
+        resources: Mapping[str, str | int] = None,
+        resource_opts: Mapping[str, str | int] = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
         domain_name: str = None,
@@ -302,33 +302,27 @@ class ComputeSession(BaseFunction):
             params["starts_at"] = starts_at
             params["bootstrap_script"] = bootstrap_script
             if assign_agent is not None:
-                params["config"].update(
-                    {
-                        "mount_map": mount_map,
-                        "preopen_ports": preopen_ports,
-                        "agentList": assign_agent,
-                    }
-                )
+                params["config"].update({
+                    "mount_map": mount_map,
+                    "preopen_ports": preopen_ports,
+                    "agentList": assign_agent,
+                })
             else:
-                params["config"].update(
-                    {
-                        "mount_map": mount_map,
-                        "preopen_ports": preopen_ports,
-                    }
-                )
+                params["config"].update({
+                    "mount_map": mount_map,
+                    "preopen_ports": preopen_ports,
+                })
         if api_session.get().api_version >= (4, "20190615"):
-            params.update(
-                {
-                    "owner_access_key": owner_access_key,
-                    "domain": domain_name,
-                    "group": group_name,
-                    "type": type_,
-                    "enqueueOnly": enqueue_only,
-                    "maxWaitSeconds": max_wait,
-                    "reuseIfExists": not no_reuse,
-                    "startupCommand": startup_command,
-                }
-            )
+            params.update({
+                "owner_access_key": owner_access_key,
+                "domain": domain_name,
+                "group": group_name,
+                "type": type_,
+                "enqueueOnly": enqueue_only,
+                "maxWaitSeconds": max_wait,
+                "reuseIfExists": not no_reuse,
+                "startupCommand": startup_command,
+            })
         if api_session.get().api_version > (4, "20181215"):
             params["image"] = image
         else:
@@ -365,8 +359,8 @@ class ComputeSession(BaseFunction):
         mount_map: Union[Mapping[str, str], Undefined] = undefined,
         envs: Union[Mapping[str, str], Undefined] = undefined,
         startup_command: str | Undefined = undefined,
-        resources: Union[Mapping[str, int], Undefined] = undefined,
-        resource_opts: Union[Mapping[str, int], Undefined] = undefined,
+        resources: Union[Mapping[str, str | int], Undefined] = undefined,
+        resource_opts: Union[Mapping[str, str | int], Undefined] = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
         domain_name: str | Undefined = undefined,
@@ -652,17 +646,15 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/complete",
             params=params,
         )
-        rqst.set_json(
-            {
-                "code": code,
-                "options": {
-                    "row": int(opts.get("row", 0)),
-                    "col": int(opts.get("col", 0)),
-                    "line": opts.get("line", ""),
-                    "post": opts.get("post", ""),
-                },
-            }
-        )
+        rqst.set_json({
+            "code": code,
+            "options": {
+                "row": int(opts.get("row", 0)),
+                "col": int(opts.get("col", 0)),
+                "line": opts.get("line", ""),
+                "post": opts.get("post", ""),
+            },
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -697,6 +689,27 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/logs",
             params=params,
         )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def get_dependency_graph(self):
+        """
+        Retrieves the root node of dependency graph of the compute session.
+        """
+        params = {}
+
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+
+        prefix = get_naming(api_session.get().api_version, "path")
+
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/dependency-graph",
+            params=params,
+        )
+
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -756,49 +769,43 @@ class ComputeSession(BaseFunction):
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "mode": mode,
-                    "code": code,
-                    "runId": run_id,
-                }
-            )
+            rqst.set_json({
+                "mode": mode,
+                "code": code,
+                "runId": run_id,
+            })
         elif mode == "batch":
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "mode": mode,
-                    "code": code,
-                    "runId": run_id,
-                    "options": {
-                        "clean": opts.get("clean", None),
-                        "build": opts.get("build", None),
-                        "buildLog": bool(opts.get("buildLog", False)),
-                        "exec": opts.get("exec", None),
-                    },
-                }
-            )
+            rqst.set_json({
+                "mode": mode,
+                "code": code,
+                "runId": run_id,
+                "options": {
+                    "clean": opts.get("clean", None),
+                    "build": opts.get("build", None),
+                    "buildLog": bool(opts.get("buildLog", False)),
+                    "exec": opts.get("exec", None),
+                },
+            })
         elif mode == "complete":
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json(
-                {
-                    "code": code,
-                    "options": {
-                        "row": int(opts.get("row", 0)),
-                        "col": int(opts.get("col", 0)),
-                        "line": opts.get("line", ""),
-                        "post": opts.get("post", ""),
-                    },
-                }
-            )
+            rqst.set_json({
+                "code": code,
+                "options": {
+                    "row": int(opts.get("row", 0)),
+                    "col": int(opts.get("col", 0)),
+                    "line": opts.get("line", ""),
+                    "post": opts.get("post", ""),
+                },
+            })
         else:
             raise BackendClientError("Invalid execution mode: {0}".format(mode))
         async with rqst.fetch() as resp:
@@ -896,11 +903,9 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/download",
             params=params,
         )
-        rqst.set_json(
-            {
-                "files": [*map(str, files)],
-            }
-        )
+        rqst.set_json({
+            "files": [*map(str, files)],
+        })
         file_names = []
         async with rqst.fetch() as resp:
             loop = current_loop()
@@ -954,11 +959,9 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/files",
             params=params,
         )
-        rqst.set_json(
-            {
-                "path": path,
-            }
-        )
+        rqst.set_json({
+            "path": path,
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -991,6 +994,39 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/abusing-report",
             params=params,
         )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def start_service(
+        self,
+        app: str,
+        *,
+        port: int | Undefined = undefined,
+        envs: dict[str, Any] | Undefined = undefined,
+        arguments: dict[str, Any] | Undefined = undefined,
+        login_session_token: str | Undefined = undefined,
+    ) -> Mapping[str, Any]:
+        """
+        Starts application from Backend.AI session and returns access credentials
+        to access AppProxy endpoint.
+        """
+        body: dict[str, Any] = {"app": app}
+        if port is not undefined:
+            body["port"] = port
+        if envs is not undefined:
+            body["envs"] = json.dumps(envs)
+        if arguments is not undefined:
+            body["arguments"] = json.dumps(arguments)
+        if login_session_token is not undefined:
+            body["login_session_token"] = login_session_token
+
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/start-service",
+        )
+        rqst.set_json(body)
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -1082,13 +1118,11 @@ class ComputeSession(BaseFunction):
         )
 
         async def send_code(ws):
-            await ws.send_json(
-                {
-                    "code": code,
-                    "mode": mode,
-                    "options": opts,
-                }
-            )
+            await ws.send_json({
+                "code": code,
+                "mode": mode,
+                "options": opts,
+            })
 
         return request.connect_websocket(on_enter=send_code)
 
@@ -1370,20 +1404,16 @@ class StreamPty(WebSocketResponse):
 
     async def resize(self, rows, cols):
         await self.ws.send_str(
-            json.dumps(
-                {
-                    "type": "resize",
-                    "rows": rows,
-                    "cols": cols,
-                }
-            )
+            json.dumps({
+                "type": "resize",
+                "rows": rows,
+                "cols": cols,
+            })
         )
 
     async def restart(self):
         await self.ws.send_str(
-            json.dumps(
-                {
-                    "type": "restart",
-                }
-            )
+            json.dumps({
+                "type": "restart",
+            })
         )

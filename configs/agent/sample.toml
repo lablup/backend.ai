@@ -16,8 +16,21 @@ mode = "docker"
 # For mobile environments such as developer laptops which roam around different networks,
 # it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
 rpc-listen-addr = { host = "", port = 6001 }
+# Address where manager will actually try to establish connection.
+# Must be set if agent RPC layer is behind NAT.
+advertised-rpc-addr = { host = "", port = 6001 }
 # env: BACKEND_AGENT_HOST_OVERRIDE
 # env: BACKEND_AGENT_PORT
+
+# Set the agent's private and public keypair to sign the RPC responses.
+# The agent's public key is sent to the manager via heartbeats.
+# [default: unset]
+# rpc-auth-agent-keypair = "agent.key_secret"
+
+# Set the manager's public key to validate and accept RPC calls from the manager.
+# Only effective when rpc-auth-agent-keypair is set.
+# [default: unset]
+# rpc-auth-manager-public-key = "manager.key"
 
 # The port number of agent socket which provides access to host-side information
 # to the containers (such as PID conversion).
@@ -39,6 +52,13 @@ agent-sock-port = 6007
 # This affects the per-sgroup configuration scope.
 scaling-group = "default"
 
+# Set the volume mount path for the agent node.
+# mount-path = "/vfroot"
+
+# A boolean flag to indicate if there is any cohabiting storage proxy within the same node.
+# If is there any cohabiting storage proxy, then events such as mount or umount will be ignored. [default: true]
+# cohabiting-storage-proxy = true
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./agent.pid"             # env: BACKEND_PID_FILE
@@ -53,12 +73,16 @@ scaling-group = "default"
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
 
+# The host container metadata server is going to bind. Defaults to 0.0.0.0.
+metadata-server-bind-host = "0.0.0.0"
+
 # The port number of container metadata server. Defaults to 40128.
 # Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
 metadata-server-port = 40128
 
 # The port number for aiomonitor.
-# aiomonitor-port = 48200
+# aiomonitor-termui-port = 48200
+# aiomonitor-webui-port = 49200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.
@@ -138,8 +162,9 @@ sandbox-type = "docker"
 # Additional arguments passed to the jail executable in containers.
 jail-args = []
 
-# One of: "hostdir", "memory", "k8s-nfs"
+# One of: "hostdir", "hostfile", "memory", "k8s-nfs"
 # "hostdir": creates an empty host directory and mount it as /home/work of containers.
+# "hostfile": creates an empty sparse file and mount it as /home/work of containers using loop. But this requires the agent to be run as root.
 # "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
 # "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
 scratch-type = "hostdir"        # env: BACKEND_SANDBOX_TYPE
@@ -151,7 +176,7 @@ scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
 
 # Limit the maximum size of the scratch space.
 # If set zero, it is unlimited.
-scratch-size = "1G"
+scratch-size = "10G"
 
 # Enable legacy swarm mode.
 # This should be true to let this agent handles multi-container session.
@@ -242,6 +267,7 @@ ssl-verify = true
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+# "callosum.lower.zeromq" = "DEBUG"  # for details of RPC auth & logs
 
 
 [resource]

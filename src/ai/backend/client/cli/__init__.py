@@ -8,4 +8,7 @@ from . import service  # noqa  # type: ignore
 from . import session  # noqa  # type: ignore
 from . import session_template  # noqa  # type: ignore
 from . import vfolder  # noqa  # type: ignore
-from . import app, logs, proxy, run  # noqa  # type: ignore
+from . import app, logs, proxy  # noqa  # type: ignore
+
+# To include the main module as an explicit dependency
+from . import main  # noqa

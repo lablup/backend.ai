@@ -5,12 +5,12 @@ aiohttp~=3.8.1
 aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
-aiomonitor-ng~=0.7.2
+aiomonitor~=0.6.0
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
-aiotools~=1.6.1
+aiotools~=1.7.0
 aiotusclient~=0.1.4
-alembic~=1.8.1
+alembic~=1.12.0
 appdirs~=1.4.4
 async_timeout~=4.0
 asyncpg>=0.27.0
@@ -19,17 +19,16 @@ asyncudp>=0.4
 attrs>=20.3
 boto3~=1.26
 cachetools~=5.2.0
-callosum~=0.9.10
+callosum~=1.0.1
 cattrs~=22.2.0
-click>=7.1.2
+click~=8.1.7
 coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
-etcetra==0.1.15
+etcetra==0.1.17
 faker~=13.12.0
-graphene~=2.1.9
-hiredis~=2.2.3
+graphene~=3.3.0
 humanize>=3.1.0
 ifaddr~=0.2
 inquirer~=2.9.2
@@ -54,9 +53,11 @@ python-json-logger>=2.0.1
 pyzmq~=24.0.1
 PyJWT~=2.0
 PyYAML~=6.0
+pydantic~=2.4.2
 packaging>=21.3
-redis[hiredis]~=4.6.0
-rich~=12.2
+hiredis>=2.2.3
+redis[hiredis]==4.5.5
+rich~=13.6
 SQLAlchemy[postgresql_asyncpg]~=1.4.40
 setproctitle~=1.3.2
 tabulate~=0.8.9
@@ -67,9 +68,11 @@ tomli~=2.0.1
 tomlkit~=0.11.1
 tqdm>=4.61
 trafaret~=2.1
+treelib==1.6.1
 typeguard~=2.10
 typing_extensions~=4.3
-uvloop>=0.17; sys_platform != "Windows"
+textual~=0.41
+uvloop~=0.17.0; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
 yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
 zipstream-new~=1.1.8
 
@@ -82,7 +85,6 @@ types-six
 types-setuptools
 types-python-dateutil
 types-aiofiles
-types-click
 types-cachetools
 types-Jinja2
 types-PyYAML

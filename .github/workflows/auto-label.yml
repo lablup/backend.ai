@@ -1,7 +1,7 @@
 name: 'Auto Label'
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled, unlabeled, opened, synchronize, reopened]
 
 permissions:
@@ -11,4 +11,4 @@ jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - uses: lablup/auto-label-in-issue@1.3.0
+      - uses: lablup/auto-label-in-issue@1.4.0

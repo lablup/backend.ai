@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import FrozenSet, Optional
+from typing import Any, FrozenSet, Optional
 
 import aiofiles.os
 
@@ -29,6 +29,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath, exist_ok=True)
@@ -101,6 +102,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
 
 class DellEMCOneFSVolume(BaseVolume):
+    name = "dellemc-onefs"
     endpoint: str
     dell_admin: str
     dell_password: str

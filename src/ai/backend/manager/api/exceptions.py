@@ -224,6 +224,10 @@ class RoutingNotFound(ObjectNotFound):
     object_name = "routing"
 
 
+class EndpointTokenNotFound(ObjectNotFound):
+    object_name = "endpoint_token"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
@@ -402,13 +406,11 @@ class BackendAgentError(BackendError):
         self.agent_error_type = agent_error_type
         self.agent_error_title = agent_details["title"]
         self.agent_exception = agent_details.get("exception", "")
-        self.body = json.dumps(
-            {
-                "type": self.error_type,
-                "title": self.error_title,
-                "agent-details": agent_details,
-            }
-        ).encode()
+        self.body = json.dumps({
+            "type": self.error_type,
+            "title": self.error_title,
+            "agent-details": agent_details,
+        }).encode()
 
     def __str__(self):
         if self.agent_exception:

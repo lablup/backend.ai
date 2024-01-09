@@ -5,6 +5,7 @@ Revises: 5b45f28d2cac
 Create Date: 2019-09-16 02:08:41.396372
 
 """
+
 import textwrap
 
 import sqlalchemy as sa
@@ -70,7 +71,8 @@ def upgrade():
         $$ LANGUAGE SQL IMMUTABLE;
     """
     conn.execute(text(query))
-    queries = textwrap.dedent("""
+    queries = textwrap.dedent(
+        """
     CREATE OPERATOR <> (
         leftarg = kernelstatus,
         rightarg = kernelstatus_old,
@@ -87,7 +89,8 @@ def upgrade():
     ) CASCADE;
 
     DROP TYPE kernelstatus_old;
-    """)
+    """
+    )
     for query in queries.split(";"):
         if len(query.strip()) == 0:
             continue
@@ -146,16 +149,19 @@ def downgrade():
     conn = op.get_bind()
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;"))
     kernelstatus_old.create(conn)
-    query = textwrap.dedent("""
+    query = textwrap.dedent(
+        """
         CREATE FUNCTION kernelstatus_new_old_compare(
             old_enum_val kernelstatus, new_enum_val kernelstatus_new
         )
             RETURNS boolean AS $$
                 SELECT old_enum_val::text <> new_enum_val::text;
             $$ LANGUAGE SQL IMMUTABLE;
-    """)
+    """
+    )
     conn.execute(text(query))
-    queries = textwrap.dedent("""\
+    queries = textwrap.dedent(
+        """\
         CREATE OPERATOR <> (
             leftarg = kernelstatus,
             rightarg = kernelstatus_new,
@@ -178,7 +184,8 @@ def downgrade():
         ) CASCADE;
 
         DROP TYPE kernelstatus_new;
-    """)
+    """
+    )
     for query in queries.split(";"):
         if len(query.strip()) == 0:
             continue

@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import collections
 import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Iterable,
+    Mapping,
+    cast,
+)
 
 import aiohttp_cors
+import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
@@ -13,6 +22,7 @@ from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
 
+from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
 from .types import CORSOptions, WebMiddleware
@@ -24,7 +34,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
+KNOWN_SLOT_METADATA: dict[str, AcceleratorMetadata] = {
     "cpu": {
         "slot_name": "cpu",
         "description": "CPU",
@@ -83,21 +93,55 @@ async def get_resource_slots(request: web.Request) -> web.Response:
     return web.json_response(known_slots, status=200)
 
 
-async def get_resource_metadata(request: web.Request) -> web.Response:
-    log.info("ETCD.GET_RESOURCE_METADATA ()")
+@check_api_params(
+    t.Dict({
+        t.Key("sgroup", default=None): t.Null | t.String,
+    })
+)
+async def get_resource_metadata(request: web.Request, params: Any) -> web.Response:
+    log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params["sgroup"])
     root_ctx: RootContext = request.app["_root.context"]
-    accelerator_metadata_jsons: Dict[str, str] = await redis_helper.execute(
-        root_ctx.redis_stat,
-        lambda r: r.hgetall("computer.metadata"),
-        encoding="utf-8",
-    )
-    accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
-    for slot_name, metadata_json in accelerator_metadata_jsons.items():
-        accelerator_metadatas[slot_name] = json.loads(metadata_json)
-    for key, value in KNOWN_SLOT_METADATA.items():
-        if key not in accelerator_metadatas:
-            accelerator_metadatas[key] = value
-    return web.json_response(accelerator_metadatas, status=200)
+    known_slots = await root_ctx.shared_config.get_resource_slots()
+
+    # Collect plugin-reported accelerator metadata
+    reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
+        slot_name: cast(AcceleratorMetadata, json.loads(metadata_json))
+        for slot_name, metadata_json in (
+            await redis_helper.execute(
+                root_ctx.redis_stat,
+                lambda r: r.hgetall("computer.metadata"),
+                encoding="utf-8",
+            )
+        ).items()
+    }
+
+    # Merge the reported metadata and preconfigured metadata (for legacy plugins)
+    accelerator_metadata: dict[str, AcceleratorMetadata] = {}
+    for slot_name, metadata in collections.ChainMap(
+        reported_accelerator_metadata,
+        KNOWN_SLOT_METADATA,
+    ).items():
+        if slot_name in known_slots:  # include only explicitly reported ones
+            accelerator_metadata[slot_name] = metadata
+
+    # Optionally filter by the slots reported by the given resource group's agents
+    if params["sgroup"] is not None:
+        available_slot_keys = set()
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(AgentRow).where(
+                (AgentRow.status == AgentStatus.ALIVE)
+                & (AgentRow.scaling_group == params["sgroup"])
+                & (AgentRow.schedulable == sa.true())
+            )
+            result = await db_sess.execute(query)
+            for agent in result.scalars().all():
+                available_slot_keys.update(agent.available_slots.keys())
+        accelerator_metadata = {
+            k: v
+            for k, v in accelerator_metadata.items()
+            if k in {"cpu", "mem", *available_slot_keys}
+        }
+    return web.json_response(accelerator_metadata, status=200)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
@@ -122,12 +166,10 @@ async def get_docker_registries(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("key"): t.String,
-            t.Key("prefix", default=False): t.Bool,
-        }
-    )
+    t.Dict({
+        t.Key("key"): t.String,
+        t.Key("prefix", default=False): t.Bool,
+    })
 )
 async def get_config(request: web.Request, params: Any) -> web.Response:
     """
@@ -171,12 +213,10 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("key"): t.String,
-            t.Key("value"): t.Any,
-        }
-    )
+    t.Dict({
+        t.Key("key"): t.String,
+        t.Key("value"): t.Any,
+    })
 )
 async def set_config(request: web.Request, params: Any) -> web.Response:
     """
@@ -212,12 +252,10 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("key"): t.String,
-            t.Key("prefix", default=False): t.Bool,
-        }
-    )
+    t.Dict({
+        t.Key("key"): t.String,
+        t.Key("prefix", default=False): t.Bool,
+    })
 )
 async def delete_config(request: web.Request, params: Any) -> web.Response:
     """
@@ -268,7 +306,7 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.cleanup_ctx.append(app_ctx)
     app["prefix"] = "config"

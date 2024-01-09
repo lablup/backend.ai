@@ -8,6 +8,8 @@ from typing import Any, FrozenSet, Mapping, Optional
 
 import aiofiles.os
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 
@@ -42,6 +44,7 @@ class WekaQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
@@ -92,6 +95,8 @@ class WekaQuotaModel(BaseQuotaModel):
 class WekaVolume(BaseVolume):
     api_client: WekaAPIClient
 
+    name = "weka"
+
     _fs_uid: str
 
     def __init__(
@@ -99,9 +104,19 @@ class WekaVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
+        event_dispathcer: EventDispatcher,
+        event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, options=options)
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            event_dispathcer=event_dispathcer,
+            event_producer=event_producer,
+        )
         ssl_verify = self.config.get("weka_verify_ssl", False)
         self.api_client = WekaAPIClient(
             self.config["weka_endpoint"],

@@ -1,6 +1,7 @@
 """
 REST-style session management APIs.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,6 +27,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 from urllib.parse import urlparse
 
@@ -49,19 +51,11 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
-    AgentTerminatedEvent,
-)
+from ai.backend.common.events import AgentTerminatedEvent
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    ClusterMode,
-    SessionTypes,
-    VFolderID,
-)
+from ai.backend.common.types import AccessKey, AgentId, ClusterMode, SessionTypes, VFolderID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -123,149 +117,122 @@ class UndefChecker(t.Trafaret):
             return None
 
 
-creation_config_v1 = t.Dict(
-    {
-        t.Key("mounts", default=None): t.Null | t.List(t.String),
-        t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-        t.Key("clusterSize", default=None): t.Null | t.Int[1:],
-    }
-)
-creation_config_v2 = t.Dict(
-    {
-        t.Key("mounts", default=None): t.Null | t.List(t.String),
-        t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-        t.Key("clusterSize", default=None): t.Null | t.Int[1:],
-        t.Key("instanceMemory", default=None): t.Null | tx.BinarySize,
-        t.Key("instanceCores", default=None): t.Null | t.Int,
-        t.Key("instanceGPUs", default=None): t.Null | t.Float,
-        t.Key("instanceTPUs", default=None): t.Null | t.Int,
-    }
-)
-creation_config_v3 = t.Dict(
-    {
-        t.Key("mounts", default=None): t.Null | t.List(t.String),
-        t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-        t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
-            t.String, t.Any
-        ),
-    }
-)
-creation_config_v3_template = t.Dict(
-    {
-        t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-        t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
-            UndefChecker | t.Null | t.Int[1:]
-        ),
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
-            UndefChecker | t.Null | t.String
-        ),
-        t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
-        ),
-    }
-)
-creation_config_v4 = t.Dict(
-    {
-        t.Key("mounts", default=None): t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(
-            t.String, t.String
-        ),
-        t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-        t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
-            t.String, t.Any
-        ),
-        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null | t.List(
-            t.Int[1024:65535]
-        ),
-    }
-)
-creation_config_v4_template = t.Dict(
-    {
-        t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
-            UndefChecker | t.Null | t.Mapping(t.String, t.String)
-        ),
-        t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
-            UndefChecker | t.Null | t.Int[1:]
-        ),
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
-            UndefChecker | t.Null | t.String
-        ),
-        t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
-        ),
-    }
-)
-creation_config_v5 = t.Dict(
-    {
-        t.Key("mounts", default=None): t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(
-            t.String, t.String
-        ),
-        t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-        # cluster_size is moved to the root-level parameters
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-        t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
-            t.String, t.Any
-        ),
-        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null | t.List(
-            t.Int[1024:65535]
-        ),
-        tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
-    }
-)
-creation_config_v5_template = t.Dict(
-    {
-        t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
-            UndefChecker | t.Null | t.Mapping(t.String, t.String)
-        ),
-        t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-        # cluster_size is moved to the root-level parameters
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
-            UndefChecker | t.Null | t.String
-        ),
-        t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
-        ),
-    }
-)
+creation_config_v1 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    t.Key("clusterSize", default=None): t.Null | t.Int[1:],
+})
+creation_config_v2 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    t.Key("clusterSize", default=None): t.Null | t.Int[1:],
+    t.Key("instanceMemory", default=None): t.Null | tx.BinarySize,
+    t.Key("instanceCores", default=None): t.Null | t.Int,
+    t.Key("instanceGPUs", default=None): t.Null | t.Float,
+    t.Key("instanceTPUs", default=None): t.Null | t.Int,
+})
+creation_config_v3 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+})
+creation_config_v3_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
+        UndefChecker | t.Null | t.Int[1:]
+    ),
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+})
+creation_config_v4 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
+    | t.List(t.Int[1024:65535]),
+})
+creation_config_v4_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.String)
+    ),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
+        UndefChecker | t.Null | t.Int[1:]
+    ),
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+})
+creation_config_v5 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
+    | t.List(t.Int[1024:65535]),
+    tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
+})
+creation_config_v5_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.String)
+    ),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+})
 
 
-overwritten_param_check = t.Dict(
-    {
-        t.Key("template_id"): tx.UUID,
-        t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-        t.Key("image", default=None): t.Null | t.String,
-        tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
-        t.Key("group", default=None): t.Null | t.String,
-        t.Key("domain", default=None): t.Null | t.String,
-        t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
-        t.Key("tag", default=None): t.Null | t.String,
-        t.Key("enqueue_only", default=False): t.ToBool,
-        t.Key("max_wait_seconds", default=0): t.Int[0:],
-        t.Key("reuse", default=True): t.ToBool,
-        t.Key("startup_command", default=None): t.Null | t.String,
-        t.Key("bootstrap_script", default=None): t.Null | t.String,
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
-        tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-    }
-).allow_extra("*")
+overwritten_param_check = t.Dict({
+    t.Key("template_id"): tx.UUID,
+    t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+    t.Key("image", default=None): t.Null | t.String,
+    tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
+    t.Key("group", default=None): t.Null | t.String,
+    t.Key("domain", default=None): t.Null | t.String,
+    t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
+    t.Key("tag", default=None): t.Null | t.String,
+    t.Key("enqueue_only", default=False): t.ToBool,
+    t.Key("max_wait_seconds", default=0): t.Int[0:],
+    t.Key("reuse", default=True): t.ToBool,
+    t.Key("startup_command", default=None): t.Null | t.String,
+    t.Key("bootstrap_script", default=None): t.Null | t.String,
+    t.Key("owner_access_key", default=None): t.Null | t.String,
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
+    tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
+    tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+}).allow_extra("*")
 
 
 def sub(d, old, new):
@@ -336,6 +303,8 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
     try:
         resp = await root_ctx.registry.create_session(
             params["session_name"],
@@ -362,6 +331,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             starts_at_timestamp=params["starts_at"],
             tag=params["tag"],
             callback_url=params["callback_url"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
@@ -384,10 +354,12 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=undefined)
-            >> "architecture": t.String | UndefChecker,
-            tx.AliasedKey(["type", "sessionType"], default=undefined)
-            >> "session_type": tx.Enum(SessionTypes) | UndefChecker,
+            tx.AliasedKey(["arch", "architecture"], default=undefined) >> "architecture": t.String
+            | UndefChecker,
+            tx.AliasedKey(["type", "sessionType"], default=undefined) >> "session_type": tx.Enum(
+                SessionTypes
+            )
+            | UndefChecker,
             tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
@@ -404,8 +376,9 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
             tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
             t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
-            t.Key("startupCommand", default=None)
-            >> "startup_command": UndefChecker | t.Null | t.String,
+            t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
+            | t.Null
+            | t.String,
             tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
@@ -561,36 +534,36 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
-            >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["image", "lang"]): t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "session_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("config", default=dict): t.Mapping(t.String, t.Any),
-            t.Key("tag", default=None): t.Null | t.String,
-            t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
-            t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.ToInt[0:],
-            tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-            t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
-            t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
-            t.Key("dependencies", default=None): t.Null | t.List(tx.UUID) | t.List(t.String),
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-        }
-    ),
+    t.Dict({
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
+            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
+        ),
+        tx.AliasedKey(["image", "lang"]): t.String,
+        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
+        >> "architecture": t.String,
+        tx.AliasedKey(["type", "sessionType"], default="interactive") >> "session_type": tx.Enum(
+            SessionTypes
+        ),
+        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+        tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+            ClusterMode
+        ),  # new in APIv6
+        t.Key("config", default=dict): t.Mapping(t.String, t.Any),
+        t.Key("tag", default=None): t.Null | t.String,
+        t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
+        t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.ToInt[0:],
+        tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
+        t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
+        tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
+        t.Key("dependencies", default=None): t.Null | t.List(tx.UUID) | t.List(t.String),
+        tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+            t.Null | tx.URL
+        ),
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
@@ -642,22 +615,22 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("clientSessionToken")
-            >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "sess_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-            t.Key("tag", default=None): t.Null | t.String,
-            t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
-            t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-        }
-    ),
+    t.Dict({
+        t.Key("clientSessionToken") >> "session_name": t.Regexp(
+            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
+        ),
+        tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
+        tx.AliasedKey(["type", "sessionType"], default="interactive") >> "sess_type": tx.Enum(
+            SessionTypes
+        ),
+        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+        tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
+        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+        t.Key("tag", default=None): t.Null | t.String,
+        t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
+        t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Response:
@@ -692,6 +665,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         if not template:
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
         resp = await root_ctx.registry.create_cluster(
@@ -710,6 +684,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             params["tag"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except TooManySessionsMatched:
@@ -728,23 +703,21 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("login_session_token", default=None): t.Null | t.String,
-            tx.AliasedKey(["app", "service"]): t.String,
-            # The port argument is only required to use secondary ports
-            # when the target app listens multiple TCP ports.
-            # Otherwise it should be omitted or set to the same value of
-            # the actual port number used by the app.
-            tx.AliasedKey(["port"], default=None): t.Null | t.Int[1024:65535],
-            tx.AliasedKey(["envs"], default=None): t.Null | t.String,  # stringified JSON
-            # e.g., '{"PASSWORD": "12345"}'
-            tx.AliasedKey(["arguments"], default=None): t.Null | t.String,  # stringified JSON
-            # e.g., '{"-P": "12345"}'
-            # The value can be one of:
-            # None, str, List[str]
-        }
-    )
+    t.Dict({
+        t.Key("login_session_token", default=None): t.Null | t.String,
+        tx.AliasedKey(["app", "service"]): t.String,
+        # The port argument is only required to use secondary ports
+        # when the target app listens multiple TCP ports.
+        # Otherwise it should be omitted or set to the same value of
+        # the actual port number used by the app.
+        tx.AliasedKey(["port"], default=None): t.Null | t.Int[1024:65535],
+        tx.AliasedKey(["envs"], default=None): t.Null | t.String,  # stringified JSON
+        # e.g., '{"PASSWORD": "12345"}'
+        tx.AliasedKey(["arguments"], default=None): t.Null | t.String,  # stringified JSON
+        # e.g., '{"-P": "12345"}'
+        # The value can be one of:
+        # None, str, List[str]
+    })
 )
 async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -852,10 +825,6 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             "domain_name": session.domain_name,
         },
     }
-    if session.routing:
-        body["endpoint"] = {
-            "id": str(session.routing.endpoint),
-        }
 
     async with aiohttp.ClientSession() as req:
         async with req.post(
@@ -863,22 +832,18 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             json=body,
         ) as resp:
             token_json = await resp.json()
-            return web.json_response(
-                {
-                    "token": token_json["token"],
-                    "wsproxy_addr": wsproxy_advertise_addr,
-                }
-            )
+            return web.json_response({
+                "token": token_json["token"],
+                "wsproxy_addr": wsproxy_advertise_addr,
+            })
 
 
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("login_session_token", default=None): t.Null | t.String,
-        }
-    ),
+    t.Dict({
+        t.Key("login_session_token", default=None): t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
@@ -911,11 +876,9 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("login_session_token", default=None): t.Null | t.String,
-        }
-    ),
+    t.Dict({
+        t.Key("login_session_token", default=None): t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
@@ -945,11 +908,9 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("agent"): t.String,
-        }
-    ),
+    t.Dict({
+        t.Key("agent"): t.String,
+    }),
 )
 async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
@@ -970,13 +931,11 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("login_session_token", default=None): t.Null | t.String,
-            # if `dst` is None, it will be agent's default destination.
-            tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
-        }
-    ),
+    t.Dict({
+        t.Key("login_session_token", default=None): t.Null | t.String,
+        # if `dst` is None, it will be agent's default destination.
+        tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
@@ -1083,12 +1042,11 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
-            >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-        }
-    ),
+    t.Dict({
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
+            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
+        ),
+    }),
 )
 async def rename_session(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1121,13 +1079,11 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("forced", default="false"): t.ToBool(),
-            t.Key("recursive", default="false"): t.ToBool(),
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("forced", default="false"): t.ToBool(),
+        t.Key("recursive", default="false"): t.ToBool(),
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
 )
 async def destroy(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1156,27 +1112,34 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     if params["recursive"]:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             dependent_session_ids = await find_dependent_sessions(
-                session_name, db_sess, owner_access_key
+                session_name,
+                db_sess,
+                owner_access_key,
+                allow_stale=True,
             )
 
             target_session_references: List[str | uuid.UUID] = [
                 *dependent_session_ids,
                 session_name,
             ]
-            sessions = [
-                await SessionRow.get_session(
-                    db_sess,
-                    name_or_id,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                )
-                for name_or_id in target_session_references
-            ]
+            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
+                *[
+                    SessionRow.get_session(
+                        db_sess,
+                        name_or_id,
+                        owner_access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                    )
+                    for name_or_id in target_session_references
+                ],
+                return_exceptions=True,
+            )
 
         last_stats = await asyncio.gather(
             *[
                 root_ctx.registry.destroy_session(sess, forced=params["forced"])
                 for sess in sessions
+                if isinstance(sess, SessionRow)
             ],
             return_exceptions=True,
         )
@@ -1209,11 +1172,9 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("id"): t.String(),
-        }
-    )
+    t.Dict({
+        t.Key("id"): t.String(),
+    })
 )
 async def match_sessions(request: web.Request, params: Any) -> web.Response:
     """
@@ -1347,10 +1308,15 @@ async def get_info(request: web.Request) -> web.Response:
 
 @server_status_required(READ_ALLOWED)
 @auth_required
-async def restart(request: web.Request) -> web.Response:
+@check_api_params(
+    t.Dict({
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
+)
+async def restart(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     async with root_ctx.db.begin_session() as db_sess:
         session = await SessionRow.get_session(
@@ -1541,11 +1507,9 @@ async def complete(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("service_name"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("service_name"): t.String,
+    })
 )
 async def shutdown_service(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1574,6 +1538,8 @@ async def find_dependent_sessions(
     root_session_name_or_id: str | uuid.UUID,
     db_session: SASession,
     access_key: AccessKey,
+    *,
+    allow_stale: bool = False,
 ) -> Set[uuid.UUID]:
     async def _find_dependent_sessions(session_id: uuid.UUID) -> Set[uuid.UUID]:
         result = await db_session.execute(
@@ -1592,9 +1558,98 @@ async def find_dependent_sessions(
         return dependent_sessions
 
     root_session = await SessionRow.get_session(
-        db_session, root_session_name_or_id, access_key=access_key
+        db_session,
+        root_session_name_or_id,
+        access_key=access_key,
+        allow_stale=allow_stale,
     )
     return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
+
+
+@aiotools.lru_cache(maxsize=100)
+async def _find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
+    db_session: SASession,
+    access_key: AccessKey,
+):
+    sessions = await SessionRow.match_sessions(
+        db_session,
+        session_name_or_id,
+        access_key=access_key,
+    )
+
+    assert len(sessions) >= 1, "session not found!"
+
+    session_id = str(sessions[0].id)
+    session_name = sessions[0].name
+
+    assert isinstance(session_id, get_args(uuid.UUID | str))
+    assert isinstance(session_name, str)
+
+    kernel_query = (
+        sa.select([
+            kernels.c.status,
+            kernels.c.status_changed,
+        ])
+        .select_from(kernels)
+        .where(kernels.c.session_id == session_id)
+    )
+
+    dependency_session_ids: list[SessionDependencyRow] = (
+        await db_session.execute(
+            sa.select(SessionDependencyRow.depends_on).where(
+                SessionDependencyRow.session_id == session_id
+            )
+        )
+    ).first()
+
+    if not dependency_session_ids:
+        dependency_session_ids = []
+
+    kernel_query_result = (await db_session.execute(kernel_query)).first()
+
+    session_info: Dict[str, Union[List, str]] = {
+        "session_id": session_id,
+        "session_name": session_name,
+        "status": str(kernel_query_result[0]),
+        "status_changed": str(kernel_query_result[1]),
+        "depends_on": [
+            await _find_dependency_sessions(dependency_session_id, db_session, access_key)
+            for dependency_session_id in dependency_session_ids
+        ],
+    }
+
+    return session_info
+
+
+async def find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
+    db_session: SASession,
+    access_key: AccessKey,
+):
+    return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
+async def get_dependency_graph(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    root_session_name = request.match_info["session_name"]
+
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    log.info(
+        "GET_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
+        requester_access_key,
+        owner_access_key,
+        root_session_name,
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        return web.json_response(
+            await find_dependency_sessions(root_session_name, db_session, owner_access_key),
+            status=200,
+        )
 
 
 @server_status_required(READ_ALLOWED)
@@ -1649,11 +1704,9 @@ async def upload_files(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.MultiKey("files"): t.List(t.String),
-        }
-    )
+    t.Dict({
+        tx.MultiKey("files"): t.List(t.String),
+    })
 )
 async def download_files(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1707,11 +1760,9 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("file"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("file"): t.String,
+    })
 )
 async def download_single(request: web.Request, params: Any) -> web.Response:
     """
@@ -1799,11 +1850,9 @@ async def list_files(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
 )
 async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1847,12 +1896,9 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["session_name", "sessionName", "task_id", "taskId"])
-            >> "kernel_id": tx.UUID,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["session_name", "sessionName", "task_id", "taskId"]) >> "kernel_id": tx.UUID,
+    })
 )
 async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse:
     log.info("GET_TASK_LOG (ak:{}, k:{})", request["keypair"]["access_key"], params["kernel_id"])
@@ -1994,4 +2040,5 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
+    cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))
     return app, []

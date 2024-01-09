@@ -56,7 +56,15 @@ local_config_iv = (
                     t.Key("group", default=None): tx.GroupID(
                         default_gid=_default_gid,
                     ),
-                    t.Key("aiomonitor-port", default=48300): t.Int[1:65535],
+                    tx.AliasedKey(
+                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48300
+                    ): t.ToInt[1:65535],
+                    t.Key("aiomonitor-webui-port", default=49300): t.ToInt[1:65535],
+                    t.Key("watcher-insock-path-prefix", default=None): t.Null
+                    | t.String(allow_blank=False),
+                    t.Key("watcher-outsock-path-prefix", default=None): t.Null
+                    | t.String(allow_blank=False),
+                    t.Key("use-watcher", default=False): t.Bool(),
                 },
             ),
             t.Key("logging"): logging_config_iv,
@@ -94,6 +102,7 @@ local_config_iv = (
                     t.Key("enabled", default=False): t.ToBool,
                     t.Key("asyncio", default=False): t.ToBool,
                     t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
                 },
             ).allow_extra("*"),
         },

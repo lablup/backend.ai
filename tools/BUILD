@@ -1,3 +1,4 @@
+python_sources()
 python_requirements(
     name="reqs-pytest",
     source="pytest-requirements.txt",

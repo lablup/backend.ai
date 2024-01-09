@@ -24,11 +24,13 @@ class Permission(BaseFunction):
 
         :param fields: Additional permission query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query {
                 vfolder_host_permissions {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
         return data["vfolder_host_permissions"]

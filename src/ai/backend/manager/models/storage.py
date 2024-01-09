@@ -30,6 +30,7 @@ from ai.backend.common.types import HardwareMetadata, VFolderID
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
 from .base import Item, PaginatedList
+from .utils import description_msg
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -97,6 +98,10 @@ class StorageSessionManager:
         return proxy_name, volume_name
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
+        """
+        Returns a list of tuple
+        [(proxy_name: str, volume_info: VolumeInfo), ...]
+        """
         try:
             # per-asyncio-task cache
             return _ctx_volumes_cache.get()
@@ -203,6 +208,10 @@ class StorageVolume(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     performance_metric = graphene.JSONString()
     usage = graphene.JSONString()
+    proxy = graphene.String(
+        description=description_msg("24.03.0", "Name of the proxy which this volume belongs to.")
+    )
+    name = graphene.String(description=description_msg("24.03.0", "Name of the storage."))
 
     async def resolve_hardware_metadata(self, info: graphene.ResolveInfo) -> HardwareMetadata:
         ctx: GraphQueryContext = info.context
@@ -256,6 +265,8 @@ class StorageVolume(graphene.ObjectType):
             path=volume_info["path"],
             fsprefix=volume_info["fsprefix"],
             capabilities=volume_info["capabilities"],
+            name=volume_info["name"],
+            proxy=proxy_name,
         )
 
     @classmethod

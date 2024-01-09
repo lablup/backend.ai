@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
 from typing import (
+    Any,
     FrozenSet,
     Optional,
 )
@@ -73,6 +74,7 @@ class QTreeQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
@@ -259,12 +261,13 @@ class XCPFSOpModel(BaseFSOpModel):
                             entry_type = DirEntryType.FILE
                     symlink_target = ""
                     if entry_type == DirEntryType.SYMLINK:
-                        symlink_dst = Path(item_abspath).resolve()
                         try:
+                            symlink_dst = Path(item_abspath).resolve()
                             symlink_dst = symlink_dst.relative_to(target_path)
-                        except ValueError:
+                        except (ValueError, RuntimeError):
                             pass
-                        symlink_target = os.fsdecode(symlink_dst)
+                        else:
+                            symlink_target = os.fsdecode(symlink_dst)
                     await entry_queue.put(
                         DirEntry(
                             name=item_path.name,
@@ -371,6 +374,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
 
 class NetAppVolume(BaseVolume):
+    name = "netapp"
     ontap_endpoint: str
     netapp_user: str
     netapp_password: str

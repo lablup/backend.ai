@@ -6,7 +6,7 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.run import prepare_env_arg, prepare_resource_arg
+from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
 from ai.backend.client.session import Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
@@ -42,7 +42,13 @@ def get_service_id(session: Session, name_or_id: str):
         return name_or_id
     except Exception:
         services = session.Service.list(name=name_or_id)
-        return services[0]["id"]
+        try:
+            return services[0]["id"]
+        except Exception as e:
+            if isinstance(e, KeyError) or isinstance(e, IndexError):
+                raise RuntimeError(f"Service {name_or_id} not found")
+            else:
+                raise e
 
 
 @main.group()
@@ -257,15 +263,15 @@ def create(
 
     """
     envs = prepare_env_arg(env)
-    resources = prepare_resource_arg(resources)
-    resource_opts = prepare_resource_arg(resource_opts)
+    parsed_resources = prepare_resource_arg(resources)
+    parsed_resource_opts = prepare_resource_arg(resource_opts)
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
         "startup_command": startup_command,
-        "resources": resources,
-        "resource_opts": resource_opts,
+        "resources": parsed_resources,
+        "resource_opts": parsed_resource_opts,
         "cluster_size": cluster_size,
         "cluster_mode": cluster_mode,
         "bootstrap_script": bootstrap_script,

@@ -163,13 +163,11 @@ class Request:
             self.api_version = override_api_version
         else:
             self.api_version = f"v{self.session.api_version[0]}.{self.session.api_version[1]}"
-        self.headers = CIMultiDict(
-            [
-                ("User-Agent", self.config.user_agent),
-                ("X-BackendAI-Domain", self.config.domain),
-                ("X-BackendAI-Version", self.api_version),
-            ]
-        )
+        self.headers = CIMultiDict([
+            ("User-Agent", self.config.user_agent),
+            ("X-BackendAI-Domain", self.config.domain),
+            ("X-BackendAI-Version", self.api_version),
+        ])
         self._content = b""
         self._attached_files = None
         self.set_content(content, content_type=content_type)
@@ -572,6 +570,7 @@ class FetchContextManager:
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
         retry_count = 0
+        raw_resp: Optional[aiohttp.ClientResponse] = None
         while True:
             try:
                 retry_count += 1
@@ -596,7 +595,8 @@ class FetchContextManager:
                     continue
             except aiohttp.ClientResponseError as e:
                 msg = "API endpoint response error.\n\u279c {!r}".format(e)
-                await raw_resp.__aexit__(*sys.exc_info())
+                if raw_resp is not None:
+                    await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
@@ -28,6 +29,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -99,6 +101,8 @@ __all__ = (
     "InferenceSessionList",
     "KernelLoadingStrategy",
 )
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
 class SessionStatus(enum.Enum):
@@ -294,7 +298,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         candidate = SessionStatus.PULLING
                     case KernelStatus.PREPARING:
                         candidate = SessionStatus.PREPARING
-                    case (KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING):
+                    case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
                     case KernelStatus.TERMINATING | KernelStatus.ERROR:
                         candidate = SessionStatus.RUNNING_DEGRADED
@@ -937,27 +941,23 @@ class SessionRow(Base):
         """
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend(
-                    [
+                eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(SessionRow.kernels).options(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend(
-                    [
+                eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(kernel_rel).options(
                         noload("*"),
-                        selectinload(kernel_rel).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
 
         session_list = await cls.match_sessions(
             db_session,
@@ -996,27 +996,23 @@ class SessionRow(Base):
     ) -> Iterable[SessionRow]:
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend(
-                    [
+                eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(SessionRow.kernels).options(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend(
-                    [
+                eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(kernel_rel).options(
                         noload("*"),
-                        selectinload(kernel_rel).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
 
         session_list = await cls.match_sessions(
             db_session,
@@ -1234,7 +1230,7 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": group_name,
+            "group_name": group_name[0],
             "group_id": row.group_id,
             "user_email": email,
             "full_name": full_name,

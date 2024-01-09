@@ -10,7 +10,7 @@ import shutil
 import time
 from collections import deque
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union, final
+from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final
 
 import aiofiles.os
 import janus
@@ -81,6 +81,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -138,6 +139,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -250,16 +252,18 @@ class BaseFSOpModel(AbstractFSOpModel):
                         symlink_target = ""
                         entry_type = DirEntryType.FILE
                         try:
-                            if entry.is_dir():
+                            if entry.is_dir(follow_symlinks=False):
                                 entry_type = DirEntryType.DIRECTORY
                             if entry.is_symlink():
                                 entry_type = DirEntryType.SYMLINK
-                                symlink_dst = Path(entry).resolve()
                                 try:
+                                    symlink_dst = Path(entry).resolve()
                                     symlink_dst = symlink_dst.relative_to(target_path)
-                                except ValueError:
+                                except (ValueError, RuntimeError):
+                                    # ValueError and ELOOP
                                     pass
-                                symlink_target = os.fsdecode(symlink_dst)
+                                else:
+                                    symlink_target = os.fsdecode(symlink_dst)
                             entry_stat = entry.stat(follow_symlinks=False)
                         except (FileNotFoundError, PermissionError):
                             # the filesystem may be changed during scan
@@ -357,6 +361,8 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
+    name = "vfs"
+
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 

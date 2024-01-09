@@ -76,3 +76,15 @@ class InvalidIpAddressValue(ValueError):
     """
     Represents an invalid value for ip_address.
     """
+
+
+class VolumeMountFailed(RuntimeError):
+    """
+    Represents a mount process failure.
+    """
+
+
+class VolumeUnmountFailed(RuntimeError):
+    """
+    Represents a umount process failure.
+    """

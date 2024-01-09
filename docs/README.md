@@ -21,13 +21,9 @@ $ git clone https://github.com/lablup/backend.ai bai-dev
 $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
-$ pip install -U \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
->     --find-links=https://dist.backend.ai/pypi/simple/hiredis \
->     --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
->     -r requirements.txt
+$ pip install -U -r requirements.txt
 ```
+
 
 ## Building API Reference JSON file
 ```console
@@ -36,9 +32,11 @@ $ ./py -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
 This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
 Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
 
+
 ## Building HTML document
 
-> 📌 NOTE: Please ensure that you are inside the `docs` directory and the virtualenv is activated.
+> [!NOTE]
+> Please ensure that you are inside the `docs` directory and the virtualenv is activated.
 
 ### Make the html version
 
@@ -49,15 +47,16 @@ $ make html
 The compiled documentation is under `_build/html/index.html`.
 You may serve it for local inspection using `python -m http.server --directory _build/html`.
 
+
 ## Translation
 
-#### Generate/update pot (Portable Object Template) files
+### Generate/update pot (Portable Object Template) files
 
 ```console
 $ make gettext
 ```
 
-#### Build po (Portable Object) files using sphinx-intl
+### Build po (Portable Object) files using sphinx-intl
 
 ```console
 $ sphinx-intl update -p _build/locale/ -l ko
@@ -66,7 +65,7 @@ $ sphinx-intl update -p _build/locale/ -l ko
 The `.po` message files are under `locales/ko/LC_MESSAGES/`.
 Edit them by filling missing translations.
 
-#### Build HTML files with translated version
+### Build HTML files with translated version
 
 ```console
 $ sphinx-intl build
@@ -74,11 +73,30 @@ $ make -e SPHINXOPTS="-D language='ko'" html
 ```
 
 
-## 🚧 Building PDF document (WIP) 🚧
+## Building PDF document
 
-> Help wanted!
+```console
+$ make latexpdf
+```
 
-We are looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
+
+Building PDF requires following libraries to be present on your system.
+
+* TeX Live
+  - ko.TeX (texlive-lang-korean)
+  - latexmk
+* ImageMagick
+* Font files (All required font files must be installed)
+
+### Installing dependencies on macOS
+1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
+2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
+3. Exceute following command to install missing dependencies.
+```console
+sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
+```
+4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
 
 
 ## Advanced Settings
@@ -107,6 +125,43 @@ Example:
 * https://readthedocs.org/projects/sorna-ko
 
 Please ask the docs maintainer for help.
+
+
+## Preview
+
+### The PR previews
+
+Our ReadTheDocs bot automatically builds the HTML preview for each commit of a PR that changes
+the contents of the `docs` directory.
+You may simply click the link in the PR comment written by the bot.
+
+### The HTML documentation
+
+You may open `_build/html/index.html` from the local filesystem directly on your browser,
+but the REST API reference (as of 24.03) which uses a dedicated Javascript-based viewer won't work.
+
+To preview the full documentation including the REST API reference seamlessly, you need to run a local nginx server.
+
+1. Create a HTTP server which serves `_build/html` folder. For example:
+   ```bash
+   python -m http.server --directory _build/html 8000
+   ```
+2. Executing the command above inside `docs` folder will serve the documentation page on port 8000 (http://localhost:8000).
+
+### Interactive GraphQL browser
+
+You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
+to interact and inspect the Backend.AI Manager's GraphQL API.
+
+1. Ensure you have the access to the manager server.  
+   The manager's *etcd* configuration should say `config/api/allow-graphql-schema-introspection` is true.
+2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
+   Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
+3. Copy `index.html` from https://gist.github.com/achimnol/dc9996aeffc7cf15e96478e635eb0699
+4. Replace `"<proxy-address>"` with the real address (host:port) of the proxy, which can be accessed from your browser as well.
+5. Run `python -m http.server` command in the directory where `index.html` is located.
+6. Open the page served by the HTTP server in the previous step in your web browser.  
+   Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
 
 ## References for newcomers

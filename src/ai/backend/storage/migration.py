@@ -18,11 +18,17 @@ import more_itertools
 import tqdm
 import yarl
 
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
-from .context import Context
+from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -51,7 +57,7 @@ class VFolderMigrationStatus(enum.StrEnum):
     COMPLETE = "complete"
 
 
-async def check_latest(ctx: Context) -> list[VolumeUpgradeInfo]:
+async def check_latest(ctx: RootContext) -> list[VolumeUpgradeInfo]:
     volumes_to_upgrade: list[VolumeUpgradeInfo] = []
     volume_infos = ctx.list_volumes()
     for name, info in volume_infos.items():
@@ -88,7 +94,7 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 
 
 async def upgrade_2_to_3(
-    ctx: Context,
+    ctx: RootContext,
     volume: AbstractVolume,
     outfile: str,
     report_path: Optional[Path] = None,
@@ -160,17 +166,15 @@ async def upgrade_2_to_3(
                         current_size = None
                     if quota_scope_id not in created_quota_scopes:
                         created_quota_scopes.add(quota_scope_id)
-                    migration_informations.append(
-                        {
-                            "volume_id": volume_id,
-                            "folder_id": folder_id,
-                            "quota_scope_id": quota_scope_id,
-                            "src_path": volume.mangle_vfpath(orig_vfid),
-                            "dst_path": volume.mangle_vfpath(dst_vfid),
-                            "current_size": current_size,
-                            "old_quota": old_quota_map[folder_id],
-                        }
-                    )
+                    migration_informations.append({
+                        "volume_id": volume_id,
+                        "folder_id": folder_id,
+                        "quota_scope_id": quota_scope_id,
+                        "src_path": volume.mangle_vfpath(orig_vfid),
+                        "dst_path": volume.mangle_vfpath(dst_vfid),
+                        "current_size": current_size,
+                        "old_quota": old_quota_map[folder_id],
+                    })
                 except Exception:
                     log.exception("error during migration of vfolder {}", folder_id)
                 finally:
@@ -220,17 +224,44 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ):
     etcd = load_shared_config(local_config)
-    ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd, dsn=dsn)
-    volumes_to_upgrade = await check_latest(ctx)
-    for upgrade_info in volumes_to_upgrade:
-        handler = upgrade_handlers[upgrade_info.target_version]
-        await handler(
-            ctx,
-            upgrade_info.volume,
-            outfile,
-            report_path=report_path,
-            force_scan_folder_size=force_scan_folder_size,
-        )
+    redis_config = redis_config_iv.check(
+        await etcd.get_prefix("config/redis"),
+    )
+    event_producer = await EventProducer.new(
+        redis_config,
+        db=REDIS_STREAM_DB,
+        log_events=local_config["debug"]["log-events"],
+    )
+    event_dispatcher = await EventDispatcher.new(
+        redis_config,
+        db=REDIS_STREAM_DB,
+        log_events=local_config["debug"]["log-events"],
+        node_id=local_config["storage-proxy"]["node-id"],
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+    )
+    ctx = RootContext(
+        pid=os.getpid(),
+        pidx=0,
+        node_id=local_config["storage-proxy"]["node-id"],
+        local_config=local_config,
+        etcd=etcd,
+        dsn=dsn,
+        event_producer=event_producer,
+        event_dispatcher=event_dispatcher,
+        watcher=None,
+    )
+
+    async with ctx:
+        volumes_to_upgrade = await check_latest(ctx)
+        for upgrade_info in volumes_to_upgrade:
+            handler = upgrade_handlers[upgrade_info.target_version]
+            await handler(
+                ctx,
+                upgrade_info.volume,
+                outfile,
+                report_path=report_path,
+                force_scan_folder_size=force_scan_folder_size,
+            )
 
 
 @click.command()

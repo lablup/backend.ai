@@ -38,6 +38,7 @@ from ai.backend.agent.resources import (
     FractionAllocMap,
 )
 from ai.backend.agent.types import Container, MountInfo
+from ai.backend.agent.utils import update_nested_dict
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -88,56 +89,44 @@ MIN_SMP_COUNT = 4  # when calculated SMP is lower than this, set this as the min
 
 PREFIX = "mock"
 
-_format_config_iv = t.Dict(
-    {
-        t.Key("human_readable_name"): t.String,
-        t.Key("description"): t.String,
-        t.Key("display_unit"): t.String,
-        t.Key("number_format"): t.Dict(
-            {
-                t.Key("binary"): t.Bool,
-                t.Key("round_length"): t.Int[0:],
-            }
-        ),
-        t.Key("display_icon"): t.String,
-    }
-).allow_extra("*")
+_format_config_iv = t.Dict({
+    t.Key("human_readable_name"): t.String,
+    t.Key("description"): t.String,
+    t.Key("display_unit"): t.String,
+    t.Key("number_format"): t.Dict({
+        t.Key("binary"): t.Bool,
+        t.Key("round_length"): t.Int[0:],
+    }),
+    t.Key("display_icon"): t.String,
+}).allow_extra("*")
 
 
-_mock_config_iv = t.Dict(
-    {
-        t.Key("slot_name"): t.String,
-        t.Key("device_plugin_name"): t.String,
-        t.Key("devices"): t.List(
-            t.Dict(
-                {
-                    t.Key("mother_uuid"): tx.UUID,
-                    t.Key("model_name"): t.String,
-                    t.Key("numa_node"): t.Int[0:],
-                    t.Key("subproc_count"): t.Int[1:],
-                    t.Key("memory_size"): tx.BinarySize,
-                }
-            ).allow_extra("*")
-        ),
-        t.Key("attributes"): t.Dict({}).allow_extra("*"),
-        t.Key("formats"): t.Dict({}).allow_extra("*"),
-    }
-).allow_extra("*")
+_mock_config_iv = t.Dict({
+    t.Key("slot_name"): t.String,
+    t.Key("device_plugin_name"): t.String,
+    t.Key("devices"): t.List(
+        t.Dict({
+            t.Key("mother_uuid"): tx.UUID,
+            t.Key("model_name"): t.String,
+            t.Key("numa_node"): t.Int[0:],
+            t.Key("subproc_count"): t.Int[1:],
+            t.Key("memory_size"): tx.BinarySize,
+        }).allow_extra("*")
+    ),
+    t.Key("attributes"): t.Dict({}).allow_extra("*"),
+    t.Key("formats"): t.Dict({}).allow_extra("*"),
+}).allow_extra("*")
 
 _cuda_devices_config_iv = t.List(
-    t.Dict(
-        {
-            t.Key("is_mig_device"): t.ToBool,
-        }
-    ).allow_extra("*")
+    t.Dict({
+        t.Key("is_mig_device"): t.ToBool,
+    }).allow_extra("*")
 )
 
-_cuda_attributes_iv = t.Dict(
-    {
-        t.Key("nvidia_driver", default="450.00.00"): t.String,
-        t.Key("cuda_runtime", default="11.0"): t.String,
-    }
-).allow_extra("*")
+_cuda_attributes_iv = t.Dict({
+    t.Key("nvidia_driver", default="450.00.00"): t.String,
+    t.Key("cuda_runtime", default="11.0"): t.String,
+}).allow_extra("*")
 
 
 class MockPlugin(AbstractComputePlugin):
@@ -613,11 +602,17 @@ class MockPlugin(AbstractComputePlugin):
         match self.key:
             case "cuda":
                 if self.nvdocker_version[0] == 2:
-                    docker_config["env"] = [
-                        f"TF_MIN_GPU_MULTIPROCESSOR_COUNT={MIN_SMP_COUNT}",
-                        "BACKENDAI_MOCK_CUDA_DEVICES=" + ",".join(map(str, assigned_device_ids)),
-                        f"BACKENDAI_MOCK_CUDA_DEVICE_COUNT={len(assigned_device_ids)}",
-                    ]
+                    update_nested_dict(
+                        docker_config,
+                        {
+                            "Env": [
+                                f"TF_MIN_GPU_MULTIPROCESSOR_COUNT={MIN_SMP_COUNT}",
+                                "BACKENDAI_MOCK_CUDA_DEVICES="
+                                + ",".join(map(str, assigned_device_ids)),
+                                f"BACKENDAI_MOCK_CUDA_DEVICE_COUNT={len(assigned_device_ids)}",
+                            ]
+                        },
+                    )
                 else:
                     raise RuntimeError(
                         f"Unsupported nvidia-docker version: {self.nvdocker_version}"
@@ -706,21 +701,19 @@ class MockPlugin(AbstractComputePlugin):
             return
         if hasattr(alloc_map, "apply_allocation"):
             for slot_name, _ in self.slot_types:
-                alloc_map.apply_allocation(
-                    {
-                        slot_name: resource_spec.allocations.get(
-                            self.key,
-                            {},
-                        ).get(
-                            slot_name,
-                            {
-                                dev_id: Decimal(0)
-                                for dev_id, dev_slot_info in alloc_map.device_slots.items()
-                                if dev_slot_info.slot_name == slot_name
-                            },
-                        ),
-                    }
-                )
+                alloc_map.apply_allocation({
+                    slot_name: resource_spec.allocations.get(
+                        self.key,
+                        {},
+                    ).get(
+                        slot_name,
+                        {
+                            dev_id: Decimal(0)
+                            for dev_id, dev_slot_info in alloc_map.device_slots.items()
+                            if dev_slot_info.slot_name == slot_name
+                        },
+                    ),
+                })
         else:  # older agents without lablup/backend.ai-agent#180
             if self._mode == AllocationModes.DISCRETE:
                 alloc_map.allocations[SlotName(f"{self.key}.device")].update(
@@ -768,16 +761,14 @@ class MockPlugin(AbstractComputePlugin):
                 else:
                     proc = device.processing_units
                     mem = BinarySize(device.memory_size)
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": device.model_name,
-                        "data": {
-                            "smp": proc,
-                            "mem": mem,
-                        },
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": device.model_name,
+                    "data": {
+                        "smp": proc,
+                        "mem": mem,
+                    },
+                })
         return attached_devices
 
     async def get_node_hwinfo(self) -> HardwareMetadata:

@@ -13,8 +13,7 @@ import pytest
 from faker import Faker
 
 from ai.backend.plugin.entrypoint import find_build_root
-from ai.backend.test.utils.cli import EOF, ClientRunnerFunc
-from ai.backend.test.utils.cli import run as _run
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, run
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
@@ -41,27 +40,32 @@ def client_bin() -> Path:
     return find_build_root(Path(__file__)) / "backend.ai"
 
 
-@pytest.fixture(scope="session")
-def client_environ() -> dict[str, str]:
-    p = os.environ.get("BACKENDAI_TEST_CLIENT_ENV", None)
-    if p is None:
-        raise RuntimeError("Missing BACKENDAI_TEST_CLIENT_ENV env-var!")
+def make_run_fixture(profile_env: str) -> Callable[[Path], Iterator[ClientRunnerFunc]]:
+    @pytest.fixture(scope="session")
+    def run_given_profile(
+        client_bin: Path,
+    ) -> Iterator[ClientRunnerFunc]:
+        env_from_file = get_env_from_profile(profile_env)
+
+        def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
+            return run([client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file})
+
+        yield run_impl
+
+    return run_given_profile
+
+
+def get_env_from_profile(profile_env: str) -> dict[str, str]:
+    if not (file_path_env := os.environ.get(profile_env)):
+        raise RuntimeError(f"Missing {profile_env} enviroment variable!")
+    file_path = Path(file_path_env)
+
     envs = {}
-    sample_admin_sh = Path(p)
-    if sample_admin_sh.exists():
-        lines = sample_admin_sh.read_text().splitlines()
-        for line in lines:
-            if m := _rx_env_export.search(line.strip()):
-                envs[m.group("key")] = m.group("val")
+    lines = file_path.read_text().splitlines()
+    for line in lines:
+        if m := _rx_env_export.search(line.strip()):
+            envs[m.group("key")] = m.group("val")
     return envs
-
-
-@pytest.fixture(scope="session")
-def run(client_bin: Path, client_environ: dict[str, str]) -> Iterator[ClientRunnerFunc]:
-    def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
-        return _run([client_bin, *cmdargs], *args, **kwargs, env=client_environ)
-
-    yield run_impl
 
 
 @pytest.fixture
@@ -134,3 +138,8 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
 def keypair_resource_policy() -> str:
     fake = Faker()
     return fake.unique.word()
+
+
+run_user = make_run_fixture("user_file")
+run_user2 = make_run_fixture("user2_file")
+run_admin = make_run_fixture("admin_file")

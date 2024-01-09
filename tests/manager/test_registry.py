@@ -38,11 +38,9 @@ async def test_handle_heartbeat(
 
     registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
     image_data = zlib.compress(
-        msgpack.packb(
-            [
-                ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
-            ]
-        )
+        msgpack.packb([
+            ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
+        ])
     )
 
     _1 = Decimal("1")
@@ -60,6 +58,7 @@ async def test_handle_heartbeat(
             "region": "ap-northeast-2",
             "addr": "10.0.0.5",
             "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
@@ -79,6 +78,7 @@ async def test_handle_heartbeat(
             "status": AgentStatus.ALIVE,
             "addr": "10.0.0.5",
             "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
@@ -95,6 +95,7 @@ async def test_handle_heartbeat(
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
             "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
@@ -118,6 +119,7 @@ async def test_handle_heartbeat(
             "status": AgentStatus.LOST,
             "addr": "10.0.0.5",
             "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
@@ -134,6 +136,7 @@ async def test_handle_heartbeat(
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
             "public_host": "10.0.0.5",
+            "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
