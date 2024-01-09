@@ -371,7 +371,7 @@ class KeyPair(graphene.ObjectType):
                 users.c.uuid == association_groups_users.c.user_id,
                 isouter=True,
             )
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id, isouter=True)
         )
         query = (
             sa.select([
