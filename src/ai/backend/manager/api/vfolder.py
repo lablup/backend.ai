@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextvars
 import functools
 import json
 import logging
@@ -35,8 +34,6 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from aiohttp.typedefs import Handler
-from pydantic.v1.utils import deep_update
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -53,6 +50,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 
+from ...common.audit_log_util import audit_log_data, audit_log_middleware, updated_data
 from ..models import (
     ACTIVE_USER_STATUSES,
     DEAD_VFOLDER_STATUSES,
@@ -92,7 +90,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
-from ..models.audit_logs import AuditLogAction, AuditLogTargetType, audit_logs
+from ..models.audit_logs import AuditLogAction, AuditLogTargetType
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -121,9 +119,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow: TypeAlias = Mapping[str, Any]
-audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "audit_log_data_partial", default={}
-)
 P = ParamSpec("P")
 
 
@@ -321,49 +316,6 @@ def vfolder_check_exists(
         return await handler(request, row, *args, **kwargs)
 
     return _wrapped
-
-
-@web.middleware
-async def audit_log_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
-    # TODO: in near future we can change this condition to dict so we can add more conditions
-
-    if request.method == "GET":
-        return await handler(request)
-
-    root_ctx: RootContext = request.app["_root.context"]
-    user_uuid = str(request["user"]["uuid"])
-    access_key = request["keypair"]["access_key"]
-    user_email = request["user"]["email"]
-
-    audit_log_data.set({
-        "user_id": user_uuid,
-        "access_key": access_key,
-        "email": user_email,
-        "action": None,
-        "data": {"before": {}, "after": {}},
-        "target_type": None,
-        "target": None,
-        "created_at": datetime.utcnow(),
-        "success": False,
-        "rest_api_path": request.path,
-    })
-
-    try:
-        return await handler(request)
-    except Exception:
-        raise
-    finally:
-        try:
-            log.info("AUDIT_LOG: {}", audit_log_data.get())
-            async with root_ctx.db.begin_session() as sess:
-                await sess.execute(sa.insert(audit_logs).values(audit_log_data.get()))
-        except Exception as e:
-            log.error("Failed to write audit log {}", e, exc_info=True)
-
-
-def updated_data(new_data: dict[str, Any]) -> dict[str, Any]:
-    current_audit_log_data = audit_log_data.get().copy()
-    return deep_update(current_audit_log_data, new_data)
 
 
 @auth_required
@@ -673,8 +625,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     audit_log_data.set(
         updated_data(
             new_data={
-                "data": {"after": {k: str(v) for k, v in resp.items()}},
-                "success": True,
+                "data": {"after": resp},
             }
         )
     )
@@ -1057,6 +1008,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
@@ -1198,6 +1150,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
@@ -1263,6 +1216,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
@@ -1310,6 +1264,7 @@ async def update_vfolder_options(
     })
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1350,6 +1305,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{}, path:{})"
@@ -1407,6 +1363,7 @@ async def create_download_session(
     })
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1460,6 +1417,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     })
 )
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1513,6 +1471,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     })
 )
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1551,6 +1510,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
     })
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1686,6 +1646,7 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
     }),
 )
 async def update_invitation(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Update sent invitation's permission. Other fields are not allowed to be updated.
     """
@@ -1723,6 +1684,7 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def invite(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1893,6 +1855,7 @@ async def invitations(request: web.Request) -> web.Response:
     }),
 )
 async def accept_invitation(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """Accept invitation by invitee.
 
     * `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is
@@ -1984,6 +1947,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def delete_invitation(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     request_email = request["user"]["email"]
@@ -2041,6 +2005,7 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def share(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     """
     Share a group folder to users with overriding permission.
@@ -2164,6 +2129,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def unshare(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Unshare a group folder from users.
     """
@@ -2254,6 +2220,18 @@ async def _delete(
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
+
+        before_data = dict(entry)
+        before_data["quota_scope_id"] = str(entry["quota_scope_id"])
+
+        audit_log_data.set(
+            updated_data(
+                new_data={
+                    "data": {"before": before_data},
+                }
+            )
+        )
+        log.info("vfolder log in api _delete {}", audit_log_data.get())
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
@@ -2283,6 +2261,7 @@ async def _delete(
     }),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2299,6 +2278,19 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         access_key,
         folder_id,
     )
+
+    audit_log_data.set(
+        updated_data(
+            new_data={
+                "action": AuditLogAction.DELETE,
+                "target_type": AuditLogTargetType.VFOLDER,
+                "target": folder_id,
+            }
+        )
+    )
+
+    log.info("vfolder log in api folder {}", audit_log_data.get())
+
     try:
         await _delete(
             root_ctx,
@@ -2323,6 +2315,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2340,6 +2333,17 @@ async def delete_by_name(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
+
+    audit_log_data.set(
+        updated_data(
+            new_data={
+                "action": AuditLogAction.DELETE,
+                "target_type": AuditLogTargetType.VFOLDER,
+                "target": folder_name,
+            }
+        )
+    )
+
     try:
         await _delete(
             root_ctx,
@@ -2364,6 +2368,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def purge(request: web.Request) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(
         request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
     )
@@ -2425,6 +2430,7 @@ async def purge(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def recover(request: web.Request) -> web.Response:
+    # TODO: audit log
     """
     Recover vfolder from trash bin, by changing status.
     """
@@ -2499,6 +2505,7 @@ async def recover(request: web.Request) -> web.Response:
     }),
 )
 async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     """
     Leave a shared vfolder.
 
@@ -2558,6 +2565,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     }),
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
@@ -2785,6 +2793,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     }),
 )
 async def update_shared_vfolder(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Update permission for shared vfolders.
 
@@ -3010,6 +3019,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     }),
 )
 async def mount_host(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Mount device into vfolder host.
 
@@ -3112,6 +3122,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def umount_host(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Unmount device from vfolder host.
 
@@ -3243,6 +3254,7 @@ async def storage_task_exception_handler(
     }),
 )
 async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
+    # TODO: audit log
     """
     Change the ownership of vfolder
     For now, we only provide changing the ownership of user-folder
