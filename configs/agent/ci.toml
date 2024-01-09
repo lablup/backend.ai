@@ -55,6 +55,16 @@ reserved-cpu = 1
 reserved-mem = "1G"
 reserved-disk = "8G"
 
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+
+# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
+ssl-verify = false
+
+ca-certs = ""
+keyfile = ""
+certfile = ""
 
 [debug]
 debug = false
