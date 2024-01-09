@@ -749,10 +749,10 @@ class SchedulerDispatcher(aobject):
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    rr_state: RoundRobinState | None = (
-                        await sched_ctx.registry.shared_config.get_roundrobin_state(
-                            sgroup_name, requested_architecture
-                        )
+                    rr_state: (
+                        RoundRobinState | None
+                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
+                        sgroup_name, requested_architecture
                     )
 
                     if rr_state is not None:
