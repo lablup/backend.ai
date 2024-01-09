@@ -64,3 +64,17 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
         rows = result.fetchall()
         print(rows)
         assert len(rows) == 0
+
+
+@pytest.mark.asyncio
+async def test_lock_timeout(database_engine: ExtendedAsyncSAEngine) -> None:
+    lock_connection_timeout = 0.5
+    sleep = 1
+
+    async def critical_section(db: ExtendedAsyncSAEngine) -> None:
+        async with db.advisory_lock(LockID.LOCKID_TEST):
+            await asyncio.sleep(sleep)
+
+    database_engine.lock_conn_timeout = lock_connection_timeout
+    with pytest.raises(asyncio.TimeoutError):
+        await critical_section(database_engine)

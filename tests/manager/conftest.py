@@ -177,6 +177,7 @@ def local_config(
             "password": "develove",
             "pool-size": 8,
             "max-overflow": 64,
+            "lock-conn-timeout": 0,
         },
         "manager": {
             "id": f"i-{test_id}",
