@@ -73,7 +73,7 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.lint.log
         path: .pants.d/pants.log
@@ -136,7 +136,7 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.check.log
         path: .pants.d/pants.log
@@ -209,7 +209,7 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
         path: .pants.d/pants.log
@@ -292,7 +292,7 @@ jobs:
         cd dist-local-proxy
         ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: local-proxy
         path: dist-local-proxy/*
@@ -311,12 +311,12 @@ jobs:
       run: |
         rm -rf dist/src.*/
     - name: Upload scies
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: scies
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log
@@ -385,17 +385,17 @@ jobs:
         done
         ls -lh dist
     - name: Upload wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels
         path: dist/*.whl
     - name: Upload source tarballs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels
         path: dist/*.tar.gz
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log

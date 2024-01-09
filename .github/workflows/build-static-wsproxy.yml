@@ -58,7 +58,7 @@ jobs:
       run: |
         ls -lh app/
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: static-wsproxy
         path: app/backend.ai-local-proxy-*
