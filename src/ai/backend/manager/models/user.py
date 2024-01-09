@@ -743,9 +743,9 @@ class ModifyUser(graphene.Mutation):
             prev_role = row.role
             user_update_data = data.copy()
             if "status" in data and row.status != data["status"]:
-                user_update_data[
-                    "status_info"
-                ] = "admin-requested"  # user mutation is only for admin
+                user_update_data["status_info"] = (
+                    "admin-requested"  # user mutation is only for admin
+                )
             if main_access_key is not None:
                 db_session = SASession(conn)
                 keypair_query = (
