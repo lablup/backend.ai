@@ -48,7 +48,13 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.audit_log_util import audit_log_data, audit_log_middleware, updated_data
+from ai.backend.manager.audit_log_util import (
+    audit_log_data,
+    audit_log_middleware,
+    dictify_entries,
+    empty_after_data,
+    updated_data,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
@@ -356,11 +362,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     audit_log_data.set(
         updated_data(
-            new_data={
+            target_data=audit_log_data.get(),
+            data_to_be_added={
                 "action": AuditLogAction.CREATE,
                 "target_type": AuditLogTargetType.VFOLDER,
                 "target": folder_host,
-            }
+            },
         )
     )
 
@@ -624,9 +631,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     audit_log_data.set(
         updated_data(
-            new_data={
-                "data": {"after": resp},
-            }
+            target_data=audit_log_data.get(),
+            data_to_be_added={
+                "data": {"after": insert_values},
+            },
         )
     )
 
@@ -2221,13 +2229,14 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        before_data = {k: str(v) for k, v in dict(entry).items()}
+        before_data = dictify_entries(entry)
 
         audit_log_data.set(
             updated_data(
-                new_data={
+                target_data=audit_log_data.get(),
+                data_to_be_added={
                     "data": {"before": before_data},
-                }
+                },
             )
         )
         log.info("vfolder log in api _delete {}", audit_log_data.get())
@@ -2280,11 +2289,12 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 
     audit_log_data.set(
         updated_data(
-            new_data={
+            target_data=audit_log_data.get(),
+            data_to_be_added={
                 "action": AuditLogAction.DELETE,
                 "target_type": AuditLogTargetType.VFOLDER,
                 "target": folder_id,
-            }
+            },
         )
     )
 
@@ -2314,7 +2324,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
 
     folder_name = request.match_info["name"]
@@ -2322,7 +2331,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+
     resource_policy = request["keypair"]["resource_policy"]
 
     log.info(
@@ -2334,13 +2343,17 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
     audit_log_data.set(
         updated_data(
-            new_data={
+            target_data=audit_log_data.get(),
+            data_to_be_added={
                 "action": AuditLogAction.DELETE,
                 "target_type": AuditLogTargetType.VFOLDER,
                 "target": folder_name,
-            }
+            },
         )
     )
+
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     try:
         await _delete(
@@ -2366,10 +2379,6 @@ async def delete_by_name(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def purge(request: web.Request) -> web.Response:
-    # TODO: audit log
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
     folder_name = request.match_info["name"]
@@ -2377,6 +2386,21 @@ async def purge(request: web.Request) -> web.Response:
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
+
+    audit_log_data.set(
+        updated_data(
+            target_data=audit_log_data.get(),
+            data_to_be_added={
+                "action": AuditLogAction.PURGE,
+                "target_type": AuditLogTargetType.VFOLDER,
+                "target": folder_name,
+            },
+        )
+    )
+
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
+    )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
@@ -2384,6 +2408,7 @@ async def purge(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
+
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -2410,6 +2435,15 @@ async def purge(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
+        audit_log_data.set(
+            updated_data(
+                target_data=audit_log_data.get(),
+                data_to_be_added={
+                    "data": {"before": dictify_entries(entry)},
+                },
+            )
+        )
+
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
 
@@ -2422,6 +2456,9 @@ async def purge(request: web.Request) -> web.Response:
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
+
+    audit_log_data.set(empty_after_data(audit_log_data.get()))
+
     return web.Response(status=204)
 
 
