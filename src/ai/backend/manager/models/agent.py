@@ -142,6 +142,7 @@ class Agent(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
+    container_count = graphene.Int()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -240,6 +241,12 @@ class Agent(graphene.ObjectType):
                 "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
             },
         }
+
+    async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        rs = ctx.redis_stat
+        cnt = await redis_helper.execute(rs, lambda r: r.get(f"container_count.{self.id}"))
+        return int(cnt) if cnt is not None else 0
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -588,11 +595,9 @@ class AgentSummaryList(graphene.ObjectType):
 
 async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:
     query = (
-        sa.select(
-            [
-                kernels.c.occupied_slots,
-            ]
-        )
+        sa.select([
+            kernels.c.occupied_slots,
+        ])
         .select_from(kernels)
         .where(
             (kernels.c.agent == agent_id)
@@ -605,11 +610,9 @@ async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: Agent
         occupied_slots += row["occupied_slots"]
     query = (
         sa.update(agents)
-        .values(
-            {
-                "occupied_slots": occupied_slots,
-            }
-        )
+        .values({
+            "occupied_slots": occupied_slots,
+        })
         .where(agents.c.id == agent_id)
     )
     await db_conn.execute(query)

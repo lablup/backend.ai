@@ -239,9 +239,9 @@ Open yet another terminal for client and run:
 .. code-block:: console
 
    $ source ./env-local-admin-api.sh  # Use the generated local endpoint and credential config.
-   $ # source ./env-local-user-api.sh  # Yo may choose an alternative credential config.
+   $ # source ./env-local-user-api.sh  # You may choose an alternative credential config.
    $ ./backend.ai config
-   $ ./backend.ai run python -c 'print("hello world")'
+   $ ./backend.ai run python --rm -c 'print("hello world")'
    ∙ Session token prefix: fb05c73953
    ✔ [0] Session fb05c73953 is ready.
    hello world

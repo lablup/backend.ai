@@ -1,18 +1,19 @@
-import base64
 import contextlib
+import json
 import logging
 import urllib.parse
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, AsyncIterator, Dict, List, Mapping, Optional
+from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Mapping, Optional, TypeAlias
 
 import aiohttp
-from aiohttp import web
+from aiohttp import BasicAuth, web
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
+from ..exception import ExternalError
 from .exceptions import (
     GPFSAPIError,
     GPFSInvalidBodyError,
@@ -34,6 +35,10 @@ from .types import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
+ResponseHandler: TypeAlias = Callable[
+    [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]
+]
+
 
 def error_handler(inner):
     async def outer(*args, **kwargs):
@@ -45,6 +50,24 @@ def error_handler(inner):
             raise GPFSNotFoundError
 
     return outer
+
+
+async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
+    match response.status // 100:
+        case 2:
+            pass
+        case 4:
+            pass
+        case 5:
+            try:
+                data = await response.json()
+                msg_detail = str(data)
+            except json.decoder.JSONDecodeError:
+                msg_detail = "Unable to decode response body."
+            raise ExternalError(
+                f"GPFS API server error. (status code: {response.status}, detail: {msg_detail})"
+            )
+    return response
 
 
 class GPFSAPIClient:
@@ -64,9 +87,7 @@ class GPFSAPIClient:
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        credential = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
         return {
-            "Authorization": f"Basic {credential}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -77,7 +98,10 @@ class GPFSAPIClient:
         method: str,
         path: str,
         body: Optional[Any] = None,
+        *,
+        err_handler: Optional[ResponseHandler] = None,
     ) -> aiohttp.ClientResponse:
+        response_handler = err_handler or base_response_handler
         match method:
             case "GET":
                 func = sess.get
@@ -93,11 +117,14 @@ class GPFSAPIClient:
                 raise GPFSAPIError(f"Unsupported request method {method}")
         try:
             if method == "GET" or method == "DELETE":
-                return await func("/scalemgmt/v2" + path, headers=self._req_header, ssl=self.ssl)
+                response = await func(
+                    "/scalemgmt/v2" + path, headers=self._req_header, ssl=self.ssl
+                )
             else:
-                return await func(
+                response = await func(
                     "/scalemgmt/v2" + path, headers=self._req_header, json=body, ssl=self.ssl
                 )
+            return await response_handler(response)
         except web.HTTPUnauthorized:
             raise GPFSUnauthorizedError
 
@@ -119,7 +146,7 @@ class GPFSAPIClient:
     @contextlib.asynccontextmanager
     async def _build_session(self) -> AsyncIterator[aiohttp.ClientSession]:
         async with aiohttp.ClientSession(
-            base_url=self.api_endpoint,
+            base_url=self.api_endpoint, auth=BasicAuth(self.username, self.password)
         ) as sess:
             yield sess
 
@@ -182,11 +209,10 @@ class GPFSAPIClient:
         self, fs_name: str, quota_type: GPFSQuotaType = GPFSQuotaType.FILESET
     ) -> List[GPFSQuota]:
         async with self._build_session() as sess:
-            query = urllib.parse.urlencode({"filter": f"entityType={quota_type}"})
             response = await self._build_request(
                 sess,
                 "GET",
-                f"/filesystems/{fs_name}/quotas?{query}",
+                f"/filesystems/{fs_name}/quotas",
             )
             data = await response.json()
         return [GPFSQuota.from_dict(quota_info) for quota_info in data["quotas"]]
@@ -199,11 +225,10 @@ class GPFSAPIClient:
         quota_type: GPFSQuotaType = GPFSQuotaType.FILESET,
     ) -> List[GPFSQuota]:
         async with self._build_session() as sess:
-            query = urllib.parse.urlencode({"filter": f"entityType={quota_type}"})
             response = await self._build_request(
                 sess,
                 "GET",
-                f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas?{query}",
+                f"/filesystems/{fs_name}/quotas?filter=objectName={fileset_name}",
             )
             data = await response.json()
             log.debug("response: {}", data)
@@ -250,7 +275,6 @@ class GPFSAPIClient:
     ) -> None:
         body: Dict[str, Any] = {
             "filesetName": fileset_name,
-            "createDirectory": create_directory,
         }
         if owner is not None:
             body["owner"] = owner
@@ -258,9 +282,26 @@ class GPFSAPIClient:
             body["permissions"] = permissions
         if path is not None:
             body["path"] = path.as_posix()
+
+        async def handler(response: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
+            match response.status:
+                case 200 | 201 | 202:
+                    pass
+                case 409:
+                    log.warning(f"GPFS fileset already exists. Skip create. (name: {fileset_name})")
+                case _:
+                    raise ExternalError(
+                        f"Cannot create GPFS fileset. status code: {response.status}"
+                    )
+            return response
+
         async with self._build_session() as sess:
             response = await self._build_request(
-                sess, "POST", f"/filesystems/{fs_name}/filesets", body
+                sess,
+                "POST",
+                f"/filesystems/{fs_name}/filesets",
+                body,
+                err_handler=handler,
             )
             data = await response.json()
             await self._wait_for_job_done([GPFSJob.from_dict(x) for x in data["jobs"]])

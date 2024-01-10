@@ -2,13 +2,15 @@
     "user_resource_policies": [
         {
             "name": "default",
-            "max_vfolder_size": -1
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
         }
     ],
     "project_resource_policies": [
         {
             "name": "default",
-            "max_vfolder_size": -1
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
         }
     ],
     "domains": [
@@ -32,7 +34,8 @@
             "domain_name": "default",
             "resource_policy": "default",
             "total_resource_slots": {},
-            "allowed_vfolder_hosts": {}
+            "allowed_vfolder_hosts": {},
+            "type": "general"
         }
     ],
     "scaling_groups": [
@@ -136,8 +139,6 @@
             "max_session_lifetime": 0,
             "max_concurrent_sessions": 5,
             "max_containers_per_session": 1,
-            "max_vfolder_count": 10,
-            "max_vfolder_size": 0,
             "idle_timeout": 3600,
             "allowed_vfolder_hosts": {
                 "local:volume1": [

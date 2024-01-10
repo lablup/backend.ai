@@ -263,15 +263,15 @@ def create(
 
     """
     envs = prepare_env_arg(env)
-    resources = prepare_resource_arg(resources)
-    resource_opts = prepare_resource_arg(resource_opts)
+    parsed_resources = prepare_resource_arg(resources)
+    parsed_resource_opts = prepare_resource_arg(resource_opts)
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
         "startup_command": startup_command,
-        "resources": resources,
-        "resource_opts": resource_opts,
+        "resources": parsed_resources,
+        "resource_opts": parsed_resource_opts,
         "cluster_size": cluster_size,
         "cluster_mode": cluster_mode,
         "bootstrap_script": bootstrap_script,

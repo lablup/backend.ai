@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import json
 import logging
 import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast
@@ -6,10 +9,15 @@ import aiohttp
 import aiotools
 import yarl
 
+from ai.backend.common.docker import arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .base import BaseContainerRegistry
+from .base import (
+    BaseContainerRegistry,
+    concurrency_sema,
+    progress_reporter,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -144,17 +152,21 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                 return
                             tag = image_info["tags"][0]["name"]
                             match image_info["manifest_media_type"]:
-                                case "application/vnd.oci.image.index.v1+json":
+                                case self.MEDIA_TYPE_OCI_INDEX:
                                     await self._process_oci_index(
                                         tg, sess, rqst_args, image, image_info
                                     )
-                                case "application/vnd.docker.distribution.manifest.list.v2+json":
+                                case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                                     await self._process_docker_v2_multiplatform_image(
                                         tg, sess, rqst_args, image, image_info
                                     )
-                                case _:
+                                case self.MEDIA_TYPE_DOCKER_MANIFEST:
                                     await self._process_docker_v2_image(
                                         tg, sess, rqst_args, image, image_info
+                                    )
+                                case _ as media_type:
+                                    raise RuntimeError(
+                                        f"Unsupported artifact media-type: {media_type}"
                                     )
                         finally:
                             if skip_reason:
@@ -179,21 +191,27 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
         rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
-        digests: list[str] = []
+        digests: list[tuple[str, str]] = []
+        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
                 or reference["platform"]["architecture"] == "unknown"
             ):
                 continue
-            digests.append(reference["child_digest"])
-        if (reporter := self.reporter.get()) is not None:
+            digests.append((reference["child_digest"], reference["platform"]["architecture"]))
+        if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(digests)
         async with aiotools.TaskGroup() as tg:
-            for digest in digests:
+            for digest, architecture in digests:
                 tg.create_task(
-                    self._scan_tag(
-                        sess, rqst_args, image, digest, tag=image_info["tags"][0]["name"]
+                    self._harbor_scan_tag_per_arch(
+                        sess,
+                        rqst_args,
+                        image,
+                        digest=digest,
+                        tag=tag_name,
+                        architecture=architecture,
                     )
                 )
 
@@ -208,24 +226,30 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update(
-            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
-        )
-        digests: list[str] = []
+        rqst_args["headers"].update({
+            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+        })
+        digests: list[tuple[str, str]] = []
+        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
                 or reference["platform"]["architecture"] == "unknown"
             ):
                 continue
-            digests.append(reference["child_digest"])
-        if (reporter := self.reporter.get()) is not None:
+            digests.append((reference["child_digest"], reference["platform"]["architecture"]))
+        if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(digests)
         async with aiotools.TaskGroup() as tg:
-            for digest in digests:
+            for digest, architecture in digests:
                 tg.create_task(
-                    self._scan_tag(
-                        sess, rqst_args, image, digest, tag=image_info["tags"][0]["name"]
+                    self._harbor_scan_tag_per_arch(
+                        sess,
+                        rqst_args,
+                        image,
+                        digest=digest,
+                        tag=tag_name,
+                        architecture=architecture,
                     )
                 )
 
@@ -240,10 +264,145 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update(
-            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
-        )
-        if (reporter := self.reporter.get()) is not None:
+        rqst_args["headers"].update({
+            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+        })
+        if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
+        tag_name = image_info["tags"][0]["name"]
         async with aiotools.TaskGroup() as tg:
-            tg.create_task(self._scan_tag(sess, rqst_args, image, image_info["tags"][0]["name"]))
+            tg.create_task(
+                self._harbor_scan_tag_single_arch(
+                    sess,
+                    rqst_args,
+                    image,
+                    tag=tag_name,
+                )
+            )
+
+    async def _harbor_scan_tag_per_arch(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        *,
+        digest: str,
+        tag: str,
+        architecture: str,
+    ) -> None:
+        """
+        Scan 'image:tag' when there are explicitly known values of digest and architecture.
+        """
+        manifests = {}
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{digest}", **rqst_args
+            ) as resp:
+                if resp.status == 404:
+                    # ignore missing tags
+                    # (may occur after deleting an image from the docker hub)
+                    return
+                resp.raise_for_status()
+                top_manifest = await resp.json()
+            architecture = arch_name_aliases.get(architecture, architecture)
+            config_digest = top_manifest["config"]["digest"]
+            size_bytes = (
+                sum(layer["size"] for layer in top_manifest["layers"])
+                + top_manifest["config"]["size"]
+            )
+            async with sess.get(
+                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                data = json.loads(await resp.read())
+            labels = {}
+            if "container_config" in data:
+                raw_labels = data["container_config"].get("Labels")
+                if raw_labels:
+                    labels.update(raw_labels)
+                else:
+                    log.warn(
+                        "label not found on image {}:{}/{}",
+                        image,
+                        tag,
+                        architecture,
+                    )
+            else:
+                raw_labels = data["config"].get("Labels")
+                if raw_labels:
+                    labels.update(raw_labels)
+                else:
+                    log.warn(
+                        "label not found on image {}:{}/{}",
+                        image,
+                        tag,
+                        architecture,
+                    )
+            manifests[architecture] = {
+                "size": size_bytes,
+                "labels": labels,
+                "digest": config_digest,
+            }
+            await self._read_manifest(image, tag, manifests)
+
+    async def _harbor_scan_tag_single_arch(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        """
+        Scan 'image:tag' which has been pusehd as a single architecture tag.
+        In this case, Harbor does not provide explicit methods to determine the architecture.
+        We infer the architecture from the tag naming patterns ("-arm64" for instance).
+        """
+        manifests = {}
+        async with concurrency_sema.get():
+            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
+            # Harbor does not provide architecture information for a single-arch tag reference.
+            # We heuristically detect the architecture using the tag name pattern.
+            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+                architecture = "aarch64"
+            else:
+                architecture = "x86_64"
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                data = await resp.json()
+                config_digest = data["config"]["digest"]
+                size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+            async with sess.get(
+                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                data = json.loads(await resp.read())
+            labels = {}
+            if "container_config" in data:
+                raw_labels = data["container_config"].get("Labels")
+                if raw_labels:
+                    labels.update(raw_labels)
+                else:
+                    log.warn(
+                        "label not found on image {}:{}/{}",
+                        image,
+                        tag,
+                        architecture,
+                    )
+            else:
+                raw_labels = data["config"].get("Labels")
+                if raw_labels:
+                    labels.update(raw_labels)
+                else:
+                    log.warn(
+                        "label not found on image {}:{}/{}",
+                        image,
+                        tag,
+                        architecture,
+                    )
+            manifests[architecture] = {
+                "size": size_bytes,
+                "labels": labels,
+                "digest": config_digest,
+            }
+            await self._read_manifest(image, tag, manifests)

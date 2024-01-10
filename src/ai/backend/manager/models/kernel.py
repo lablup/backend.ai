@@ -21,7 +21,7 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
+from dateutil.tz import tzfile, tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -39,6 +39,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -429,7 +430,7 @@ kernels = sa.Table(
     # Resource occupation
     sa.Column("container_id", sa.String(length=64)),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("requested_slots", ResourceSlotColumn(), nullable=True),
+    sa.Column("requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()),
     sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
     sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
     sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03
@@ -559,6 +560,21 @@ class KernelRow(Base):
         if self.cluster_role == DEFAULT_ROLE:
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
+
+    @property
+    def used_time(self) -> Optional[str]:
+        if self.terminated_at is not None:
+            return str(self.terminated_at - self.created_at)
+        return None
+
+    def get_used_days(self, local_tz: tzfile) -> Optional[int]:
+        if self.terminated_at is not None:
+            return (
+                self.terminated_at.astimezone(local_tz).toordinal()
+                - self.created_at.astimezone(local_tz).toordinal()
+                + 1
+            )
+        return None
 
     @property
     def is_private(self) -> bool:
@@ -740,9 +756,10 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                await pipe.mget(
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
-                )
+                await pipe.mget([
+                    f"session.{sess_id}.requests",
+                    f"session.{sess_id}.last_response_time",
+                ])
             return pipe
 
         stats = []
@@ -987,7 +1004,8 @@ class ComputeContainer(graphene.ObjectType):
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[ComputeContainer]]:
         query = (
-            sa.select([kernels]).select_from(kernels)
+            sa.select([kernels])
+            .select_from(kernels)
             # TODO: use "owner session ID" when we implement multi-container session
             .where(kernels.c.session_id.in_(session_ids))
         )

@@ -20,8 +20,6 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 from typing_extensions import ParamSpec
 
-from ai.backend.common.types import RedisHelperConfig
-
 if TYPE_CHECKING:
     from .types import AbstractRedisNode
 
@@ -35,12 +33,6 @@ disruptions: Final = {
         "begin": "pause",
         "end": "unpause",
     },
-}
-
-redis_helper_config: RedisHelperConfig = {
-    "socket_timeout": 5.0,
-    "socket_connect_timeout": 2.0,
-    "reconnect_poll_timeout": 0.3,
 }
 
 

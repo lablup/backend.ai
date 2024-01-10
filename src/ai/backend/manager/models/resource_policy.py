@@ -28,6 +28,7 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
+from .utils import deprecation_reason_msg, description_msg
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -57,6 +58,34 @@ __all__: Sequence[str] = (
 )
 
 
+def user_max_vfolder_count(required: bool = False):
+    return graphene.Int(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the number of user vfolders."),
+    )
+
+
+def user_max_quota_scope_size(required: bool = False):
+    return BigInt(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the quota size of user vfolders."),
+    )
+
+
+def project_max_vfolder_count(required: bool = False):
+    return graphene.Int(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the number of project vfolders."),
+    )
+
+
+def project_max_quota_scope_size(required: bool = False):
+    return BigInt(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the quota size of project vfolders."),
+    )
+
+
 keypair_resource_policies = sa.Table(
     "keypair_resource_policies",
     mapper_registry.metadata,
@@ -75,8 +104,6 @@ keypair_resource_policies = sa.Table(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
     ),
     sa.Column("max_containers_per_session", sa.Integer(), nullable=False),
-    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
-    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
     sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
     sa.Column(
         "allowed_vfolder_hosts",
@@ -99,7 +126,8 @@ user_resource_policies = sa.Table(
     mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
+    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
+    sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
 )
 
 
@@ -107,9 +135,10 @@ class UserResourcePolicyRow(Base):
     __table__ = user_resource_policies
     users = relationship("UserRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_vfolder_size) -> None:
+    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
         self.name = name
-        self.max_vfolder_size = max_vfolder_size
+        self.max_vfolder_count = max_vfolder_count
+        self.max_quota_scope_size = max_quota_scope_size
 
 
 project_resource_policies = sa.Table(
@@ -117,7 +146,8 @@ project_resource_policies = sa.Table(
     mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
+    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
+    sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
 )
 
 
@@ -125,9 +155,10 @@ class ProjectResourcePolicyRow(Base):
     __table__ = project_resource_policies
     projects = relationship("GroupRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_vfolder_size) -> None:
+    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
         self.name = name
-        self.max_vfolder_size = max_vfolder_size
+        self.max_vfolder_count = max_vfolder_count
+        self.max_quota_scope_size = max_quota_scope_size
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
@@ -139,9 +170,11 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     max_concurrent_sessions = graphene.Int()
     max_containers_per_session = graphene.Int()
     idle_timeout = BigInt()
-    max_vfolder_count = graphene.Int()
-    max_vfolder_size = BigInt()
     allowed_vfolder_hosts = graphene.JSONString()
+
+    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
 
     @classmethod
     def from_row(
@@ -160,8 +193,6 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             max_concurrent_sessions=row["max_concurrent_sessions"],
             max_containers_per_session=row["max_containers_per_session"],
             idle_timeout=row["idle_timeout"],
-            max_vfolder_count=row["max_vfolder_count"],
-            max_vfolder_size=row["max_vfolder_size"],
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
         )
 
@@ -286,14 +317,25 @@ class KeyPairResourcePolicy(graphene.ObjectType):
 
 class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     default_for_unspecified = graphene.String(required=True)
-    total_resource_slots = graphene.JSONString(required=True)
-    max_session_lifetime = graphene.Int(required=True, default_value=0)
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    max_session_lifetime = graphene.Int(required=False, default_value=0)
     max_concurrent_sessions = graphene.Int(required=True)
+    max_concurrent_sftp_sessions = graphene.Int(required=False, default_value=1)
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
-    max_vfolder_count = graphene.Int(required=True)
-    max_vfolder_size = BigInt(required=True)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_vfolder_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_quota_scope_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -301,11 +343,22 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     max_session_lifetime = graphene.Int(required=False)
     max_concurrent_sessions = graphene.Int(required=False)
+    max_concurrent_sftp_sessions = graphene.Int(required=False)
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
-    max_vfolder_count = graphene.Int(required=False)
-    max_vfolder_size = BigInt(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_vfolder_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_quota_scope_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
@@ -333,10 +386,9 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
             "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
             "max_session_lifetime": props.max_session_lifetime,
             "max_concurrent_sessions": props.max_concurrent_sessions,
+            "max_concurrent_sftp_sessions": props.max_concurrent_sessions,
             "max_containers_per_session": props.max_containers_per_session,
             "idle_timeout": props.idle_timeout,
-            "max_vfolder_count": props.max_vfolder_count,
-            "max_vfolder_size": props.max_vfolder_size,
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
         }
         insert_query = sa.insert(keypair_resource_policies).values(data)
@@ -368,7 +420,10 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
     ) -> ModifyKeyPairResourcePolicy:
         data: Dict[str, Any] = {}
         set_if_set(
-            props, data, "default_for_unspecified", clean_func=lambda v: DefaultForUnspecified[v]
+            props,
+            data,
+            "default_for_unspecified",
+            clean_func=lambda v: DefaultForUnspecified[v],
         )
         set_if_set(
             props,
@@ -378,10 +433,9 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         )
         set_if_set(props, data, "max_session_lifetime")
         set_if_set(props, data, "max_concurrent_sessions")
+        set_if_set(props, data, "max_concurrent_sftp_sessions")
         set_if_set(props, data, "max_containers_per_session")
         set_if_set(props, data, "idle_timeout")
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_vfolder_size")
         set_if_set(props, data, "allowed_vfolder_hosts")
         update_query = (
             sa.update(keypair_resource_policies)
@@ -417,7 +471,9 @@ class UserResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_size = BigInt()
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.1"))
 
     @classmethod
     def from_row(
@@ -431,7 +487,8 @@ class UserResourcePolicy(graphene.ObjectType):
             id=f"UserResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
-            max_vfolder_size=row.max_vfolder_size,
+            max_vfolder_count=row.max_vfolder_count,
+            max_quota_scope_size=row.max_quota_scope_size,
         )
 
     @classmethod
@@ -488,11 +545,13 @@ class UserResourcePolicy(graphene.ObjectType):
 
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_size = BigInt(required=True)
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_size = BigInt(required=True)
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
 
 
 class CreateUserResourcePolicy(graphene.Mutation):
@@ -518,7 +577,9 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> UserResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(name, props.max_vfolder_size)
+                row = UserResourcePolicyRow(
+                    name, props.max_vfolder_count, props.max_quota_scope_size
+                )
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
@@ -550,7 +611,8 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_size")
+        set_if_set(props, data, "max_vfolder_count")
+        set_if_set(props, data, "max_quota_scope_size")
         update_query = (
             sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
         )
@@ -586,7 +648,9 @@ class ProjectResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_size = BigInt()
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.1"))
 
     @classmethod
     def from_row(
@@ -600,7 +664,9 @@ class ProjectResourcePolicy(graphene.ObjectType):
             id=f"ProjectResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
-            max_vfolder_size=row.max_vfolder_size,
+            max_vfolder_count=row.max_vfolder_count,
+            max_vfolder_size=row.max_quota_scope_size,
+            max_quota_scope_size=row.max_quota_scope_size,
         )
 
     @classmethod
@@ -657,11 +723,13 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_size = BigInt(required=True)
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_size = BigInt(required=True)
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
@@ -687,7 +755,9 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(name, props.max_vfolder_size)
+                row = ProjectResourcePolicyRow(
+                    name, props.max_vfolder_count, props.max_quota_scope_size
+                )
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(ProjectResourcePolicyRow).where(
@@ -721,7 +791,8 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_size")
+        set_if_set(props, data, "max_vfolder_count")
+        set_if_set(props, data, "max_quota_scope_size")
         update_query = (
             sa.update(ProjectResourcePolicyRow)
             .values(data)

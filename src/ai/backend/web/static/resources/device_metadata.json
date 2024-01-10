@@ -11,7 +11,7 @@
       },
       "display_icon": "cpu"
     },
-    "ram": {
+    "mem": {
       "slot_name": "ram",
       "description": "Memory",
       "human_readable_name": "RAM",
@@ -97,7 +97,7 @@
         "binary": false,
         "round_length": 0
       },
-      "display_icon": "rebel"
+      "display_icon": "furiosa"
     }
   }
 }

@@ -26,6 +26,7 @@ from .base import (
     EnumValueType,
     ForeignKeyIDColumn,
     IDColumn,
+    InferenceSessionError,
     Item,
     PaginatedList,
     ResourceSlotColumn,
@@ -354,17 +355,6 @@ class EndpointTokenRow(Base):
         return row
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
-        src = graphene.String(required=True)
-        name = graphene.String(required=True)
-        repr = graphene.String(required=True)
-
-    session_id = graphene.UUID(required=True)
-
-    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
-
-
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -452,9 +442,10 @@ class Endpoint(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(EndpointRow)
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -488,9 +479,10 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.routings))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -569,39 +561,27 @@ class Endpoint(graphene.ObjectType):
         return "PROVISIONING"
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
-        from .session import SessionRow
-
-        ctx = info.context
-        async with ctx.db.begin_readonly_session() as db_sess:
-            error_routes = [
-                r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name
-            ]
-            query = sa.select(SessionRow).where(
-                SessionRow.id.in_([r.session for r in error_routes])
-            )
-            result = await db_sess.execute(query)
-            error_sessions = result.scalars().all()
-
-            errors_by_session = []
-            for sess in error_sessions:
-                if "error" not in sess.status_data:
-                    continue
-                if sess.status_data["error"]["name"] == "MultiAgentError":
-                    errors = sess.status_data["error"]["collection"]
-                else:
-                    errors = [sess.status_data["error"]]
-                errors_by_session.append(
-                    InferenceSessionError(
-                        session_id=sess.id,
-                        errors=[
-                            InferenceSessionError.InferenceSessionErrorInfo(
-                                src=e["src"], name=e["name"], repr=e["repr"]
-                            )
-                            for e in errors
-                        ],
-                    )
+        error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
+        errors = []
+        for route in error_routes:
+            match route.error_data["type"]:
+                case "session_cancelled":
+                    session_id = route.error_data["session_id"]
+                case _:
+                    session_id = None
+            errors.append(
+                InferenceSessionError(
+                    session_id=session_id,
+                    errors=[
+                        InferenceSessionError.InferenceSessionErrorInfo(
+                            src=e["src"], name=e["name"], repr=e["repr"]
+                        )
+                        for e in route.error_data["errors"]
+                    ],
                 )
-            return errors_by_session
+            )
+
+        return errors
 
 
 class EndpointList(graphene.ObjectType):

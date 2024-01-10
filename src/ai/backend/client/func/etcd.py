@@ -24,12 +24,10 @@ class EtcdConfig(BaseFunction):
         :param prefix: get all keys prefixed with the give key.
         """
         rqst = Request("POST", "/config/get")
-        rqst.set_json(
-            {
-                "key": key,
-                "prefix": prefix,
-            }
-        )
+        rqst.set_json({
+            "key": key,
+            "prefix": prefix,
+        })
         async with rqst.fetch() as resp:
             data = await resp.json()
             return data.get("result", None)
@@ -44,12 +42,10 @@ class EtcdConfig(BaseFunction):
         :param value: Value to set.
         """
         rqst = Request("POST", "/config/set")
-        rqst.set_json(
-            {
-                "key": key,
-                "value": value,
-            }
-        )
+        rqst.set_json({
+            "key": key,
+            "value": value,
+        })
         async with rqst.fetch() as resp:
             data = await resp.json()
             return data
@@ -64,12 +60,10 @@ class EtcdConfig(BaseFunction):
         :param prefix: delete all keys prefixed with the give key.
         """
         rqst = Request("POST", "/config/delete")
-        rqst.set_json(
-            {
-                "key": key,
-                "prefix": prefix,
-            }
-        )
+        rqst.set_json({
+            "key": key,
+            "prefix": prefix,
+        })
         async with rqst.fetch() as resp:
             data = await resp.json()
             return data

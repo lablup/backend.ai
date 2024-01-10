@@ -84,6 +84,11 @@
         "SpectrumScale",
         "GPFS"
       ]
+    },
+    "auto": {
+      "name": "Auto",
+      "description": "Choose the host with the lowest usage from the available host volumes for users. This ensures that usage is evenly distributed across multiple storage volumes, avoiding over-concentration on any single volume.",
+      "icon": "local.png"
     }
   }
 }

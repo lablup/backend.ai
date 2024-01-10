@@ -8,6 +8,17 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/agent/**",
+    ],
+    allowed_dependencies=[
+        "//src/ai/backend/runner/**",
+        "//src/ai/backend/helpers/**",
+        "//python-kernel.lock",
+    ],
+)
+
 pex_binary(
     name="__main__",
     entry_point="__main__.py",

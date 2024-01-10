@@ -114,6 +114,10 @@ usage() {
   echo "    The port for the agent's watcher service."
   echo "    (default: 6019)"
   echo ""
+  echo "  ${LWHITE}--agent-backend mode${NC}"
+  echo "    Mode for backend agent(docker, kubernetes)."
+  echo "    (default: docker)"
+  echo ""
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
   echo "    (default: /tmp/backend.ai/ipc)"
@@ -295,6 +299,7 @@ WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
+AGENT_BACKEND="docker"
 IPC_BASE_PATH="/tmp/backend.ai/ipc"
 VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
 VFOLDER_REL_PATH="vfroot/local"
@@ -343,6 +348,8 @@ while [ $# -gt 0 ]; do
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+    --agent-backend)        AGENT_BACKEND=$2; shift ;;
+    --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
     --configure-ha)         CONFIGURE_HA=1 ;;
     *)
       echo "Unknown option: $1"
@@ -569,8 +576,8 @@ bootstrap_pants() {
       curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
       bash /tmp/get-pants.sh
       if ! command -v pants &> /dev/null ; then
-        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
-        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+        $sudo ln -s $HOME/.local/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/.local/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
       fi
       ;;
     esac
@@ -857,7 +864,7 @@ configure_backendai() {
     ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
 
-  ./backend.ai mgr etcd put-json config/redis/redis-helper-config ./configs/manager/sample.etcd.redis-helper.json
+  ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
 
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
@@ -872,6 +879,15 @@ configure_backendai() {
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+
+  # configure backend mode
+  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then 
+    sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
+    sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
+  elif [ $AGENT_BACKEND = "docker" ]; then
+    sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
+    mv ./agent.toml.sed ./agent.toml
+  fi
   sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
@@ -899,6 +915,7 @@ configure_backendai() {
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
   sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
+  sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 

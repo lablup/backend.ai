@@ -20,7 +20,7 @@ parser.add_argument(
     default="-",
 )
 parser.add_argument(
-    "--no-capitalize", help="Don`\t capitalize the words in the password", action="store_true"
+    "--no-capitalize", help="Don't capitalize the words in the password", action="store_true"
 )
 parser.add_argument(
     "-e",

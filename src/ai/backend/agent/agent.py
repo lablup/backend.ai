@@ -67,7 +67,7 @@ from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -86,13 +86,12 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
-    KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
+    ModelServiceStatusEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
     VolumeMountableNodeType,
@@ -120,6 +119,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
+    ModelServiceStatus,
     MountPermission,
     MountTypes,
     Sentinel,
@@ -160,21 +160,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 _sentinel = Sentinel.TOKEN
 
-ACTIVE_STATUS_SET = frozenset(
-    [
-        ContainerStatus.RUNNING,
-        ContainerStatus.RESTARTING,
-        ContainerStatus.PAUSED,
-    ]
-)
+ACTIVE_STATUS_SET = frozenset([
+    ContainerStatus.RUNNING,
+    ContainerStatus.RESTARTING,
+    ContainerStatus.PAUSED,
+])
 
-DEAD_STATUS_SET = frozenset(
-    [
-        ContainerStatus.EXITED,
-        ContainerStatus.DEAD,
-        ContainerStatus.REMOVING,
-    ]
-)
+DEAD_STATUS_SET = frozenset([
+    ContainerStatus.EXITED,
+    ContainerStatus.DEAD,
+    ContainerStatus.REMOVING,
+])
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
@@ -187,6 +183,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
+    event_producer: EventProducer
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
     kernel_features: FrozenSet[str]
@@ -201,6 +198,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -212,6 +210,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
+        self.event_producer = event_producer
         self.kernel_config = kernel_config
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
@@ -632,8 +631,16 @@ class AbstractAgent(
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
-        self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
+        self.redis_stream_pool = redis_helper.get_redis_object(
+            self.local_config["redis"],
+            name="stream",
+            db=REDIS_STREAM_DB,
+        )
+        self.redis_stat_pool = redis_helper.get_redis_object(
+            self.local_config["redis"],
+            name="stat",
+            db=REDIS_STAT_DB,
+        )
         self.backend_data_root = await self._read_data_root()
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
@@ -801,7 +808,8 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent("""
+        commit_status_script = textwrap.dedent(
+            """
         local key_and_value = {}
         for i, k in pairs(KEYS) do
             key_and_value[i*2-1] = k
@@ -813,7 +821,8 @@ class AbstractAgent(
                 redis.call('EXPIRE', k, ARGV[1])
             end
         end
-        """)
+        """
+        )
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
@@ -1264,7 +1273,7 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
+                            "rescan_resource_usage(k:{}): "
                             "failed to read kernel resource info; "
                             "maybe already terminated",
                             kernel_id,
@@ -1279,6 +1288,7 @@ class AbstractAgent(
         known_kernels: Dict[KernelId, ContainerId] = {}
         alive_kernels: Dict[KernelId, ContainerId] = {}
         kernel_session_map: Dict[KernelId, SessionId] = {}
+        own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels = {}
 
         async with self.registry_lock:
@@ -1307,6 +1317,7 @@ class AbstractAgent(
                     alive_kernels[kernel_id] = container.id
                     session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                     kernel_session_map[kernel_id] = session_id
+                    own_kernels[kernel_id] = container.id
                 for kernel_id, kernel_obj in self.kernel_registry.items():
                     known_kernels[kernel_id] = kernel_obj["container_id"]
                     session_id = kernel_obj.session_id
@@ -1340,6 +1351,14 @@ class AbstractAgent(
                 # Enqueue the events.
                 for kernel_id, ev in terminated_kernels.items():
                     await self.container_lifecycle_queue.put(ev)
+
+                # Set container count
+                await self.set_container_count(len(own_kernels.keys()))
+
+    async def set_container_count(self, container_count: int) -> None:
+        await redis_helper.execute(
+            self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
+        )
 
     async def clean_all_kernels(self, blocking: bool = False) -> None:
         kernel_ids = [*self.kernel_registry.keys()]
@@ -1400,20 +1419,23 @@ class AbstractAgent(
             except Exception as e:
                 return key, e
 
+        keys = []
         for key, plugin in self.computers.items():
+            keys.append(key)
             tasks.append(_get(key, plugin.instance))
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for key, result in results:
-            if isinstance(result, NotImplementedError):
-                continue
-            elif isinstance(result, Exception):
-                hwinfo[key] = {
-                    "status": "unavailable",
-                    "status_info": str(result),
-                    "metadata": {},
-                }
-            else:
-                hwinfo[key] = result
+        for key, result in zip(keys, results):
+            match result:
+                case NotImplementedError():
+                    continue
+                case BaseException():
+                    hwinfo[key] = {
+                        "status": "unavailable",
+                        "status_info": str(result),
+                        "metadata": {},
+                    }
+                case HardwareMetadata():
+                    hwinfo[key] = result
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
@@ -1469,7 +1491,8 @@ class AbstractAgent(
                 await self.container_lifecycle_queue.put(ev)
 
             hash_name = "abuse_report"
-            abuse_report_script = textwrap.dedent("""
+            abuse_report_script = textwrap.dedent(
+                """
                 local key = KEYS[1]
                 local new_report = cjson.decode(ARGV[1])
 
@@ -1489,7 +1512,8 @@ class AbstractAgent(
                         redis.call('HSET', key, kern_id, report_val)
                     end
                 end
-            """)
+            """
+            )
             await redis_helper.execute_script(
                 self.redis_stat_pool,
                 "report_abusing_kernels",
@@ -1559,6 +1583,7 @@ class AbstractAgent(
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
             if kernel_obj.runner is not None:
+                kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
@@ -1830,24 +1855,20 @@ class AbstractAgent(
                 if preopen_ports is None:
                     preopen_ports = []
 
-                service_ports.append(
-                    {
-                        "name": "sshd",
-                        "protocol": ServicePortProtocols.TCP,
-                        "container_ports": (2200,),
-                        "host_ports": (None,),
-                        "is_inference": False,
-                    }
-                )
-                service_ports.append(
-                    {
-                        "name": "ttyd",
-                        "protocol": ServicePortProtocols.HTTP,
-                        "container_ports": (7681,),
-                        "host_ports": (None,),
-                        "is_inference": False,
-                    }
-                )
+                service_ports.append({
+                    "name": "sshd",
+                    "protocol": ServicePortProtocols.TCP,
+                    "container_ports": (2200,),
+                    "host_ports": (None,),
+                    "is_inference": False,
+                })
+                service_ports.append({
+                    "name": "ttyd",
+                    "protocol": ServicePortProtocols.HTTP,
+                    "container_ports": (7681,),
+                    "host_ports": (None,),
+                    "is_inference": False,
+                })
 
                 model_definition: Optional[Mapping[str, Any]] = None
                 # Read model config
@@ -1890,15 +1911,13 @@ class AbstractAgent(
                             environ["BACKEND_MODEL_NAME"] = model["name"]
                             environ["BACKEND_MODEL_PATH"] = model["model_path"]
                             if service := model.get("service"):
-                                service_ports.append(
-                                    {
-                                        "name": f"{model['name']}-{service['port']}",
-                                        "protocol": ServicePortProtocols.PREOPEN,
-                                        "container_ports": (service["port"],),
-                                        "host_ports": (None,),
-                                        "is_inference": True,
-                                    }
-                                )
+                                service_ports.append({
+                                    "name": f"{model['name']}-{service['port']}",
+                                    "protocol": ServicePortProtocols.PREOPEN,
+                                    "container_ports": (service["port"],),
+                                    "host_ports": (None,),
+                                    "is_inference": True,
+                                })
                     except DataError as e:
                         raise AgentError(
                             "Failed to validate model definition from vFolder"
@@ -1929,15 +1948,13 @@ class AbstractAgent(
                         for cport in sport["container_ports"]:
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
-                        service_ports.append(
-                            {
-                                "name": f"hostport{index+1}",
-                                "protocol": ServicePortProtocols.INTERNAL,
-                                "container_ports": (port,),
-                                "host_ports": (port,),
-                                "is_inference": False,
-                            }
-                        )
+                        service_ports.append({
+                            "name": f"hostport{index+1}",
+                            "protocol": ServicePortProtocols.INTERNAL,
+                            "container_ports": (port,),
+                            "host_ports": (port,),
+                            "is_inference": False,
+                        })
                         exposed_ports.append(port)
                     log.debug("exposed ports: {!r}", exposed_ports)
 
@@ -2004,10 +2021,10 @@ class AbstractAgent(
                         preopen_ports,
                     )
                 except ContainerCreationError as e:
-                    log.warning(
-                        "Kernel failed to create container (k:{}). Kernel is going to be"
-                        " destroyed.",
-                        ctx.kernel_id,
+                    msg = e.message or "unknown"
+                    log.error(
+                        "Kernel failed to create container. Kernel is going to be destroyed."
+                        f" (k:{ctx.kernel_id}, detail:{msg})",
                     )
                     cid = e.container_id
                     async with self.registry_lock:
@@ -2016,10 +2033,12 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.UNKNOWN,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
                         container_id=ContainerId(cid),
                     )
-                    raise AgentError(f"Kernel failed to create container (k:{str(ctx.kernel_id)})")
+                    raise AgentError(
+                        f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
+                    )
                 except Exception:
                     log.warning(
                         "Kernel failed to create container (k:{}). Kernel is going to be"
@@ -2031,7 +2050,7 @@ class AbstractAgent(
                     raise
                 async with self.registry_lock:
                     self.kernel_registry[ctx.kernel_id].data.update(container_data)
-                await kernel_obj.init()
+                await kernel_obj.init(self.event_producer)
 
                 current_task = asyncio.current_task()
                 assert current_task is not None
@@ -2095,7 +2114,7 @@ class AbstractAgent(
                 if model_definition:
                     for model in model_definition["models"]:
                         asyncio.create_task(
-                            self.start_and_monitor_model_service_initial_health(kernel_obj, model)
+                            self.start_and_monitor_model_service_health(kernel_obj, model)
                         )
 
                 # Finally we are done.
@@ -2130,7 +2149,7 @@ class AbstractAgent(
                 await self.reconstruct_resource_usage()
                 raise e
 
-    async def start_and_monitor_model_service_initial_health(
+    async def start_and_monitor_model_service_health(
         self,
         kernel_obj: KernelObjectType,
         model: Any,
@@ -2138,15 +2157,14 @@ class AbstractAgent(
         log.debug("starting model service of model {}", model["name"])
         result = await kernel_obj.start_model_service(model)
         if result["status"] == "failed":
+            # handle cases where krunner fails to spawn model service process
+            # if everything went well then krunner itself will report the status via zmq
             await self.event_producer.produce_event(
-                KernelHealthCheckFailedEvent(
-                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
-                )
-            )
-        else:
-            await self.event_producer.produce_event(
-                KernelHealthyEvent(
-                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                ModelServiceStatusEvent(
+                    kernel_obj.kernel_id,
+                    kernel_obj.session_id,
+                    model["name"],
+                    ModelServiceStatus.HEALTHY,
                 )
             )
 

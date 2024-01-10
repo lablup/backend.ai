@@ -7,11 +7,11 @@ import aiotools
 import pytest
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.types import RedisConnectionInfo
 
 from .types import RedisClusterInfo
-from .utils import interrupt, redis_helper_config, with_timeout
+from .utils import interrupt, with_timeout
 
 
 @pytest.mark.redis
@@ -52,8 +52,9 @@ async def test_blist_cluster_sentinel(
 
     r = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
-        redis_helper_config=redis_helper_config,
+        redis_helper_config=config.redis_helper_default_config,
         sentinel=s,
+        name="test",
         service_name="mymaster",
     )
     await redis_helper.execute(r, lambda r: r.delete("bl1"))

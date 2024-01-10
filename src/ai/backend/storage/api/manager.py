@@ -1,6 +1,7 @@
 """
 Manager-facing API
 """
+
 from __future__ import annotations
 
 import json
@@ -42,6 +43,7 @@ from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
     QuotaScopeAlreadyExists,
@@ -76,7 +78,7 @@ async def token_auth_middleware(
 
 
 def skip_token_auth(
-    handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     setattr(handler, "skip_token_auth", True)
     return handler
@@ -105,10 +107,17 @@ def handle_fs_errors(
     except OSError as e:
         related_paths = []
         msg = str(e) if e.strerror is None else e.strerror
+
+        def _append_fpath(fname: Any) -> None:
+            try:
+                related_paths.append(str(volume.strip_vfpath(vfid, Path(fname))))
+            except (ValueError, OSError):
+                related_paths.append(fname)
+
         if e.filename:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename))))
+            _append_fpath(e.filename)
         if e.filename2:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename2))))
+            _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
             body=json.dumps(
                 {
@@ -117,6 +126,19 @@ def handle_fs_errors(
                     "paths": related_paths,
                 },
             ),
+            content_type="application/json",
+        )
+
+
+@ctxmgr
+def handle_external_errors() -> Iterator[None]:
+    try:
+        yield
+    except ExternalError as e:
+        raise web.HTTPInternalServerError(
+            body=json.dumps({
+                "msg": str(e),
+            }),
             content_type="application/json",
         )
 
@@ -193,9 +215,10 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                await volume.quota_model.create_quota_scope(
-                    params["qsid"], params["options"], params["extra_args"]
-                )
+                with handle_external_errors():
+                    await volume.quota_model.create_quota_scope(
+                        params["qsid"], params["options"], params["extra_args"]
+                    )
             except QuotaScopeAlreadyExists:
                 return web.json_response(
                     {"msg": "Volume already exists with given quota scope."},
@@ -224,17 +247,14 @@ async def get_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "get_quota_scope", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
-            return web.json_response(
-                {
-                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                    "limit_bytes": (
-                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
-                    ),
-                }
-            )
+            return web.json_response({
+                "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+            })
 
 
 async def update_quota_scope(request: web.Request) -> web.Response:
@@ -259,16 +279,17 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "update_quota_scope", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
-            if not quota_usage:
-                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-            try:
-                await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
-            except InvalidQuotaConfig:
-                return web.json_response(
-                    {"msg": "Invalid quota config option"},
-                    status=400,
-                )
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+                if not quota_usage:
+                    await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+                try:
+                    await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+                except InvalidQuotaConfig:
+                    return web.json_response(
+                        {"msg": "Invalid quota config option"},
+                        status=400,
+                    )
             return web.Response(status=204)
 
 
@@ -292,7 +313,8 @@ async def unset_quota(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "unset_quota", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
             await volume.quota_model.unset_quota(params["qsid"])

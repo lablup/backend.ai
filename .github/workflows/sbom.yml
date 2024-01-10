@@ -1,6 +1,6 @@
 name: SBOM report
 
-on: [workflow_dispatch]
+on: [workflow_dispatch, workflow_call]
 
 jobs:
   sbom:
@@ -15,7 +15,7 @@ jobs:
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
@@ -27,7 +27,7 @@ jobs:
         gha-cache-key: pants-cache-main-1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - uses: CycloneDX/gh-python-generate-sbom@v1.0.1
+    - uses: CycloneDX/gh-python-generate-sbom@v2
     - name: Upload SBOM report
       uses: actions/upload-artifact@v3
       with:
