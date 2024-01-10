@@ -36,6 +36,7 @@ class AuditLogAction(str, enum.Enum):
     CREATE = "CREATE"
     CHANGE = "CHANGE"
     DELETE = "DELETE"
+    PURGE = "PURGE"
 
 
 class AuditLogTargetType(str, enum.Enum):
