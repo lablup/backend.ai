@@ -1,4 +1,5 @@
 import contextvars
+from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -6,8 +7,9 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic.v1.utils import deep_update
 
-from ai.backend.manager.models import audit_logs
-from ai.backend.storage.context import RootContext, log
+from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.models.audit_logs import audit_logs
+from ai.backend.storage.context import log
 
 audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
     "audit_log_data", default={}
@@ -25,8 +27,6 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
     user_uuid = str(request["user"]["uuid"])
     access_key = request["keypair"]["access_key"]
     user_email = request["user"]["email"]
-
-    from datetime import datetime
 
     audit_log_data.set({
         "user_id": user_uuid,
@@ -56,8 +56,9 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
     finally:
         try:
             log.info("AUDIT_LOG in after middleware try: {}", audit_log_data.get())
-            async with root_ctx.db.begin_session() as sess:
-                await sess.execute(sa.insert(audit_logs).values(audit_log_data.get()))
+            async with root_ctx.db.begin_session() as session:
+                query = sa.insert(audit_logs, audit_log_data.get())
+                await session.execute(query)
         except Exception as e:
             log.error("Failed to write audit log {}", e, exc_info=True)
 

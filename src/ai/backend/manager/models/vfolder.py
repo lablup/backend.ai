@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
+from ...common.audit_log_util import audit_log_data, updated_data
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
@@ -819,7 +820,8 @@ async def update_vfolder_status(
 
     async def _update() -> None:
         async with engine.begin_session() as db_session:
-            query = (
+            # change to orm someday
+            update_query = (
                 sa.update(vfolders)
                 .values(
                     status=update_status,
@@ -833,7 +835,25 @@ async def update_vfolder_status(
                 )
                 .where(cond)
             )
-            await db_session.execute(query)
+            await db_session.execute(update_query)
+
+            # retrive updated columns
+            select_query = sa.select(["*"]).where(cond)
+            updated_rows = await db_session.execute(select_query)
+            updated_rows_list = [dict(row) for row in updated_rows.all()]
+            updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
+
+            audit_log_data.set(
+                updated_data(
+                    new_data={
+                        "data": {
+                            "after": updated_rows_list[0]
+                            if len(updated_rows_list) == 1
+                            else updated_rows
+                        },
+                    }
+                )
+            )
 
     await execute_with_retry(_update)
     if do_log:

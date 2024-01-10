@@ -2221,8 +2221,7 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        before_data = dict(entry)
-        before_data["quota_scope_id"] = str(entry["quota_scope_id"])
+        before_data = {k: str(v) for k, v in dict(entry).items()}
 
         audit_log_data.set(
             updated_data(
@@ -2315,7 +2314,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
-    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2439,7 +2437,7 @@ async def recover(request: web.Request) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
-    resource_policy = request["keypair"]["resource_policy"]
+    # resource_policy = request["keypair"]["resource_policy"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2476,13 +2474,13 @@ async def recover(request: web.Request) -> web.Response:
             raise InvalidAPIParameters("No such vfolder.")
 
         # Check resource policy's max_vfolder_count
-        if resource_policy["max_vfolder_count"] > 0:
-            query = sa.select([sa.func.count()]).where(
-                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
-            )
-            result = await conn.scalar(query)
-            if result + len(recover_targets) > resource_policy["max_vfolder_count"]:
-                raise InvalidAPIParameters("You cannot create (or recover) more vfolders.")
+        # if resource_policy["max_vfolder_count"] > 0:
+        #     query = sa.select([sa.func.count()]).where(
+        #         (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+        #     )
+        #     result = await conn.scalar(query)
+        #     if result + len(recover_targets) > resource_policy["max_vfolder_count"]:
+        #         raise InvalidAPIParameters("You cannot create (or recover) more vfolders.")
 
         # query_accesible_vfolders returns list
         entry = recover_targets[0]
@@ -3386,6 +3384,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
     cors.add(add_route("POST", r"/{name}/purge", purge))
+    cors.add(add_route("POST", r"/{name}/recover", recover))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
