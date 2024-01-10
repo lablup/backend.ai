@@ -80,7 +80,6 @@ from .utils import (
     ExtendedAsyncSAEngine,
     agg_to_array,
     execute_with_retry,
-    execute_with_retry_v2,
     sql_json_merge,
 )
 
@@ -787,7 +786,7 @@ class SessionRow(Base):
             await db_session.execute(update_query)
             return determined_status
 
-        return await execute_with_retry_v2(db, _check_and_update, timeout=db.conn_timeout)
+        return await db.execute_with_cnx_retry(_check_and_update)
 
     @staticmethod
     async def set_session_status(

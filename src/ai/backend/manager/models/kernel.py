@@ -77,7 +77,7 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_retry_v2, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -703,7 +703,7 @@ class KernelRow(Base):
             await db_session.execute(update_query)
             return True
 
-        return await execute_with_retry_v2(db, _update, timeout=db.conn_timeout)
+        return await db.execute_with_cnx_retry(_update)
 
 
 DEFAULT_KERNEL_ORDERING = [
