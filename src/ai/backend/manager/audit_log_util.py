@@ -1,7 +1,7 @@
 import contextvars
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping
 
 import sqlalchemy as sa
 from aiohttp import web
@@ -43,16 +43,17 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
         "success": True,
         "rest_api_path": f"{request.method} {request.path}",
     })
-    log.info("AUDIT_LOG in middleware: {}", audit_log_data.get())
+    log.info("AUDIT_LOG in middleware before: {}", audit_log_data.get())
 
     try:
         return await handler(request)
     except Exception:
         audit_log_data.set(
             updated_data(
-                new_data={
+                target_data=audit_log_data.get(),
+                data_to_be_added={
                     "success": False,
-                }
+                },
             )
         )
         raise
@@ -63,9 +64,19 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
                 query = sa.insert(audit_logs, audit_log_data.get())
                 await session.execute(query)
         except Exception as e:
-            log.error("Failed to write audit log {}", e, exc_info=True)
+            log.error("Failed to write audit log {}", e)
 
 
-def updated_data(new_data: dict[str, Any]) -> dict[str, Any]:
-    current_audit_log_data = audit_log_data.get().copy()
-    return deep_update(current_audit_log_data, new_data)
+def updated_data(target_data: dict[str, Any], data_to_be_added: dict[str, Any]) -> dict[str, Any]:
+    current_audit_log_data = target_data.copy()
+    return deep_update(current_audit_log_data, data_to_be_added)
+
+
+def empty_after_data(new_data: dict[str, Any]) -> dict[str, Any]:
+    current_audit_log_data = new_data.copy()
+    current_audit_log_data["data"]["after"] = {}
+    return current_audit_log_data
+
+
+def dictify_entries(entry: Mapping[str, Any]) -> dict[str, str]:
+    return {k: str(v) for k, v in dict(entry).items()}
