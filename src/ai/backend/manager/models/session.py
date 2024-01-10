@@ -784,6 +784,63 @@ class SessionRow(Base):
 
         return await execute_with_retry(_check_and_update)
 
+    @classmethod
+    async def finalize_running(
+        cls,
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+        kernel_actual_allocs: ResourceSlot,
+    ) -> SessionStatus:
+        """
+        Update session's occupying resource slots and finalize session status to RUNNING.
+
+        Check status of session's sibling kernels and transit the status of session.
+        Return the current status of session.
+        """
+        now = datetime.now(tzutc())
+
+        async def _check_and_update() -> SessionStatus:
+            async with db.begin_session() as db_session:
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .with_for_update()
+                    .options(
+                        noload("*"),
+                        load_only(
+                            SessionRow.status,
+                            SessionRow.occupying_slots,
+                        ),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
+                        ),
+                    )
+                )
+                session_row: SessionRow = (await db_session.scalars(session_query)).first()
+                determined_status = determine_session_status(session_row.kernels)
+
+                update_values = {
+                    "occupying_slots": session_row.occupying_slots + kernel_actual_allocs,
+                }
+                if determined_status != session_row.status:
+                    update_values["status"] = determined_status
+                    update_values["status_history"] = sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            determined_status.name: now.isoformat(),
+                        },
+                    )
+                    if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+                        update_values["terminated_at"] = now
+                update_query = (
+                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
+                )
+                await db_session.execute(update_query)
+            return determined_status
+
+        return await execute_with_retry(_check_and_update)
+
     @staticmethod
     async def set_session_status(
         db: ExtendedAsyncSAEngine,

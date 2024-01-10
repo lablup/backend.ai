@@ -1514,7 +1514,7 @@ class AgentRegistry:
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
                     else:  # maybe Decimal("Infinity"), etc.
                         total_allocs.append(Decimal(allocation))
-                slots[slot_name] = str(sum(total_allocs))
+                slots[slot_name] = sum(total_allocs)
         return slots
 
     async def finalize_running(
@@ -1549,13 +1549,10 @@ class AgentRegistry:
                 ),
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            kernel_did_update = await KernelRow.update_kernel(
-                self.db, kernel_id, new_status, update_data=update_data
+            await KernelRow.update_kernel(self.db, kernel_id, new_status, update_data=update_data)
+            new_session_status = await SessionRow.finalize_running(
+                self.db, session_id, actual_allocs
             )
-            if not kernel_did_update:
-                return
-
-            new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
             query = (
