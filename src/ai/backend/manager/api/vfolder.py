@@ -48,9 +48,9 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.audit_log_util import audit_log_data, audit_log_middleware, updated_data
 from ai.backend.manager.models.storage import StorageSessionManager
 
-from ...common.audit_log_util import audit_log_data, audit_log_middleware, updated_data
 from ..models import (
     ACTIVE_USER_STATUSES,
     DEAD_VFOLDER_STATUSES,

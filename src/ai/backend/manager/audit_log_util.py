@@ -1,4 +1,5 @@
 import contextvars
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -7,9 +8,11 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic.v1.utils import deep_update
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.audit_logs import audit_logs
-from ai.backend.storage.context import log
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
     "audit_log_data", default={}

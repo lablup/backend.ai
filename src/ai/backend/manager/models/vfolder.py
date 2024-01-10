@@ -37,8 +37,8 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.audit_log_util import audit_log_data, updated_data
 
-from ...common.audit_log_util import audit_log_data, updated_data
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
