@@ -846,7 +846,7 @@ async def update_vfolder_status(
             audit_log_data.set(
                 updated_data(
                     target_data=audit_log_data.get(),
-                    data_to_be_added={
+                    values_to_update={
                         "data": {
                             "after": updated_rows_list[0]
                             if len(updated_rows_list) == 1

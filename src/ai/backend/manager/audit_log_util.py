@@ -51,7 +51,7 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
         audit_log_data.set(
             updated_data(
                 target_data=audit_log_data.get(),
-                data_to_be_added={
+                values_to_update={
                     "success": False,
                 },
             )
@@ -67,9 +67,9 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
             log.error("Failed to write audit log {}", e)
 
 
-def updated_data(target_data: dict[str, Any], data_to_be_added: dict[str, Any]) -> dict[str, Any]:
+def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) -> dict[str, Any]:
     current_audit_log_data = target_data.copy()
-    return deep_update(current_audit_log_data, data_to_be_added)
+    return deep_update(current_audit_log_data, values_to_update)
 
 
 def empty_after_data(new_data: dict[str, Any]) -> dict[str, Any]:
@@ -78,5 +78,5 @@ def empty_after_data(new_data: dict[str, Any]) -> dict[str, Any]:
     return current_audit_log_data
 
 
-def dictify_entries(entry: Mapping[str, Any]) -> dict[str, str]:
+def dictify_entry(entry: Mapping[str, Any]) -> dict[str, str]:
     return {k: str(v) for k, v in dict(entry).items()}
