@@ -42,8 +42,10 @@ class AuditLogTargetType(str, enum.Enum):
     """ """
 
     USER = "user"
-    KEYS = "keypairs"
+    KEYPAIRS = "keypair"
+    GROUP = "group"
     VFOLDER = "vfolder"
+    COMPUTE_SESSION = "compute_session"
 
 
 audit_logs = sa.Table(
