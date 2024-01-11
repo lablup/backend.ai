@@ -23,6 +23,7 @@ from typing import (
     Optional,
     ParamSpec,
     Tuple,
+    TypeAlias,
     TypeVar,
     Union,
 )
@@ -214,6 +215,15 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
+APIResponseType: TypeAlias = TResponseModel | list | TAnyResponse
+APIFunctionType: TypeAlias = Callable[Concatenate[web.Request, P], Awaitable[APIResponseType]]
+APIFunctionWithResponseType: TypeAlias = Callable[
+    Concatenate[web.Request, P], Awaitable[web.StreamResponse]
+]
+ParamCheckedAPIFunctionType: TypeAlias = Callable[
+    Concatenate[web.Request, TParamModel, P], Awaitable[APIResponseType]
+]
+
 
 def convert_response(response: TResponseModel | list | TAnyResponse) -> web.StreamResponse:
     match response:
@@ -227,23 +237,31 @@ def convert_response(response: TResponseModel | list | TAnyResponse) -> web.Stre
             raise RuntimeError(f"Unsupported response type ({type(response)})")
 
 
+def typed_response(
+    handler: APIFunctionType,
+) -> APIFunctionWithResponseType:
+    @functools.wraps(handler)
+    async def wrapped(
+        request: web.Request, *args: P.args, **kwargs: P.kwargs
+    ) -> web.StreamResponse:
+        response = await handler(request, *args, **kwargs)
+        return convert_response(response)
+
+    return wrapped
+
+
 def check_api_params_v2(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[
-    [Callable[Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel | list]]],
-    Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]],
-]:
+) -> Callable[[ParamCheckedAPIFunctionType], APIFunctionType]:
     def wrap(
-        handler: Callable[
-            Concatenate[web.Request, TParamModel, P], Awaitable[TResponseModel | list]
-        ],
-    ) -> Callable[Concatenate[web.Request, P], Awaitable[web.StreamResponse]]:
+        handler: ParamCheckedAPIFunctionType,
+    ) -> APIFunctionType:
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request, *args: P.args, **kwargs: P.kwargs
-        ) -> web.StreamResponse:
+        ) -> APIResponseType:
             orig_params: Any
             body: str = ""
             try:
@@ -266,8 +284,7 @@ def check_api_params_v2(
                 raise InvalidAPIParameters("Malformed body")
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
-            response = await handler(request, checked_params, *args, **kwargs)
-            return convert_response(response)
+            return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)
 
