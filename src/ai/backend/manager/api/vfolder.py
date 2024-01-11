@@ -55,7 +55,7 @@ from ai.backend.manager.audit_log_util import (
     empty_after_data,
     set_audit_log_action_decorator,
     update_after_data,
-    update_audit_log_field,
+    update_audit_log_target_field,
     update_before_data,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -364,7 +364,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     folder_host = params["folder_host"]
     unmanaged_path = params["unmanaged_path"]
 
-    update_audit_log_field("target", folder_host)
+    update_audit_log_target_field(vfolder_name)
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
@@ -1155,7 +1155,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
 
-    update_audit_log_field("target", old_name)
+    update_audit_log_target_field(old_name)
 
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -1231,6 +1231,7 @@ async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
     # TODO: audit log
+    update_audit_log_target_field(request.match_info["name"])
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
@@ -2267,7 +2268,7 @@ async def _delete(
 )
 @set_audit_log_action_decorator(AuditLogAction.DELETE)
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    update_audit_log_field("target", params["id"])
+    update_audit_log_target_field(params["id"])
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     # TODO: audit log
@@ -2312,7 +2313,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @set_audit_log_action_decorator(AuditLogAction.DELETE)
 async def delete_by_name(request: web.Request) -> web.Response:
-    update_audit_log_field("target", request.match_info["name"])
+    update_audit_log_target_field(request.match_info["name"])
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
 
     root_ctx: RootContext = request.app["_root.context"]
@@ -2357,7 +2358,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @set_audit_log_action_decorator(AuditLogAction.PURGE)
 async def purge(request: web.Request) -> web.Response:
-    update_audit_log_field("target", request.match_info["name"])
+    update_audit_log_target_field(request.match_info["name"])
     await ensure_vfolder_status(
         request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
     )

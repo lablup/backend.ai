@@ -87,7 +87,7 @@ def set_audit_log_action_decorator(action: AuditLogAction):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            update_audit_log_field("action", action)
+            update_audit_log_by_field_name("action", action)
             return func(*args, **kwargs)
 
         return wrapper
@@ -110,7 +110,7 @@ def set_target_decorator(obj: Any, target_path: list[str]):
                 output = "".join([f'["{item}"]' for item in target_path])
                 raise ValueError(f"Target not found: Object{output}")
 
-            update_audit_log_field("target", target)
+            update_audit_log_by_field_name("target", target)
             return func(target, *args, **kwargs)
 
         return wrapper
@@ -118,7 +118,12 @@ def set_target_decorator(obj: Any, target_path: list[str]):
     return decorator
 
 
-def update_audit_log_field(field_to_update: str, value: Any):
+def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) -> dict[str, Any]:
+    current_audit_log_data = target_data.copy()
+    return deep_update(current_audit_log_data, values_to_update)
+
+
+def update_audit_log_by_field_name(field_to_update: str, value: Any):
     audit_log_data.set(
         updated_data(
             target_data=audit_log_data.get(),
@@ -129,27 +134,26 @@ def update_audit_log_field(field_to_update: str, value: Any):
     )
 
 
-def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) -> dict[str, Any]:
-    current_audit_log_data = target_data.copy()
-    return deep_update(current_audit_log_data, values_to_update)
+def update_audit_log_target_field(value: str):
+    update_audit_log_by_field_name("target", value)
+
+
+def update_after_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
+    update_audit_log_by_field_name("data", {"after": data_to_insert})
+
+
+def update_before_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
+    update_audit_log_by_field_name("data", {"before": data_to_insert})
+
+
+def update_audit_log_success_state(success: bool):
+    update_audit_log_by_field_name("success", success)
 
 
 def empty_after_data(new_data: dict[str, Any]) -> None:
     current_audit_log_data = new_data.copy()
     current_audit_log_data["data"]["after"] = {}
     audit_log_data.set(current_audit_log_data)
-
-
-def update_after_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
-    update_audit_log_field("data", {"after": data_to_insert})
-
-
-def update_before_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
-    update_audit_log_field("data", {"before": data_to_insert})
-
-
-def update_audit_log_success_state(success: bool):
-    update_audit_log_field("success", success)
 
 
 def dictify_entry(entry: Mapping[str, Any]) -> dict[str, str]:
