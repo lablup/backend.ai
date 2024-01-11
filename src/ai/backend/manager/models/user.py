@@ -172,6 +172,13 @@ class UserRow(Base):
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
 
+    created_endpoints = relationship(
+        "EndpointRow", back_populates="created_user_row", foreign_keys="EndpointRow.created_user"
+    )
+    owned_endpoints = relationship(
+        "EndpointRow", back_populates="session_owner_row", foreign_keys="EndpointRow.session_owner"
+    )
+
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
 
