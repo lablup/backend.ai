@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import enum
 import json
 import logging
 import os
@@ -46,6 +47,12 @@ from .service import ServiceParser
 from .utils import scan_proc_stats, wait_local_port_open
 
 log = BraceStyleAdapter(logging.getLogger())
+
+
+class HealthStatus(enum.Enum):
+    HEALTHY = 0
+    UNHEALTHY = 1
+    UNDETERMINED = 2
 
 
 async def pipe_output(stream, outsock, target, log_fd):
@@ -692,9 +699,9 @@ class BaseRunner(metaclass=ABCMeta):
             f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
         )
         retries = 0
-        is_healthy = None
+        current_health_status = HealthStatus.UNDETERMINED
         while True:
-            new_is_healthy = False
+            new_health_status = HealthStatus.UNHEALTHY
             try:
                 async with timeout(health_check_info["max_wait_time"]):
                     try:
@@ -702,7 +709,7 @@ class BaseRunner(metaclass=ABCMeta):
                             None, urllib.request.urlopen, health_check_endpoint
                         )
                         if resp.status == health_check_info["expected_status_code"]:
-                            new_is_healthy = True
+                            new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
                     # falling to here means that health check has failed, so just wait until
@@ -711,18 +718,24 @@ class BaseRunner(metaclass=ABCMeta):
             except asyncio.TimeoutError:
                 pass
             finally:
-                if new_is_healthy and is_healthy is not False:
-                    is_healthy = True
+                if (
+                    new_health_status == HealthStatus.HEALTHY
+                    and current_health_status != HealthStatus.HEALTHY
+                ):
+                    current_health_status = HealthStatus.HEALTHY
                     retries = 0
-                    log.info("check_model_health(): new status -> {}", is_healthy)
+                    log.info("check_model_health(): new status -> healthy")
                     await self.outsock.send_multipart([
                         b"model-service-status",
                         json.dumps({"model_name": model_name, "is_healthy": True}).encode("utf8"),
                     ])
-                elif not new_is_healthy:
-                    if retries > health_check_info["max_retries"] and is_healthy is True:
-                        is_healthy = False
-                        log.info("check_model_health(): new status -> {}", is_healthy)
+                elif new_health_status == HealthStatus.UNHEALTHY:
+                    if (
+                        retries > health_check_info["max_retries"]
+                        and current_health_status != HealthStatus.UNHEALTHY
+                    ):
+                        current_health_status = HealthStatus.UNHEALTHY
+                        log.info("check_model_health(): new status -> unhealthy")
                         await self.outsock.send_multipart([
                             b"model-service-status",
                             json.dumps({"model_name": model_name, "is_healthy": False}).encode(
