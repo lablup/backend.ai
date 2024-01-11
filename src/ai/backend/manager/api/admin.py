@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
@@ -96,6 +97,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             else:
                 errmsg = {"message": str(e)}
             log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
 
