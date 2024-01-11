@@ -104,7 +104,7 @@ model_definition_iv = t.Dict({
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
                 }),
             }),
-            t.Key("metadata"): t.Null
+            t.Key("metadata", default=None): t.Null
             | t.Dict({
                 t.Key("author", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("title", default=None): t.Null | t.String(allow_blank=True),
