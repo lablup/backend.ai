@@ -196,7 +196,12 @@ async def check_user_resource_limit(
     select_query = sa.select(KeyPairResourcePolicyRow).where(
         KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
     )
-    resource_policy: KeyPairResourcePolicyRow = (await db_sess.scalars(select_query)).first()
+    resource_policy: KeyPairResourcePolicyRow | None = (await db_sess.scalars(select_query)).first()
+    if resource_policy is None:
+        return PredicateResult(
+            False,
+            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.user_uuid})",
+        )
 
     resource_policy_map = {
         "total_resource_slots": resource_policy.total_resource_slots,

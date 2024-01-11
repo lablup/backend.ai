@@ -156,7 +156,7 @@ users = sa.Table(
     sa.Column(
         "main_access_key",
         sa.String(length=20),
-        sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
+        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
         nullable=True,  # keypairs.user is non-nullable
     ),
 )
