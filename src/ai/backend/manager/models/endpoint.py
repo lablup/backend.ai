@@ -118,7 +118,7 @@ class EndpointRow(Base):
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    url = sa.Column("url", sa.String(length=1024), unique=True)
+    url = sa.Column("url", sa.String(length=1024))
     resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     cluster_mode = sa.Column(
         "cluster_mode",
