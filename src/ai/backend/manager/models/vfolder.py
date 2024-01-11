@@ -1031,8 +1031,12 @@ async def initiate_vfolder_purge(
                         sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
                     )
 
-            await execute_with_retry(_delete_row)
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
+            try:
+                await execute_with_retry(_delete_row)
+            except Exception as e:
+                failed_deletion.extend([(vf_id, repr(e)) for vf_id, _ in row_deletion_infos])
+            else:
+                log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
             raise VFolderOperationFailed(extra_data=extra_data)
