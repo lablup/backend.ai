@@ -2108,7 +2108,7 @@ class AbstractAgent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
                     model["name"],
-                    ModelServiceStatus.HEALTHY,
+                    ModelServiceStatus.UNHEALTHY,
                 )
             )
 
