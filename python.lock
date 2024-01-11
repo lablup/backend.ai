@@ -46,6 +46,7 @@
 //     "etcetra==0.1.17",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
+//     "graypy==2.1.0",
 //     "hiredis>=2.2.3",
 //     "humanize>=3.1.0",
 //     "ifaddr~=0.2",
@@ -1603,6 +1604,29 @@
           ],
           "requires_python": "<4,>=3.6",
           "version": "3.2.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "5df0102ed52fdaa24dd579bc1e4904480c2c9bbb98917a0b3241ecf510c94207",
+              "url": "https://files.pythonhosted.org/packages/82/80/d9de7f4747ab54aad84c479d2c3dad9171de5a7f832ce4229bcef1f472ce/graypy-2.1.0-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fd8dc4a721de1278576d92db10ac015e99b4e480cf1b18892e79429fd9236e16",
+              "url": "https://files.pythonhosted.org/packages/8c/13/9fd9d88a16d4333b784c0d24daf90cf93bac63c7ab031dc72d9425b7f106/graypy-2.1.0.tar.gz"
+            }
+          ],
+          "project_name": "graypy",
+          "requires_dists": [
+            "amqplib==1.0.2; extra == \"amqp\"",
+            "sphinx-autodoc-typehints<2.0.0,>=1.6.0; extra == \"docs\"",
+            "sphinx-rtd-theme<1.0.0,>=0.4.3; extra == \"docs\"",
+            "sphinx<3.0.0,>=2.1.2; extra == \"docs\""
+          ],
+          "requires_python": null,
+          "version": "2.1.0"
         },
         {
           "artifacts": [
@@ -4740,6 +4764,7 @@
     "etcetra==0.1.17",
     "faker~=13.12.0",
     "graphene~=3.3.0",
+    "graypy==2.1.0",
     "hiredis>=2.2.3",
     "humanize>=3.1.0",
     "ifaddr~=0.2",
