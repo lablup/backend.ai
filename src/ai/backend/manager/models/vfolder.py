@@ -37,7 +37,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.audit_log_util import audit_log_data, updated_data
+from ai.backend.manager.audit_log_util import update_after_data
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import (
@@ -838,23 +838,15 @@ async def update_vfolder_status(
             await db_session.execute(update_query)
 
             # retrive updated columns
-            select_query = sa.select(["*"]).where(cond)
+            select_query = sa.select([vfolders]).where(cond)
             updated_rows = await db_session.execute(select_query)
             updated_rows_list = [dict(row) for row in updated_rows.all()]
             updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
-
-            audit_log_data.set(
-                updated_data(
-                    target_data=audit_log_data.get(),
-                    values_to_update={
-                        "data": {
-                            "after": updated_rows_list[0]
-                            if len(updated_rows_list) == 1
-                            else updated_rows
-                        },
-                    },
-                )
+            after_data_to_insert = (
+                updated_rows_list[0] if len(updated_rows_list) == 1 else updated_rows
             )
+
+            update_after_data(after_data_to_insert)
 
     await execute_with_retry(_update)
     if do_log:

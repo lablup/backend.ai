@@ -53,7 +53,10 @@ from ai.backend.manager.audit_log_util import (
     audit_log_middleware,
     dictify_entry,
     empty_after_data,
-    updated_data,
+    set_audit_log_action_decorator,
+    update_after_data,
+    update_audit_log_field,
+    update_before_data,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -96,7 +99,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
-from ..models.audit_logs import AuditLogAction, AuditLogTargetType
+from ..models.audit_logs import AuditLogAction
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -338,6 +341,7 @@ def vfolder_check_exists(
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
+@set_audit_log_action_decorator(AuditLogAction.CREATE)
 async def create(request: web.Request, params: Any) -> web.Response:
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
@@ -360,17 +364,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     folder_host = params["folder_host"]
     unmanaged_path = params["unmanaged_path"]
 
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "action": AuditLogAction.CREATE,
-                "target_type": AuditLogTargetType.VFOLDER,
-                "target": folder_host,
-            },
-        )
-    )
-
+    update_audit_log_field("target", folder_host)
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
@@ -629,14 +623,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters
         assert result.rowcount == 1
 
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "data": {"after": insert_values},
-            },
-        )
-    )
+    update_after_data(data_to_insert=insert_values)
 
     return web.json_response(resp, status=201)
 
@@ -1157,8 +1144,8 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         t.Key("new_name"): tx.Slug(allow_dot=True),
     })
 )
+@set_audit_log_action_decorator(AuditLogAction.CHANGE)
 async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    # TODO: audit log
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1168,16 +1155,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
 
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "action": AuditLogAction.CHANGE,
-                "target_type": AuditLogTargetType.VFOLDER,
-                "target": old_name,
-            },
-        )
-    )
+    update_audit_log_field("target", old_name)
 
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -1197,27 +1175,12 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
         )
-        audit_log_data.set(
-            updated_data(
-                target_data=audit_log_data.get(),
-                values_to_update={
-                    "data": {
-                        "before": [
-                            dictify_entry(entry) for entry in entries if entry["name"] == old_name
-                        ]
-                    },
-                },
-            )
-        )
+
+        entries_filtered = [dictify_entry(entry) for entry in entries if entry["name"] == old_name]
+        update_before_data(data_to_insert=entries_filtered)
 
         for entry in entries:
             if entry["name"] == new_name:
-                audit_log_data.set(
-                    updated_data(
-                        target_data=audit_log_data.get(),
-                        values_to_update={"success": False},
-                    )
-                )
                 raise InvalidAPIParameters(
                     "One of your accessible vfolders already has the name you requested."
                 )
@@ -1227,12 +1190,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             if entry["name"] == old_name:
                 updated_ids.append(entry["id"])
                 if not entry["is_owner"]:
-                    audit_log_data.set(
-                        updated_data(
-                            target_data=audit_log_data.get(),
-                            values_to_update={"success": False},
-                        )
-                    )
                     raise InvalidAPIParameters(
                         "Cannot change the name of a vfolder that is not owned by myself."
                     )
@@ -1256,15 +1213,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         updated_rows = await conn.execute(find_updated_row_queries)
         updated_rows_list = [dict(row) for row in updated_rows.all()]
         updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
-
-        audit_log_data.set(
-            updated_data(
-                target_data=audit_log_data.get(),
-                values_to_update={
-                    "data": {"after": updated_rows_list},
-                },
-            )
-        )
+        update_after_data(data_to_insert=updated_rows_list)
 
     return web.Response(status=201)
 
@@ -2286,16 +2235,7 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        before_data = dictify_entry(entry)
-
-        audit_log_data.set(
-            updated_data(
-                target_data=audit_log_data.get(),
-                values_to_update={
-                    "data": {"before": before_data},
-                },
-            )
-        )
+        update_before_data(dictify_entry(entry))
         log.info("vfolder log in api _delete {}", audit_log_data.get())
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
@@ -2325,11 +2265,12 @@ async def _delete(
         t.Key("id"): tx.UUID,
     }),
 )
+@set_audit_log_action_decorator(AuditLogAction.DELETE)
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    # TODO: audit log
+    update_audit_log_field("target", params["id"])
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
-
+    # TODO: audit log
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     user_role = request["user"]["role"]
@@ -2342,17 +2283,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         request["user"]["email"],
         access_key,
         folder_id,
-    )
-
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "action": AuditLogAction.DELETE,
-                "target_type": AuditLogTargetType.VFOLDER,
-                "target": folder_id,
-            },
-        )
     )
 
     log.info("vfolder log in api folder {}", audit_log_data.get())
@@ -2380,15 +2310,17 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
+@set_audit_log_action_decorator(AuditLogAction.DELETE)
 async def delete_by_name(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    update_audit_log_field("target", request.match_info["name"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
 
+    root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-
     resource_policy = request["keypair"]["resource_policy"]
 
     log.info(
@@ -2398,18 +2330,6 @@ async def delete_by_name(request: web.Request) -> web.Response:
         folder_name,
     )
 
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "action": AuditLogAction.DELETE,
-                "target_type": AuditLogTargetType.VFOLDER,
-                "target": folder_name,
-            },
-        )
-    )
-
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     try:
@@ -2435,7 +2355,12 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
+@set_audit_log_action_decorator(AuditLogAction.PURGE)
 async def purge(request: web.Request) -> web.Response:
+    update_audit_log_field("target", request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
     folder_name = request.match_info["name"]
@@ -2444,20 +2369,6 @@ async def purge(request: web.Request) -> web.Response:
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
 
-    audit_log_data.set(
-        updated_data(
-            target_data=audit_log_data.get(),
-            values_to_update={
-                "action": AuditLogAction.PURGE,
-                "target_type": AuditLogTargetType.VFOLDER,
-                "target": folder_name,
-            },
-        )
-    )
-
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
-    )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
@@ -2492,14 +2403,7 @@ async def purge(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
-        audit_log_data.set(
-            updated_data(
-                target_data=audit_log_data.get(),
-                values_to_update={
-                    "data": {"before": dictify_entry(entry)},
-                },
-            )
-        )
+        update_before_data(dictify_entry(entry))
 
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
@@ -2514,7 +2418,7 @@ async def purge(request: web.Request) -> web.Response:
         app_ctx.storage_ptask_group,
     )
 
-    audit_log_data.set(empty_after_data(audit_log_data.get()))
+    empty_after_data(audit_log_data.get())
 
     return web.Response(status=204)
 
@@ -3478,6 +3382,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
     cors.add(add_route("POST", r"/{name}/purge", purge))
+    # TODO: do not make this API alive on final push!!!
     cors.add(add_route("POST", r"/{name}/recover", recover))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
