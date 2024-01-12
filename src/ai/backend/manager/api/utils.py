@@ -244,8 +244,8 @@ def pydantic_response_api_handler(
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
-    For handlers with params to consume use @pydantic_request_body() or
-    @check_api_params() decorator.
+    For handlers with params to consume use @pydantic_params_api_handler() or
+    @check_api_params() decorator (only when request param is validated with trafaret).
     """
 
     @functools.wraps(handler)
