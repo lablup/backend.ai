@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.8rc3 (2024-01-12)
+
+### Features
+* Add a new log handler corresponding to graylog ([#1138](https://github.com/lablup/backend.ai/issues/1138))
+* Add the --output option to the function that outputs gql and openapi and unify the output format. ([#1691](https://github.com/lablup/backend.ai/issues/1691))
+* Introduce `endpoint.created_user_email` and `endpoint.session_owner_email` GQL field ([#1831](https://github.com/lablup/backend.ai/issues/1831))
+
+### Fixes
+* Fix `modify_user` mutation not working ([#1787](https://github.com/lablup/backend.ai/issues/1787))
+* Add a missing `ComputeSession.start_service()` functional API in the client SDK with documentation updates ([#1789](https://github.com/lablup/backend.ai/issues/1789))
+* Update the default PATH where the `pants` executable is installed in `install-dev.sh` ([#1806](https://github.com/lablup/backend.ai/issues/1806))
+* Fix an issue in the `ModifyContainerRegistry` mutation where the `url` was not updating due to a key mismatch. ([#1810](https://github.com/lablup/backend.ai/issues/1810))
+* Exclude unallocated resources from kernel idle utilization checks. ([#1820](https://github.com/lablup/backend.ai/issues/1820))
+* Fix model service health checker reporting invalid healthy status ([#1833](https://github.com/lablup/backend.ai/issues/1833))
+* Fix model service endpoint not updated despite session spawned without error ([#1835](https://github.com/lablup/backend.ai/issues/1835))
+* Fix `vfolder_list` GQL query not returning `user_email` and `groups_name` field ([#1837](https://github.com/lablup/backend.ai/issues/1837))
+
+
 ## 23.09.8rc2 (2023-12-14)
 
 ### Fixes
