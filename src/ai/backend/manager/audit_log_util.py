@@ -1,5 +1,7 @@
 import contextvars
+import enum
 import functools
+import inspect
 import logging
 from datetime import datetime
 from typing import Any, Iterable, Mapping
@@ -33,9 +35,6 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
     user_uuid = str(request["user"]["uuid"])
     access_key = request["keypair"]["access_key"]
     user_email = request["user"]["email"]
-
-    # "action": AuditLogAction.CREATE,
-    # "target": folder_host,
 
     audit_log_data.set({
         "user_id": user_uuid,
@@ -83,47 +82,12 @@ def target_type_path_mapper(request: web.Request) -> AuditLogTargetType:
     raise ValueError(f"Unknown action: {prefix}")
 
 
-def set_audit_log_action_decorator(action: AuditLogAction):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            update_audit_log_by_field_name("action", action)
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def set_target_decorator(obj: Any, target_path: list[str]):
-    def recursive_find(obj: Any, target_path: list[str]):
-        if not target_path or obj is None:
-            return obj
-        else:
-            return recursive_find(obj.get(target_path[0]), target_path[1:])
-
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(obj: Any, *args, **kwargs):
-            target = recursive_find(obj, target_path)
-            if target is None:
-                output = "".join([f'["{item}"]' for item in target_path])
-                raise ValueError(f"Target not found: Object{output}")
-
-            update_audit_log_by_field_name("target", target)
-            return func(target, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) -> dict[str, Any]:
     current_audit_log_data = target_data.copy()
     return deep_update(current_audit_log_data, values_to_update)
 
 
-def update_audit_log_by_field_name(field_to_update: str, value: Any):
+def update_audit_log_by_field_name(field_to_update: str, value: Any) -> None:
     audit_log_data.set(
         updated_data(
             target_data=audit_log_data.get(),
@@ -134,19 +98,82 @@ def update_audit_log_by_field_name(field_to_update: str, value: Any):
     )
 
 
-def update_audit_log_target_field(value: str):
+class ArgNameEnum(str, enum.Enum):
+    REQUEST = "request"
+    PARAMS = "params"
+    REQUEST_MATCH_INFO = "request"
+
+
+def set_audit_log_action_target_decorator(
+    *,
+    action: AuditLogAction,
+    arg_name_enum: ArgNameEnum = ArgNameEnum.REQUEST,
+    target_path: list[str] = [],
+    nullable: bool = False,
+):
+    arg_name_str = arg_name_enum.value
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            def process_target() -> None:
+                sig = inspect.signature(func)
+                bound_args = sig.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+                if arg_name_str not in bound_args.arguments:
+                    raise KeyError(
+                        f"Argument '{arg_name_str}' not found in function '{func.__name__}'"
+                    )
+
+                arg_value: web.Request | Any = bound_args.arguments[arg_name_str]
+
+                if arg_name_enum == ArgNameEnum.REQUEST_MATCH_INFO:
+                    result = arg_value.match_info[target_path[0]]
+                else:
+                    result = recursive_find(arg_value, target_path)
+
+                update_audit_log_target_field(result)
+
+            def recursive_find(obj: Any, now_path: list[str]) -> Any:
+                if not now_path:
+                    return obj
+                if obj is None or not isinstance(obj, dict):
+                    return None
+
+                next_obj = obj.get(now_path[0])
+                if next_obj is None:
+                    raise KeyError(f"KeyError '{now_path[0]}'")
+
+                return recursive_find(next_obj, now_path[1:])
+
+            # Update action
+            update_audit_log_by_field_name("action", action)
+
+            # Process target
+            if not nullable:
+                process_target()
+
+            # Call the original function
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def update_audit_log_target_field(value: str) -> None:
     update_audit_log_by_field_name("target", value)
 
 
-def update_after_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
+def update_after_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]) -> None:
     update_audit_log_by_field_name("data", {"after": data_to_insert})
 
 
-def update_before_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]):
+def update_before_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]) -> None:
     update_audit_log_by_field_name("data", {"before": data_to_insert})
 
 
-def update_audit_log_success_state(success: bool):
+def update_audit_log_success_state(success: bool) -> None:
     update_audit_log_by_field_name("success", success)
 
 
