@@ -32,6 +32,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web, web_response
+from aiohttp.typedefs import Handler
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -215,17 +216,18 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-THandlerResponse: TypeAlias = TResponseModel | list | TAnyResponse
-THandlerFunc: TypeAlias = Callable[Concatenate[web.Request, P], Awaitable[THandlerResponse]]
-TNoParamHandlerFunc: TypeAlias = Callable[
-    Concatenate[web.Request, P], Awaitable[web.StreamResponse]
+TPydanticResponse: TypeAlias = TResponseModel | list
+THandlerFuncWithoutParam: TypeAlias = Callable[
+    Concatenate[web.Request, P], Awaitable[TPydanticResponse | TAnyResponse]
 ]
-TParamHandlerFunc: TypeAlias = Callable[
-    Concatenate[web.Request, TParamModel, P], Awaitable[THandlerResponse]
+THandlerFuncWithParam: TypeAlias = Callable[
+    Concatenate[web.Request, TParamModel, P], Awaitable[TPydanticResponse | TAnyResponse]
 ]
 
 
-def convert_response(response: TResponseModel | list | TAnyResponse) -> web.StreamResponse:
+def ensure_stream_response_type(
+    response: TResponseModel | list | TAnyResponse,
+) -> web.StreamResponse:
     match response:
         case BaseModel():
             return web.json_response(response.model_dump())
@@ -237,9 +239,9 @@ def convert_response(response: TResponseModel | list | TAnyResponse) -> web.Stre
             raise RuntimeError(f"Unsupported response type ({type(response)})")
 
 
-def pydantic_response(
-    handler: THandlerFunc,
-) -> TNoParamHandlerFunc:
+def pydantic_response_api_handler(
+    handler: THandlerFuncWithoutParam,
+) -> Handler:
     """
     Only for API handlers which does not require request body.
     For handlers with params to consume use @pydantic_request_body() or
@@ -251,19 +253,19 @@ def pydantic_response(
         request: web.Request, *args: P.args, **kwargs: P.kwargs
     ) -> web.StreamResponse:
         response = await handler(request, *args, **kwargs)
-        return convert_response(response)
+        return ensure_stream_response_type(response)
 
     return wrapped
 
 
-def pydantic_request_body(
+def pydantic_params_api_handler(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[[TParamHandlerFunc], THandlerFunc]:
+) -> Callable[[THandlerFuncWithParam], Handler]:
     def wrap(
-        handler: TParamHandlerFunc,
-    ) -> THandlerFunc:
+        handler: THandlerFuncWithParam,
+    ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request, *args: P.args, **kwargs: P.kwargs
@@ -291,7 +293,7 @@ def pydantic_request_body(
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
             result = await handler(request, checked_params, *args, **kwargs)
-            return convert_response(result)
+            return ensure_stream_response_type(result)
 
         set_handler_attr(wrapped, "request_scheme", checker)
 
