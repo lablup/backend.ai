@@ -63,7 +63,7 @@ audit_logs = sa.Table(
         index=True,
         nullable=False,
     ),
-    sa.Column("target", sa.String(length=64), index=True, nullable=False),
+    sa.Column("target", sa.String(length=64), index=True, nullable=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column("success", sa.Boolean(), server_default=sa.true(), index=True, nullable=False),
     sa.Column("rest_api_path", sa.String(length=256), nullable=True),
