@@ -127,7 +127,6 @@ class CompactServeInfoModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(ListServeRequestModel)
-@typed_response
 async def list_serve(
     request: web.Request, params: ListServeRequestModel
 ) -> list[CompactServeInfoModel]:
@@ -326,7 +325,6 @@ class NewServiceRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params_v2(NewServiceRequestModel)
-@typed_response
 async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
     """
     Creates a new model service. If `desired_session_count` is greater than zero,
@@ -623,7 +621,6 @@ class ScaleResponseModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(ScaleRequestModel)
-@typed_response
 async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
     """
     Updates ideal inference session count manually. Based on the difference of this number,
@@ -666,7 +663,6 @@ class UpdateRouteRequestModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(UpdateRouteRequestModel)
-@typed_response
 async def update_route(
     request: web.Request, params: UpdateRouteRequestModel
 ) -> SuccessResponseModel:
@@ -770,7 +766,6 @@ class TokenResponseModel(BaseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params_v2(TokenRequestModel)
-@typed_response
 async def generate_token(request: web.Request, params: TokenRequestModel) -> TokenResponseModel:
     """
     Generates a token which acts as an API key to authenticate when calling model service endpoint.

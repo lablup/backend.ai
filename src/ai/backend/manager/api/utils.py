@@ -261,7 +261,7 @@ def check_api_params_v2(
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request, *args: P.args, **kwargs: P.kwargs
-        ) -> APIResponseType:
+        ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
             try:
@@ -284,7 +284,8 @@ def check_api_params_v2(
                 raise InvalidAPIParameters("Malformed body")
             except ValidationError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
-            return await handler(request, checked_params, *args, **kwargs)
+            result = await handler(request, checked_params, *args, **kwargs)
+            return convert_response(result)
 
         set_handler_attr(wrapped, "request_scheme", checker)
 
