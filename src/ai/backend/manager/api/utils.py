@@ -215,13 +215,13 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-APIResponseType: TypeAlias = TResponseModel | list | TAnyResponse
-APIFunctionType: TypeAlias = Callable[Concatenate[web.Request, P], Awaitable[APIResponseType]]
-APIFunctionWithResponseType: TypeAlias = Callable[
+THandlerResponse: TypeAlias = TResponseModel | list | TAnyResponse
+THandlerFunc: TypeAlias = Callable[Concatenate[web.Request, P], Awaitable[THandlerResponse]]
+TNoParamHandlerFunc: TypeAlias = Callable[
     Concatenate[web.Request, P], Awaitable[web.StreamResponse]
 ]
-ParamCheckedAPIFunctionType: TypeAlias = Callable[
-    Concatenate[web.Request, TParamModel, P], Awaitable[APIResponseType]
+TParamHandlerFunc: TypeAlias = Callable[
+    Concatenate[web.Request, TParamModel, P], Awaitable[THandlerResponse]
 ]
 
 
@@ -237,9 +237,15 @@ def convert_response(response: TResponseModel | list | TAnyResponse) -> web.Stre
             raise RuntimeError(f"Unsupported response type ({type(response)})")
 
 
-def typed_response(
-    handler: APIFunctionType,
-) -> APIFunctionWithResponseType:
+def pydantic_response(
+    handler: THandlerFunc,
+) -> TNoParamHandlerFunc:
+    """
+    Only for API handlers which does not require request body.
+    For handlers with params to consume use @pydantic_request_body() or
+    @check_api_params() decorator.
+    """
+
     @functools.wraps(handler)
     async def wrapped(
         request: web.Request, *args: P.args, **kwargs: P.kwargs
@@ -250,14 +256,14 @@ def typed_response(
     return wrapped
 
 
-def check_api_params_v2(
+def pydantic_request_body(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[[ParamCheckedAPIFunctionType], APIFunctionType]:
+) -> Callable[[TParamHandlerFunc], THandlerFunc]:
     def wrap(
-        handler: ParamCheckedAPIFunctionType,
-    ) -> APIFunctionType:
+        handler: TParamHandlerFunc,
+    ) -> THandlerFunc:
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request, *args: P.args, **kwargs: P.kwargs
