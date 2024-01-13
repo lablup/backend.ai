@@ -1235,11 +1235,14 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
     })
 )
+@set_audit_log_action_target_decorator(
+    action=AuditLogAction.CHANGE,
+    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
+    target_path=["name"],
+)
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    # TODO: audit log
-    update_audit_log_target_field(request.match_info["name"])
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
@@ -1247,10 +1250,14 @@ async def update_vfolder_options(
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        update_query = (
-            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
-        )
-        folder_host = await conn.scalar(update_query)
+        # change to bring all columns due to
+        query = sa.select([vfolders]).select_from(vfolders).where(vfolders.c.id == row["id"])
+
+        result = await conn.execute(query)
+        db_row_to_update = result.one()
+        update_before_data(data_to_insert=[dictify_entry(db_row_to_update)])
+
+        folder_host = db_row_to_update._mapping["host"]
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1271,18 +1278,21 @@ async def update_vfolder_options(
             "Cannot change the options of a vfolder that is not owned by myself."
         )
 
+    after_data_to_insert = db_row_to_update
+
     if len(updated_fields) > 0:
         async with root_ctx.db.begin() as conn:
-            update_query = (
-                sa.update(vfolders).values(**updated_fields).where(vfolders.c.id == row["id"])
+            query = (
+                sa.update(vfolders)
+                .values(**updated_fields)
+                .where(vfolders.c.id == row["id"])
+                .returning(vfolders)
             )
-            await conn.execute(update_query)
+            result = await conn.execute(query)
+            updated_result = result.one()
+            after_data_to_insert = updated_result
 
-            check_updated_query = sa.select([vfolders]).where(vfolders.c.id == row["id"])
-            updated_rows = await conn.execute(check_updated_query)
-            updated_rows_list = [dict(row) for row in updated_rows.all()]
-            updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
-
+    update_after_data(data_to_insert=[dictify_entry(after_data_to_insert)])
     return web.Response(status=201)
 
 
