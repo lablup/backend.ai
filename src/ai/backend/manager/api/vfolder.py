@@ -1306,8 +1306,13 @@ async def update_vfolder_options(
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
+@set_audit_log_action_target_decorator(
+    action=AuditLogAction.CREATE,
+    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
+    target_path=["name"],
+)
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    # TODO: audit log
+    update_before_data(data_to_insert=[dictify_entry(row)])
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1333,6 +1338,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         },
     ):
         pass
+    update_after_data(data_to_insert=[dictify_entry(row)])
     return web.Response(status=201)
 
 
