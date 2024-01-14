@@ -794,8 +794,8 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
-                    # mount_perm=vfolder["permission"],  # TODO: override permission
-                    mount_perm=VFolderPermission("ro"),
+                    mount_perm=vfolder["permission"],  # TODO: override permission
+                    # mount_perm=VFolderPermission("ro"),
                     usage_mode=vfolder["usage_mode"],
                 )
             )

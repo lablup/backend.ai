@@ -8,7 +8,7 @@ import string
 import sys
 import traceback
 from decimal import Decimal
-from typing import Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 import aiohttp
 import click
@@ -276,7 +276,7 @@ def prepare_mount_arg(
 # docker/cli/cli/compose/loader/volume.go (https://github.com/docker/cli/blob/1fc6ef9d63d4442a56d0d5d551bb19c89bd35036/cli/compose/loader/volume.go#L16)  # noqa
 def prepare_mount_arg_v2(
     mount_args: Optional[Sequence[str]] = None,
-) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, str]]:
+) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, Any]]]:
     """
     Parse the list of mount arguments into a list of
     vfolder name and in-container mount path pairs,
@@ -293,7 +293,7 @@ def prepare_mount_arg_v2(
     mount_options = {}
     if mount_args is not None:
         for arg in mount_args:
-            volume = {}
+            volume: dict[str, Any] = {}
             for field in arg.split(","):
                 if "=" in field:
                     key, value = field.split("=")
@@ -304,7 +304,7 @@ def prepare_mount_arg_v2(
                             volume["readonly"] = True
                         case "rw":
                             volume["readonly"] = False
-            volume = ParsedVolume(**volume).model_dump()
+            volume = ParsedVolume(**volume).model_dump()  # TODO
             mount = str(volume.pop("source"))
             mounts.add(mount)
             if target := volume.pop("target", None):
