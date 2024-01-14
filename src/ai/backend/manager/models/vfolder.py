@@ -118,7 +118,7 @@ class VFolderOwnershipType(str, enum.Enum):
     GROUP = "group"
 
 
-class VFolderPermission(str, enum.Enum):
+class VFolderPermission(enum.StrEnum):
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
@@ -619,7 +619,7 @@ async def get_allowed_vfolder_hosts_by_user(
     return allowed_hosts
 
 
-async def prepare_vfolder_mounts(
+async def prepare_vfolder_mounts(  # TODO: ro permission
     conn: SAConnection,
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
@@ -661,7 +661,7 @@ async def prepare_vfolder_mounts(
 
     # Split the vfolder name and subpaths
     for key in requested_mounts:
-        name, _, subpath = key.partition("/")
+        name, _, subpath = key.partition("/")  # TODO: name=alias:perm
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
                 f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
@@ -718,6 +718,14 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        log.warning(
+            "VFOLDER.MOUNT (name={}, permission={})", vfolder["name"], vfolder["permission"]
+        )
+        # VFolderPermission.READ_ONLY == VFolderPermission("ro") == "ro"
+        """
+        2024-01-11 11:45:05.066 WARNING ai.backend.manager.models.vfolder [41689] VFOLDER.MOUNT (name=pipeline-0-p2bYu2, permission=VFolderPermission.READ_WRITE)
+        2024-01-11 11:45:05.073 WARNING ai.backend.manager.models.vfolder [41689] VFOLDER.MOUNT (name=pipeline-0-p2bYu2, permission=VFolderPermission.READ_WRITE)
+        """
         await ensure_host_permission_allowed(
             conn,
             vfolder["host"],
@@ -786,7 +794,8 @@ async def prepare_vfolder_mounts(
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
-                    mount_perm=vfolder["permission"],
+                    # mount_perm=vfolder["permission"],  # TODO: override permission
+                    mount_perm=VFolderPermission("ro"),
                     usage_mode=vfolder["usage_mode"],
                 )
             )

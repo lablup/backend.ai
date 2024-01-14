@@ -18,7 +18,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.types import ExitCode, ParsedVolume
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run, current_loop
@@ -244,11 +244,18 @@ def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_mount_arg(
-    mount_args: Optional[Sequence[str]],
+    mount_args: Optional[Sequence[str]] = None,
 ) -> Tuple[Sequence[str], Mapping[str, str]]:
     """
     Parse the list of mount arguments into a list of
     vfolder name and in-container mount path pairs.
+
+    :param mount_args: A list of mount arguments such as
+        [
+            "vf-5194d5d8",
+            "vf-70b99ea5=/home/work/abc",
+            "vf-cd6c0b91:/home/work/zxc",
+        ]
     """
     mounts = set()
     mount_map = {}
@@ -256,7 +263,7 @@ def prepare_mount_arg(
         for value in mount_args:
             if "=" in value:
                 sp = value.split("=", maxsplit=1)
-            elif ":" in value:  # docker-like volume mount mapping
+            elif ":" in value:  # docker-like volume mount mapping  # TODO
                 sp = value.split(":", maxsplit=1)
             else:
                 sp = [value]
@@ -264,6 +271,46 @@ def prepare_mount_arg(
             if len(sp) == 2:
                 mount_map[sp[0]] = sp[1]
     return list(mounts), mount_map
+
+
+# docker/cli/cli/compose/loader/volume.go (https://github.com/docker/cli/blob/1fc6ef9d63d4442a56d0d5d551bb19c89bd35036/cli/compose/loader/volume.go#L16)  # noqa
+def prepare_mount_arg_v2(
+    mount_args: Optional[Sequence[str]] = None,
+) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, str]]:
+    """
+    Parse the list of mount arguments into a list of
+    vfolder name and in-container mount path pairs,
+    followed by extra options.
+
+    :param mount_args: A list of mount arguments such as
+        [
+            "type=bind,source=/colon:path/test,target=/data",
+            "type=bind,source=/colon:path/abcd,target=/zxcv,readonly",
+        ]
+    """
+    mounts = set()
+    mount_map = {}
+    mount_options = {}
+    if mount_args is not None:
+        for arg in mount_args:
+            volume = {}
+            for field in arg.split(","):
+                if "=" in field:
+                    key, value = field.split("=")
+                    volume[key] = value
+                else:
+                    match field:
+                        case "ro" | "readonly":
+                            volume["readonly"] = True
+                        case "rw":
+                            volume["readonly"] = False
+            volume = ParsedVolume(**volume).model_dump()
+            mount = str(volume.pop("source"))
+            mounts.add(mount)
+            if target := volume.pop("target", None):
+                mount_map[mount] = str(target)
+            mount_options[mount] = volume
+    return list(mounts), mount_map, mount_options
 
 
 @main.command()
@@ -405,7 +452,7 @@ def run(
     build_range,
     exec_range,
     max_parallel,  # experiment support
-    mount,  # click_start_option
+    mount,  # click_start_option  # TODO
     scaling_group,  # click_start_option
     resources,  # click_start_option
     cluster_size,  # click_start_option
@@ -447,7 +494,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map = prepare_mount_arg(mount)
+    mount, mount_map = prepare_mount_arg(mount)  # TODO
 
     if env_range is None:
         env_range = []  # noqa
