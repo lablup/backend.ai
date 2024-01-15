@@ -24,7 +24,7 @@ __all__ = (
     "update_before_data",
     "update_audit_log_success_state",
     "empty_after_data",
-    "dictify_entry",
+    "stringify_entry_values",
 )
 
 
@@ -196,5 +196,5 @@ def empty_after_data(new_data: dict[str, Any]) -> None:
     audit_log_data.set(current_audit_log_data)
 
 
-def dictify_entry(entry: Mapping[str, Any]) -> dict[str, str]:
+def stringify_entry_values(entry: Mapping[str, Any]) -> dict[str, str]:
     return {k: str(v) for k, v in dict(entry).items()}

@@ -52,9 +52,9 @@ from ai.backend.manager.audit_log_util import (
     ArgNameEnum,
     audit_log_data,
     audit_log_middleware,
-    dictify_entry,
     empty_after_data,
     set_audit_log_action_target_decorator,
+    stringify_entry_values,
     update_after_data,
     update_audit_log_target_field,
     update_before_data,
@@ -1184,7 +1184,9 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             allowed_vfolder_types=allowed_vfolder_types,
         )
 
-        entries_filtered = [dictify_entry(entry) for entry in entries if entry["name"] == old_name]
+        entries_filtered = [
+            stringify_entry_values(entry) for entry in entries if entry["name"] == old_name
+        ]
         update_before_data(data_to_insert=entries_filtered)
 
         for entry in entries:
@@ -1193,10 +1195,8 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
                     "One of your accessible vfolders already has the name you requested."
                 )
 
-        updated_ids = []
         for entry in entries:
             if entry["name"] == old_name:
-                updated_ids.append(entry["id"])
                 if not entry["is_owner"]:
                     raise InvalidAPIParameters(
                         "Cannot change the name of a vfolder that is not owned by myself."
@@ -1216,11 +1216,12 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
                 await conn.execute(query)
                 break
 
+        updated_ids = [entry["id"] for entry in entries if entry["name"] == old_name]
         find_updated_row_queries = sa.select([vfolders]).where(vfolders.c.id.in_(updated_ids))
 
         updated_rows = await conn.execute(find_updated_row_queries)
-        updated_rows_list = [dict(row) for row in updated_rows.all()]
-        updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
+        updated_rows_list = [stringify_entry_values(row) for row in updated_rows.all()]
+
         update_after_data(data_to_insert=updated_rows_list)
 
     return web.Response(status=201)
@@ -1255,7 +1256,7 @@ async def update_vfolder_options(
 
         result = await conn.execute(query)
         db_row_to_update = result.one()
-        update_before_data(data_to_insert=[dictify_entry(db_row_to_update)])
+        update_before_data(data_to_insert=[stringify_entry_values(db_row_to_update)])
 
         folder_host = db_row_to_update._mapping["host"]
         await ensure_host_permission_allowed(
@@ -1292,7 +1293,7 @@ async def update_vfolder_options(
             updated_result = result.one()
             after_data_to_insert = updated_result
 
-    update_after_data(data_to_insert=[dictify_entry(after_data_to_insert)])
+    update_after_data(data_to_insert=[stringify_entry_values(after_data_to_insert)])
     return web.Response(status=201)
 
 
@@ -1332,7 +1333,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         },
     ):
         pass
-    update_after_data(data_to_insert=[dictify_entry(row)])
+    update_after_data(data_to_insert=[stringify_entry_values(row)])
     return web.Response(status=201)
 
 
@@ -2264,7 +2265,7 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        update_before_data(dictify_entry(entry))
+        update_before_data(stringify_entry_values(entry))
         log.info("vfolder log in api _delete {}", audit_log_data.get())
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
@@ -2440,7 +2441,7 @@ async def purge(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
-        update_before_data(dictify_entry(entry))
+        update_before_data(stringify_entry_values(entry))
 
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
@@ -3405,6 +3406,7 @@ def create_app(default_cors_options):
     app["folders.context"] = PrivateContext()
     app.middlewares.append(audit_log_middleware)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    add_route = app.router.add_route
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("POST", create))
