@@ -1,5 +1,5 @@
-from ai.backend.cli.types import MountType
 from ai.backend.client.cli.session.execute import prepare_mount_arg, prepare_mount_arg_v2
+from ai.backend.common.types import MountTypes
 
 
 def test_vfolder_mount_simple():
@@ -45,19 +45,19 @@ def test_vfolder_mount_complex():
     }
     assert mount_options == {
         "/colon:path/test": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": None,
         },
         "/usr/abcd": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": True,
         },
         "/usr/lorem": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": True,
         },
         "/usr/dolor": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": False,
         },
     }
@@ -77,7 +77,7 @@ def test_vfolder_mount_v2_without_target():
     assert mount_map == {}
     assert mount_options == {
         "vf-dd244f7f": {
-            "type": MountType.VOLUME,
+            "type": MountTypes.VOLUME,
             "readonly": True,
         },
     }
@@ -100,15 +100,15 @@ def test_vfolder_mount_simple_with_v2():
     assert mount_map_v1 == mount_map_v2
     assert mount_options_v2 == {
         "vf-d2340c9d": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": None,
         },
         "vf-a3430d85": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": None,
         },
         "vf-4bf23b66": {
-            "type": MountType.BIND,
+            "type": MountTypes.BIND,
             "readonly": None,
         },
     }

@@ -18,8 +18,9 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
-from ai.backend.cli.types import ExitCode, MountPoint
+from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import MountPoint
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path

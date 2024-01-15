@@ -14,7 +14,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -41,6 +41,7 @@ import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 
 from .exception import InvalidIpAddressValue
@@ -71,6 +72,7 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "MountPoint",
     "VFolderID",
     "QuotaScopeID",
     "VFolderUsageMode",
@@ -368,6 +370,13 @@ class MountTypes(str, enum.Enum):
     TMPFS = "tmpfs"
     K8S_GENERIC = "k8s-generic"
     K8S_HOSTPATH = "k8s-hostpath"
+
+
+class MountPoint(BaseModel):
+    type: MountTypes = Field(default=MountTypes.BIND)
+    source: Path
+    target: Path | None = Field(default=None)
+    readonly: bool | None = Field(default=None)
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import enum
-from pathlib import Path
 from typing import Dict
 
 import attr
-from pydantic import BaseModel, Field
 
 __all__ = (
     "Undefined",
@@ -39,17 +37,3 @@ class Undefined(enum.Enum):
 
 
 undefined = Undefined.TOKEN
-
-
-class MountType(enum.StrEnum):
-    BIND = "bind"
-    VOLUME = "volume"
-    TMPFS = "tmpfs"
-    CLUSTER = "cluster"
-
-
-class MountPoint(BaseModel):
-    type: MountType = Field(default=MountType.BIND)
-    source: Path
-    target: Path | None = Field(default=None)
-    readonly: bool | None = Field(default=None)

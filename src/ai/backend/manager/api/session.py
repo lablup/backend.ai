@@ -55,7 +55,14 @@ from ai.backend.common.events import AgentTerminatedEvent
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.common.types import AccessKey, AgentId, ClusterMode, SessionTypes, VFolderID
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    MountTypes,
+    SessionTypes,
+    VFolderID,
+)
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -187,7 +194,13 @@ creation_config_v5 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
     tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
-    | t.Mapping(t.String, t.Mapping(t.String, t.Any)),
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): MountTypes,
+            t.Key("readonly", default=None): t.Null | t.Bool,
+        }).ignore_extra("*"),
+    ),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
