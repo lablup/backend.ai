@@ -1132,15 +1132,21 @@ class VirtualFolder(graphene.ObjectType):
         if row is None:
             return None
 
+        def _get_field(name: str) -> Any:
+            try:
+                return row[name]
+            except sa.exc.NoSuchColumnError:
+                return None
+
         return cls(
             id=row["id"],
             host=row["host"],
             quota_scope_id=row["quota_scope_id"],
             name=row["name"],
             user=row["user"],
-            user_email=row["users_email"] if "users_email" in row else None,
+            user_email=_get_field("users_email"),
             group=row["group"],
-            group_name=row["groups_name"] if "groups_name" in row else None,
+            group_name=_get_field("groups_name"),
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
