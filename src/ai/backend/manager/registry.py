@@ -903,9 +903,12 @@ class AgentRegistry:
             )
             use_host_network_result = await conn.execute(use_host_network_query)
             use_host_network = use_host_network_result.scalar()
-            # Translate mounts/mount_map into vfolder mounts
+            # Translate mounts/mount_map/mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_options = (
+                session_enqueue_configs["creation_config"].get("mount_options") or {}
+            )
             allowed_vfolder_types = await self.shared_config.get_vfolder_types()
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -915,6 +918,7 @@ class AgentRegistry:
                 resource_policy,
                 requested_mounts,
                 requested_mount_map,
+                requested_mount_options,
             )
 
             # Prepare internal data for common dotfiles.

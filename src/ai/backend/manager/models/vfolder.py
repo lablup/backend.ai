@@ -29,6 +29,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MountPermission,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
@@ -627,6 +628,7 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
     resource_policy: Mapping[str, Any],
     requested_mount_references: Sequence[str | uuid.UUID],
     requested_mount_reference_map: Mapping[str | uuid.UUID, str],
+    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
@@ -637,6 +639,11 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
     ]
     requested_mount_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+    requested_mount_options: dict[str, dict[str, Any]] = {
+        name: options
+        for name, options in requested_mount_reference_options.items()
+        if isinstance(name, str)
     }
 
     vfolder_ids_to_resolve = [
@@ -653,6 +660,8 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
         requested_mounts.append(name)
         if path := requested_mount_reference_map.get(vfid):
             requested_mount_map[name] = path
+        if options := requested_mount_reference_options.get(vfid):
+            requested_mount_options[name] = options
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -787,6 +796,10 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
+            if requested_mount_options[key]["readonly"] is True:
+                mount_perm = MountPermission.READ_ONLY
+            else:
+                mount_perm = MountPermission.READ_WRITE
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
@@ -794,8 +807,7 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
-                    mount_perm=vfolder["permission"],  # TODO: override permission
-                    # mount_perm=VFolderPermission("ro"),
+                    mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
                 )
             )

@@ -508,7 +508,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map = prepare_mount_arg(mount)  # TODO
+    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
 
     if env_range is None:
         env_range = []  # noqa
@@ -688,6 +688,7 @@ def run(
                 cluster_mode=cluster_mode,
                 mounts=mount,
                 mount_map=mount_map,
+                mount_options=mount_options,
                 envs=envs,
                 resources=resources,
                 resource_opts=resource_opts,

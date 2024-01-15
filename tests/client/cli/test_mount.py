@@ -92,15 +92,13 @@ def test_vfolder_mount_simple_with_v2():
     ]
 
     # when
-    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+    mount_v1, mount_map_v1 = prepare_mount_arg(mount)
+    mount_v2, mount_map_v2, mount_options_v2 = prepare_mount_arg_v2(mount)
 
     # then
-    assert set(mount) == {"vf-d2340c9d", "vf-a3430d85", "vf-4bf23b66"}
-    assert mount_map == {
-        "vf-a3430d85": "/home/work/v1",
-        "vf-4bf23b66": "/home/work/v1/tmp",
-    }
-    assert mount_options == {
+    assert set(mount_v1) == set(mount_v2)
+    assert mount_map_v1 == mount_map_v2
+    assert mount_options_v2 == {
         "vf-d2340c9d": {
             "type": MountType.BIND,
             "readonly": False,

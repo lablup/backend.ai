@@ -186,6 +186,8 @@ creation_config_v4_template = t.Dict({
 creation_config_v5 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(t.String, t.Mapping(t.String, t.Any)),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
