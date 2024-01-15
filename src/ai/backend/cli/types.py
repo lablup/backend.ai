@@ -48,7 +48,7 @@ class MountType(enum.StrEnum):
     CLUSTER = "cluster"
 
 
-class ParsedVolume(BaseModel):
+class MountPoint(BaseModel):
     type: MountType
     source: Path
     target: Path | None

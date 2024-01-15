@@ -18,7 +18,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
-from ai.backend.cli.types import ExitCode, ParsedVolume
+from ai.backend.cli.types import ExitCode, MountPoint
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run, current_loop
@@ -273,7 +273,6 @@ def prepare_mount_arg(
     return list(mounts), mount_map
 
 
-# docker/cli/cli/compose/loader/volume.go (https://github.com/docker/cli/blob/1fc6ef9d63d4442a56d0d5d551bb19c89bd35036/cli/compose/loader/volume.go#L16)  # noqa
 def prepare_mount_arg_v2(
     mount_args: Optional[Sequence[str]] = None,
 ) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, Any]]]:
@@ -304,7 +303,7 @@ def prepare_mount_arg_v2(
                             volume["readonly"] = True
                         case "rw":
                             volume["readonly"] = False
-            volume = ParsedVolume(**volume).model_dump()  # TODO
+            volume = MountPoint(**volume).model_dump()
             mount = str(volume.pop("source"))
             mounts.add(mount)
             if target := volume.pop("target", None):
