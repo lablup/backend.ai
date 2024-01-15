@@ -118,7 +118,7 @@ class VFolderOwnershipType(str, enum.Enum):
     GROUP = "group"
 
 
-class VFolderPermission(enum.StrEnum):
+class VFolderPermission(str, enum.Enum):
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
