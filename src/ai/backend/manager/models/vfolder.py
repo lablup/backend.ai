@@ -625,7 +625,7 @@ async def get_allowed_vfolder_hosts_by_user(
     return allowed_hosts
 
 
-async def prepare_vfolder_mounts(  # TODO: ro permission
+async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
@@ -675,7 +675,7 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
 
     # Split the vfolder name and subpaths
     for key in requested_mounts:
-        name, _, subpath = key.partition("/")  # TODO: name=alias:perm
+        name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
                 f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
