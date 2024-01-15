@@ -263,7 +263,7 @@ def prepare_mount_arg(
         for value in mount_args:
             if "=" in value:
                 sp = value.split("=", maxsplit=1)
-            elif ":" in value:  # docker-like volume mount mapping  # TODO
+            elif ":" in value:  # docker-like volume mount mapping
                 sp = value.split(":", maxsplit=1)
             else:
                 sp = [value]
@@ -285,24 +285,39 @@ def prepare_mount_arg_v2(
         [
             "type=bind,source=/colon:path/test,target=/data",
             "type=bind,source=/colon:path/abcd,target=/zxcv,readonly",
+            # simple formats are still supported
+            "vf-abcd:/home/work/zxcv",
         ]
     """
+
+    def _parse_mount_option(option: str) -> tuple[str, Any] | None:
+        if "=" in option:
+            sp = option.split("=", maxsplit=1)
+            return (sp[0], sp[1])
+        match option:
+            case "ro" | "readonly":
+                return ("readonly", True)
+            case "rw":
+                return ("readonly", False)
+        return None
+
     mounts = set()
     mount_map = {}
     mount_options = {}
     if mount_args is not None:
         for arg in mount_args:
             volume: dict[str, Any] = {}
-            for field in arg.split(","):
-                if "=" in field:
-                    key, value = field.split("=")
-                    volume[key] = value
-                else:
-                    match field:
-                        case "ro" | "readonly":
-                            volume["readonly"] = True
-                        case "rw":
-                            volume["readonly"] = False
+            if len(options := arg.split(",")) == 1:
+                # e.g., vf-001=/home/work/abc or vf-001=/home/work/abc
+                _mounts, _mount_map = prepare_mount_arg([arg])
+                volume["source"] = _mounts[0]
+                if target := _mount_map.get(volume["source"]):
+                    volume["target"] = target
+            else:
+                # e.g., type=bind,source=vf-001,target=/home/work/abc,readonly
+                for option in options:
+                    if opt := _parse_mount_option(option):
+                        volume[opt[0]] = opt[1]
             volume = MountPoint(**volume).model_dump()
             mount = str(volume.pop("source"))
             mounts.add(mount)

@@ -49,7 +49,7 @@ class MountType(enum.StrEnum):
 
 
 class MountPoint(BaseModel):
-    type: MountType
+    type: MountType = Field(default=MountType.BIND)
     source: Path
-    target: Path | None
+    target: Path | None = Field(default=None)
     readonly: bool = Field(default=False)

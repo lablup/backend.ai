@@ -61,3 +61,56 @@ def test_vfolder_mount_complex():
             "readonly": False,
         },
     }
+
+
+def test_vfolder_mount_v2_without_target():
+    # given
+    mount = [
+        "type=volume,source=vf-dd244f7f,readonly",
+    ]
+
+    # when
+    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+
+    # then
+    assert set(mount) == {"vf-dd244f7f"}
+    assert mount_map == {}
+    assert mount_options == {
+        "vf-dd244f7f": {
+            "type": MountType.VOLUME,
+            "readonly": True,
+        },
+    }
+
+
+def test_vfolder_mount_simple_with_v2():
+    # given
+    mount = [
+        "vf-d2340c9d",
+        "vf-a3430d85:/home/work/v1",
+        "vf-4bf23b66=/home/work/v1/tmp",
+    ]
+
+    # when
+    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+
+    # then
+    assert set(mount) == {"vf-d2340c9d", "vf-a3430d85", "vf-4bf23b66"}
+    assert mount_map == {
+        "vf-a3430d85": "/home/work/v1",
+        "vf-4bf23b66": "/home/work/v1/tmp",
+    }
+    assert mount_options == {
+        "vf-d2340c9d": {
+            "type": MountType.BIND,
+            "readonly": False,
+        },
+        "vf-a3430d85": {
+            "type": MountType.BIND,
+            "readonly": False,
+        },
+        "vf-4bf23b66": {
+            "type": MountType.BIND,
+            "readonly": False,
+        },
+    }
