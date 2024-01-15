@@ -49,14 +49,10 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.audit_log_util import (
-    ArgNameEnum,
-    audit_log_data,
     audit_log_middleware,
     empty_after_data,
-    set_audit_log_action_target_decorator,
     stringify_entry_values,
     update_after_data,
-    update_audit_log_target_field,
     update_before_data,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -100,7 +96,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
-from ..models.audit_logs import AuditLogAction
+from ..models.audit_logs import AuditLogAction, AuditLogTargetType
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -121,7 +117,12 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import check_api_params, get_user_scopes
+from .utils import (
+    ArgNameEnum,
+    check_api_params,
+    get_user_scopes,
+    set_audit_log_action_target_decorator,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -344,6 +345,7 @@ def vfolder_check_exists(
 )
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.CREATE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.PARAMS,
     target_path=["name"],
 )
@@ -357,6 +359,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
     vfolder_name = params["name"]
+
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -1150,6 +1153,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
 )
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.CHANGE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
     target_path=["name"],
 )
@@ -1162,8 +1166,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
-
-    update_audit_log_target_field(old_name)
 
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -1238,6 +1240,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 )
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.CHANGE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
     target_path=["name"],
 )
@@ -2266,7 +2269,6 @@ async def _delete(
         entry = entries[0]
 
         update_before_data(stringify_entry_values(entry))
-        log.info("vfolder log in api _delete {}", audit_log_data.get())
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
@@ -2297,6 +2299,7 @@ async def _delete(
 )
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.DELETE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.PARAMS,
     target_path=["id"],
 )
@@ -2316,8 +2319,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         access_key,
         folder_id,
     )
-
-    log.info("vfolder log in api folder {}", audit_log_data.get())
 
     try:
         await _delete(
@@ -2344,6 +2345,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.DELETE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
     target_path=["name"],
 )
@@ -2392,6 +2394,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @set_audit_log_action_target_decorator(
     action=AuditLogAction.PURGE,
+    target_type=AuditLogTargetType.VFOLDER,
     arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
     target_path=["name"],
 )
@@ -2456,7 +2459,7 @@ async def purge(request: web.Request) -> web.Response:
         app_ctx.storage_ptask_group,
     )
 
-    empty_after_data(audit_log_data.get())
+    empty_after_data()
 
     return web.Response(status=204)
 
@@ -3406,7 +3409,6 @@ def create_app(default_cors_options):
     app["folders.context"] = PrivateContext()
     app.middlewares.append(audit_log_middleware)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    add_route = app.router.add_route
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("POST", create))

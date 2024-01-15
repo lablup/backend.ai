@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import functools
 import inspect
 import io
@@ -38,7 +39,9 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
 
+from ..audit_log_util import update_audit_log_target
 from ..models import UserRole, users
+from ..models.audit_logs import AuditLogAction, AuditLogTargetType
 from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
@@ -207,6 +210,69 @@ def check_api_params(
         set_handler_attr(wrapped, "request_scheme", checker)
         if request_examples:
             set_handler_attr(wrapped, "request_examples", request_examples)
+        return wrapped
+
+    return wrap
+
+
+class ArgNameEnum(str, enum.Enum):
+    REQUEST = "request"
+    PARAMS = "params"
+    REQUEST_MATCH_INFO = "request"
+
+
+def set_audit_log_action_target_decorator(
+    *,
+    action: AuditLogAction,
+    arg_name_enum: ArgNameEnum = ArgNameEnum.REQUEST,
+    target_type: AuditLogTargetType,
+    target_path: list[str] = [],
+    nullable: bool = False,
+):
+    arg_name_str = arg_name_enum.value
+
+    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]):
+        @functools.wraps(handler)
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
+            def process_target() -> Any:
+                if nullable:
+                    return None
+                sig = inspect.signature(handler)
+                bound_args = sig.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+                if arg_name_str not in bound_args.arguments:
+                    raise KeyError(
+                        f"Argument '{arg_name_str}' not found in function '{handler.__name__}'"
+                    )
+
+                arg_value: web.Request | Any = bound_args.arguments[arg_name_str]
+
+                if arg_name_enum == ArgNameEnum.REQUEST_MATCH_INFO:
+                    return arg_value.match_info[target_path[0]]
+
+                return recursive_find(arg_value, target_path)
+
+            def recursive_find(obj: Any, now_path: list[str]) -> Any:
+                if not now_path:
+                    return obj
+                if obj is None or not isinstance(obj, dict):
+                    return None
+
+                next_obj = obj.get(now_path[0])
+                if next_obj is None:
+                    raise KeyError(f"KeyError '{now_path[0]}'")
+
+                return recursive_find(next_obj, now_path[1:])
+
+            update_audit_log_target(process_target())
+
+            # Call the original function
+            return await handler(*args, **kwargs)
+
+        set_handler_attr(wrapped, "audit_log_applicable", True)
+        set_handler_attr(wrapped, "audit_log_action", action)
+        set_handler_attr(wrapped, "audit_log_target_type", target_type)
+
         return wrapped
 
     return wrap
@@ -398,7 +464,7 @@ def set_handler_attr(func, key, value):
 
 def get_handler_attr(request, key, default=None):
     # When used in the aiohttp server-side codes, we should use
-    # request.match_info.hanlder instead of handler passed to the middleware
+    # request.match_info.handler instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
     # multiple times to implement its internal middleware processing.
     attrs = getattr(request.match_info.handler, "_backend_attrs", None)
