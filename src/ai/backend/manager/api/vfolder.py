@@ -1306,13 +1306,7 @@ async def update_vfolder_options(
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
-)
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    update_before_data(data_to_insert=[dictify_entry(row)])
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1354,7 +1348,6 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{}, path:{})"
@@ -1399,6 +1392,7 @@ async def create_download_session(
             "token": storage_reply["token"],
             "url": str(client_api_url / "download"),
         }
+
     return web.json_response(resp, status=200)
 
 
@@ -1412,7 +1406,6 @@ async def create_download_session(
     })
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    # TODO: audit log
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1452,6 +1445,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
             "token": storage_reply["token"],
             "url": str(client_api_url / "upload"),
         }
+
     return web.json_response(resp, status=200)
 
 

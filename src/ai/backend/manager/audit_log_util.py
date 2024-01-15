@@ -15,6 +15,19 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.audit_logs import AuditLogAction, AuditLogTargetType, audit_logs
 
+__all__ = (
+    "audit_log_middleware",
+    "audit_log_data",
+    "set_audit_log_action_target_decorator",
+    "update_audit_log_target_field",
+    "update_after_data",
+    "update_before_data",
+    "update_audit_log_success_state",
+    "empty_after_data",
+    "dictify_entry",
+)
+
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
