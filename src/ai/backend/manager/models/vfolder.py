@@ -39,7 +39,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..api.exceptions import (
+    InvalidAPIParameters,
+    VFolderNotFound,
+    VFolderOperationFailed,
+    VFolderPermissionError,
+)
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
     RESERVED_VFOLDER_PATTERNS,
@@ -727,14 +732,6 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        log.warning(
-            "VFOLDER.MOUNT (name={}, permission={})", vfolder["name"], vfolder["permission"]
-        )
-        # VFolderPermission.READ_ONLY == VFolderPermission("ro") == "ro"
-        """
-        2024-01-11 11:45:05.066 WARNING ai.backend.manager.models.vfolder [41689] VFOLDER.MOUNT (name=pipeline-0-p2bYu2, permission=VFolderPermission.READ_WRITE)
-        2024-01-11 11:45:05.073 WARNING ai.backend.manager.models.vfolder [41689] VFOLDER.MOUNT (name=pipeline-0-p2bYu2, permission=VFolderPermission.READ_WRITE)
-        """
         await ensure_host_permission_allowed(
             conn,
             vfolder["host"],
@@ -796,10 +793,17 @@ async def prepare_vfolder_mounts(  # TODO: ro permission
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            if requested_mount_options[key]["readonly"] is True:
-                mount_perm = MountPermission.READ_ONLY
-            else:
-                mount_perm = MountPermission.READ_WRITE
+            match requested_mount_options[key]["readonly"]:
+                case True:
+                    mount_perm = MountPermission.READ_ONLY
+                case False:
+                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                        raise VFolderPermissionError(
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, but attempted with '{MountPermission.READ_WRITE.value}' mode."
+                        )
+                    mount_perm = MountPermission.READ_WRITE
+                case _:  # None if unset
+                    mount_perm = vfolder["permission"]
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],

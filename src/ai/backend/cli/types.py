@@ -52,4 +52,4 @@ class MountPoint(BaseModel):
     type: MountType = Field(default=MountType.BIND)
     source: Path
     target: Path | None = Field(default=None)
-    readonly: bool = Field(default=False)
+    readonly: bool | None = Field(default=None)

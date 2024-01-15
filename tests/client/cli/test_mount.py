@@ -46,7 +46,7 @@ def test_vfolder_mount_complex():
     assert mount_options == {
         "/colon:path/test": {
             "type": MountType.BIND,
-            "readonly": False,
+            "readonly": None,
         },
         "/usr/abcd": {
             "type": MountType.BIND,
@@ -101,14 +101,14 @@ def test_vfolder_mount_simple_with_v2():
     assert mount_options_v2 == {
         "vf-d2340c9d": {
             "type": MountType.BIND,
-            "readonly": False,
+            "readonly": None,
         },
         "vf-a3430d85": {
             "type": MountType.BIND,
-            "readonly": False,
+            "readonly": None,
         },
         "vf-4bf23b66": {
             "type": MountType.BIND,
-            "readonly": False,
+            "readonly": None,
         },
     }

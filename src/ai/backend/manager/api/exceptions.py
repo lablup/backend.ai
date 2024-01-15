@@ -299,6 +299,11 @@ class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
     error_title = "There is no available virtual folder to filter its status."
 
 
+class VFolderPermissionError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-permission-error"
+    error_title = "The virtual folder does not permit the specified permission."
+
+
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."
