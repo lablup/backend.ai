@@ -3256,6 +3256,7 @@ class AgentRegistry:
                         },
                         "endpoint": {
                             "id": str(endpoint.id),
+                            "existing_url": str(endpoint.url) if endpoint.url else None,
                         },
                     },
                     "apps": inference_apps,
