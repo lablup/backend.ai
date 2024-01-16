@@ -94,7 +94,7 @@ async def record_audit_log(
 
 
 def update_audit_log_target(target: Any) -> None:
-    audit_log_target.set(target)
+    audit_log_target.set(str(target))
 
 
 def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) -> dict[str, Any]:
