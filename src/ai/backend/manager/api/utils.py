@@ -230,9 +230,11 @@ def ensure_stream_response_type(
 ) -> web.StreamResponse:
     match response:
         case BaseModel():
-            return web.json_response(response.model_dump())
+            return web.json_response(response.model_dump(mode="json"))
         case list():
-            return web.json_response(TypeAdapter(list[TResponseModel]).dump_python(response))
+            return web.json_response(
+                TypeAdapter(list[TResponseModel]).dump_python(response, mode="json")
+            )
         case web_response.StreamResponse():
             return response
         case _:
