@@ -1,15 +1,29 @@
 import json
 import subprocess
 import sys
+import re
 
 
 def pad_zero(num: int, size: int) -> str:
     return "".join([*(["0"] * min(size - len(str(num)), 0)), str(num)])
 
 
+rc_regex = re.compile(r"(\d+)rc(\d+)")
+dev_regex = re.compile(r"(\d+)dev(\d+)")
+
 release_id = sys.argv[1]
 major, minor, patch = release_id.split(".", maxsplit=3)
-prev_release = f"{major}.{minor}.{pad_zero(int(patch)-1, 2)}"
+
+if (rc_patch_ver := rc_regex.findall(patch)):
+    patch_ver, rc_ver = rc_patch_ver[0]
+    prev_patch = f"{patch_ver}rc{int(rc_ver)-1}"
+elif (dev_patch_ver := dev_regex.findall(patch)):
+    patch_ver, dev_ver = dev_patch_ver[0]
+    prev_patch = f"{patch_ver}dev{int(dev_ver)-1}"
+else:
+    prev_patch = pad_zero(int(patch)-1, 2)
+
+prev_release = f"{major}.{minor}.{prev_patch}"
 
 backports_since = subprocess.check_output(["git", "log", f"{prev_release}..{major}.{minor}", "--oneline"]).decode("utf-8")
 release_date = subprocess.check_output(["git", "log", f"{prev_release}~1..{prev_release}", "--pretty=format:'%ad'", "--date=format:'%Y-%m-%d'"]).decode("utf-8").replace("''", "")
