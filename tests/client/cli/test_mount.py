@@ -1,5 +1,5 @@
 from ai.backend.client.cli.session.execute import prepare_mount_arg, prepare_mount_arg_v2
-from ai.backend.common.types import MountTypes
+from ai.backend.common.types import MountPermission, MountTypes
 
 
 def test_vfolder_mount_simple():
@@ -27,9 +27,9 @@ def test_vfolder_mount_complex():
     # given
     mount = [
         "type=bind,source=/colon:path/test,target=/data",
-        "type=bind,source=/usr/abcd,target=/home/work/zxcv,readonly",
-        "type=bind,source=/usr/lorem,target=/home/work/ipsum,ro",
-        "type=bind,source=/usr/dolor,target=/home/work/sit,rw",
+        "type=bind,source=/usr/abcd,target=/home/work/zxcv,perm=ro",
+        "type=bind,source=/usr/lorem,target=/home/work/ipsum,permission=ro",
+        "type=bind,source=/usr/dolor,target=/home/work/sit,permission=rw",
     ]
 
     # when
@@ -46,19 +46,19 @@ def test_vfolder_mount_complex():
     assert mount_options == {
         "/colon:path/test": {
             "type": MountTypes.BIND,
-            "readonly": None,
+            "permission": None,
         },
         "/usr/abcd": {
             "type": MountTypes.BIND,
-            "readonly": True,
+            "permission": MountPermission.READ_ONLY,
         },
         "/usr/lorem": {
             "type": MountTypes.BIND,
-            "readonly": True,
+            "permission": MountPermission.READ_ONLY,
         },
         "/usr/dolor": {
             "type": MountTypes.BIND,
-            "readonly": False,
+            "permission": MountPermission.READ_WRITE,
         },
     }
 
@@ -66,7 +66,7 @@ def test_vfolder_mount_complex():
 def test_vfolder_mount_v2_without_target():
     # given
     mount = [
-        "type=volume,source=vf-dd244f7f,readonly",
+        "type=volume,source=vf-dd244f7f,perm=ro",
     ]
 
     # when
@@ -78,7 +78,7 @@ def test_vfolder_mount_v2_without_target():
     assert mount_options == {
         "vf-dd244f7f": {
             "type": MountTypes.VOLUME,
-            "readonly": True,
+            "permission": MountPermission.READ_ONLY,
         },
     }
 
@@ -101,14 +101,14 @@ def test_vfolder_mount_simple_with_v2():
     assert mount_options_v2 == {
         "vf-d2340c9d": {
             "type": MountTypes.BIND,
-            "readonly": None,
+            "permission": None,
         },
         "vf-a3430d85": {
             "type": MountTypes.BIND,
-            "readonly": None,
+            "permission": None,
         },
         "vf-4bf23b66": {
             "type": MountTypes.BIND,
-            "readonly": None,
+            "permission": None,
         },
     }

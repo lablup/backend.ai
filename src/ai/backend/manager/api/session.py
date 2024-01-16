@@ -59,6 +59,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    MountPermission,
     MountTypes,
     SessionTypes,
     VFolderID,
@@ -198,7 +199,7 @@ creation_config_v5 = t.Dict({
         t.String,
         t.Dict({
             t.Key("type", default=MountTypes.BIND): MountTypes,
-            t.Key("readonly", default=None): t.Null | t.Bool,
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | MountPermission,
         }).ignore_extra("*"),
     ),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),

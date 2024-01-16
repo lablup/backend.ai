@@ -276,7 +276,7 @@ def prepare_mount_arg(
 
 def prepare_mount_arg_v2(
     mount_args: Optional[Sequence[str]] = None,
-) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, Any]]]:
+) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
     vfolder name and in-container mount path pairs,
@@ -291,16 +291,11 @@ def prepare_mount_arg_v2(
         ]
     """
 
-    def _parse_mount_option(option: str) -> tuple[str, Any] | None:
-        if "=" in option:
-            sp = option.split("=", maxsplit=1)
-            return (sp[0], sp[1])
-        match option:
-            case "ro" | "readonly":
-                return ("readonly", True)
-            case "rw":
-                return ("readonly", False)
-        return None
+    def _parse_mount_option(option: str) -> tuple[str, str] | None:
+        if "=" not in option:
+            return None
+        sp = option.split("=", maxsplit=1)
+        return (sp[0], sp[1])
 
     mounts = set()
     mount_map = {}

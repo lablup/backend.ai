@@ -41,7 +41,7 @@ import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
 from .exception import InvalidIpAddressValue
@@ -376,7 +376,9 @@ class MountPoint(BaseModel):
     type: MountTypes = Field(default=MountTypes.BIND)
     source: Path
     target: Path | None = Field(default=None)
-    readonly: bool | None = Field(default=None)
+    permission: MountPermission | None = Field(alias="perm", default=None)
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
