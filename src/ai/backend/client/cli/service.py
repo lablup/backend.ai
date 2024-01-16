@@ -313,7 +313,7 @@ def create(
 @click.argument("image", metavar="IMAGE", type=str)
 @click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
 @click.option("-t", "--name", metavar="NAME", type=str, default=None)
-@click.option("--model-version", metavar="VERSION", type=str, default=None)
+@click.option("--model-version", metavar="VERSION", type=int, default=1)
 @click.option("--model-mount-destination", metavar="PATH", type=str, default="/models")
 # execution environment
 @click.option(
@@ -427,7 +427,7 @@ def try_start(
     model_name_or_id: str,
     *,
     name: Optional[str],
-    model_version: Optional[str],
+    model_version: int,
     model_mount_destination: Optional[str],
     env: Sequence[str],
     startup_command: Optional[str],
@@ -497,7 +497,7 @@ def try_start(
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Model service validation completed.")
+                completion_msg_func = lambda: print_done("Model service validation started.")
                 async with (
                     bgtask.listen_events() as response,
                     ProgressViewer("Starting the session...") as viewer,
@@ -505,11 +505,11 @@ def try_start(
                     async for ev in response:
                         data = json.loads(ev.data)
                         if ev.event == "bgtask_updated":
+                            print(data["message"])
                             if viewer.tqdm is None:
                                 pbar = await viewer.to_tqdm()
                             else:
                                 pbar.total = data["total_progress"]
-                                pbar.write(data["message"])
                                 pbar.update(data["current_progress"] - pbar.n)
                         elif ev.event == "bgtask_failed":
                             error_msg = data["message"]

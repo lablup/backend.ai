@@ -657,6 +657,13 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             sudo_session_enabled=sudo_session_enabled,
         )
 
+        await reporter.update(
+            message=json.dumps({
+                "event": "session_enqueued",
+                "session_id": str(result["sessionId"]),
+            })
+        )
+
         async def _handle_event(
             context: None,
             source: AgentId,
@@ -667,17 +674,10 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             | SessionTerminatedEvent
             | ModelServiceStatusEvent,
         ) -> None:
-            message_body = {
-                "event": event.name,
-            }
-            match event:
-                case SessionEnqueuedEvent():
-                    message_body["session_id"] = str(event.session_id)
-
-            await reporter.update(message=json.dumps(message_body))
+            await reporter.update(message=json.dumps({"event": event.name}))
 
             match event:
-                case SessionEnqueuedEvent() | SessionCancelledEvent():
+                case SessionTerminatedEvent() | SessionCancelledEvent():
                     terminated_event.set()
                 case ModelServiceStatusEvent():
                     await reporter.update(message=event.new_status.value)
@@ -688,21 +688,15 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
                             None,
                             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
                         )
-                    await root_ctx.registry.destroy_session(
-                        session,
-                        forced=True,
-                    )
+                        await root_ctx.registry.destroy_session(
+                            session,
+                            forced=True,
+                        )
 
         session_event_matcher = lambda args: args[0] == str(result["sessionId"])
         model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
 
         handlers: list[EventHandler] = [
-            root_ctx.event_dispatcher.subscribe(
-                SessionEnqueuedEvent,
-                None,
-                _handle_event,
-                args_matcher=session_event_matcher,
-            ),
             root_ctx.event_dispatcher.subscribe(
                 SessionPreparingEvent,
                 None,
