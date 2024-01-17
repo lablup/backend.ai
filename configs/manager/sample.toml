@@ -187,6 +187,17 @@ ssl-enabled = true
 ssl-verify = true
 
 
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+
+# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+
 # Specify additional package namespaces to include in the logs
 # and their individual log levels.
 # Note that the actual logging level applied is the conjunction of the global logging level and the
