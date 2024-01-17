@@ -51,7 +51,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.audit_log_util import (
     audit_log_middleware,
     empty_after_data,
-    stringify_entry_values,
     update_after_data,
     update_before_data,
 )
@@ -615,9 +614,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
             })
             resp["unmanaged_path"] = unmanaged_path
         try:
-            query = sa.insert(vfolders, insert_values)
+            query = sa.insert(vfolders, insert_values).returning(*vfolders.c)
             result = await conn.execute(query)
+            data_to_insert = result.one()
 
+            update_after_data(data_to_insert=data_to_insert)
             # Here we grant creator the permission to alter VFolder contents
             if group_type == ProjectType.MODEL_STORE:
                 query = sa.insert(vfolder_permissions).values({
@@ -629,8 +630,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
-
-    update_after_data(data_to_insert=insert_values)
 
     return web.json_response(resp, status=201)
 
@@ -1191,9 +1190,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             allowed_vfolder_types=allowed_vfolder_types,
         )
 
-        entries_filtered = [
-            stringify_entry_values(entry) for entry in entries if entry["name"] == old_name
-        ]
+        entries_filtered = [entry for entry in entries if entry["name"] == old_name]
         update_before_data(data_to_insert=entries_filtered)
 
         for entry in entries:
@@ -1227,7 +1224,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         find_updated_row_queries = sa.select([vfolders]).where(vfolders.c.id.in_(updated_ids))
 
         updated_rows = await conn.execute(find_updated_row_queries)
-        updated_rows_list = [stringify_entry_values(row) for row in updated_rows.all()]
+        updated_rows_list = [row for row in updated_rows.all()]
 
         update_after_data(data_to_insert=updated_rows_list)
 
@@ -1264,7 +1261,7 @@ async def update_vfolder_options(
 
         result = await conn.execute(query)
         db_row_to_update = result.one()
-        update_before_data(data_to_insert=[stringify_entry_values(db_row_to_update)])
+        update_before_data(data_to_insert=[db_row_to_update])
 
         folder_host = db_row_to_update._mapping["host"]
         await ensure_host_permission_allowed(
@@ -1301,7 +1298,7 @@ async def update_vfolder_options(
             updated_result = result.one()
             after_data_to_insert = updated_result
 
-    update_after_data(data_to_insert=[stringify_entry_values(after_data_to_insert)])
+    update_after_data(data_to_insert=[after_data_to_insert])
     return web.Response(status=201)
 
 
@@ -2335,7 +2332,7 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        update_before_data(stringify_entry_values(entry))
+        update_before_data(entry)
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
@@ -2511,7 +2508,7 @@ async def purge(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
-        update_before_data(stringify_entry_values(entry))
+        update_before_data(entry)
 
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
@@ -3433,10 +3430,18 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         user_info.uuid,
     )
     async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+        query = sa.select([vfolders]).where(
+            (vfolders.c.id == vfolder_id) & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
         )
-        folder_host = await conn.scalar(query)
+        # get host
+        result = await conn.execute(query)
+
+        if (row_to_update := result.first()) is None:
+            raise ObjectNotFound(object_name="vfolders")
+
+        update_before_data(row_to_update)
+
+        folder_host = row_to_update._mapping["host"]
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
@@ -3452,8 +3457,14 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
+                .returning(vfolders)
             )
-            await conn.execute(query)
+            result = await conn.execute(query)
+
+            if (updated_row := result.one()) is None:
+                raise ObjectNotFound(object_name="vfolders")
+
+            update_after_data(updated_row)
 
     await execute_with_retry(_update)
 
