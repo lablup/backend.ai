@@ -1,12 +1,13 @@
 import contextvars
 import logging
 from datetime import datetime
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 import sqlalchemy as sa
 from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic.v1.utils import deep_update
+from sqlalchemy.engine import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.api.context import RootContext
@@ -102,7 +103,9 @@ def updated_data(target_data: dict[str, Any], values_to_update: dict[str, Any]) 
     return deep_update(current_audit_log_data, values_to_update)
 
 
-def update_audit_log_data_by_field_name(field_to_update: str, value: Any) -> None:
+def update_audit_log_data_by_field_name(
+    field_to_update: str, value: Mapping[str, str] | Iterable[Mapping[str, str]]
+) -> None:
     audit_log_data.set(
         updated_data(
             target_data=audit_log_data.get(),
@@ -113,12 +116,37 @@ def update_audit_log_data_by_field_name(field_to_update: str, value: Any) -> Non
     )
 
 
-def update_after_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]) -> None:
-    update_audit_log_data_by_field_name("after", data_to_insert)
+def update_after_data(
+    data_to_insert: Row | Mapping[str, Any] | Sequence[Row] | Sequence[Mapping[str, Any]],
+) -> None:
+    converted_data = convert_data(data_to_insert)
+    update_audit_log_data_by_field_name("after", converted_data)
 
 
-def update_before_data(data_to_insert: dict[str, Any] | Iterable[dict[str, Any]]) -> None:
-    update_audit_log_data_by_field_name("before", data_to_insert)
+def update_before_data(
+    data_to_insert: Row | Mapping[str, Any] | Sequence[Row] | Sequence[Mapping[str, Any]],
+) -> None:
+    converted_data = convert_data(data_to_insert)
+    update_audit_log_data_by_field_name("before", converted_data)
+
+
+def convert_data(
+    data_to_insert: Row | Mapping[str, Any] | Sequence[Row] | Sequence[Mapping[str, Any]],
+) -> Mapping[str, str] | list[Mapping[str, str]]:
+    if isinstance(data_to_insert, (Row, Mapping)):
+        return stringify_entry_values(data_to_insert)
+    elif isinstance(data_to_insert, Sequence):
+        return process_multiple_entries(data_to_insert)
+    else:
+        raise TypeError("data_to_insert must be a Row or list of Rows")
+
+
+def process_multiple_entries(
+    data_to_insert: Sequence[Row] | Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, str]]:
+    if not all(isinstance(item, (Row, Mapping)) for item in data_to_insert):
+        raise TypeError("data_to_insert must be a list of Rows")
+    return [stringify_entry_values(entry) for entry in data_to_insert]
 
 
 def empty_after_data() -> None:
@@ -127,5 +155,5 @@ def empty_after_data() -> None:
     audit_log_data.set(current_audit_log_data)
 
 
-def stringify_entry_values(entry: Mapping[str, Any]) -> dict[str, str]:
+def stringify_entry_values(entry: Mapping[str, Any] | Row) -> dict[str, str]:
     return {k: str(v) for k, v in dict(entry).items()}
