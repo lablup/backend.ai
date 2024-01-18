@@ -112,3 +112,17 @@ def test_vfolder_mount_simple_with_v2():
             "permission": None,
         },
     }
+
+
+def test_vfolder_mount__edge_cases_with_v2():
+    # given
+    mount = [
+        "type=bind,source=vf-abc,zxc,target=/home/work",  # source with a comma
+        "type=bind,source=vf-abc=zxc,target=/home/work",  # source with an equals sign
+    ]
+
+    # when
+    mount, *_ = prepare_mount_arg_v2(mount)
+
+    # then
+    assert set(mount) == {"vf-abc,zxc", "vf-abc=zxc"}
