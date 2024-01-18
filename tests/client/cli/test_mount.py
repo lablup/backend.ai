@@ -26,6 +26,7 @@ def test_vfolder_mount_simple():
 def test_vfolder_mount_complex():
     # given
     mount = [
+        # "type=bind",
         "type=bind,source=/colon:path/test,target=/data",
         "type=bind,source=/usr/abcd,target=/home/work/zxcv,perm=ro",
         "type=bind,source=/usr/lorem,target=/home/work/ipsum,permission=ro",
