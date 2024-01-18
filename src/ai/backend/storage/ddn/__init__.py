@@ -3,14 +3,18 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from typing import Any, Final, FrozenSet, Mapping
 
+import aiofiles
+import aiofiles.os
+
 from ai.backend.common.types import QuotaScopeID
-from ai.backend.storage.exception import QuotaScopeNotFoundError
+from ai.backend.storage.exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
 
 from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..subproc import run
 from ..types import Optional, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 
+FIRST_PROJECT_ID: Final = 100
 PROJECT_ID_FILE_NAME: Final = "project_id"
 
 
@@ -18,33 +22,84 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     def __init__(self, mount_path: Path, local_config: Mapping[str, Any]) -> None:
         self.local_config = local_config
         super().__init__(mount_path)
+        return
 
-    async def _set_quota_by_pool(self, quota_scope_id: QuotaScopeID, limit_bytes: int) -> None:
-        fs_name = self.local_config["fs_name"]
-        pool_name = f"{fs_name}.{str(quota_scope_id)}"
-        qspath = self.mangle_qspath(quota_scope_id)
-        if not qspath.exists():
-            raise QuotaScopeNotFoundError
+    async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
+        def _read():
+            try:
+                with open(pid_file_path, "r") as f:
+                    return int(f.read())
+            except FileNotFoundError:
+                return None
 
-        # Set quota
+        return await asyncio.get_running_loop().run_in_executor(None, _read)
+
+    async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
+        def _write():
+            with open(pid_file_path, "w") as f:
+                f.write(pid)
+
+        await asyncio.get_running_loop().run_in_executor(None, _write)
+
+    async def _read_main_project_id(self) -> int:
+        main_pid_path = self.mount_path / PROJECT_ID_FILE_NAME
+        pid = await self._read_project_id(main_pid_path)
+        if pid is None:
+            pid = FIRST_PROJECT_ID
+            await self._write_project_id(FIRST_PROJECT_ID, main_pid_path)
+        return pid
+
+    async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
+        quota_limit = options.limit_bytes // 1024  # default unit for quota is KB
         try:
             await run([
                 b"lfs",
                 b"setquota",
-                b"--pool",
-                pool_name,
-                b"-B",
-                str(limit_bytes),
-                str(qspath),
+                b"-p",
+                str(pid),
+                f"-B{quota_limit}",
+                path,
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs setquota' command failed: {e.stderr}")
+            raise RuntimeError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
 
-    # async def _set_quota_by_project(self, quota_scope_id: QuotaScopeID, limit_bytes: int) -> None:
-    #     qspath = self.mangle_qspath(quota_scope_id)
-    #     if not qspath.exists():
-    #         raise QuotaScopeNotFoundError
-    #     fs_name = self.local_config["fs_name"]
+    async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
+        await self._set_quota_by_project(pid, path, QuotaConfig(0))
+
+    async def _get_quota_by_project(self, pid: int, qspath: Path) -> QuotaUsage | None:
+        proc = await asyncio.create_subprocess_exec(
+            b"lfs",
+            b"quota",
+            b"-p",
+            str(pid),
+            str(qspath),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        try:
+            assert proc.stdout is not None
+            next_line_is_quota = False
+            while True:
+                try:
+                    raw = await proc.stdout.readline()
+                    if not raw:
+                        break
+                    line = raw.decode()
+                except asyncio.IncompleteReadError:
+                    break
+                words = line.split()
+                if next_line_is_quota:
+                    used_bytes, hard_limit = int(words[0]), int(words[2])
+                    # words[1] is soft_limit
+                    if hard_limit == 0:
+                        return None
+                    return QuotaUsage(used_bytes=used_bytes, limit_bytes=hard_limit)
+                if Path(words[0]) == qspath:
+                    next_line_is_quota = True
+                    continue
+            return None
+        finally:
+            await proc.wait()
 
     async def create_quota_scope(
         self,
@@ -52,119 +107,108 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         options: Optional[QuotaConfig] = None,
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
-        # AWS example
-        # Associate directory with project
-        "lfs project -p 100 -r -s /mnt/fsxfs/dir1"
-        "lfs setquota -p 250 -b 307200 -B 309200 -i 10000 -I 11000 /mnt/fsx"
-
-        # doc example
-        "lfs setquota -p 111 -B100T /mnt/testfs"
-        "lfs setquota -p 111 --pool ddn_ssd -b 10G -B 11G -i 0 -I 0 /mnt/testfs"
-        "lfs project -p 111 -s /mnt/testfs/111"
-        "lfs project -d /mnt/testfs/111"  # to check directory metadata? the below line could be result
-        "111 P /mnt/testfs/111"
-
-        r"lfs setquota {-u|--user|-g|--group|-p} {<uname>|<gname>} [--pool <pool_name] \ [-b <block-softlimit>] [-B <block_hardlimit>] [-i <inode_softlimit>] [-I <inode_hardlimit>] <fs_mount_point>"
-
         qspath = self.mangle_qspath(quota_scope_id)
-        fs_name = self.local_config["fs_name"]
-        pool_name = f"{fs_name}.{str(quota_scope_id)}"
-
-        # Create new pool
+        pid_path = qspath / PROJECT_ID_FILE_NAME
         try:
-            await run([
-                b"lctl",
-                b"pool_new",
-                pool_name,
-            ])
-        except CalledProcessError as e:
-            raise RuntimeError(f"'lctl pool_new' command failed: {e.stderr}")
+            await aiofiles.os.makedirs(qspath)
+        except FileExistsError:
+            pass
+        project_id = await self._read_project_id(pid_path)
+        if project_id is None:
+            main_pid = await self._read_main_project_id()
+            project_id = main_pid + 1
+            await self._write_project_id(project_id, pid_path)
+            await self._write_project_id(project_id, self.mount_path / PROJECT_ID_FILE_NAME)
+        else:
+            quota_usage = await self._get_quota_by_project(project_id, qspath)
+            if quota_usage is not None:
+                raise QuotaScopeAlreadyExists
 
-        try:
-            await run([
-                b"lctl",
-                b"pool_add",
-                pool_name,
-                f"{self.local_config['ost_list']}",
-            ])
-        except CalledProcessError as e:
-            raise RuntimeError(f"'lctl pool_add' command failed: {e.stderr}")
+        if options is None:
+            return
 
-        # Assign pool to an directory
+        # Set projectID to the directory
         try:
             await run([
                 b"lfs",
-                b"setstripe",
+                b"project",
                 b"-p",
-                f"{fs_name}.{qspath}",
-                qspath,
+                str(project_id),
+                b"-r",
+                b"-s",
+                str(qspath),
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs setstripe' command failed: {e.stderr}")
+            raise RuntimeError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
 
-        if options is not None:
-            await self._set_quota_by_pool(quota_scope_id, options.limit_bytes)
+        await self._set_quota_by_project(project_id, qspath, options)
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+        # Set quota grace period to 0
+        try:
+            await run([
+                b"lfs",
+                b"setquota",
+                b"-t",
+                b"-p",
+                str(project_id),
+                b"-b",  # byte usage grace period
+                b"0",
+                b"-i",  # inode usage grace period
+                b"0",
+                str(qspath),
+            ])
+        except CalledProcessError as e:
+            raise RuntimeError(f"'lfs setquota -t -p {project_id}' command failed: {e.stderr}")
+
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         """
-        $ lfs quota -p <projectId> --pool <pool_name> -v <fs_mount_point>
+        $ lfs quota -p <projectId> <fs_mount_point>
 
-        Disk quotas for user bob (uid 500):
-        Filesystem  kbytes  quota   limit   grace       fies    quota   limit   grace
-        /mnt/testfs 30400*  30400   30900   6d23h49m12s 10101*  10000   11000
-        #                           `limit` is hard limit
-        #                   `quota` is soft limit
-        6d23h59m50s
-        testfs-MDT0000_UUID
-        testfs-OST0000_UUID
-        testfs-OST0001_UUID
-        ...
-        Total allocated inode limit: 11000, total allocated block limit: 30900
+        Disk quotas for prj <PID> (pid <PID>):
+        Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
+        /mnt/lufs01/vfroot/test
+                    1004       0       2048       -       2       0       0       -
+        pid <PID> is using default file quota setting
+
+        ---
+
+        `kbytes` is quota usage. `quota` is soft limit and `limit` is hard limit.
+        It will remove files after the `grace` if you exceed soft limit.
         """
 
         qspath = self.mangle_qspath(quota_scope_id)
-        fs_name = self.local_config["fs_name"]
-        pool_name = f"{fs_name}.{str(quota_scope_id)}"
-
-        proc = await asyncio.create_subprocess_exec(
-            b"lfs",
-            b"quota",
-            b"--pool",
-            pool_name,
-            b"-v",
-            str(qspath),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        assert proc.stdout is not None
-        try:
-            while True:
-                try:
-                    line = await proc.stdout.readuntil(b"\0")
-                    line = line.rstrip(b"\0")
-                except asyncio.IncompleteReadError:
-                    break
-                words = line.split()
-                target_dir = Path(words[0].decode())
-                if target_dir == qspath:
-                    return QuotaUsage(used_bytes=int(words[1]), limit_bytes=int(words[3]))
+        if not qspath.exists():
             return None
-        finally:
-            await proc.wait()
+        pid_path = qspath / PROJECT_ID_FILE_NAME
+        if (pid := await self._read_project_id(pid_path)) is None:
+            return None
+
+        return await self._get_quota_by_project(pid, qspath)
 
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
-        await self._set_quota_by_pool(quota_scope_id, config.limit_bytes)
+        qspath = self.mangle_qspath(quota_scope_id)
+        pid_path = qspath / PROJECT_ID_FILE_NAME
+        pid = await self._read_project_id(pid_path)
+        if pid is None:
+            raise QuotaScopeNotFoundError
+        await self._set_quota_by_project(pid, qspath, config)
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
-        await self._set_quota_by_pool(quota_scope_id, 0)
+        qspath = self.mangle_qspath(quota_scope_id)
+        pid_path = qspath / PROJECT_ID_FILE_NAME
+        pid = await self._read_project_id(pid_path)
+        if pid is None:
+            raise QuotaScopeNotFoundError
+        await self._unset_quota_by_project(pid, qspath)
 
-
-# class EXAScalerFSOpModel(BaseFSOpModel):
-#     pass
+    async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
+        await self.unset_quota(quota_scope_id)
+        qspath = self.mangle_qspath(quota_scope_id)
+        await aiofiles.os.rmdir(qspath)
 
 
 class EXAScalerFSVolume(BaseVolume):
@@ -172,12 +216,6 @@ class EXAScalerFSVolume(BaseVolume):
 
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config)
-
-    # async def create_fsop_model(self) -> AbstractFSOpModel:
-    #     return EXAScalerFSOpModel(
-    #         self.mount_path,
-    #         self.local_config["storage-proxy"]["scandir-limit"],
-    #     )
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])
