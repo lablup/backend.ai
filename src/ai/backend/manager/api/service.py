@@ -674,13 +674,16 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             | SessionTerminatedEvent
             | ModelServiceStatusEvent,
         ) -> None:
-            await reporter.update(message=json.dumps({"event": event.name}))
+            task_message = {"event": event.name, "session_id": str(event.session_id)}
+            match event:
+                case ModelServiceStatusEvent():
+                    task_message["is_healthy"] = event.new_status.value
+            await reporter.update(message=json.dumps(task_message))
 
             match event:
                 case SessionTerminatedEvent() | SessionCancelledEvent():
                     terminated_event.set()
                 case ModelServiceStatusEvent():
-                    await reporter.update(message=event.new_status.value)
                     async with root_ctx.db.begin_readonly_session() as db_sess:
                         session = await SessionRow.get_session(
                             db_sess,
