@@ -2,11 +2,12 @@ import json
 import textwrap
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
+from ...cli.types import Undefined, undefined
 from ..output.fields import scaling_group_fields
 from ..output.types import FieldSpec
 from ..request import Request
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)

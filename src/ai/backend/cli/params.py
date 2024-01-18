@@ -6,7 +6,7 @@ from typing import Any, Generic, Mapping, Optional, Protocol, TypeVar, Union
 import click
 import trafaret
 
-from ..types import Undefined, undefined
+from .types import Undefined, undefined
 
 
 class BoolExprType(click.ParamType):

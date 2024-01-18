@@ -19,6 +19,7 @@ from ..models import (
     SessionRow,
     UserRow,
 )
+from ..models.session import SessionStatus
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
@@ -120,6 +121,7 @@ async def check_dependencies(
         sa.select(
             SessionRow.id,
             SessionRow.name,
+            SessionRow.status,
             SessionRow.result,
         )
         .select_from(j)
@@ -129,7 +131,7 @@ async def check_dependencies(
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row.result != SessionResult.SUCCESS:
+        if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
@@ -196,7 +198,12 @@ async def check_user_resource_limit(
     select_query = sa.select(KeyPairResourcePolicyRow).where(
         KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
     )
-    resource_policy: KeyPairResourcePolicyRow = (await db_sess.scalars(select_query)).first()
+    resource_policy: KeyPairResourcePolicyRow | None = (await db_sess.scalars(select_query)).first()
+    if resource_policy is None:
+        return PredicateResult(
+            False,
+            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.user_uuid})",
+        )
 
     resource_policy_map = {
         "total_resource_slots": resource_policy.total_resource_slots,

@@ -301,6 +301,7 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     await plugin_ctx.init(
+        context=root_ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
@@ -439,7 +440,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
-        context=ctx,
+        context=root_ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )

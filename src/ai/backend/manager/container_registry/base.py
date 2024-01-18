@@ -43,9 +43,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
     MEDIA_TYPE_OCI_MANIFEST: Final[str] = "application/vnd.oci.image.manifest.v1+json"
-    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[
-        str
-    ] = "application/vnd.docker.distribution.manifest.list.v2+json"
+    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[str] = (
+        "application/vnd.docker.distribution.manifest.list.v2+json"
+    )
     MEDIA_TYPE_DOCKER_MANIFEST: Final[str] = "application/vnd.docker.distribution.manifest.v2+json"
 
     def __init__(

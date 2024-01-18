@@ -481,9 +481,9 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
             wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable[
-                "url"
-            ] = f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            wsproxy_itable["url"] = (
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            )
             data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
@@ -505,13 +505,15 @@ class Context(metaclass=ABCMeta):
             else:
                 assert halfstack.redis_addr
                 redis_table = tomlkit.table()
-                redis_table[
-                    "addr"
-                ] = f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+                redis_table["addr"] = (
+                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+                )
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             data["session"]["redis"] = redis_table  # type: ignore
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -748,6 +750,8 @@ class DevContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
@@ -833,6 +837,8 @@ class PackageContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
