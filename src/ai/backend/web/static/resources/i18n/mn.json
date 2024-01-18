@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Тавтай морилно уу,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Тавтай морилно уу, {{ userName }}.",
       "Summary": "Хураангуй",
       "Sessions": "Session-үүд",
       "Import&Run": "Импортлох & ажиллуулах",
@@ -62,7 +61,10 @@
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
       "PleaseConfirmYourPassword": "Нууц үгээ баталгаажуулна уу",
       "FastTrack": "FastTrack",
-      "Data&Model": "Өгөгдөл"
+      "Data&Model": "Өгөгдөл",
+      "InvalidBlankPassword": "Нууц үгээ оруулна уу",
+      "InvalidBlankEmail": "Имэйлээ оруулна уу",
+      "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна"
     },
     "YouAreOffline": "Та одоо офлайн байна",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Хувьсагчийн нэр үсэг эсвэл доогуур зураасаар эхлэх ёстой бөгөөд зөвхөн үсэг, тоо, доогуур зураас агуулсан байж болно.",
       "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна.",
       "Template": "Сеанс загвар",
-      "EnableAutomaticShmem": "Автомат хуваалцсан санах ой"
+      "EnableAutomaticShmem": "Автомат хуваалцсан санах ой",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -866,7 +869,9 @@
     "Parameters": "Параметрүүд",
     "ErrorType": "Алдааны төрөл",
     "LogMessageRemoved": "Бүртгэлийн мессежүүдийг устгасан.",
-    "NoLogToDisplay": "Харуулах бүртгэл байхгүй"
+    "NoLogToDisplay": "Харуулах бүртгэл байхгүй",
+    "ShowOnlyError": "Зөвхөн алдаа харуулах",
+    "SearchLogs": "Лог хайх"
   },
   "resourcePolicy": {
     "Resources": "Нөөц",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Текстийг хуулж чадсангүй:",
     "NotebookBadgeURL": "Jupyter Notebook-ийн тэмдэгийн URL",
     "GetAndRunNotebook": "Импортлох & ажиллуулах",
-    "ImportGithubRepo": "Github репозиторыг импортлох",
+    "ImportGithubRepo": "GitHub репозиторыг импортлох",
     "GitHubURL": "GitHub URL",
     "GetToFolder": "Фолдер руу орох",
     "RepoWillBeFolder": "Импортоор оруулсан GitHub репозиторыг фолдер болгон хөрвүүлдэг бөгөөд Session эхлэхэд холбож болдог.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Импортын фолдерын нэр:",
     "NotebookBadgeCodeHTML": "Jupyter Notebook-ийн код (HTML)",
     "NotebookBadgeCodeMarkdown": "Jupyter Notebook-ийн код (Markdown)",
-    "GithubInternalError": "Github дотоод алдаа.",
-    "GithubAPILimitError": "Github API хязгаарлалтын алдаа.",
-    "GithubAPIEtcError": "Github серверийн асуудал.",
-    "ImportGitlabRepo": "Gitlab репозиторыг импортлох",
-    "GitlabRepoWillBeFolder": "Импортын Gitlab репозиторуудыг хавтас болгон хөрвүүлдэг бөгөөд сесс эхлэхэд холбож болно.",
-    "GitlabURL": "Gitlab URL",
-    "GitlabDefaultBranch": "Gitlab салбарын нэр"
+    "GithubInternalError": "GitHub дотоод алдаа.",
+    "GithubAPILimitError": "GitHub API хязгаарлалтын алдаа.",
+    "GithubAPIEtcError": "GitHub серверийн асуудал.",
+    "ImportGitlabRepo": "GitLab репозиторыг импортлох",
+    "GitlabRepoWillBeFolder": "Импортын GitLab репозиторуудыг хавтас болгон хөрвүүлдэг бөгөөд сесс эхлэхэд холбож болно.",
+    "GitlabURL": "GitLab URL",
+    "GitlabDefaultBranch": "GitLab салбарын нэр"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Энэ сарын статистик",
@@ -1444,7 +1449,8 @@
     "ServiceNameRule": "Зөвхөн 4-24 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
     "resources": "Нөөц",
     "Image": "Зураг",
-    "Owner": "Эзэмшигч"
+    "Owner": "Эзэмшигч",
+    "ServiceDelegatedFrom": "Загвар үйлчилгээг {{ createdUser }} үүсгэсэн боловч сессийн эрхийг {{ sessionOwner }}-д шилжүүлнэ."
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",

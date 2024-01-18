@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Chào mừng,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Chào mừng, {{ userName }}.",
       "Summary": "Tóm lược",
       "Sessions": "Phiên",
       "Import&Run": "Nhập & Chạy",
@@ -62,7 +61,10 @@
       "Notifications": "Thông báo",
       "Tasks": "Nhiệm vụ",
       "FastTrack": "FastTrack",
-      "Data&Model": "Dữ liệu"
+      "Data&Model": "Dữ liệu",
+      "InvalidBlankPassword": "Nhập mật khẩu của bạn",
+      "InvalidBlankEmail": "Nhập email của bạn",
+      "DisMatchUserEmail": "E-mail của người dùng không khớp"
     },
     "YouAreOffline": "Bạn hiện đang ngoại tuyến",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
@@ -253,7 +255,8 @@
       "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại.",
       "Template": "Mẫu phiên",
       "EnableAutomaticShmem": "Bộ nhớ chia sẻ tự động",
-      "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước."
+      "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -866,7 +869,9 @@
     "Parameters": "Thông số",
     "ErrorType": "Loại lỗi",
     "LogMessageRemoved": "Thông báo nhật ký đã bị xóa.",
-    "NoLogToDisplay": "Không có nhật ký để hiển thị"
+    "NoLogToDisplay": "Không có nhật ký để hiển thị",
+    "ShowOnlyError": "Lỗi chỉ hiển thị",
+    "SearchLogs": "Nhật ký tìm kiếm"
   },
   "resourcePolicy": {
     "Resources": "Tài nguyên",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Không thể sao chép văn bản:",
     "NotebookBadgeURL": "URL máy tính xách tay",
     "GetAndRunNotebook": "Nhập & Chạy",
-    "ImportGithubRepo": "Nhập kho lưu trữ Github",
+    "ImportGithubRepo": "Nhập kho lưu trữ GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Vào thư mục",
     "RepoWillBeFolder": "Các kho lưu trữ GitHub đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Tên thư mục đã nhập:",
     "NotebookBadgeCodeHTML": "Mã huy hiệu sổ tay (HTML)",
     "NotebookBadgeCodeMarkdown": "Mã huy hiệu sổ tay (Markdown)",
-    "GithubInternalError": "Lỗi nội bộ Github.",
-    "GithubAPILimitError": "Lỗi giới hạn API Github.",
-    "GithubAPIEtcError": "Sự cố máy chủ Github.",
-    "ImportGitlabRepo": "Nhập kho lưu trữ Gitlab",
-    "GitlabRepoWillBeFolder": "Các kho lưu trữ Gitlab đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Tên chi nhánh Gitlab"
+    "GithubInternalError": "Lỗi nội bộ GitHub.",
+    "GithubAPILimitError": "Lỗi giới hạn API GitHub.",
+    "GithubAPIEtcError": "Sự cố máy chủ GitHub.",
+    "ImportGitlabRepo": "Nhập kho lưu trữ GitLab",
+    "GitlabRepoWillBeFolder": "Các kho lưu trữ GitLab đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Tên chi nhánh GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Số liệu thống kê cho tháng này",
@@ -1435,7 +1440,8 @@
     "Active/Total": "Đang hoạt động/Tổng cộng",
     "Public": "Công cộng",
     "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
-    "Owner": "Người sở hữu"
+    "Owner": "Người sở hữu",
+    "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",

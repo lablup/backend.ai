@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Добро пожаловать,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Добро пожаловать, {{ userName }}.",
       "Summary": "Обзор",
       "Sessions": "Сессии",
       "Import&Run": "Импорт и запуск",
@@ -62,7 +61,10 @@
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
       "PleaseConfirmYourPassword": "Пожалуйста, подтвердите свой пароль",
       "FastTrack": "FastTrack",
-      "Data&Model": "Данные"
+      "Data&Model": "Данные",
+      "InvalidBlankPassword": "Введите ваш пароль",
+      "InvalidBlankEmail": "Введите адрес электронной почты",
+      "DisMatchUserEmail": "Электронная почта пользователя не совпадает"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -253,7 +255,10 @@
       "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
       "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует.",
       "Template": "Шаблон сессии",
-      "EnableAutomaticShmem": "Автоматическая разделяемая память"
+      "EnableAutomaticShmem": "Автоматическая разделяемая память",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -866,7 +871,9 @@
     "Parameters": "Параметры",
     "ErrorType": "Тип ошибки",
     "LogMessageRemoved": "Сообщения журнала были удалены.",
-    "NoLogToDisplay": "Нет журналов для отображения"
+    "NoLogToDisplay": "Нет журналов для отображения",
+    "ShowOnlyError": "Ошибка только отображения",
+    "SearchLogs": "Поиск журналов"
   },
   "resourcePolicy": {
     "Resources": "Ресурсы",
@@ -1261,7 +1268,7 @@
     "CouldNotCopyText": "Не удалось скопировать текст:",
     "NotebookBadgeURL": "URL блокнота",
     "GetAndRunNotebook": "Импорт и запуск",
-    "ImportGithubRepo": "Импортировать репозиторий Github",
+    "ImportGithubRepo": "Импортировать репозиторий GitHub",
     "GitHubURL": "GitHub URL",
     "GetToFolder": "Перейти в папку",
     "RepoWillBeFolder": "Импортированные репозитории GitHub преобразуются в папки и могут быть подключены при запуске сеанса.",
@@ -1275,13 +1282,13 @@
     "FolderName": "Имя импортированной папки:",
     "NotebookBadgeCodeHTML": "Код значка блокнота (HTML)",
     "NotebookBadgeCodeMarkdown": "Код значка блокнота (маркдаун)",
-    "GithubInternalError": "Внутренняя ошибка Github.",
-    "GithubAPILimitError": "Ошибка ограничения API Github.",
-    "GithubAPIEtcError": "Проблема с сервером Github.",
-    "ImportGitlabRepo": "Импорт репозитория Gitlab",
-    "GitlabRepoWillBeFolder": "Импортированные репозитории Gitlab преобразуются в папки и могут быть смонтированы при запуске сессии.",
-    "GitlabURL": "URL-адрес Gitlab",
-    "GitlabDefaultBranch": "Имя филиала Gitlab"
+    "GithubInternalError": "Внутренняя ошибка GitHub.",
+    "GithubAPILimitError": "Ошибка ограничения API GitHub.",
+    "GithubAPIEtcError": "Проблема с сервером GitHub.",
+    "ImportGitlabRepo": "Импорт репозитория GitLab",
+    "GitlabRepoWillBeFolder": "Импортированные репозитории GitLab преобразуются в папки и могут быть смонтированы при запуске сессии.",
+    "GitlabURL": "URL-адрес GitLab",
+    "GitlabDefaultBranch": "Имя филиала GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Статистика за этот месяц",
@@ -1444,7 +1451,8 @@
     "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
     "Image": "Изображение",
-    "Owner": "Владелец"
+    "Owner": "Владелец",
+    "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}."
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",

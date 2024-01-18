@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Hoşgeldiniz,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Hoş geldiniz, {{ userName }}.",
       "Summary": "Özet",
       "Sessions": "Oturumlar",
       "Import&Run": "İçe Aktar ve Çalıştır",
@@ -62,7 +61,10 @@
       "Notifications": "Bildirimler",
       "Tasks": "Görevler",
       "FastTrack": "FastTrack",
-      "Data&Model": "Veri"
+      "Data&Model": "Veri",
+      "InvalidBlankPassword": "Şifrenizi girin",
+      "InvalidBlankEmail": "E-postanızı giriniz",
+      "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Değişken adı bir harf veya alt çizgi ile başlamalıdır ve yalnızca harfler, sayılar ve alt çizgiler içerebilir.",
       "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı.",
       "Template": "Oturum Şablonu",
-      "EnableAutomaticShmem": "Otomatik paylaşılan bellek"
+      "EnableAutomaticShmem": "Otomatik paylaşılan bellek",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -866,7 +869,9 @@
     "Parameters": "parametreler",
     "ErrorType": "Hata Türü",
     "LogMessageRemoved": "Günlük Mesajları kaldırıldı.",
-    "NoLogToDisplay": "Görüntülenecek Günlük Yok"
+    "NoLogToDisplay": "Görüntülenecek Günlük Yok",
+    "ShowOnlyError": "Yalnızca hatayı görüntüle",
+    "SearchLogs": "Günlüklerde arama yapın"
   },
   "resourcePolicy": {
     "Resources": "Kaynaklar",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Metin kopyalanamadı:",
     "NotebookBadgeURL": "Not Defteri URL'si",
     "GetAndRunNotebook": "İçe Aktar ve Çalıştır",
-    "ImportGithubRepo": "Github Deposunu İçe Aktar",
+    "ImportGithubRepo": "GitHub Deposunu İçe Aktar",
     "GitHubURL": "GitHub URL'si",
     "GetToFolder": "Klasöre Git",
     "RepoWillBeFolder": "İçe aktarılan GitHub depoları klasörlere dönüştürülür ve oturum başladığında eklenebilir.",
@@ -1275,9 +1280,9 @@
     "FolderName": "İçe aktarılan klasör adı:",
     "NotebookBadgeCodeHTML": "Defter Rozeti Kodu (HTML)",
     "NotebookBadgeCodeMarkdown": "Defter Rozeti Kodu (Markdown)",
-    "GithubInternalError": "Github Dahili Hatası.",
-    "GithubAPILimitError": "Github API Sınırlama Hatası.",
-    "GithubAPIEtcError": "Github Sunucu Sorunu.",
+    "GithubInternalError": "GitHub Dahili Hatası.",
+    "GithubAPILimitError": "GitHub API Sınırlama Hatası.",
+    "GithubAPIEtcError": "GitHub Sunucu Sorunu.",
     "ImportGitlabRepo": "Gitlab Deposunu İçe Aktarma",
     "GitlabRepoWillBeFolder": "İçe aktarılan Gitlab depoları klasörlere dönüştürülür ve oturum başladığında bağlanabilir.",
     "GitlabURL": "Gitlab URL'si",
@@ -1395,7 +1400,8 @@
     "Active/Total": "Aktif/Toplam",
     "Public": "Kamu",
     "YouAreAboutToTerminate": "Sonlandırmak üzeresiniz",
-    "Owner": "Mal sahibi"
+    "Owner": "Mal sahibi",
+    "ServiceDelegatedFrom": "Model hizmeti {{ createdUser }} tarafından oluşturulur ancak oturum sahipliği {{ sessionOwner }}'a devredilir."
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",

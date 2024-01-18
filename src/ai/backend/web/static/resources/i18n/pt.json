@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Receber,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bem vindo, {{userName }}.",
       "Summary": "Resumo",
       "Sessions": "Sessões",
       "Import&Run": "Importar e executar",
@@ -62,7 +61,10 @@
       "Notifications": "Notificações",
       "Tasks": "Tarefas",
       "FastTrack": "FastTrack",
-      "Data&Model": "Dados"
+      "Data&Model": "Dados",
+      "InvalidBlankPassword": "Coloque sua senha",
+      "InvalidBlankEmail": "Digite seu e-mail",
+      "DisMatchUserEmail": "E-mail do usuário não corresponde"
     },
     "YouAreOffline": "Agora você está offline",
     "YouAreOnline": "Agora você está online",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
       "EnvironmentVariableDuplicateName": "Um nome de variável que já existe.",
       "Template": "Modelo de sessão",
-      "EnableAutomaticShmem": "Memória partilhada automática"
+      "EnableAutomaticShmem": "Memória partilhada automática",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -866,7 +869,9 @@
     "Parameters": "Parâmetros",
     "ErrorType": "Tipo de Erro",
     "LogMessageRemoved": "As mensagens de log foram removidas.",
-    "NoLogToDisplay": "Não há registos a apresentar"
+    "NoLogToDisplay": "Não há registos a apresentar",
+    "ShowOnlyError": "Exibir apenas erro",
+    "SearchLogs": "Registros de pesquisa"
   },
   "resourcePolicy": {
     "Resources": "Recursos",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Não foi possível copiar o texto:",
     "NotebookBadgeURL": "URL do notebook",
     "GetAndRunNotebook": "Importar e executar",
-    "ImportGithubRepo": "Importar Repositório Github",
+    "ImportGithubRepo": "Importar Repositório GitHub",
     "GitHubURL": "URL do GitHub",
     "GetToFolder": "Obter para a pasta",
     "RepoWillBeFolder": "Os repositórios GitHub importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Nome da pasta importada:",
     "NotebookBadgeCodeHTML": "Código do emblema do notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Código do emblema do notebook (Markdown)",
-    "GithubInternalError": "Erro interno do Github.",
-    "GithubAPILimitError": "Erro de limitação da API do Github.",
-    "GithubAPIEtcError": "Problema no servidor do Github.",
-    "ImportGitlabRepo": "Importar o repositório Gitlab",
-    "GitlabRepoWillBeFolder": "Os repositórios Gitlab importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
-    "GitlabURL": "URL do Gitlab",
-    "GitlabDefaultBranch": "Nome do ramo do Gitlab"
+    "GithubInternalError": "Erro interno do GitHub.",
+    "GithubAPILimitError": "Erro de limitação da API do GitHub.",
+    "GithubAPIEtcError": "Problema no servidor do GitHub.",
+    "ImportGitlabRepo": "Importar o repositório GitLab",
+    "GitlabRepoWillBeFolder": "Os repositórios GitLab importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
+    "GitlabURL": "URL do GitLab",
+    "GitlabDefaultBranch": "Nome do ramo do GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Estatísticas para este mês",
@@ -1435,7 +1440,8 @@
     "Public": "Público",
     "YouAreAboutToTerminate": "Está prestes a terminar",
     "Image": "Imagem",
-    "Owner": "Proprietário"
+    "Owner": "Proprietário",
+    "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1477,7 +1483,8 @@
     "Task": "Tarefa",
     "CloneAsFolder": "Clonar como Pasta",
     "CloneSuccess": "O pedido de clone foi enviado com sucesso.",
-    "category": "Categoria"
+    "category": "Categoria",
+    "CloneInfo": "__NOT_TRANSLATED__"
   },
   "table": {
     "SettingTable": "Configuração de mesa",

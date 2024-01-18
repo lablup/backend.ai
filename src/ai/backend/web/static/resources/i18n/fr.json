@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Bienvenue,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bienvenue, {{ userName }}.",
       "Summary": "Résumé",
       "Sessions": "Sessions",
       "Import&Run": "Importer et exécuter",
@@ -62,7 +61,10 @@
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
       "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe",
       "FastTrack": "FastTrack",
-      "Data&Model": "Données"
+      "Data&Model": "Données",
+      "InvalidBlankPassword": "Tapez votre mot de passe",
+      "InvalidBlankEmail": "Entrer votre Email",
+      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
       "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà.",
       "Template": "Modèle de session",
-      "EnableAutomaticShmem": "Mémoire partagée automatique"
+      "EnableAutomaticShmem": "Mémoire partagée automatique",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -866,7 +869,9 @@
     "Parameters": "Paramètres",
     "ErrorType": "Type d'erreur",
     "LogMessageRemoved": "Les messages de journal ont été supprimés.",
-    "NoLogToDisplay": "Aucun journal à afficher"
+    "NoLogToDisplay": "Aucun journal à afficher",
+    "ShowOnlyError": "Afficher uniquement l'erreur",
+    "SearchLogs": "Journaux de recherche"
   },
   "resourcePolicy": {
     "Resources": "Ressources",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Impossible de copier le texte :",
     "NotebookBadgeURL": "URL du bloc-notes",
     "GetAndRunNotebook": "Importer et exécuter",
-    "ImportGithubRepo": "Importer le dépôt Github",
+    "ImportGithubRepo": "Importer le dépôt GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Accéder au dossier",
     "RepoWillBeFolder": "Les dépôts GitHub importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Nom du dossier importé :",
     "NotebookBadgeCodeHTML": "Code de badge de bloc-notes (HTML)",
     "NotebookBadgeCodeMarkdown": "Code de badge de bloc-notes (Markdown)",
-    "GithubInternalError": "Erreur interne de Github.",
-    "GithubAPILimitError": "Erreur de limitation de l'API Github.",
-    "GithubAPIEtcError": "Problème de serveur Github.",
-    "ImportGitlabRepo": "Importer le dépôt Gitlab",
-    "GitlabRepoWillBeFolder": "Les dépôts Gitlab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nom de la branche Gitlab"
+    "GithubInternalError": "Erreur interne de GitHub.",
+    "GithubAPILimitError": "Erreur de limitation de l'API GitHub.",
+    "GithubAPIEtcError": "Problème de serveur GitHub.",
+    "ImportGitlabRepo": "Importer le dépôt GitLab",
+    "GitlabRepoWillBeFolder": "Les dépôts GitLab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nom de la branche GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiques pour ce mois",
@@ -1444,7 +1449,8 @@
     "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image",
-    "Owner": "Propriétaire"
+    "Owner": "Propriétaire",
+    "ServiceDelegatedFrom": "Le service modèle est créé par {{ createdUser }} mais la propriété de la session sera déléguée à {{ sessionOwner }}."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",

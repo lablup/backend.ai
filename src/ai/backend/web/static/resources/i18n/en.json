@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Welcome, ",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Welcome, {{ userName }}.",
       "Summary": "Summary",
       "Sessions": "Sessions",
       "Serving": "Serving",
@@ -62,7 +61,10 @@
       "Notifications": "Notifications",
       "Tasks": "Tasks",
       "FastTrack": "FastTrack",
-      "Data&Model": "Data & Model"
+      "Data&Model": "Data & Model",
+      "InvalidBlankPassword": "Enter your password",
+      "InvalidBlankEmail": "Enter your e-mail",
+      "DisMatchUserEmail": "User E-mail does not match"
     },
     "YouAreOffline": "You are now offline",
     "YouAreOnline": "You are now online",
@@ -264,7 +266,8 @@
       "EnvironmentVariableNamePatternError": "Variable name must start with a letter or underscore, and can only contain letters, numbers, and underscores.",
       "EnvironmentVariableDuplicateName": "A variable name that already exists.",
       "Template": "Session Template",
-      "EnableAutomaticShmem": "Automatic shared memory"
+      "EnableAutomaticShmem": "Automatic shared memory",
+      "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -430,7 +433,8 @@
     "FormValidationFailed": "Form validation failed",
     "resources": "Resources",
     "Image": "Image",
-    "Owner": "Owner"
+    "Owner": "Owner",
+    "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}"
   },
   "button": {
     "Cancel": "Cancel",
@@ -959,7 +963,9 @@
     "Parameters": "Parameters",
     "ErrorType": "Error Type",
     "NoLogToDisplay": "No Logs to display",
-    "LogMessageRemoved": "Log Messages have been removed."
+    "LogMessageRemoved": "Log Messages have been removed.",
+    "ShowOnlyError": "Display only error",
+    "SearchLogs": "Search logs"
   },
   "resourcePolicy": {
     "Resources": "Resources",
@@ -1354,7 +1360,7 @@
     "CouldNotCopyText": "Could not copy text: ",
     "NotebookBadgeURL": "Notebook URL",
     "GetAndRunNotebook": "Import & Run",
-    "ImportGithubRepo": "Import Github Repository",
+    "ImportGithubRepo": "Import GitHub Repository",
     "GitHubURL": "GitHub URL",
     "GetToFolder": "Get To Folder",
     "RepoWillBeFolder": "Imported GitHub repositories are converted to folders and can be mounted when session starts.",
@@ -1368,13 +1374,13 @@
     "FolderName": "Imported folder name: ",
     "NotebookBadgeCodeHTML": "Notebook Badge Code (HTML)",
     "NotebookBadgeCodeMarkdown": "Notebook Badge Code (Markdown)",
-    "GithubInternalError": "Github Internal Error.",
-    "GithubAPILimitError": "Github API Limitation Error.",
-    "GithubAPIEtcError": "Github Server Issue.",
-    "ImportGitlabRepo": "Import Gitlab Repository",
-    "GitlabRepoWillBeFolder": "Imported Gitlab repositories are converted to folders and can be mounted when session starts.",
-    "GitlabURL": "Gitlab URL",
-    "GitlabDefaultBranch": "Gitlab Branch Name"
+    "GithubInternalError": "GitHub Internal Error.",
+    "GithubAPILimitError": "GitHub API Limitation Error.",
+    "GithubAPIEtcError": "GitHub Server Issue.",
+    "ImportGitlabRepo": "Import GitLab Repository",
+    "GitlabRepoWillBeFolder": "Imported GitLab repositories are converted to folders and can be mounted when session starts.",
+    "GitlabURL": "GitLab URL",
+    "GitlabDefaultBranch": "GitLab Branch Name"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistics for This Month",

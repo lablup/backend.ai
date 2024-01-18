@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Καλως ΗΡΘΑΤΕ,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Καλώς ορίσατε, {{ username }}.",
       "Summary": "Περίληψη",
       "Sessions": "Συνεδρίες",
       "Import&Run": "Εισαγωγή και εκτέλεση",
@@ -62,7 +61,10 @@
       "Notifications": "Ειδοποιήσεις",
       "Tasks": "Εργασίες",
       "FastTrack": "FastTrack",
-      "Data&Model": "Δεδομένα"
+      "Data&Model": "Δεδομένα",
+      "InvalidBlankPassword": "Εισάγετε τον κωδικό σας",
+      "InvalidBlankEmail": "Συμπληρώστε το email σας",
+      "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Το όνομα της μεταβλητής πρέπει να αρχίζει με γράμμα ή υπογράμμιση και μπορεί να περιέχει μόνο γράμματα, αριθμούς και υπογράμμιση.",
       "EnvironmentVariableDuplicateName": "Ένα όνομα μεταβλητής που υπάρχει ήδη.",
       "Template": "Πρότυπο συνεδρίας",
-      "EnableAutomaticShmem": "Αυτόματη κοινή μνήμη"
+      "EnableAutomaticShmem": "Αυτόματη κοινή μνήμη",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -866,7 +869,9 @@
     "Parameters": "Παράμετροι",
     "ErrorType": "Τύπος σφάλματος",
     "LogMessageRemoved": "Τα μηνύματα καταγραφής έχουν καταργηθεί.",
-    "NoLogToDisplay": "Δεν εμφανίζονται αρχεία καταγραφής"
+    "NoLogToDisplay": "Δεν εμφανίζονται αρχεία καταγραφής",
+    "ShowOnlyError": "Εμφάνιση μόνο σφάλματος",
+    "SearchLogs": "Αναζήτηση αρχείων καταγραφής"
   },
   "resourcePolicy": {
     "Resources": "Πόροι",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Δεν ήταν δυνατή η αντιγραφή κειμένου:",
     "NotebookBadgeURL": "URL σημειωματάριου",
     "GetAndRunNotebook": "Εισαγωγή και εκτέλεση",
-    "ImportGithubRepo": "Εισαγωγή αποθετηρίου Github",
+    "ImportGithubRepo": "Εισαγωγή αποθετηρίου GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Μεταβείτε στο φάκελο",
     "RepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitHub μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της περιόδου λειτουργίας.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Εισαγόμενο όνομα φακέλου:",
     "NotebookBadgeCodeHTML": "Κωδικός σήματος σημειωματάριου (HTML)",
     "NotebookBadgeCodeMarkdown": "Κωδικός σήματος σημειωματάριου (Markdown)",
-    "GithubInternalError": "Εσωτερικό σφάλμα Github.",
-    "GithubAPILimitError": "Σφάλμα περιορισμού API Github.",
-    "GithubAPIEtcError": "Θέμα διακομιστή Github.",
-    "ImportGitlabRepo": "Εισαγωγή αποθετηρίου Gitlab",
-    "GitlabRepoWillBeFolder": "Τα εισαγόμενα αποθετήρια Gitlab μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της συνεδρίας.",
-    "GitlabURL": "URL του Gitlab",
-    "GitlabDefaultBranch": "Όνομα υποκαταστήματος Gitlab"
+    "GithubInternalError": "Εσωτερικό σφάλμα GitHub.",
+    "GithubAPILimitError": "Σφάλμα περιορισμού API GitHub.",
+    "GithubAPIEtcError": "Θέμα διακομιστή GitHub.",
+    "ImportGitlabRepo": "Εισαγωγή αποθετηρίου GitLab",
+    "GitlabRepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitLab μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της συνεδρίας.",
+    "GitlabURL": "URL του GitLab",
+    "GitlabDefaultBranch": "Όνομα υποκαταστήματος GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Στατιστικά για αυτόν τον μήνα",
@@ -1395,7 +1400,8 @@
     "Active/Total": "Ενεργό/Σύνολο",
     "Public": "Δημόσιο",
     "YouAreAboutToTerminate": "Πρόκειται να τερματίσετε",
-    "Owner": "Ιδιοκτήτης"
+    "Owner": "Ιδιοκτήτης",
+    "ServiceDelegatedFrom": "Το μοντέλο υπηρεσίας δημιουργείται από τον {{ createdUser }}, αλλά η ιδιοκτησία της συνεδρίας θα ανατεθεί στον {{ sessionOwner }}"
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",

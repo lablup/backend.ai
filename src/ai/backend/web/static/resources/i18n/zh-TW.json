@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "歡迎，",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "歡迎，{{ userName }}",
       "Summary": "概括",
       "Sessions": "會話",
       "Import&Run": "導入並運行",
@@ -62,7 +61,10 @@
       "Notifications": "通知",
       "Tasks": "任务",
       "FastTrack": "FastTrack",
-      "Data&Model": "數據"
+      "Data&Model": "數據",
+      "InvalidBlankPassword": "輸入您的密碼",
+      "InvalidBlankEmail": "輸入你的電子郵件信箱",
+      "DisMatchUserEmail": "使用者電子郵件不符"
     },
     "YouAreOffline": "您現在離線",
     "YouAreOnline": "您現在在線",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
       "EnvironmentVariableDuplicateName": "已经存在的变量名。",
       "Template": "会议模板",
-      "EnableAutomaticShmem": "自动共享内存"
+      "EnableAutomaticShmem": "自动共享内存",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -866,7 +869,9 @@
     "Parameters": "參數",
     "ErrorType": "錯誤類型",
     "LogMessageRemoved": "日誌消息已被刪除。",
-    "NoLogToDisplay": "无日志显示"
+    "NoLogToDisplay": "无日志显示",
+    "ShowOnlyError": "僅顯示錯誤",
+    "SearchLogs": "搜尋日誌"
   },
   "resourcePolicy": {
     "Resources": "資源",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "無法複製文本：",
     "NotebookBadgeURL": "筆記本網址",
     "GetAndRunNotebook": "導入並運行",
-    "ImportGithubRepo": "導入 Github 存儲庫",
+    "ImportGithubRepo": "導入 GitHub 存儲庫",
     "GitHubURL": "GitHub 網址",
     "GetToFolder": "進入文件夾",
     "RepoWillBeFolder": "導入的 GitHub 存儲庫轉換為文件夾，並且可以在會話開始時掛載。",
@@ -1275,13 +1280,13 @@
     "FolderName": "導入的文件夾名稱：",
     "NotebookBadgeCodeHTML": "筆記本徽章代碼 (HTML)",
     "NotebookBadgeCodeMarkdown": "筆記本徽章代碼 (Markdown)",
-    "GithubInternalError": "Github 内部错误。",
-    "GithubAPILimitError": "Github API 限制错误。",
-    "GithubAPIEtcError": "Github 服务器问题。",
-    "ImportGitlabRepo": "导入 Gitlab 仓库",
-    "GitlabRepoWillBeFolder": "导入的 Gitlab 资源库会转换为文件夹，并可在会话启动时挂载。",
-    "GitlabURL": "Gitlab URL",
-    "GitlabDefaultBranch": "Gitlab 分支名称"
+    "GithubInternalError": "GitHub 内部错误。",
+    "GithubAPILimitError": "GitHub API 限制错误。",
+    "GithubAPIEtcError": "GitHub 服务器问题。",
+    "ImportGitlabRepo": "导入 GitLab 仓库",
+    "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
+    "GitlabURL": "GitLab URL",
+    "GitlabDefaultBranch": "GitLab 分支名称"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "本月統計",
@@ -1435,7 +1440,8 @@
     "Public": "公众",
     "YouAreAboutToTerminate": "您即将终止",
     "Image": "图片",
-    "Owner": "擁有者"
+    "Owner": "擁有者",
+    "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",

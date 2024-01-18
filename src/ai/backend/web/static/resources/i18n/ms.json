@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Selamat datang,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Selamat datang, {{ userName }}.",
       "Summary": "Ringkasan",
       "Sessions": "Sesi",
       "Import&Run": "Import & Jalankan",
@@ -62,7 +61,10 @@
       "Notifications": "Pemberitahuan",
       "Tasks": "Tugasan",
       "FastTrack": "FastTrack",
-      "Data&Model": "Data"
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Masukkan kata laluan anda",
+      "InvalidBlankEmail": "Masukkan emel anda",
+      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -253,7 +255,8 @@
       "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud.",
       "Template": "Templat Sesi",
       "EnableAutomaticShmem": "Memori dikongsi automatik",
-      "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka."
+      "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -866,7 +869,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Jenis Ralat",
     "LogMessageRemoved": "Mesej Log telah dikeluarkan.",
-    "NoLogToDisplay": "Tiada Log untuk dipaparkan"
+    "NoLogToDisplay": "Tiada Log untuk dipaparkan",
+    "ShowOnlyError": "Paparkan sahaja ralat",
+    "SearchLogs": "Cari log"
   },
   "resourcePolicy": {
     "Resources": "Sumber",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Tidak dapat menyalin teks:",
     "NotebookBadgeURL": "URL buku nota",
     "GetAndRunNotebook": "Import & Jalankan",
-    "ImportGithubRepo": "Import Repositori Github",
+    "ImportGithubRepo": "Import Repositori GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Dapatkan ke Folder",
     "RepoWillBeFolder": "Repositori GitHub yang diimport ditukar menjadi folder dan boleh dipasang semasa sesi dimulakan.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Nama folder yang diimport:",
     "NotebookBadgeCodeHTML": "Kod Lencana Notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Kod Lencana Notebook (Markdown)",
-    "GithubInternalError": "Ralat Dalaman Github.",
-    "GithubAPILimitError": "Ralat Had API Github.",
-    "GithubAPIEtcError": "Isu Pelayan Github.",
-    "ImportGitlabRepo": "Import Repositori Gitlab",
-    "GitlabRepoWillBeFolder": "Repositori Gitlab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nama Cawangan Gitlab"
+    "GithubInternalError": "Ralat Dalaman GitHub.",
+    "GithubAPILimitError": "Ralat Had API GitHub.",
+    "GithubAPIEtcError": "Isu Pelayan GitHub.",
+    "ImportGitlabRepo": "Import Repositori GitLab",
+    "GitlabRepoWillBeFolder": "Repositori GitLab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nama Cawangan GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik untuk Bulan Ini",
@@ -1435,7 +1440,8 @@
     "Active/Total": "Aktif/Jumlah",
     "Public": "Awam",
     "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
-    "Owner": "Pemilik"
+    "Owner": "Pemilik",
+    "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",

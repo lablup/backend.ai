@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "환영합니다. ",
-      "WelcomeMessage_2": "님",
+      "WelcomeMessage": "환영합니다. {{ userName }}님",
       "Summary": "요약",
       "Sessions": "세션",
       "Serving": "모델 서빙",
@@ -62,7 +61,10 @@
       "Notifications": "알림",
       "Tasks": "작업",
       "FastTrack": "FastTrack",
-      "Data&Model": "데이터 & 모델"
+      "Data&Model": "데이터 & 모델",
+      "InvalidBlankEmail": "E-mail을 입력하세요.",
+      "InvalidBlankPassword": "패스워드를 입력하세요.",
+      "DisMatchUserEmail": "사용자 E-mail이 일치하지 않습니다."
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -253,7 +255,8 @@
       "EnterEnvironmentVariable": "변수 이름 입력해주세요.",
       "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
       "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다.",
-      "EnableAutomaticShmem": "자동 공유메모리 설정"
+      "EnableAutomaticShmem": "자동 공유메모리 설정",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -419,7 +422,8 @@
     "FormValidationFailed": "양식 유효성 검사 실패",
     "resources": "자원",
     "Image": "이미지",
-    "Owner": "소유자"
+    "Owner": "소유자",
+    "ServiceDelegatedFrom": "모델 서비스는 {{ createdUser }}에 의해 생성되지만 세션 소유권은 {{ sessionOwner }}에 위임됩니다."
   },
   "button": {
     "Cancel": "취소",
@@ -948,7 +952,9 @@
     "Parameters": "파라미터",
     "ErrorType": "에러 종류",
     "NoLogToDisplay": "로그 정보가 없습니다.",
-    "LogMessageRemoved": "로그 메시지가 삭제되었습니다."
+    "LogMessageRemoved": "로그 메시지가 삭제되었습니다.",
+    "ShowOnlyError": "에러만 표시",
+    "SearchLogs": "로그 검색"
   },
   "resourcePolicy": {
     "Resources": "자원",
@@ -1357,13 +1363,13 @@
     "FolderName": "가져올 폴더 이름: ",
     "NotebookBadgeCodeHTML": "노트북 배지 코드(HTML)",
     "NotebookBadgeCodeMarkdown": "노트북 배지 코드(Markdown)",
-    "GithubInternalError": "Github 저장소가 잠시 중단되었습니다. 잠시 후 시도하시기 바랍니다.",
-    "GithubAPILimitError": "Github API 호출횟수가 많습니다. 잠시 후에 시도하시기 바랍니다.",
-    "GithubAPIEtcError": "Github API 호출이슈가 있습니다. 잠시 후에 시도하시기 바랍니다.",
-    "ImportGitlabRepo": "Gitlab 저장소 가져오기",
-    "GitlabRepoWillBeFolder": "가져온 Gitlab 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
-    "GitlabURL": "Gitlab 주소",
-    "GitlabDefaultBranch": "Gitlab 브랜치 이름"
+    "GithubInternalError": "GitHub 저장소가 잠시 중단되었습니다. 잠시 후 시도하시기 바랍니다.",
+    "GithubAPILimitError": "GitHub API 호출횟수가 많습니다. 잠시 후에 시도하시기 바랍니다.",
+    "GithubAPIEtcError": "GitHub API 호출이슈가 있습니다. 잠시 후에 시도하시기 바랍니다.",
+    "ImportGitlabRepo": "GitLab 저장소 가져오기",
+    "GitlabRepoWillBeFolder": "가져온 GitLab 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
+    "GitlabURL": "GitLab 주소",
+    "GitlabDefaultBranch": "GitLab 브랜치 이름"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "이번달 통계",

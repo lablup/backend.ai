@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Benvenuto,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Benvenuto, {{ userName }}.",
       "Summary": "Sommario",
       "Sessions": "sessioni",
       "Import&Run": "Importa ed esegui",
@@ -62,7 +61,10 @@
       "Notifications": "Notifiche",
       "Tasks": "Compiti",
       "FastTrack": "FastTrack",
-      "Data&Model": "Dati"
+      "Data&Model": "Dati",
+      "InvalidBlankPassword": "Inserisci la tua password",
+      "InvalidBlankEmail": "Inserisci il tuo indirizzo email",
+      "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde"
     },
     "YouAreOffline": "Ora sei offline",
     "YouAreOnline": "Ora sei online",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Il nome della variabile deve iniziare con una lettera o un trattino basso e può contenere solo lettere, numeri e trattini bassi.",
       "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente.",
       "Template": "Modello di sessione",
-      "EnableAutomaticShmem": "Memoria condivisa automatica"
+      "EnableAutomaticShmem": "Memoria condivisa automatica",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -866,7 +869,9 @@
     "Parameters": "Parametri",
     "ErrorType": "Tipo di errore",
     "LogMessageRemoved": "I messaggi di registro sono stati rimossi.",
-    "NoLogToDisplay": "Nessun registro da visualizzare"
+    "NoLogToDisplay": "Nessun registro da visualizzare",
+    "ShowOnlyError": "Visualizza solo errore",
+    "SearchLogs": "Cerca nei log"
   },
   "resourcePolicy": {
     "Resources": "risorse",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Impossibile copiare il testo:",
     "NotebookBadgeURL": "URL del blocco note",
     "GetAndRunNotebook": "Importa ed esegui",
-    "ImportGithubRepo": "Importa repository Github",
+    "ImportGithubRepo": "Importa repository GitHub",
     "GitHubURL": "URL GitHubub",
     "GetToFolder": "Vai alla cartella",
     "RepoWillBeFolder": "I repository GitHub importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Nome della cartella importata:",
     "NotebookBadgeCodeHTML": "Codice badge per notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Codice badge per notebook (markdown)",
-    "GithubInternalError": "Errore interno di Github.",
-    "GithubAPILimitError": "Errore di limitazione dell'API di Github.",
-    "GithubAPIEtcError": "Problema del server Github.",
-    "ImportGitlabRepo": "Importare il repository Gitlab",
-    "GitlabRepoWillBeFolder": "I repository Gitlab importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
-    "GitlabURL": "URL di Gitlab",
-    "GitlabDefaultBranch": "Nome della filiale Gitlab"
+    "GithubInternalError": "Errore interno di GitHub.",
+    "GithubAPILimitError": "Errore di limitazione dell'API di GitHub.",
+    "GithubAPIEtcError": "Problema del server GitHub.",
+    "ImportGitlabRepo": "Importare il repository GitLab",
+    "GitlabRepoWillBeFolder": "I repository GitLab importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
+    "GitlabURL": "URL di GitLab",
+    "GitlabDefaultBranch": "Nome della filiale GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiche per questo mese",
@@ -1395,7 +1400,8 @@
     "Active/Total": "Attivo/Totale",
     "Public": "Pubblico",
     "YouAreAboutToTerminate": "State per terminare",
-    "Owner": "Proprietario"
+    "Owner": "Proprietario",
+    "ServiceDelegatedFrom": "Il servizio modello è creato da {{ createdUser }}, ma la proprietà della sessione sarà delegata a {{ sessionOwner }}."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",

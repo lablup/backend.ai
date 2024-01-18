@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Herzlich willkommen,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Willkommen, {{ userName }}.",
       "Summary": "Zusammenfassung",
       "Sessions": "Sitzungen",
       "Import&Run": "Importieren und ausführen",
@@ -62,7 +61,10 @@
       "Notifications": "Benachrichtigungen",
       "Tasks": "Aufgaben",
       "FastTrack": "FastTrack",
-      "Data&Model": "Daten"
+      "Data&Model": "Daten",
+      "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
+      "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
+      "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
       "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
       "Template": "Sitzungsvorlage",
-      "EnableAutomaticShmem": "Automatischer gemeinsamer Speicher"
+      "EnableAutomaticShmem": "Automatischer gemeinsamer Speicher",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -866,7 +869,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Fehlertyp",
     "LogMessageRemoved": "Protokollnachrichten wurden entfernt.",
-    "NoLogToDisplay": "Keine Protokolle anzeigen"
+    "NoLogToDisplay": "Keine Protokolle anzeigen",
+    "ShowOnlyError": "Nur Anzeigefehler",
+    "SearchLogs": "Protokolle durchsuchen"
   },
   "resourcePolicy": {
     "Resources": "Ressourcen",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Text konnte nicht kopiert werden:",
     "NotebookBadgeURL": "Notizbuch-URL",
     "GetAndRunNotebook": "Importieren und ausführen",
-    "ImportGithubRepo": "Github-Repository importieren",
+    "ImportGithubRepo": "GitHub-Repository importieren",
     "GitHubURL": "GitHub-URL",
     "GetToFolder": "Ordner aufrufen",
     "RepoWillBeFolder": "Importierte GitHub-Repositorys werden in Ordner konvertiert und können beim Sitzungsstart gemountet werden.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Name des importierten Ordners:",
     "NotebookBadgeCodeHTML": "Notebook-Badge-Code (HTML)",
     "NotebookBadgeCodeMarkdown": "Notebook-Badge-Code (Abschlag)",
-    "GithubInternalError": "Github Interner Fehler.",
-    "GithubAPILimitError": "Github API-Beschränkungsfehler.",
-    "GithubAPIEtcError": "Github Server Problem.",
-    "ImportGitlabRepo": "Gitlab-Repository importieren",
-    "GitlabRepoWillBeFolder": "Importierte Gitlab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
-    "GitlabURL": "Gitlab-URL",
-    "GitlabDefaultBranch": "Gitlab-Zweigname"
+    "GithubInternalError": "GitHub Interner Fehler.",
+    "GithubAPILimitError": "GitHub API-Beschränkungsfehler.",
+    "GithubAPIEtcError": "GitHub Server Problem.",
+    "ImportGitlabRepo": "GitLab-Repository importieren",
+    "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
+    "GitlabURL": "GitLab-URL",
+    "GitlabDefaultBranch": "GitLab-Zweigname"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik für diesen Monat",
@@ -1395,7 +1400,8 @@
     "Active/Total": "Aktiv/Gesamt",
     "Public": "Öffentlich",
     "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
-    "Owner": "Eigentümer"
+    "Owner": "Eigentümer",
+    "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",

@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Selamat datang,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Selamat datang, {{ userName }}.",
       "Summary": "Ringkasan",
       "Sessions": "Sesi",
       "Import&Run": "Impor & Jalankan",
@@ -62,7 +61,10 @@
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
       "PleaseConfirmYourPassword": "Harap konfirmasi kata sandi Anda",
       "FastTrack": "FastTrack",
-      "Data&Model": "Data"
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Masukkan kata sandi Anda",
+      "InvalidBlankEmail": "Masukkan email Anda",
+      "DisMatchUserEmail": "Email Pengguna tidak cocok"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -253,7 +255,8 @@
       "EnvironmentVariableNamePatternError": "Nama variabel harus dimulai dengan huruf atau garis bawah, dan hanya boleh terdiri dari huruf, angka, dan garis bawah.",
       "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
       "Template": "Templat Sesi",
-      "EnableAutomaticShmem": "Memori bersama otomatis"
+      "EnableAutomaticShmem": "Memori bersama otomatis",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -866,7 +869,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Jenis Galat",
     "LogMessageRemoved": "Pesan Log telah dihapus.",
-    "NoLogToDisplay": "Tidak ada Log untuk ditampilkan"
+    "NoLogToDisplay": "Tidak ada Log untuk ditampilkan",
+    "ShowOnlyError": "Hanya menampilkan kesalahan",
+    "SearchLogs": "Log pencarian"
   },
   "resourcePolicy": {
     "Resources": "Sumber daya",
@@ -1261,7 +1266,7 @@
     "CouldNotCopyText": "Tidak dapat menyalin teks: ",
     "NotebookBadgeURL": "URL Buku Catatan",
     "GetAndRunNotebook": "Impor & Jalankan",
-    "ImportGithubRepo": "Impor Repositori Github",
+    "ImportGithubRepo": "Impor Repositori GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Masuk ke Folder",
     "RepoWillBeFolder": "Repositori GitHub yang diimpor dikonversi ke folder dan dapat dipasang saat sesi dimulai.",
@@ -1275,13 +1280,13 @@
     "FolderName": "Nama folder yang diimpor:",
     "NotebookBadgeCodeHTML": "Kode Lencana Notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Kode Lencana Notebook (Markdown)",
-    "GithubInternalError": "Kesalahan Internal Github.",
-    "GithubAPILimitError": "Kesalahan Batasan API Github.",
-    "GithubAPIEtcError": "Masalah Server Github.",
-    "ImportGitlabRepo": "Impor Repositori Gitlab",
-    "GitlabRepoWillBeFolder": "Repositori Gitlab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nama Cabang Gitlab"
+    "GithubInternalError": "Kesalahan Internal GitHub.",
+    "GithubAPILimitError": "Kesalahan Batasan API GitHub.",
+    "GithubAPIEtcError": "Masalah Server GitHub.",
+    "ImportGitlabRepo": "Impor Repositori GitLab",
+    "GitlabRepoWillBeFolder": "Repositori GitLab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nama Cabang GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik Bulan Ini",
@@ -1444,7 +1449,8 @@
     "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
     "Image": "Gambar",
-    "Owner": "Pemilik"
+    "Owner": "Pemilik",
+    "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",

@@ -497,15 +497,15 @@
     "GetAndRunNotebook": "Importar y ejecutar",
     "GetToFolder": "Llegar a la carpeta",
     "GitHubURL": "URL de GitHub",
-    "GithubAPIEtcError": "Incidencia en el servidor Github.",
-    "GithubAPILimitError": "Error de limitación de la API de Github.",
-    "GithubInternalError": "Error interno de Github.",
-    "GitlabDefaultBranch": "Nombre de la rama de Gitlab",
-    "GitlabRepoWillBeFolder": "Los repositorios Gitlab importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
-    "GitlabURL": "URL de Gitlab",
+    "GithubAPIEtcError": "Incidencia en el servidor GitHub.",
+    "GithubAPILimitError": "Error de limitación de la API de GitHub.",
+    "GithubInternalError": "Error interno de GitHub.",
+    "GitlabDefaultBranch": "Nombre de la rama de GitLab",
+    "GitlabRepoWillBeFolder": "Los repositorios GitLab importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
+    "GitlabURL": "URL de GitLab",
     "ImportFinished": "Importación finalizada.",
-    "ImportGithubRepo": "Importar repositorio Github",
-    "ImportGitlabRepo": "Importar repositorio Gitlab",
+    "ImportGithubRepo": "Importar repositorio GitHub",
+    "ImportGitlabRepo": "Importar repositorio GitLab",
     "ImportNotebook": "Importar cuaderno",
     "NoNotebookCode": "La dirección del cuaderno está vacía. Introduzca un código de libreta válido para copiar el código de identificación.",
     "NoSuitableResourceFoundOnGivenURL": "No se ha encontrado ningún recurso adecuado en la URL indicada.",
@@ -641,7 +641,9 @@
     "RequestUrl": "Solicitar Url",
     "Status": "Estado",
     "TimeStamp": "Marca de tiempo",
-    "UpTo3000Logs": "(Hasta 3000 registros recientes)"
+    "UpTo3000Logs": "(Hasta 3000 registros recientes)",
+    "ShowOnlyError": "Mostrar solo error",
+    "SearchLogs": "Registros de búsqueda"
   },
   "maintenance": {
     "CleanupImages": "Limpieza de imágenes",
@@ -717,7 +719,8 @@
     "TrafficRatio": "Ratio de tráfico",
     "YouAreAboutToTerminate": "Está a punto de terminar",
     "resources": "Recursos",
-    "Owner": "Dueño"
+    "Owner": "Dueño",
+    "ServiceDelegatedFrom": "El servicio modelo es creado por {{ createdUser }} pero la propiedad de la sesión será delegada a {{ sessionOwner }}"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -1132,7 +1135,8 @@
       "EnvironmentVariableNamePatternError": "El nombre de la variable debe empezar por una letra o un guión bajo, y sólo puede contener letras, números y guiones bajos.",
       "EnvironmentVariableDuplicateName": "Un nombre de variable que ya existe.",
       "Template": "Plantilla de sesión",
-      "EnableAutomaticShmem": "Memoria compartida automática"
+      "EnableAutomaticShmem": "Memoria compartida automática",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1446,10 +1450,12 @@
       "Update": "Actualización",
       "UserCredentials&Policies": "Credenciales de usuario y políticas",
       "Users": "Usuarios",
-      "WelcomeMessage": "Bienvenido,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bienvenido, {{ userName }}.",
       "YouMushChangeYourPassword": "Se recomienda cambiar periódicamente la contraseña por razones de seguridad. Dado que ha transcurrido cierto tiempo desde la última vez que cambió su contraseña, deberá cambiarla para poder seguir utilizando el servicio.",
-      "Data&Model": "Datos"
+      "Data&Model": "Datos",
+      "InvalidBlankPassword": "Ingresa tu contraseña",
+      "InvalidBlankEmail": "Introduce tu correo electrónico",
+      "DisMatchUserEmail": "El correo electrónico del usuario no coincide"
     }
   },
   "modelStore": {

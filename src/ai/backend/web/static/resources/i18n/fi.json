@@ -497,15 +497,15 @@
     "GetAndRunNotebook": "Tuo ja suorita",
     "GetToFolder": "Siirry kansioon",
     "GitHubURL": "GitHub URL",
-    "GithubAPIEtcError": "Github-palvelimen ongelma.",
-    "GithubAPILimitError": "Github API-rajoitusvirhe.",
-    "GithubInternalError": "Githubin sisäinen virhe.",
-    "GitlabDefaultBranch": "Gitlab Branchin nimi",
-    "GitlabRepoWillBeFolder": "Tuodut Gitlab-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
-    "GitlabURL": "Gitlabin URL-osoite",
+    "GithubAPIEtcError": "GitHub-palvelimen ongelma.",
+    "GithubAPILimitError": "GitHub API-rajoitusvirhe.",
+    "GithubInternalError": "GitHubin sisäinen virhe.",
+    "GitlabDefaultBranch": "GitLab Branchin nimi",
+    "GitlabRepoWillBeFolder": "Tuodut GitLab-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
+    "GitlabURL": "GitLabin URL-osoite",
     "ImportFinished": "Tuonti valmis.",
-    "ImportGithubRepo": "Tuo Github-repositoriosta",
-    "ImportGitlabRepo": "Tuo Gitlab-repositoriosta",
+    "ImportGithubRepo": "Tuo GitHub-repositoriosta",
+    "ImportGitlabRepo": "Tuo GitLab-repositoriosta",
     "ImportNotebook": "Tuo muistikirja",
     "NoNotebookCode": "Muistikirjan osoite on tyhjä. Syötä voimassa oleva muistikirjan koodi kopioidaksesi virkamerkkikoodin.",
     "NoSuitableResourceFoundOnGivenURL": "Annetusta URL-osoitteesta ei löytynyt sopivaa resurssia.",
@@ -641,7 +641,9 @@
     "RequestUrl": "Pyyntö Url",
     "Status": "Tila",
     "TimeStamp": "Aikaleima",
-    "UpTo3000Logs": "(Enintään 3000 viimeisintä lokia)"
+    "UpTo3000Logs": "(Enintään 3000 viimeisintä lokia)",
+    "ShowOnlyError": "Vain näyttövirhe",
+    "SearchLogs": "Hakulokit"
   },
   "maintenance": {
     "CleanupImages": "Siivous Kuvat",
@@ -717,7 +719,8 @@
     "TrafficRatio": "Liikennesuhde",
     "YouAreAboutToTerminate": "Olet lopettamassa",
     "resources": "Resurssit",
-    "Owner": "Omistaja"
+    "Owner": "Omistaja",
+    "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle."
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -1132,7 +1135,8 @@
       "EnvironmentVariableDuplicateName": "Muuttujan nimi, joka on jo olemassa.",
       "ErrorCanNotExceedRemaining": "Ei voida asettaa suuremmaksi kuin jäljellä olevat resurssit ({{amount}}).",
       "EnableAutomaticShmem": "Automaattinen jaettu muisti",
-      "Template": "Istuntomalli"
+      "Template": "Istuntomalli",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1446,10 +1450,12 @@
       "Update": "Päivitys",
       "UserCredentials&Policies": "Käyttäjien valtakirjat ja käytännöt",
       "Users": "Käyttäjät",
-      "WelcomeMessage": "Tervetuloa,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Tervetuloa, {{ userName }}.",
       "YouMushChangeYourPassword": "On suositeltavaa vaihtaa salasana säännöllisesti turvallisuussyistä. Koska salasanasi viimeisimmästä vaihtamisesta on kulunut tietty aika, sinun on vaihdettava se, jotta voit jatkaa palvelun käyttöä.",
-      "Data&Model": "Data"
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Syötä salasanasi",
+      "InvalidBlankEmail": "Syötä sähköpostiosoitteesi",
+      "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää"
     }
   },
   "modelStore": {
