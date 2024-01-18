@@ -576,8 +576,8 @@ bootstrap_pants() {
       curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
       bash /tmp/get-pants.sh
       if ! command -v pants &> /dev/null ; then
-        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
-        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+        $sudo ln -s $HOME/.local/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/.local/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
       fi
       ;;
     esac
