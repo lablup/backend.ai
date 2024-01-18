@@ -5,48 +5,30 @@ from lark.exceptions import LarkError
 
 
 # https://github.com/lark-parser/lark/blob/master/lark/grammars/common.lark
-# _grammar = r"""
-#     start: pair ("," pair)*
-#     # pair: key "=" value
-#     pair: pair_v1 | pair_v2
-#     pair_v1: vf [":" alias]
-#     pair_v2: key "=" value
-#     key: SLASH? CNAME (SEPARATOR CNAME)*
-#     value: SLASH? CNAME (SEPARATOR CNAME)* | ESCAPED_STRING
-#     vf: CNAME (DASH | CNAME | DIGIT)*  # lh
-#     alias: SLASH? CNAME (SEPARATOR | CNAME | DIGIT)*
-
-#     SEPARATOR: SLASH | "," | "=" | ":" | DASH
-#     SLASH: "/"
-#     DASH: "-"
-
-#     %import common.CNAME
-#     %import common.DIGIT
-#     %import common.ESCAPED_STRING
-#     %import common.WS
-#     %ignore WS
-# """
 _grammar = r"""
     start: pair ("," pair)*
     pair: key [("="|":") value]
-    key: CNAME (SEPARATOR CNAME)*
-    value: SLASH? CNAME (SEPARATOR CNAME)* | ESCAPED_STRING
+    key: SLASH? CNAME (SEPARATOR|CNAME|DIGIT)*
+    value: SLASH? CNAME (SEPARATOR|CNAME|DIGIT)* | ESCAPED_STRING
 
-    # CNAME: ("_"|LETTER) ("_"|LETTER)*
-    CNAME: ("_"|LETTER) ("_"|LETTER|DIGIT|DASH)*
-    SEPARATOR: SLASH | DASH | "," | "=" | ":"
+    SEPARATOR: SLASH | "\\," | "\\=" | "\\:" | DASH
     SLASH: "/"
     DASH: "-"
 
-    # %import common.CNAME
+    %import common.CNAME
     %import common.DIGIT
-    %import common.LETTER
     %import common.ESCAPED_STRING
     %import common.WS
     %ignore WS
 """
 
 _reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
+
+_escape_map = {
+    "\\,": ",",
+    "\\:": ":",
+    "\\=": "=",
+}
 
 
 PairType: TypeAlias = tuple[str, str]
@@ -55,79 +37,33 @@ PairType: TypeAlias = tuple[str, str]
 class DictTransformer(Transformer):
     def start(self, pairs: list[PairType]) -> dict[str, str]:
         print(f"Transformer.start() {pairs=}")
-        if len(pairs) == 1:
-            key, value = pairs[0]
-            if key not in _reserved_keys:
-                result = {"source": key}
-                if value is not None:
-                    result["target"] = value
-                return result
+        if isinstance(pairs[0], list):  # [[("source", "vf-000")]]
+            return dict(pairs[0])
         return dict(pairs)
-
-    def pair(self, token: list[PairType]) -> PairType:
+    
+    def pair(self, token: list[str, str]) -> PairType:
         print(f"Transformer.pair() {token=}")
-        return token
-
+        if token[0] not in _reserved_keys:  # vf-000[:/home/work]
+            result = [("source", token[0])]
+            if (target := token[1]) is not None:
+                result.append(("target", target))
+            return result
+        return (token[0], token[1])
+    
     def key(self, token: list[lexer.Token]) -> str:
         print(f"Transformer.key() {token=}")
+        # return token
         return "".join(token)
-
+    
     def value(self, token: list[lexer.Token]) -> str:
-        print(f"Transformer.value() {token=}")
-        return "".join(token)
-
-
-# class DictTransformer(Transformer):
-#     def start(self, pairs: list[tuple[str, str]]) -> dict[str, str]:
-#         print(f"Transformer.start() {pairs=} ({type(pairs)=})")
-#         # if isinstance(pairs[0], dict.items):
-#         #     return dict(pairs[0])
-#         if isinstance(pairs[0], list):
-#             return dict(pairs[0])
-#         return dict(pairs)
-
-#     def pair(self, token: list[tuple[str, str]] | Mapping[str, str | None]):
-#         print(f"Transformer.pair() {token=} (type:{type(token)},{type(token[0])})")
-#         # return str(token[0])
-#         # key, value = token[0]
-#         # # return token[0]
-#         # return (key, value)
-#         if isinstance(token[0], Mapping):
-#             return list(token[0].items())
-#         return token  # if isinstance(token, list)
-
-#     def pair_v1(self, token: list[lexer.Token]) -> Mapping[str, str | None]:
-#         print(f"Transformer.pair_v1() {token=}")
-#         result = {"source": token[0]}
-#         if alias := token[1]:
-#             result["target"] = alias
-#         return result
-
-#     def pair_v2(self, token) -> tuple[str, str]:
-#         print(f"Transformer.pair_v2() {token=}")
-#         # return "".join(token)
-#         return tuple(token)
-
-#     def vf(self, token: list[lexer.Token]):
-#         print(f"Transformer.vf() {token=}")
-#         return "".join(token)
-
-#     def alias(self, token):
-#         print(f"Transformer.alias() {token=}")
-#         return "".join(token)
-
-#     # def pair(self, token: list[str]) -> tuple[str, str]:
-#     #     print(f"Transformer.pair() {token=}")
-#     #     key, value = token
-#     #     return (key, value)
-
-#     def key(self, token: list[lexer.Token]) -> str:
-#         print(f"Transformer.key() {token=}")
-#         return str(token[0])
-
-#     def value(self, token: list[lexer.Token]) -> str:
-#         print(f"Transformer.value() {token=}")
-#         return "".join(token)
+        # print(f"Transformer.value() {token=}")
+        # return token
+        result = "".join(token)
+        for pair in _escape_map.items():
+            result = result.replace(*pair)
+        # result = "".join(token).replace("\,", ",")
+        print(f"Transformer.value() {token=} -> {result=}")
+        return result
 
 
 _parser = Lark(_grammar, parser="lalr")
