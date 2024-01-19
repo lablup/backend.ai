@@ -5,14 +5,25 @@ import click
 from tqdm import tqdm
 
 
-def validate_key_value(ctx, param, value):
-    key_value_pairs = value.split(",")
+def validate_key_value(ctx, param, option_value):
+    key_value_pairs = option_value.split(",")
+    if len(key_value_pairs) > 50:
+        raise click.BadParameter("Too many key-value pairs (maximum 50).")
     for pair in key_value_pairs:
         if "=" not in pair:
             raise click.BadParameter(
                 'Invalid format. Each key-value pair should be in the format "key=value".'
             )
-    return value
+        key, value = pair.split("=", 1)
+        if not key:
+            raise click.BadParameter("Empty key is not allowed.")
+        if not value:
+            raise click.BadParameter("Empty value is not allowed.")
+        if len(key) > 128:
+            raise click.BadParameter("Key length should be less than 128 characters.")
+        if len(value) > 256:
+            raise click.BadParameter("Value length should be less than 256 characters.")
+    return option_value
 
 
 class ProgressReportingReader(io.BufferedReader):
