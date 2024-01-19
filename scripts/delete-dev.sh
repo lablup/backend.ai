@@ -35,7 +35,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--skip-venvs${NC}       Skip removal of temporary virtualenvs (default: false)"
   echo ""
-  echo "  ${LWHITE}--skip-db${NC}       Skip removal of volume resources (default: false)"
+  echo "  ${LWHITE}--skip-db${NC}          Skip removal of volume resources (default: false)"
 }
 
 show_error() {
@@ -140,7 +140,7 @@ fi
 
 if [ $REMOVE_DB -eq 1 ]; then
   show_info "Removing data volumes..."
-  sudo rm -rf volumes
+  rm -rf volumes
 fi
 
 echo ""
