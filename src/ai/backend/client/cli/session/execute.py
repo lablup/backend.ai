@@ -21,11 +21,11 @@ from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import MountPoint
-from ai.backend.manager.models.minilang.mount import MountPointParser
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
+from ...models.minilang.mount import MountPointParser
 from ...session import AsyncSession
 from ..pretty import (
     format_info,
