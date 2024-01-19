@@ -1,4 +1,4 @@
-from typing import Mapping, TypeAlias
+from typing import Annotated, Mapping, Sequence, TypeAlias
 
 from lark import Lark, Transformer, lexer
 from lark.exceptions import LarkError
@@ -33,17 +33,15 @@ class DictTransformer(Transformer):
         }
         self._reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
 
-    def start(self, pairs: list[PairType]) -> Mapping[str, str]:
-        if isinstance(pairs[0], list):  # [[("source", "vf-000")]]
-            return dict(pairs[0])
-        return dict(pairs)
-
-    def pair(self, token: list[str, str]) -> PairType:
-        if token[0] not in self._reserved_keys:  # vf-000[:/home/work]
-            result = [("source", token[0])]
-            if (target := token[1]) is not None:
-                result.append(("target", target))
+    def start(self, pairs: Sequence[PairType]) -> Mapping[str, str]:
+        if pairs[0][0] not in self._reserved_keys:  # [["vf-000", "/home/work"]]
+            result = {"source": pairs[0][0]}
+            if target := pairs[0][1]:
+                result["target"] = target
             return result
+        return dict(pairs)  # [("type", "bind"), ("source", "vf-000"), ...]
+
+    def pair(self, token: Annotated[Sequence[str], 2]) -> PairType:
         return (token[0], token[1])
 
     def key(self, token: list[lexer.Token]) -> str:

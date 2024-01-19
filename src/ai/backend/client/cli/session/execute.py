@@ -298,7 +298,7 @@ def prepare_mount_arg_v2(
         for mount_arg in mount_args:
             parser = MountPointParser()
             result = parser.parse_mount(mount_arg)
-            mountpoint = MountPoint(**result).model_dump()
+            mountpoint = MountPoint(**result).model_dump()  # type: ignore[arg-type]
             mount = str(mountpoint.pop("source"))
             mounts.add(mount)
             if target := mountpoint.pop("target", None):
