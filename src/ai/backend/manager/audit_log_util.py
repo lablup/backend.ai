@@ -86,7 +86,7 @@ async def record_audit_log(
     }
 
     try:
-        log.info("AUDIT_LOG: {}", data)
+        log.info("AUDIT_LOG DATA: {}", data)
         async with root_ctx.db.begin_session() as session:
             query = sa.insert(audit_logs, data)
             await session.execute(query)

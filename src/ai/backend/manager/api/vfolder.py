@@ -2166,6 +2166,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Convert users' emails to uuids and check if user belong to the group of vfolder.
         j = users.join(agus, users.c.uuid == agus.c.user_id)
+
         query = (
             sa.select([users.c.uuid, users.c.email])
             .select_from(j)
@@ -2173,7 +2174,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
                 & (agus.c.group_id == vf_info["group"])
-                & (users.c.status == ACTIVE_USER_STATUSES),
+                & (users.c.status.in_(ACTIVE_USER_STATUSES)),
             )
         )
         result = await conn.execute(query)
@@ -2192,7 +2193,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Do not share to users who have already been shared the folder.
         query = (
-            sa.select([vfolder_permissions.c.user])
+            sa.select([vfolder_permissions])
             .select_from(vfolder_permissions)
             .where(
                 (vfolder_permissions.c.user.in_(users_to_share))
@@ -2295,12 +2296,24 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         if len(users_to_unshare) < 1:
             raise ObjectNotFound(object_name="user(s).")
 
+        query = sa.select(vfolder_permissions).where(
+            (vfolder_permissions.c.vfolder == vf_info["id"])
+            & (vfolder_permissions.c.user.in_(users_to_unshare)),
+        )
+        result = await conn.execute(query)
+        row_to_delete = result.fetchall()
+
+        if row_to_delete:
+            update_before_data(row_to_delete)
+
         # Delete vfolder_permission(s).
         query = sa.delete(vfolder_permissions).where(
             (vfolder_permissions.c.vfolder == vf_info["id"])
             & (vfolder_permissions.c.user.in_(users_to_unshare)),
         )
         await conn.execute(query)
+        empty_after_data()
+
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
 
 
@@ -2928,13 +2941,27 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
+
     async with root_ctx.db.begin() as conn:
+        query = (
+            sa.select(vfolder_permissions)
+            .where(vfolder_permissions.c.vfolder == vfolder_id)
+            .where(vfolder_permissions.c.user == user_uuid)
+        )
+
+        result = await conn.execute(query)
+        if (row_to_update := result.first()) is None:
+            raise ObjectNotFound("vfolder_permissions")
+
+        update_before_data(row_to_update)
+
         if perm is not None:
             query = (
                 sa.update(vfolder_permissions)
                 .values(permission=perm)
                 .where(vfolder_permissions.c.vfolder == vfolder_id)
                 .where(vfolder_permissions.c.user == user_uuid)
+                .returning(vfolder_permissions)
             )
         else:
             query = (
@@ -2942,7 +2969,14 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
                 .where(vfolder_permissions.c.vfolder == vfolder_id)
                 .where(vfolder_permissions.c.user == user_uuid)
             )
-        await conn.execute(query)
+
+        result = await conn.execute(query)
+
+        if (perm is not None) and (updated_row := result.first()) is None:
+            raise ObjectNotFound("vfolder_permissions")
+
+        update_after_data(updated_row if (perm is not None) else {})
+
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=200)
 
