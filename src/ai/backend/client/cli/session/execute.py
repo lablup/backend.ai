@@ -8,7 +8,7 @@ import string
 import sys
 import traceback
 from decimal import Decimal
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from typing import Mapping, Optional, Sequence, Tuple
 
 import aiohttp
 import click
@@ -21,7 +21,7 @@ from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import MountPoint
-from ai.backend.manager.models.minilang.mount import VirtualFolderMountParser
+from ai.backend.manager.models.minilang.mount import MountPointParser
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
@@ -291,48 +291,19 @@ def prepare_mount_arg_v2(
             "vf-abcd:/home/work/zxcv",
         ]
     """
-
-    # VirtualFolderMountParser().
-
-    # def _parse_mount_option(option: str) -> tuple[str, str] | None:
-    #     if "=" not in option:
-    #         return None
-    #     sp = option.split("=", maxsplit=1)
-    #     return (sp[0], sp[1])
-
     mounts = set()
     mount_map = {}
     mount_options = {}
     if mount_args is not None:
-        # for arg in mount_args:
-        #     volume: dict[str, Any] = {}
-        #     parser = VirtualFolderMountParser()
-        #     # if len(options := arg.split(",")) == 1:
-        #     #     # e.g., vf-001=/home/work/abc or vf-001=/home/work/abc
-        #     #     _mounts, _mount_map = prepare_mount_arg([arg])
-        #     #     volume["source"] = _mounts[0]
-        #     #     if target := _mount_map.get(volume["source"]):
-        #     #         volume["target"] = target
-        #     # else:
-        #     #     # e.g., type=bind,source=vf-001,target=/home/work/abc,readonly
-        #     #     for option in options:
-        #     #         if opt := _parse_mount_option(option):
-        #     #             volume[opt[0]] = opt[1]
-        #     volume = MountPoint(**volume).model_dump()
-        #     mount = str(volume.pop("source"))
-        #     mounts.add(mount)
-        #     if target := volume.pop("target", None):
-        #         mount_map[mount] = str(target)
-        #     mount_options[mount] = volume
         for mount_arg in mount_args:
-            parser = VirtualFolderMountParser()
+            parser = MountPointParser()
             result = parser.parse_mount(mount_arg)
-            volume = MountPoint(**result).model_dump()
-            mount = str(volume.pop("source"))
+            mountpoint = MountPoint(**result).model_dump()
+            mount = str(mountpoint.pop("source"))
             mounts.add(mount)
-            if target := volume.pop("target", None):
+            if target := mountpoint.pop("target", None):
                 mount_map[mount] = str(target)
-            mount_options[mount] = volume
+            mount_options[mount] = mountpoint
     return list(mounts), mount_map, mount_options
 
 
