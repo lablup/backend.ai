@@ -1,7 +1,18 @@
 import io
 import os
 
+import click
 from tqdm import tqdm
+
+
+def validate_key_value(ctx, param, value):
+    key_value_pairs = value.split(",")
+    for pair in key_value_pairs:
+        if "=" not in pair:
+            raise click.BadParameter(
+                'Invalid format. Each key-value pair should be in the format "key=value".'
+            )
+    return value
 
 
 class ProgressReportingReader(io.BufferedReader):

@@ -2,6 +2,8 @@ from typing import Any, Callable
 
 import click
 
+from ai.backend.client.utils import validate_key_value
+
 START_OPTION = [
     click.option(
         "-t",
@@ -58,7 +60,11 @@ START_OPTION = [
     ),
     # extra options
     click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
+        "--tag",
+        type=str,
+        callback=validate_key_value,
+        default=None,
+        help="User-defined tag string to annotate sessions.",
     ),
     # resource spec
     click.option(

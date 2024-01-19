@@ -579,7 +579,23 @@ class SessionRow(Base):
 
     # `image` column is identical to kernels `image` column.
     images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
-    tag = sa.Column("tag", sa.String(length=64), nullable=True)
+    tag = sa.Column(
+        "tag",
+        pgsql.JSONB(),
+        sa.CheckConstraint(
+            """
+            (
+                SELECT jsonb_object_agg(key, value)
+                FROM   jsonb_each_text(tag)
+                WHERE  length(KEY) <= 128
+                AND    length(value) <= 256) is NOT NULL
+                AND    jsonb_array_length(jsonb_object_keys(json_data)) <= 50
+            )
+            """
+        ),
+        nullable=True,
+        default={},
+    )
 
     # Resource occupation
     # occupied_slots = sa.Column('occupied_slots', ResourceSlotColumn(), nullable=False)
@@ -1141,7 +1157,7 @@ class ComputeSession(graphene.ObjectType):
     # identity
     session_id = graphene.UUID()  # identical to `id`
     main_kernel_id = graphene.UUID()
-    tag = graphene.String()
+    tag = graphene.JSONString()
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()

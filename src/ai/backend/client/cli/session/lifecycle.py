@@ -25,6 +25,7 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.utils import validate_key_value
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run
@@ -82,7 +83,11 @@ def _create_cmd(docs: str = None):
         help="A user-defined script to execute on startup.",
     )
     @click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
+        "--tag",
+        type=str,
+        callback=validate_key_value,
+        default=None,
+        help="User-defined tag string to annotate sessions.",
     )
     @click.option(
         "--arch",
