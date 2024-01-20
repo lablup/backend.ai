@@ -1401,7 +1401,8 @@
     "Public": "Öffentlich",
     "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
     "Owner": "Eigentümer",
-    "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert."
+    "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert.",
+    "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",

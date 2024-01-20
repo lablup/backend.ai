@@ -423,7 +423,8 @@
     "resources": "자원",
     "Image": "이미지",
     "Owner": "소유자",
-    "ServiceDelegatedFrom": "모델 서비스는 {{ createdUser }}에 의해 생성되지만 세션 소유권은 {{ sessionOwner }}에 위임됩니다."
+    "ServiceDelegatedFrom": "모델 서비스는 {{ createdUser }}에 의해 생성되지만 세션 소유권은 {{ sessionOwner }}에 위임됩니다.",
+    "FailedToTerminateService": "서비스 삭제 요청이 실패하였습니다."
   },
   "button": {
     "Cancel": "취소",

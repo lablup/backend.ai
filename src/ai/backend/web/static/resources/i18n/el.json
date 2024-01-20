@@ -1401,7 +1401,8 @@
     "Public": "Δημόσιο",
     "YouAreAboutToTerminate": "Πρόκειται να τερματίσετε",
     "Owner": "Ιδιοκτήτης",
-    "ServiceDelegatedFrom": "Το μοντέλο υπηρεσίας δημιουργείται από τον {{ createdUser }}, αλλά η ιδιοκτησία της συνεδρίας θα ανατεθεί στον {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "Το μοντέλο υπηρεσίας δημιουργείται από τον {{ createdUser }}, αλλά η ιδιοκτησία της συνεδρίας θα ανατεθεί στον {{ sessionOwner }}",
+    "FailedToTerminateService": "Η αίτηση τερματισμού της υπηρεσίας απέτυχε."
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",

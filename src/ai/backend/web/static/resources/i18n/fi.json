@@ -720,7 +720,8 @@
     "YouAreAboutToTerminate": "Olet lopettamassa",
     "resources": "Resurssit",
     "Owner": "Omistaja",
-    "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle."
+    "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle.",
+    "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui."
   },
   "notification": {
     "Initializing": "Aloitetaan...",

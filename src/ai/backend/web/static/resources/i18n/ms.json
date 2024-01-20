@@ -1441,7 +1441,8 @@
     "Public": "Awam",
     "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
     "Owner": "Pemilik",
-    "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
+    "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",

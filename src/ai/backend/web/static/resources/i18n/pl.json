@@ -1403,7 +1403,8 @@
     "Public": "Publiczny",
     "YouAreAboutToTerminate": "Zamierzasz zakończyć",
     "Owner": "Właściciel",
-    "ServiceDelegatedFrom": "Usługa modelu jest tworzona przez {{ createdUser }}, ale własność sesji będzie delegowana do {{ sessionOwner }}."
+    "ServiceDelegatedFrom": "Usługa modelu jest tworzona przez {{ createdUser }}, ale własność sesji będzie delegowana do {{ sessionOwner }}.",
+    "FailedToTerminateService": "Żądanie zakończenia usługi nie powiodło się."
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",

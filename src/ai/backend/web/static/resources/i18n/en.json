@@ -434,7 +434,8 @@
     "resources": "Resources",
     "Image": "Image",
     "Owner": "Owner",
-    "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}",
+    "FailedToTerminateService": "The request to terminate the service failed."
   },
   "button": {
     "Cancel": "Cancel",

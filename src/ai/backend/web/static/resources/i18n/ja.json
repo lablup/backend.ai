@@ -1401,7 +1401,8 @@
     "YouAreAboutToTerminate": "以下のサービスを削除しようとします：",
     "Image": "イメージ",
     "Owner": "所有者",
-    "ServiceDelegatedFrom": "モデルサービスは{{ createdUser }}によって作成されますが、セッションの所有権は{{ sessionOwner }}に委譲されます。"
+    "ServiceDelegatedFrom": "モデルサービスは{{ createdUser }}によって作成されますが、セッションの所有権は{{ sessionOwner }}に委譲されます。",
+    "FailedToTerminateService": "サービス終了のリクエストに失敗しました。"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",

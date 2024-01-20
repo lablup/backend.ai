@@ -720,7 +720,8 @@
     "YouAreAboutToTerminate": "Está a punto de terminar",
     "resources": "Recursos",
     "Owner": "Dueño",
-    "ServiceDelegatedFrom": "El servicio modelo es creado por {{ createdUser }} pero la propiedad de la sesión será delegada a {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "El servicio modelo es creado por {{ createdUser }} pero la propiedad de la sesión será delegada a {{ sessionOwner }}",
+    "FailedToTerminateService": "La solicitud para finalizar el servicio ha fallado."
   },
   "notification": {
     "Initializing": "Inicializando...",

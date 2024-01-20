@@ -1441,7 +1441,8 @@
     "YouAreAboutToTerminate": "Está prestes a terminar",
     "Image": "Imagem",
     "Owner": "Proprietário",
-    "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}",
+    "FailedToTerminateService": "O pedido para terminar o serviço falhou."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",

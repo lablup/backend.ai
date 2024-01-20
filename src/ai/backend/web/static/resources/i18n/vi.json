@@ -1441,7 +1441,8 @@
     "Public": "Công cộng",
     "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
     "Owner": "Người sở hữu",
-    "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}"
+    "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}",
+    "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
