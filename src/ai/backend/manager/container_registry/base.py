@@ -6,7 +6,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Dict, Final, Literal, Mapping, Optional, cast
 
 import aiohttp
 import aiotools
@@ -70,7 +70,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
-        ssl_ctx = None  # default
+        ssl_ctx: None | Literal[False] = None  # default
         if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
