@@ -255,6 +255,13 @@ def add(
                 allowed_client_ip=allowed_ip,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
+                fields=(
+                    user_fields["domain_name"],
+                    user_fields["email"],
+                    user_fields["username"],
+                    user_fields["uuid"],
+                    user_fields["groups"],
+                ),
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -270,6 +277,9 @@ def add(
                 action_name="add",
             )
             sys.exit(ExitCode.FAILURE)
+
+        # preprocessing groups
+        data["user"]["groups"] = " ,".join(item["name"] for item in data["user"]["groups"])
         ctx.output.print_mutation_result(
             data,
             item_name="user",

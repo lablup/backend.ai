@@ -657,10 +657,18 @@ class CreateUser(graphene.Mutation):
             model_store_query = sa.select([groups.c.id]).where(
                 groups.c.type == ProjectType.MODEL_STORE
             )
+            default_query = sa.select([groups.c.id]).where(groups.c.name == "default")
+
             model_store_gid = (await conn.execute(model_store_query)).first()["id"]
-            gids_to_join = [*group_ids, model_store_gid]
+            default_gid = (await conn.execute(default_query)).first()["id"]
+
+            if group_ids:
+                gids_to_join = [*group_ids, model_store_gid]
+            else:
+                gids_to_join = [default_gid, model_store_gid]
 
             # Add user to groups if group_ids parameter is provided.
+            # Or add default group
             if gids_to_join:
                 query = (
                     sa.select([groups.c.id])
