@@ -1,0 +1,19 @@
+name: check-pr-title-prefix
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pr-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title prefix
+        run: |
+          if echo "${{ github.event.pull_request.title }}" | tr ':' '\n' | head -n 1 | grep -qE 'feat|fix|docs|refactor|ci|chore(\([^)]+\)|$)';
+          then
+            echo "PR title is valid"
+          else
+            echo "PR title is invalid"
+            exit 1
+          fi
