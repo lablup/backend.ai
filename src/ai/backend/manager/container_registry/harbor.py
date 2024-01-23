@@ -75,6 +75,54 @@ class HarborRegistry_v1(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    async def _scan_tag(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                if resp.status == 404:
+                    # ignore missing tags
+                    # (may occur after deleting an image from the docker hub)
+                    return
+                resp.raise_for_status()
+                data = await resp.json()
+
+                config_digest = data["config"]["digest"]
+                size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+                async with sess.get(
+                    self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+                ) as resp:
+                    resp.raise_for_status()
+                    data = json.loads(await resp.read())
+                    architecture = arch_name_aliases.get(data["architecture"], data["architecture"])
+                    labels = {}
+                    if "container_config" in data:
+                        raw_labels = data["container_config"].get("Labels")
+                        if raw_labels:
+                            labels.update(raw_labels)
+                        else:
+                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
+                    else:
+                        raw_labels = data["config"].get("Labels")
+                        if raw_labels:
+                            labels.update(raw_labels)
+                        else:
+                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
+                    manifest = {
+                        architecture: {
+                            "size": size_bytes,
+                            "labels": labels,
+                            "digest": config_digest,
+                        },
+                    }
+        await self._read_manifest(image, tag, manifest)
+
 
 class HarborRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(
