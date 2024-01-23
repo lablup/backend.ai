@@ -14,6 +14,6 @@ __all__ = (
 )
 
 redis_app_key = web.AppKey("redis", Redis)
-config_app_key = web.AppKey("config", Any)
+config_app_key = web.AppKey("config", Any)  # type: ignore
 j2env_app_key = web.AppKey("j2env", jinja2.Environment)
 stats_app_key = web.AppKey("stats", WebStats)
