@@ -8,13 +8,14 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.web.session import get_session
 
 from . import user_agent
+from .appkey import config_app_key
 
 
 async def get_api_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
+    config = request.app[config_app_key]
     api_endpoint = config["api"]["endpoint"][0]
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
@@ -61,7 +62,7 @@ async def get_anonymous_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
+    config = request.app[config_app_key]
     api_endpoint = config["api"]["endpoint"][0]
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint

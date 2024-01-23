@@ -31,7 +31,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.web.appkey import redis_app_key, stats_app_key
+from ai.backend.web.appkey import redis_app_key, stats_app_key, config_app_key
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -76,7 +76,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     stats = request.app[stats_app_key]
     stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
-    static_path = request.app["config"]["service"]["static_path"]
+    static_path = request.app[config_app_key]["service"]["static_path"]
     file_path = (static_path / request_path).resolve()
     try:
         file_path.relative_to(static_path)
@@ -102,7 +102,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 async def config_ini_handler(request: web.Request) -> web.Response:
     stats = request.app[stats_app_key]
     stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
+    config = request.app[config_app_key]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
         scheme = request.scheme
@@ -118,7 +118,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 async def config_toml_handler(request: web.Request) -> web.Response:
     stats = request.app[stats_app_key]
     stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
+    config = request.app[config_app_key]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
         scheme = request.scheme
@@ -135,7 +135,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     stats = request.app[stats_app_key]
     stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
-    config = request.app["config"]
+    config = request.app[config_app_key]
     static_path = config["service"]["static_path"]
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
@@ -156,7 +156,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def update_password_no_auth(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = request.app[config_app_key]
     client_ip = get_client_ip(request)
     try:
         text = await request.text()
@@ -254,7 +254,7 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 
 async def login_handler(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = request.app[config_app_key]
     stats = request.app[stats_app_key]
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
@@ -444,7 +444,7 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
-    config = request.app["config"]
+    config = request.app[config_app_key]
     stats = request.app[stats_app_key]
     stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
 
@@ -576,7 +576,7 @@ async def server_main(
 ) -> AsyncIterator[None]:
     config = args[0]
     app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
-    app["config"] = config
+    app[config_app_key] = config
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",

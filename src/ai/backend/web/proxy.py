@@ -18,7 +18,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .appkey import stats_app_key
+from .appkey import stats_app_key, config_app_key
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
@@ -130,7 +130,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         if not request.can_read_body:  # designated as encrypted but has an empty payload
             request["payload"] = ""
             return await handler(request)
-        config = request.app["config"]
+        config = request.app[config_app_key]
         scheme = config["service"]["force_endpoint_protocol"]
         if scheme is None:
             scheme = request.scheme
@@ -153,7 +153,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
     stats = request.app[stats_app_key]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
+    config = request.app[config_app_key]
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
@@ -287,7 +287,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             content = request.content
             if path == "auth/signup":
                 body = await request.json()
-                body["domain"] = request.app["config"]["api"]["domain"]
+                body["domain"] = request.app[config_app_key]["api"]["domain"]
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
             fill_forwarding_hdrs_to_api_session(request, api_session)
@@ -356,7 +356,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     # Choose a specific Manager endpoint for persistent web app connection.
     api_endpoint = None
     should_save_session = False
-    configured_endpoints = request.app["config"]["api"]["endpoint"]
+    configured_endpoints = request.app[config_app_key]["api"]["endpoint"]
     if session.get("api_endpoints", {}).get(app):
         stringified_endpoints = [str(e) for e in configured_endpoints]
         if session["api_endpoints"][app] in stringified_endpoints:
@@ -370,7 +370,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
 
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        pipeline_config = request.app["config"]["pipeline"]
+        pipeline_config = request.app[config_app_key]["pipeline"]
         if not pipeline_config:
             raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
         endpoint = pipeline_config["endpoint"].with_scheme("ws")
