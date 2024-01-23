@@ -196,8 +196,9 @@ async def websocket_handler(request):
 
 
 async def proxy_context(app: web.Application) -> AsyncIterator[None]:
-    app["client_session"] = AsyncSession()
-    async with app["client_session"]:
+    client_session_app_key = web.AppKey("client_session", AsyncSession)
+    app[client_session_app_key] = AsyncSession()
+    async with app[client_session_app_key]:
         yield
 
 
