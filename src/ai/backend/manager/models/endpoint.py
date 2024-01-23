@@ -2,7 +2,7 @@ import datetime
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import graphene
 import jwt
@@ -15,7 +15,7 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 
 from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound
@@ -31,6 +31,8 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     URLColumn,
+    set_if_set,
+    simple_db_mutate,
 )
 from .image import ImageRow
 from .routing import RouteStatus, Routing
@@ -43,6 +45,7 @@ __all__ = (
     "Endpoint",
     "EndpointLifecycle",
     "EndpointList",
+    "ModifyEndpoint",
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
@@ -629,6 +632,45 @@ class EndpointList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(Endpoint, required=True)
+
+
+class ModifyEndpointInput(graphene.InputObjectType):
+    resource_slots = graphene.JSONString(required=True)
+    resource_opts = graphene.JSONString()
+    cluster_mode = graphene.String()
+    cluster_size = graphene.Int()
+    desired_session_count = graphene.Int()
+
+
+class ModifyEndpoint(graphene.Mutation):
+    class Arguments:
+        endpoint_id = graphene.UUID(required=True)
+        props = ModifyEndpointInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        endpoint_id: uuid.UUID,
+        props: ModifyEndpointInput,
+    ) -> "ModifyEndpoint":
+        data: Dict[str, Any] = {}
+        set_if_set(
+            props,
+            data,
+            "resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "resource_opts")
+        set_if_set(props, data, "cluster_mode")
+        set_if_set(props, data, "cluster_size")
+        set_if_set(props, data, "desired_session_count")
+        update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
+        return await simple_db_mutate(cls, info.context, update_query)
 
 
 class EndpointToken(graphene.ObjectType):
