@@ -68,14 +68,12 @@ def parse_service_ports(
                     "The service ports 2000 to 2003, 2200 and 7681 are reserved for internal use."
                 )
             used_ports.add(p)
-        items.append(
-            {
-                "name": name,
-                "protocol": ServicePortProtocols(protocol),
-                "container_ports": ports,
-                "host_ports": (None,) * len(ports),
-                "is_inference": name in inference_apps,
-            }
-        )
+        items.append({
+            "name": name,
+            "protocol": ServicePortProtocols(protocol),
+            "container_ports": ports,
+            "host_ports": (None,) * len(ports),
+            "is_inference": name in inference_apps,
+        })
 
     return items

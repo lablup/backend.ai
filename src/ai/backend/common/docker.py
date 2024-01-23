@@ -74,30 +74,26 @@ default_repository = "lablup"
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
 
-common_image_label_schema = t.Dict(
-    {
-        # Required labels
-        t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
-        t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
-        # ai.backend.resource.min.*
-        t.Key("ai.backend.base-distro"): t.String(),
-        t.Key("ai.backend.runtime-type"): t.String(),
-        t.Key("ai.backend.runtime-path"): tx.PurePath(),
-        # Optional labels
-        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
-        t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
-    }
-).allow_extra("*")
+common_image_label_schema = t.Dict({
+    # Required labels
+    t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+    t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
+    # ai.backend.resource.min.*
+    t.Key("ai.backend.base-distro"): t.String(),
+    t.Key("ai.backend.runtime-type"): t.String(),
+    t.Key("ai.backend.runtime-path"): tx.PurePath(),
+    # Optional labels
+    t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
+    t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
+    t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
+    t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
+}).allow_extra("*")
 
-inference_image_label_schema = t.Dict(
-    {
-        t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
-        t.Key("ai.backend.model-path"): tx.PurePath(),
-        t.Key("ai.backend.model-format"): t.String(),
-    }
-).ignore_extra("*")
+inference_image_label_schema = t.Dict({
+    t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
+    t.Key("ai.backend.model-path"): tx.PurePath(),
+    t.Key("ai.backend.model-format"): t.String(),
+}).ignore_extra("*")
 
 
 class DockerConnectorSource(enum.Enum):
@@ -590,13 +586,15 @@ class ImageRef:
         ptagset_self, ptagset_other = self.tag_set[1], other.tag_set[1]
         for key_self in ptagset_self:
             if ptagset_other.has(key_self):
-                version_self, version_other = ptagset_self.get(key_self), ptagset_other.get(
-                    key_self
+                version_self, version_other = (
+                    ptagset_self.get(key_self),
+                    ptagset_other.get(key_self),
                 )
                 if version_self and version_other:
-                    parsed_version_self, parsed_version_other = version.parse(
-                        version_self
-                    ), version.parse(version_other)
+                    parsed_version_self, parsed_version_other = (
+                        version.parse(version_self),
+                        version.parse(version_other),
+                    )
                     if parsed_version_self != parsed_version_other:
                         return parsed_version_self < parsed_version_other
         return len(ptagset_self) > len(ptagset_other)

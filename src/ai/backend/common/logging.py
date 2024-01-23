@@ -50,44 +50,47 @@ default_pkg_ns = {
     "ai.backend": "INFO",
     "tests": "DEBUG",
 }
-
-logging_config_iv = t.Dict(
-    {
+logging_config_iv = t.Dict({
+    t.Key("level", default="INFO"): loglevel_iv,
+    t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
+    t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file", "graylog")),
+    t.Key(
+        "console",
+        default={
+            "colored": None,
+            "format": "verbose",
+        },
+    ): t.Dict({
+        t.Key("colored", default=None): t.Null | t.Bool,
+        t.Key("format", default="verbose"): logformat_iv,
+    }).allow_extra("*"),
+    t.Key("file", default=None): t.Null
+    | t.Dict({
+        t.Key("path"): tx.Path(type="dir", auto_create=True),
+        t.Key("filename"): t.String,
+        t.Key("backup-count", default=5): t.Int[1:100],
+        t.Key("rotation-size", default="10M"): tx.BinarySize,
+        t.Key("format", default="verbose"): logformat_iv,
+    }).allow_extra("*"),
+    t.Key("logstash", default=None): t.Null
+    | t.Dict({
+        t.Key("endpoint"): tx.HostPortPair,
+        t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
+        t.Key("ssl-enabled", default=True): t.Bool,
+        t.Key("ssl-verify", default=True): t.Bool,
+        # NOTE: logstash does not have format option.
+    }).allow_extra("*"),
+    t.Key("graylog", default=None): t.Null
+    | t.Dict({
+        t.Key("host"): t.String,
+        t.Key("port"): t.ToInt[1024:65535],
         t.Key("level", default="INFO"): loglevel_iv,
-        t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
-        t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
-        t.Key(
-            "console",
-            default={
-                "colored": None,
-                "format": "verbose",
-            },
-        ): t.Dict(
-            {
-                t.Key("colored", default=None): t.Null | t.Bool,
-                t.Key("format", default="verbose"): logformat_iv,
-            }
-        ).allow_extra("*"),
-        t.Key("file", default=None): t.Null | t.Dict(
-            {
-                t.Key("path"): tx.Path(type="dir", auto_create=True),
-                t.Key("filename"): t.String,
-                t.Key("backup-count", default=5): t.Int[1:100],
-                t.Key("rotation-size", default="10M"): tx.BinarySize,
-                t.Key("format", default="verbose"): logformat_iv,
-            }
-        ).allow_extra("*"),
-        t.Key("logstash", default=None): t.Null | t.Dict(
-            {
-                t.Key("endpoint"): tx.HostPortPair,
-                t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
-                t.Key("ssl-enabled", default=True): t.Bool,
-                t.Key("ssl-verify", default=True): t.Bool,
-                # NOTE: logstash does not have format option.
-            }
-        ).allow_extra("*"),
-    }
-).allow_extra("*")
+        t.Key("ssl-verify", default=False): t.Bool,
+        t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
+    }).allow_extra("*"),
+}).allow_extra("*")
 
 
 class PickledException(Exception):
@@ -150,9 +153,9 @@ class LogstashHandler(logging.Handler):
             sock.connect((str(self._endpoint.host), self._endpoint.port))
             self._sock = sock
         else:
-            raise ConfigurationError(
-                {"logging.LogstashHandler": f"unsupported protocol: {self._protocol}"}
-            )
+            raise ConfigurationError({
+                "logging.LogstashHandler": f"unsupported protocol: {self._protocol}"
+            })
 
     def cleanup(self):
         if self._sock:
@@ -167,20 +170,18 @@ class LogstashHandler(logging.Handler):
         extra_data = dict()
 
         # This log format follows logstash's event format.
-        log = OrderedDict(
-            [
-                ("@timestamp", datetime.now().isoformat()),
-                ("@version", 1),
-                ("host", self._myhost),
-                ("logger", record.name),
-                ("path", record.pathname),
-                ("func", record.funcName),
-                ("lineno", record.lineno),
-                ("message", record.getMessage()),
-                ("level", record.levelname),
-                ("tags", list(tags)),
-            ]
-        )
+        log = OrderedDict([
+            ("@timestamp", datetime.now().isoformat()),
+            ("@version", 1),
+            ("host", self._myhost),
+            ("logger", record.name),
+            ("path", record.pathname),
+            ("func", record.funcName),
+            ("lineno", record.lineno),
+            ("message", record.getMessage()),
+            ("level", record.levelname),
+            ("tags", list(tags)),
+        ])
         log.update(extra_data)
         if self._protocol.startswith("zmq"):
             self._sock.send_json(log)
@@ -199,6 +200,24 @@ def format_exception(self, ei):
 class SerializedExceptionFormatter(logging.Formatter):
     def formatException(self, ei) -> str:
         return format_exception(self, ei)
+
+
+def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
+    try:
+        import graypy
+    except ImportError:
+        return None
+    drv_config = config["graylog"]
+    graylog_handler = graypy.GELFTLSHandler(
+        host=drv_config["host"],
+        port=drv_config["port"],
+        validate=drv_config["ssl-verify"],
+        ca_certs=drv_config["ca-certs"],
+        keyfile=drv_config["keyfile"],
+        certfile=drv_config["certfile"],
+    )
+    graylog_handler.setLevel(config["level"])
+    return graylog_handler
 
 
 class ConsoleFormatter(logging.Formatter):
@@ -319,6 +338,7 @@ def log_worker(
     console_handler = None
     file_handler = None
     logstash_handler = None
+    graylog_handler = None
 
     # For future references: when implementing new kind of logging adapters,
     # make sure to adapt our custom `Formatter.formatException()` approach;
@@ -340,6 +360,10 @@ def log_worker(
         )
         logstash_handler.setLevel(logging_config["level"])
         logstash_handler.setFormatter(SerializedExceptionFormatter())
+    if "graylog" in logging_config["drivers"]:
+        graylog_handler = setup_graylog_handler(logging_config)
+        assert graylog_handler is not None
+        graylog_handler.setFormatter(SerializedExceptionFormatter())
 
     zctx = zmq.Context()
     agg_sock = zctx.socket(zmq.PULL)
@@ -366,12 +390,17 @@ def log_worker(
                     file_handler.emit(rec)
                 if logstash_handler:
                     logstash_handler.emit(rec)
+                    print("logstash")
+                if graylog_handler:
+                    graylog_handler.emit(rec)
             except OSError:
                 # don't terminate the log worker.
                 continue
     finally:
         if logstash_handler:
             logstash_handler.cleanup()
+        if graylog_handler:
+            graylog_handler.close()
         agg_sock.close()
         zctx.term()
 
@@ -540,6 +569,7 @@ class Logger(AbstractLogger):
         _check_driver_config_exists_if_activated(cfg, "console")
         _check_driver_config_exists_if_activated(cfg, "file")
         _check_driver_config_exists_if_activated(cfg, "logstash")
+        _check_driver_config_exists_if_activated(cfg, "graylog")
 
         self.is_master = is_master
         self.log_endpoint = log_endpoint

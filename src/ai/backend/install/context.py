@@ -366,6 +366,9 @@ class Context(metaclass=ABCMeta):
         }
         await self.etcd_put_json("", data)
         data = {}
+        # TODO: in dev-mode, enable these.
+        data["api"]["allow-openapi-schema-introspection"] = "no"
+        data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
             assert halfstack.redis_sentinel_addrs
             data["redis"] = {
@@ -509,6 +512,8 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             data["session"]["redis"] = redis_table  # type: ignore
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -639,16 +644,14 @@ class Context(metaclass=ABCMeta):
             )
 
     async def alias_image(self, alias: str, target_ref: str, arch: str) -> None:
-        await self.run_manager_cli(
-            [
-                "mgr",
-                "image",
-                "alias",
-                alias,
-                target_ref,
-                arch,
-            ]
-        )
+        await self.run_manager_cli([
+            "mgr",
+            "image",
+            "alias",
+            alias,
+            target_ref,
+            arch,
+        ])
 
     async def populate_images(self) -> None:
         data: Any
@@ -716,9 +719,13 @@ class Context(metaclass=ABCMeta):
                     self.log_header("Populating local container images...")
                     for src in self.dist_info.image_payloads:
                         # TODO: Ensure src.ref
-                        await self.run_exec(
-                            [*self.docker_sudo, "docker", "load", "-i", str(src.file)]
-                        )
+                        await self.run_exec([
+                            *self.docker_sudo,
+                            "docker",
+                            "load",
+                            "-i",
+                            str(src.file),
+                        ])
                 case ImageSource.LOCAL_REGISTRY:
                     raise NotImplementedError()
 
@@ -743,6 +750,8 @@ class DevContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
@@ -828,6 +837,8 @@ class PackageContext(Context):
             webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",

@@ -5,6 +5,7 @@ Revises: 69c059996cbd
 Create Date: 2023-07-06 13:51:52.098587
 
 """
+
 from collections import defaultdict
 
 import sqlalchemy as sa
