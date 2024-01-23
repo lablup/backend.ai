@@ -18,9 +18,9 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
+from .appkey import stats_app_key
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
-from .stats import WebStats
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -151,7 +151,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
 
 
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
+    stats = request.app[stats_app_key]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     path = request.match_info.get("path", "")
@@ -275,7 +275,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
-    stats: WebStats = request.app["stats"]
+    stats = request.app[stats_app_key]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
     if is_anonymous:
@@ -347,7 +347,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
 
 
 async def websocket_handler(request, *, is_anonymous=False) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
+    stats = request.app[stats_app_key]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
     session = await get_session(request)

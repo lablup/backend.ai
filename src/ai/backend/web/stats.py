@@ -26,13 +26,17 @@ class WebStats:
 
 @web.middleware
 async def track_active_handlers(request: web.Request, handler) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
+    from ai.backend.web.appkey import stats_app_key
+
+    stats = request.app[stats_app_key]
     stats.active_handlers.add(asyncio.current_task())  # type: ignore
     return await handler(request)
 
 
 async def view_stats(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
+    from ai.backend.web.appkey import stats_app_key
+
+    stats = request.app[stats_app_key]
     match request.query.get("format", "text"):
         case "text":
             text = "\n".join([
