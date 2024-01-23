@@ -31,7 +31,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.web.appkey import stats_app_key
+from ai.backend.web.appkey import redis_app_key, stats_app_key
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -300,7 +300,7 @@ async def login_handler(request: web.Request) -> web.Response:
     }
 
     async def _get_login_history():
-        login_history = await request.app["redis"].get(
+        login_history = await request.app[redis_app_key].get(
             f'login_history_{creds["username"]}',
         )
         if not login_history:
@@ -325,7 +325,7 @@ async def login_handler(request: web.Request) -> web.Response:
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await request.app["redis"].set(key, value)
+        await request.app[redis_app_key].set(key, value)
 
     # Block login if there are too many consecutive failed login attempts.
     BLOCK_TIME = config["session"]["login_block_time"]
@@ -548,7 +548,7 @@ async def server_shutdown(app) -> None:
 
 
 async def server_cleanup(app) -> None:
-    await app["redis"].close()
+    await app[redis_app_key].close()
 
 
 @aiotools.server
@@ -595,7 +595,7 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
-    app["redis"] = redis_helper.get_redis_object(
+    app[redis_app_key] = redis_helper.get_redis_object(
         config["session"]["redis"],
         name="web.session",
         socket_keepalive=True,
@@ -603,11 +603,11 @@ async def server_main(
     ).client
 
     if pidx == 0 and config["session"]["flush_on_startup"]:
-        await app["redis"].flushdb()
+        await app[redis_app_key].flushdb()
         log.info("flushed session storage.")
 
     redis_storage = RedisStorage(
-        app["redis"],
+        app[redis_app_key],
         max_age=config["session"]["max_age"],
     )
 
