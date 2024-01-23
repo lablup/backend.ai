@@ -149,8 +149,9 @@ async def test_get_instance_ip(mocker, provider):
                 return mocked_ares_host_result
 
             mocked_resolver.gethostbyname = coro_return_mocked_result
-            with patch("aiodns.DNSResolver", return_value=mocked_resolver), patch(
-                "socket.gethostname", return_value="myname"
+            with (
+                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip()
                 assert ret == "10.1.2.3"
@@ -160,8 +161,9 @@ async def test_get_instance_ip(mocker, provider):
 
             mocked_resolver = MagicMock()
             mocked_resolver.gethostbyname = coro_raise_error
-            with patch("aiodns.DNSResolver", return_value=mocked_resolver), patch(
-                "socket.gethostname", return_value="myname"
+            with (
+                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip()
                 assert ret == "127.0.0.1"

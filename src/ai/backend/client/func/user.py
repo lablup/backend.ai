@@ -5,13 +5,14 @@ import textwrap
 import uuid
 from typing import Any, Iterable, Mapping, Sequence, Union
 
+from ...cli.types import Undefined, undefined
 from ..auth import AuthToken, AuthTokenTypes
 from ..output.fields import user_fields
 from ..output.types import FieldSpec, PaginatedResult
 from ..pagination import fetch_paginated_result
 from ..request import Request
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
