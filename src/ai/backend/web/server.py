@@ -31,7 +31,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.web.appkey import redis_app_key, stats_app_key, config_app_key
+from ai.backend.web.appkey import config_app_key, redis_app_key, stats_app_key
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
