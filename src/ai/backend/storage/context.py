@@ -23,8 +23,6 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
-from .api.client import init_client_app
-from .api.manager import init_manager_app
 from .api.types import WebMiddleware
 from .cephfs import CephFSVolume
 from .dellemc import DellEMCOneFSVolume
@@ -80,7 +78,9 @@ def _init_subapp(
     async def _set_root_ctx(subapp: web.Application):
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
-        subapp["ctx"] = root_app["ctx"]
+        from .appkey import ctx_app_key
+
+        subapp[ctx_app_key] = root_app[ctx_app_key]
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
@@ -129,6 +129,9 @@ class RootContext:
         }
 
     async def __aenter__(self) -> None:
+        from .api.client import init_client_app
+        from .api.manager import init_manager_app
+
         self.client_api_app = await init_client_app(self)
         self.manager_api_app = await init_manager_app(self)
         self.backends = {
