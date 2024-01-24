@@ -640,6 +640,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     desired_session_count = graphene.Int()
+    image = graphene.String()
 
 
 class ModifyEndpoint(graphene.Mutation):
