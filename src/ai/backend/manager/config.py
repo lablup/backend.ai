@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Configuration Schema on etcd
 ----------------------------
@@ -172,8 +174,6 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -217,6 +217,7 @@ from ai.backend.common.types import (
     SlotTypes,
     current_resource_slots,
 )
+from ai.backend.manager.types import RaftLogLovel
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -301,6 +302,56 @@ manager_local_config_iv = (
             t.Key("log-scheduler-ticks", default=False): t.ToBool,
             t.Key("periodic-sync-stats", default=False): t.ToBool,
         }).allow_extra("*"),
+        t.Key("raft", default=None): (
+            t.Dict({
+                # Cluster configurations
+                ## Cluster's Leader node id
+                t.Key("cluster-leader-id", default=1): t.Int,
+                ## This would be useful when adding new RaftNodes to an existing cluster without restarting the server.
+                t.Key("bootstrap-done", default=False): t.ToBool,
+                ## Set this to the max(node_ids) when joining RaftNodes to another cluster.
+                t.Key("restore-wal-from", default=None): t.Int | t.Null,
+                t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
+                # Initial peers
+                ## my peers
+                t.Key("myself"): t.List(
+                    t.Dict({
+                        t.Key("node-id"): t.Int,
+                        t.Key("host"): t.String,
+                        t.Key("port"): t.Int,
+                    })
+                ),
+                ## Other peers
+                t.Key("peers", default=[]): t.List(
+                    t.Dict({
+                        t.Key("node-id"): t.Int,
+                        t.Key("host"): t.String,
+                        t.Key("port"): t.Int,
+                    })
+                )
+                | t.Null,
+                # Storage configurations
+                t.Key("log-dir"): t.String,
+                # Logging configurations
+                t.Key("log-level", default=RaftLogLovel.INFO): tx.Enum(RaftLogLovel),
+                # Raft core configurations
+                # TODO: Decide proper default values for these configs.
+                t.Key("heartbeat-tick", default=None): t.Int | t.Null,
+                t.Key("election-tick", default=None): t.Int | t.Null,
+                t.Key("min-election-tick", default=None): t.Int | t.Null,
+                t.Key("max-election-tick", default=None): t.Int | t.Null,
+                t.Key("max-committed-size-per-ready", default=None): t.Int | t.Null,
+                t.Key("max-size-per-msg", default=None): t.Int | t.Null,
+                t.Key("max-inflight-msgs", default=None): t.Int | t.Null,
+                t.Key("check-quorum", default=None): t.ToBool | t.Null,
+                t.Key("batch-append", default=None): t.ToBool | t.Null,
+                t.Key("max-uncommitted-size", default=None): t.Int | t.Null,
+                t.Key("skip-bcast-commit", default=None): t.ToBool | t.Null,
+                t.Key("pre-vote", default=None): t.ToBool | t.Null,
+                t.Key("priority", default=None): t.Int | t.Null,
+            }).allow_extra("*")
+            | t.Null
+        ),
     })
     .merge(config.etcd_config_iv)
     .allow_extra("*")
@@ -344,6 +395,7 @@ _config_defaults: Mapping[str, Any] = {
             "threshold": {},
         },
     },
+    "raft": None,
 }
 
 container_registry_iv = t.Dict({
