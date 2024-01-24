@@ -6,6 +6,7 @@ from typing import Any, Final, FrozenSet, Mapping
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.storage.exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
 
@@ -15,12 +16,14 @@ from ..types import Optional, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
+PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"
 PROJECT_ID_FILE_NAME: Final = "project_id"
 
 
 class EXAScalerQuotaModel(BaseQuotaModel):
-    def __init__(self, mount_path: Path, local_config: Mapping[str, Any]) -> None:
+    def __init__(self, mount_path: Path, local_config: Mapping[str, Any], etcd: AsyncEtcd) -> None:
         self.local_config = local_config
+        self.etcd = etcd
         super().__init__(mount_path)
         return
 
@@ -42,12 +45,13 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         await asyncio.get_running_loop().run_in_executor(None, _write)
 
     async def _read_main_project_id(self) -> int:
-        main_pid_path = self.mount_path / PROJECT_ID_FILE_NAME
-        pid = await self._read_project_id(main_pid_path)
-        if pid is None:
-            pid = FIRST_PROJECT_ID
-            await self._write_project_id(FIRST_PROJECT_ID, main_pid_path)
-        return pid
+        raw_val = await self.etcd.get(PROJECT_MAIN_ID_KEY)
+        if raw_val is None:
+            val = int(FIRST_PROJECT_ID)
+        else:
+            val = int(raw_val)
+        await self.etcd.put(PROJECT_MAIN_ID_KEY, str(val + 1))
+        return val
 
     async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
         quota_limit = options.limit_bytes // 1024  # default unit for quota is KB
@@ -215,7 +219,7 @@ class EXAScalerFSVolume(BaseVolume):
     name = "exascaler"
 
     async def create_quota_model(self) -> AbstractQuotaModel:
-        return EXAScalerQuotaModel(self.mount_path, self.local_config)
+        return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])
