@@ -279,7 +279,7 @@ def add(
             sys.exit(ExitCode.FAILURE)
 
         # preprocessing groups
-        data["user"]["groups"] = " ,".join(item["name"] for item in data["user"]["groups"])
+        data["user"]["groups"] = ", ".join(item["name"] for item in data["user"]["groups"])
         ctx.output.print_mutation_result(
             data,
             item_name="user",
