@@ -269,6 +269,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Permission",
         "Service",
         "Model",
+        "QuotaScope",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -313,6 +314,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
+        from .func.quota_scope import QuotaScope
 
         self.System = System
         self.Admin = Admin
@@ -339,6 +341,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Permission = Permission
         self.Service = Service
         self.Model = Model
+        self.QuotaScope = QuotaScope
 
     @property
     def proxy_mode(self) -> bool:

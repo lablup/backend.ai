@@ -320,3 +320,9 @@ routing_fields = FieldSet([
     FieldSpec("session"),
     FieldSpec("traffic_ratio"),
 ])
+
+quota_scope_fields = FieldSet([
+    FieldSpec("usage_bytes"),
+    FieldSpec("usage_count"),
+    FieldSpec("hard_limit_bytes"),
+])
