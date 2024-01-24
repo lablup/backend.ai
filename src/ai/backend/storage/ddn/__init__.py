@@ -57,6 +57,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         quota_limit = options.limit_bytes // 1024  # default unit for quota is KB
         try:
             await run([
+                b"sudo",
                 b"lfs",
                 b"setquota",
                 b"-p",
@@ -134,6 +135,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         # Set projectID to the directory
         try:
             await run([
+                b"sudo",
                 b"lfs",
                 b"project",
                 b"-p",
@@ -150,6 +152,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         # Set quota grace period to 0
         try:
             await run([
+                b"sudo",
                 b"lfs",
                 b"setquota",
                 b"-t",
