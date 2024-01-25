@@ -2,7 +2,7 @@ import datetime
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
 
 import graphene
 import jwt
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
@@ -643,12 +644,12 @@ class EndpointList(graphene.ObjectType):
 
 
 class ModifyEndpointInput(graphene.InputObjectType):
-    resource_slots = graphene.JSONString(required=True)
+    resource_slots = graphene.JSONString()
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     desired_session_count = graphene.Int()
-    image = graphene.String()
+    image = graphene.JSONString()
     name = graphene.String()
     resource_group = graphene.String()
     open_to_public = graphene.Boolean()
@@ -670,7 +671,8 @@ class ModifyEndpoint(graphene.Mutation):
         endpoint_id: uuid.UUID,
         props: ModifyEndpointInput,
     ) -> "ModifyEndpoint":
-        data: Dict[str, Any] = {}
+        graph_ctx: GraphQueryContext = info.context
+        data: dict[str, Any] = {}
         set_if_set(
             props,
             data,
@@ -681,8 +683,26 @@ class ModifyEndpoint(graphene.Mutation):
         set_if_set(props, data, "cluster_mode")
         set_if_set(props, data, "cluster_size")
         set_if_set(props, data, "desired_session_count")
+        set_if_set(props, data, "image")
+        image = data.pop("image", None)
+        if image is not None:
+            image_name = image.get("name")
+            arch = image.get("architecture")
+            if image_name is None:
+                raise ValueError("Expected not null value on `name` of `image` field")
+            if arch is not None:
+                image_ref = ImageRef(image_name, ["*"], arch)
+            else:
+                image_ref = ImageRef(
+                    image_name,
+                    ["*"],
+                )
+            async with graph_ctx.db.begin_readonly_session() as db_session:
+                image_row = await ImageRow.resolve(db_session, [image_ref])
+            data["image"] = image_row.id
+
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
-        return await simple_db_mutate(cls, info.context, update_query)
+        return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
 class EndpointToken(graphene.ObjectType):
