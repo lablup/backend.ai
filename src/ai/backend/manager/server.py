@@ -174,6 +174,9 @@ global_subapp_pkgs: Final[list[str]] = [
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
+cctx_instances_app_key: web.AppKey = web.AppKey("_cctx_instances", list)
+scheduler_opts_app_key = web.AppKey("scheduler_opts", Mapping[str, Any])
+
 
 async def hello(request: web.Request) -> web.Response:
     """
@@ -777,7 +780,7 @@ def build_root_app(
         "exception_handler": global_exception_handler,
         "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }
-    app["scheduler_opts"] = {
+    app[scheduler_opts_app_key] = {
         **default_scheduler_opts,
         **(scheduler_opts if scheduler_opts is not None else {}),
     }
@@ -803,7 +806,7 @@ def build_root_app(
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         cctx_instance = cctx(app["_root.context"])
-        app["_cctx_instances"].append(cctx_instance)
+        app[cctx_instances_app_key].append(cctx_instance)
         try:
             async with cctx_instance:
                 yield
@@ -812,14 +815,14 @@ def build_root_app(
             log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
-        for cctx in app["_cctx_instances"]:
+        for cctx in app[cctx_instances_app_key]:
             if hasattr(cctx, "shutdown"):
                 try:
                     await cctx.shutdown()
                 except Exception:
                     log.exception("error while shutting down a cleanup context")
 
-    app["_cctx_instances"] = []
+    app[cctx_instances_app_key] = []
     app.on_shutdown.append(_call_cleanup_context_shutdown_handlers)
     for cleanup_ctx in cleanup_contexts:
         app.cleanup_ctx.append(
