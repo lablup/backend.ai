@@ -71,7 +71,9 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-database_ptask_group_app_key: web.AppKey = web.AppKey("database_ptask_group", aiotools.PersistentTaskGroup)
+database_ptask_group_app_key: web.AppKey = web.AppKey(
+    "database_ptask_group", aiotools.PersistentTaskGroup
+)
 rpc_ptask_group_app_key: web.AppKey = web.AppKey("rpc_ptask_group", aiotools.PersistentTaskGroup)
 
 
