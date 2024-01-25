@@ -15,7 +15,7 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.agent.appkey import config_app_key
+from ai.backend.agent.appkey import config_app_key, config_server_app_key
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -135,7 +135,7 @@ async def handle_fstab_detail(request: web.Request) -> web.Response:
 
 async def handle_list_mounts(request: web.Request) -> web.Response:
     log.info("HANDLE_LIST_MOUNT")
-    config = request.app["config_server"]
+    config = request.app[config_server_app_key]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
@@ -149,7 +149,7 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
 async def handle_mount(request: web.Request) -> web.Response:
     log.info("HANDLE_MOUNT")
     params = await request.json()
-    config = request.app["config_server"]
+    config = request.app[config_server_app_key]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
@@ -193,7 +193,7 @@ async def handle_mount(request: web.Request) -> web.Response:
 async def handle_umount(request: web.Request) -> web.Response:
     log.info("HANDLE_UMOUNT")
     params = await request.json()
-    config = request.app["config_server"]
+    config = request.app[config_server_app_key]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
@@ -275,7 +275,7 @@ async def watcher_server(loop, pidx, args):
         scope_prefix_map=scope_prefix_map,
         credentials=etcd_credentials,
     )
-    app["config_server"] = etcd
+    app[config_server_app_key] = etcd
 
     token = await etcd.get("config/watcher/token")
     if token is None:
