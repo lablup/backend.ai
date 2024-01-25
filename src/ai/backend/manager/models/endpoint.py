@@ -641,6 +641,9 @@ class ModifyEndpointInput(graphene.InputObjectType):
     cluster_size = graphene.Int()
     desired_session_count = graphene.Int()
     image = graphene.String()
+    name = graphene.String()
+    resource_group = graphene.String()
+    open_to_public = graphene.Boolean()
 
 
 class ModifyEndpoint(graphene.Mutation):
