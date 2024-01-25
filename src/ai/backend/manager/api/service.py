@@ -39,6 +39,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.registry import check_scaling_group
 
+from ..appkey import api_versions_app_key
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
     EndpointLifecycle,
@@ -938,7 +939,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "services"
-    app["api_versions"] = (4, 5)
+    app[api_versions_app_key] = (4, 5)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["services.context"] = PrivateContext()

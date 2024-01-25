@@ -25,6 +25,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 
+from ..appkey import api_versions_app_key
 from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
@@ -1126,7 +1127,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
-    app["api_versions"] = (1, 2, 3, 4)
+    app[api_versions_app_key] = (1, 2, 3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", test))

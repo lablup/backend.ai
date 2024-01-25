@@ -22,6 +22,7 @@ from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
 
+from ..appkey import api_versions_app_key
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -310,7 +311,7 @@ def create_app(
     app = web.Application()
     app.cleanup_ctx.append(app_ctx)
     app["prefix"] = "config"
-    app["api_versions"] = (3, 4)
+    app[api_versions_app_key] = (3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))
     cors.add(app.router.add_route("GET", r"/resource-slots/details", get_resource_metadata))

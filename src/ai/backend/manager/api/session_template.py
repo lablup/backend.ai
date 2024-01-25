@@ -13,6 +13,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..appkey import api_versions_app_key
 from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
 from .auth import auth_required
@@ -325,7 +326,7 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["api_versions"] = (4, 5)
+    app[api_versions_app_key] = (4, 5)
     app["prefix"] = "template/session"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create))

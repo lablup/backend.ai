@@ -13,6 +13,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
+from ..appkey import api_versions_app_key
 from ..models import query_allowed_sgroups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -119,7 +120,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "scaling-groups"
-    app["api_versions"] = (2, 3, 4)
+    app[api_versions_app_key] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

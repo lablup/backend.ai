@@ -19,6 +19,7 @@ from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity
 
+from ..appkey import api_versions_app_key
 from ..defs import LockID
 from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
@@ -270,7 +271,7 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["api_versions"] = (4, 5)
+    app[api_versions_app_key] = (4, 5)
     app["prefix"] = "logs/error"
     app["logs.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

@@ -22,6 +22,7 @@ from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEve
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .. import __version__
+from ..appkey import api_versions_app_key
 from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from . import ManagerStatus, SchedulerEvent
@@ -294,7 +295,7 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app["api_versions"] = (2, 3, 4)
+    app[api_versions_app_key] = (2, 3, 4)
     app["manager.context"] = PrivateContext()
     app["prefix"] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

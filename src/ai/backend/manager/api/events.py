@@ -50,6 +50,7 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
+from ..appkey import api_versions_app_key
 from ..models import UserRole, groups, kernels
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
@@ -426,7 +427,7 @@ def create_app(
     app = web.Application()
     app["prefix"] = "events"
     app["events.context"] = PrivateContext()
-    app["api_versions"] = (3, 4)
+    app[api_versions_app_key] = (3, 4)
     app.on_shutdown.append(events_shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route

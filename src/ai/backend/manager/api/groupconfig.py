@@ -11,6 +11,7 @@ from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..appkey import api_versions_app_key
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
     groups,
@@ -293,7 +294,7 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["api_versions"] = (4, 5)
+    app[api_versions_app_key] = (4, 5)
     app["prefix"] = "group-config"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "/dotfiles", create))
