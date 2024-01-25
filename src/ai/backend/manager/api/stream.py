@@ -809,9 +809,9 @@ def create_app(
     app = web.Application()
     app.cleanup_ctx.append(stream_app_ctx)
     app.on_shutdown.append(stream_shutdown)
-    app["prefix"] = "stream"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
+    app[prefix_app_key] = "stream"
     app[api_versions_app_key] = (2, 3, 4)
     app["stream.context"] = PrivateContext()
     app["database_ptask_group"] = aiotools.PersistentTaskGroup()

@@ -430,10 +430,10 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app["prefix"] = "events"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
     app[events_context_app_key] = PrivateContext()
+    app[prefix_app_key] = "events"
     app[api_versions_app_key] = (3, 4)
     app.on_shutdown.append(events_shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

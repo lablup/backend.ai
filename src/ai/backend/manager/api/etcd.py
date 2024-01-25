@@ -309,9 +309,9 @@ def create_app(
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.cleanup_ctx.append(app_ctx)
-    app["prefix"] = "config"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
+    app[prefix_app_key] = "config"
     app[api_versions_app_key] = (3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))

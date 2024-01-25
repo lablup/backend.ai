@@ -4,3 +4,4 @@ from aiohttp import web
 
 # root_context_app_key = web.AppKey("_root.context", RootContext)
 api_versions_app_key = web.AppKey("api_versions", tuple[int, ...])
+prefix_app_key = web.AppKey("prefix", str)

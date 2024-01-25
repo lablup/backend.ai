@@ -294,11 +294,11 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
     app[api_versions_app_key] = (2, 3, 4)
     app["manager.context"] = PrivateContext()
-    app["prefix"] = "manager"
+    app[prefix_app_key] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     status_resource = cors.add(app.router.add_resource("/status"))
     cors.add(status_resource.add_route("GET", fetch_manager_status))

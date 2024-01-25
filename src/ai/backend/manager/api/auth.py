@@ -1125,9 +1125,9 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
+    app[prefix_app_key] = "auth"  # slashed to distinguish with "/vN/authorize"
     app[api_versions_app_key] = (1, 2, 3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     root_resource = cors.add(app.router.add_resource(r""))

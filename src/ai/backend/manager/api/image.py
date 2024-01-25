@@ -496,9 +496,9 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["prefix"] = "image"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
+    app[prefix_app_key] = "image"
     app[api_versions_app_key] = (4,)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", "/import", get_import_image_form))

@@ -33,9 +33,9 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(default_cors_options):
     app = web.Application()
-    app["prefix"] = "acl"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
+    app[prefix_app_key] = "acl"
     app[api_versions_app_key] = (4,)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

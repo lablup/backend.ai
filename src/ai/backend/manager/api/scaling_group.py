@@ -118,8 +118,9 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app["prefix"] = "scaling-groups"
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
+
+    app[prefix_app_key] = "scaling-groups"
 
     app[api_versions_app_key] = (2, 3, 4)
     app.on_startup.append(init)

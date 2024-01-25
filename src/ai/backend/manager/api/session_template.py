@@ -325,10 +325,10 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    from ..appkey import api_versions_app_key
+    from ..appkey import api_versions_app_key, prefix_app_key
 
     app[api_versions_app_key] = (4, 5)
-    app["prefix"] = "template/session"
+    app[prefix_app_key] = "template/session"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create))
     cors.add(app.router.add_route("GET", "", list_template))
