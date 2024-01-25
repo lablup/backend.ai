@@ -18,7 +18,6 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
-from async_timeout import timeout as _timeout
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -143,7 +142,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # but in this case:
                 #  - The lock ID is only given from trusted codes.
                 #  - asyncpg does not support parameter interpolation with raw SQL statements.
-                async with _timeout(self.lock_conn_timeout):
+                async with asyncio.timeout(self.lock_conn_timeout):
                     await lock_conn.exec_driver_sql(
                         f"SELECT pg_advisory_lock({lock_id:d});",
                     )
