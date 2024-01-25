@@ -19,6 +19,7 @@ import ai.backend.common.validators as tx
 from ai.backend.manager import __version__
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
+from ai.backend.manager.appkey import root_app_app_key
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
 
 
@@ -230,7 +231,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             if not resource:
                 continue
 
-            if "_root_app" not in app:
+            if root_app_app_key not in app:
                 path = "/" + ("" if prefix == "root" else prefix) + resource.canonical
             else:
                 path = resource.canonical

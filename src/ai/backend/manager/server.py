@@ -50,6 +50,7 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginConte
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
+from ai.backend.manager.appkey import root_app_app_key
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -690,7 +691,7 @@ def _init_subapp(
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
-        subapp["_root_app"] = root_app
+        subapp[root_app_app_key] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)

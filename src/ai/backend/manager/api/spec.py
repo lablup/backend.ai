@@ -9,6 +9,7 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.openapi import generate_openapi
 
+from ..appkey import root_app_app_key
 from .auth import auth_required
 from .exceptions import GenericForbidden
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -59,7 +60,7 @@ async def generate_spec(request: web.Request) -> web.Response:
     if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
         raise GenericForbidden
 
-    return web.json_response(generate_openapi(request.app["_root_app"]._subapps))
+    return web.json_response(generate_openapi(request.app[root_app_app_key]._subapps))
 
 
 async def init(app: web.Application) -> None:
