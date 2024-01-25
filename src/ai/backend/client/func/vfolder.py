@@ -60,7 +60,6 @@ class VFolder(BaseFunction):
         group: str = None,
         usage_mode: str = "general",
         permission: str = "rw",
-        quota: str = "0",
         cloneable: bool = False,
     ):
         rqst = Request("POST", "/folders")
@@ -71,7 +70,6 @@ class VFolder(BaseFunction):
             "group": group,
             "usage_mode": usage_mode,
             "permission": permission,
-            "quota": quota,
             "cloneable": cloneable,
         })
         async with rqst.fetch() as resp:
