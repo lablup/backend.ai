@@ -71,6 +71,9 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
+database_ptask_group_app_key: web.AppKey = web.AppKey("database_ptask_group", aiotools.PersistentTaskGroup)
+rpc_ptask_group_app_key: web.AppKey = web.AppKey("rpc_ptask_group", aiotools.PersistentTaskGroup)
+
 
 @server_status_required(READ_ALLOWED)
 @auth_required
@@ -78,7 +81,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx = request.app[stream_context_app_key]
-    database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
+    database_ptask_group = request.app[database_ptask_group_app_key]
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
     api_version = request["api_version"]
@@ -289,8 +292,8 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     """
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx = request.app[stream_context_app_key]
-    database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
-    rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
+    database_ptask_group = request.app[database_ptask_group_app_key]
+    rpc_ptask_group = request.app[rpc_ptask_group_app_key]
 
     local_config = root_ctx.local_config
     registry = root_ctx.registry
@@ -431,8 +434,8 @@ async def stream_proxy(
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx = request.app[stream_context_app_key]
-    database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
-    rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
+    database_ptask_group = request.app[database_ptask_group_app_key]
+    rpc_ptask_group = request.app[rpc_ptask_group_app_key]
     session_name: str = request.match_info["session_name"]
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
@@ -780,8 +783,8 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
 
 
 async def stream_shutdown(app: web.Application) -> None:
-    database_ptask_group: aiotools.PersistentTaskGroup = app["database_ptask_group"]
-    rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
+    database_ptask_group = app[database_ptask_group_app_key]
+    rpc_ptask_group = app[rpc_ptask_group_app_key]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
     cancelled_tasks: List[asyncio.Task] = []
@@ -817,8 +820,8 @@ def create_app(
     app[prefix_app_key] = "stream"
     app[api_versions_app_key] = (2, 3, 4)
     app[stream_context_app_key] = PrivateContext()
-    app["database_ptask_group"] = aiotools.PersistentTaskGroup()
-    app["rpc_ptask_group"] = aiotools.PersistentTaskGroup()
+    app[database_ptask_group_app_key] = aiotools.PersistentTaskGroup()
+    app[rpc_ptask_group_app_key] = aiotools.PersistentTaskGroup()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", r"/session/{session_name}/pty", stream_pty))
