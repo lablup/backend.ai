@@ -1,11 +1,11 @@
 import textwrap
-from typing import Sequence
+from typing import Any, Sequence
 
-from .base import BaseFunction, api_function
-from ..session import api_session
-from ..output.fields import quota_scope_fields, user_fields, group_fields
+from ..output.fields import group_fields, quota_scope_fields, user_fields
 from ..output.types import FieldSpec
-
+from ..session import api_session
+from ..types import set_if_set
+from .base import BaseFunction, api_function
 
 _default_user_fields = (
     user_fields["uuid"],
@@ -17,10 +17,15 @@ _default_project_fields = (
     group_fields["name"],
 )
 
-_default_quota_scope_fields = (
+_default_detail_fields = (
     quota_scope_fields["usage_bytes"],
     quota_scope_fields["usage_count"],
-    quota_scope_fields["hard_limit_bytes"]
+    quota_scope_fields["hard_limit_bytes"],
+)
+
+_default_quota_scope_fields = (
+    quota_scope_fields["quota_scope_id"],
+    quota_scope_fields["storage_host_name"],
 )
 
 
@@ -77,12 +82,14 @@ class QuotaScope(BaseFunction):
         cls,
         host: str,
         qsid: str,
-        fields: Sequence[FieldSpec] = _default_quota_scope_fields,
+        fields: Sequence[FieldSpec] = _default_detail_fields,
     ):
         query = textwrap.dedent(
             """\
             query($storage_host_name: String!, $quota_scope_id: String!) {
-                quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id) {details {$fields}}
+                quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id) {
+                    details {$fields}
+                }
             }
         """
         )
@@ -92,4 +99,33 @@ class QuotaScope(BaseFunction):
             "quota_scope_id": qsid,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["quota_scope"]['details']
+        return data["quota_scope"]["details"]
+
+    @api_function
+    @classmethod
+    async def set_quota_scope(
+        cls,
+        host: str,
+        qsid: str,
+        hard_limit_bytes: int,
+        fields: Sequence[FieldSpec] = _default_quota_scope_fields,
+    ):
+        query = textwrap.dedent(
+            """\
+            mutation($storage_host_name: String!, $quota_scope_id: String!, $input: QuotaScopeInput!) {
+                set_quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id, props: $input) {
+                    quota_scope {$fields}
+                }
+            }
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        inputs: dict[str, Any] = {}
+        set_if_set(inputs, "hard_limit_bytes", hard_limit_bytes)
+        variables = {
+            "storage_host_name": host,
+            "quota_scope_id": qsid,
+            "input": inputs,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["set_quota_scope"]["quota_scope"]
