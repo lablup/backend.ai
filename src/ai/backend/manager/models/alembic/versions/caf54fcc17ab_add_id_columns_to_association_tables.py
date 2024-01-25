@@ -1,7 +1,7 @@
 """add_id_columns_to_association_tables
 
 Revision ID: caf54fcc17ab
-Revises: d3f8c74bf148
+Revises: 8b2ec7e3d22a
 Create Date: 2024-01-03 21:39:50.558724
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "caf54fcc17ab"
-down_revision = "d3f8c74bf148"
+down_revision = "8b2ec7e3d22a"
 branch_labels = None
 depends_on = None
 
