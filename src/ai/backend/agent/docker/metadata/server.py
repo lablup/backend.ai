@@ -1,6 +1,5 @@
 import logging
 from typing import Any, Iterable, List, Mapping, MutableMapping
-from uuid import UUID
 
 import attr
 from aiodocker.docker import Docker
@@ -45,7 +44,7 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 async def container_resolver_middleware(
     request: web.Request, handler: Handler
 ) -> web.StreamResponse:
-    from ...appkey import docker_mode_app_key
+    from ...appkey import docker_mode_app_key, kernel_registry_app_key
 
     if (
         request.headers.get("X-Forwarded-For") is not None
@@ -72,8 +71,8 @@ async def container_resolver_middleware(
         return web.Response(status=403)
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
-    request["kernel"] = request.app["kernel-registry"].get(
-        UUID(target_container[0]["Labels"]["ai.backend.kernel-id"])
+    request["kernel"] = request.app[kernel_registry_app_key].get(
+        KernelId(target_container[0]["Labels"]["ai.backend.kernel-id"])
     )
     return await handler(request)
 
@@ -100,12 +99,12 @@ class MetadataServer(aobject):
                 self.route_structure_fallback_middleware,
             ],
         )
-        from ...appkey import root_context_app_key
+        from ...appkey import kernel_registry_app_key, root_context_app_key
 
         app[root_context_app_key] = RootContext()
         app[root_context_app_key].local_config = local_config
         app[root_context_app_key].etcd = etcd
-        app["kernel-registry"] = kernel_registry
+        app[kernel_registry_app_key] = kernel_registry
         self.app = app
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
