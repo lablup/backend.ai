@@ -15,6 +15,7 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.agent.appkey import config_app_key
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -47,7 +48,7 @@ async def auth_middleware(request, handler):
 
 
 async def handle_status(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(
         *["sudo", "systemctl", "is-active", svc], stdout=subprocess.PIPE
     )
@@ -63,7 +64,7 @@ async def handle_status(request: web.Request) -> web.Response:
 
 
 async def handle_soft_reset(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "reload", svc])
     await proc.wait()
     return web.json_response({
@@ -72,7 +73,7 @@ async def handle_soft_reset(request: web.Request) -> web.Response:
 
 
 async def handle_hard_reset(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "stop", svc])
     await proc.wait()
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "restart", "docker.service"])
@@ -86,7 +87,7 @@ async def handle_hard_reset(request: web.Request) -> web.Response:
 
 async def handle_shutdown(request: web.Request) -> web.Response:
     global shutdown_enabled
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "stop", svc])
     await proc.wait()
     shutdown_enabled = True
@@ -97,7 +98,7 @@ async def handle_shutdown(request: web.Request) -> web.Response:
 
 
 async def handle_agent_start(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "start", svc])
     await proc.wait()
     return web.json_response({
@@ -106,7 +107,7 @@ async def handle_agent_start(request: web.Request) -> web.Response:
 
 
 async def handle_agent_stop(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "stop", svc])
     await proc.wait()
     return web.json_response({
@@ -115,7 +116,7 @@ async def handle_agent_stop(request: web.Request) -> web.Response:
 
 
 async def handle_agent_restart(request: web.Request) -> web.Response:
-    svc = request.app["config"]["watcher"]["target-service"]
+    svc = request.app[config_app_key]["watcher"]["target-service"]
     proc = await asyncio.create_subprocess_exec(*["sudo", "systemctl", "restart", svc])
     await proc.wait()
     return web.json_response({
@@ -231,7 +232,7 @@ async def handle_umount(request: web.Request) -> web.Response:
 async def init_app(app):
     r = app.router.add_route
     r("GET", "/", handle_status)
-    if app["config"]["watcher"]["soft-reset-available"]:
+    if app[config_app_key]["watcher"]["soft-reset-available"]:
         r("POST", "/soft-reset", handle_soft_reset)
     r("POST", "/hard-reset", handle_hard_reset)
     r("POST", "/shutdown", handle_shutdown)
@@ -257,20 +258,20 @@ async def watcher_server(loop, pidx, args):
     global shutdown_enabled
 
     app = web.Application()
-    app["config"] = args[0]
+    app[config_app_key] = args[0]
 
     etcd_credentials = None
-    if app["config"]["etcd"]["user"]:
+    if app[config_app_key]["etcd"]["user"]:
         etcd_credentials = {
-            "user": app["config"]["etcd"]["user"],
-            "password": app["config"]["etcd"]["password"],
+            "user": app[config_app_key]["etcd"]["user"],
+            "password": app[config_app_key]["etcd"]["password"],
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
     }
     etcd = AsyncEtcd(
-        app["config"]["etcd"]["addr"],
-        app["config"]["etcd"]["namespace"],
+        app[config_app_key]["etcd"]["addr"],
+        app[config_app_key]["etcd"]["namespace"],
         scope_prefix_map=scope_prefix_map,
         credentials=etcd_credentials,
     )
@@ -287,15 +288,15 @@ async def watcher_server(loop, pidx, args):
     app.on_startup.append(init_app)
     app.on_response_prepare.append(prepare_hook)
     ssl_ctx = None
-    if app["config"]["watcher"]["ssl-enabled"]:
+    if app[config_app_key]["watcher"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
-            str(app["config"]["watcher"]["ssl-cert"]),
-            str(app["config"]["watcher"]["ssl-privkey"]),
+            str(app[config_app_key]["watcher"]["ssl-cert"]),
+            str(app[config_app_key]["watcher"]["ssl-privkey"]),
         )
     runner = web.AppRunner(app)
     await runner.setup()
-    watcher_addr = app["config"]["watcher"]["service-addr"]
+    watcher_addr = app[config_app_key]["watcher"]["service-addr"]
     site = web.TCPSite(
         runner,
         str(watcher_addr.host),

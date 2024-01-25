@@ -98,16 +98,20 @@ class MetadataServer(aobject):
                 self.route_structure_fallback_middleware,
             ],
         )
-        app["_root.context"] = RootContext()
-        app["_root.context"].local_config = local_config
-        app["_root.context"].etcd = etcd
+        from ...appkey import root_context_app_key
+
+        app[root_context_app_key] = RootContext()
+        app[root_context_app_key].local_config = local_config
+        app[root_context_app_key].etcd = etcd
         app["kernel-registry"] = kernel_registry
         self.app = app
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
     async def __ainit__(self):
-        local_config = self.app["_root.context"].local_config
+        from ...appkey import root_context_app_key
+
+        local_config = self.app[root_context_app_key].local_config
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config["agent"]["docker-mode"]
         log.info("Loading metadata plugin: meta-data")
@@ -168,7 +172,9 @@ class MetadataServer(aobject):
         async def _set_root_ctx(subapp: web.Application):
             # Allow subapp's access to the root app properties.
             # These are the public APIs exposed to plugins as well.
-            subapp["_root.context"] = root_app["_root.context"]
+            from ...appkey import root_context_app_key
+
+            subapp[root_context_app_key] = root_app[root_context_app_key]
 
         # We must copy the public interface prior to all user-defined startup signal handlers.
         subapp.on_startup.insert(0, _set_root_ctx)
@@ -183,7 +189,9 @@ class MetadataServer(aobject):
         self.loaded_apps.append(prefix)
 
     async def load_metadata_plugins(self):
-        root_ctx = self.app["_root.context"]
+        from ...appkey import root_context_app_key
+
+        root_ctx = self.app[root_context_app_key]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
         root_ctx.metadata_plugin_ctx = plugin_ctx
@@ -197,7 +205,9 @@ class MetadataServer(aobject):
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
-        local_config = self.app["_root.context"].local_config
+        from ...appkey import root_context_app_key
+
+        local_config = self.app[root_context_app_key].local_config
         site = web.TCPSite(
             metadata_server_runner,
             local_config["agent"]["metadata-server-bind-host"],
@@ -207,7 +217,9 @@ class MetadataServer(aobject):
         await site.start()
 
     async def cleanup(self):
-        plugin_context = self.app["_root.context"].metadata_plugin_ctx
+        from ...appkey import root_context_app_key
+
+        plugin_context = self.app[root_context_app_key].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()
         await plugin_context.cleanup()
