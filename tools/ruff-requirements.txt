@@ -1,2 +1,2 @@
-ruff~=0.1.7
-ruff-lsp~=0.0.45
+ruff~=0.1.11
+ruff-lsp~=0.0.49

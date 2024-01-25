@@ -158,7 +158,7 @@ users = sa.Table(
     sa.Column(
         "main_access_key",
         sa.String(length=20),
-        sa.ForeignKey("keypairs.access_key", ondelete="RESTRICT"),
+        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
         nullable=True,  # keypairs.user is non-nullable
     ),
 )
@@ -173,6 +173,13 @@ class UserRow(Base):
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+
+    created_endpoints = relationship(
+        "EndpointRow", back_populates="created_user_row", foreign_keys="EndpointRow.created_user"
+    )
+    owned_endpoints = relationship(
+        "EndpointRow", back_populates="session_owner_row", foreign_keys="EndpointRow.session_owner"
+    )
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
@@ -743,9 +750,9 @@ class ModifyUser(graphene.Mutation):
             prev_role = row.role
             user_update_data = data.copy()
             if "status" in data and row.status != data["status"]:
-                user_update_data[
-                    "status_info"
-                ] = "admin-requested"  # user mutation is only for admin
+                user_update_data["status_info"] = (
+                    "admin-requested"  # user mutation is only for admin
+                )
             if main_access_key is not None:
                 db_session = SASession(conn)
                 keypair_query = (

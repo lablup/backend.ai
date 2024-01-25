@@ -20,6 +20,7 @@ from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ...common.types import SSLContextType
 from ..models.image import ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -43,9 +44,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
     MEDIA_TYPE_OCI_MANIFEST: Final[str] = "application/vnd.oci.image.manifest.v1+json"
-    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[
-        str
-    ] = "application/vnd.docker.distribution.manifest.list.v2+json"
+    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[str] = (
+        "application/vnd.docker.distribution.manifest.list.v2+json"
+    )
     MEDIA_TYPE_DOCKER_MANIFEST: Final[str] = "application/vnd.docker.distribution.manifest.v2+json"
 
     def __init__(
@@ -70,7 +71,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
-        ssl_ctx = None  # default
+        ssl_ctx: SSLContextType = None  # default
         if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
