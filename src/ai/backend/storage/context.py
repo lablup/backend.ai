@@ -84,9 +84,11 @@ def _init_subapp(
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
-    if "prefix" not in subapp:
-        subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
-    prefix = subapp["prefix"]
+    from .appkey import prefix_app_key
+
+    if prefix_app_key not in subapp:
+        subapp[prefix_app_key] = pkg_name.split(".")[-1].replace("_", "-")
+    prefix = subapp[prefix_app_key]
     root_app.add_subapp("/" + prefix, subapp)
     root_app.middlewares.extend(global_middlewares)
 
