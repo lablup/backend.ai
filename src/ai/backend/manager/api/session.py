@@ -45,8 +45,6 @@ from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
-from ..appkey import api_versions_app_key
-
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -2008,6 +2006,8 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (1, 2, 3, 4)
     app["session.context"] = PrivateContext()
     app["prefix"] = "session"

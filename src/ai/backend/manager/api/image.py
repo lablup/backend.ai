@@ -13,7 +13,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.types import SessionTypes
 
-from ..appkey import api_versions_app_key
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import association_groups_users as agus
 from ..models import domains, groups, query_allowed_sgroups
@@ -498,6 +497,8 @@ def create_app(
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["prefix"] = "image"
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (4,)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", "/import", get_import_image_form))

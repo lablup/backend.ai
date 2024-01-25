@@ -9,7 +9,6 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..appkey import api_versions_app_key
 from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required
 from .exceptions import (
@@ -204,6 +203,8 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (4, 5)
     app["prefix"] = "domain-config"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

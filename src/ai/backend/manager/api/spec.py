@@ -9,7 +9,6 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.openapi import generate_openapi
 
-from ..appkey import api_versions_app_key
 from .auth import auth_required
 from .exceptions import GenericForbidden
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -76,6 +75,8 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (4, 5)
     app["prefix"] = "spec"
     app.on_startup.append(init)

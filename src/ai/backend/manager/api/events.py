@@ -50,7 +50,6 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
-from ..appkey import api_versions_app_key
 from ..models import UserRole, groups, kernels
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
@@ -90,7 +89,8 @@ async def push_session_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["events.context"]
+
+    app_ctx = request.app[events_context_app_key]
     session_name = params["session_name"]
     session_id = params["session_id"]
     scope = params["scope"]
@@ -193,7 +193,8 @@ async def enqueue_kernel_creation_status_update(
     event: KernelPreparingEvent | KernelPullingEvent | KernelCreatingEvent | KernelStartedEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+
+    app_ctx = app[events_context_app_key]
 
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
@@ -230,7 +231,8 @@ async def enqueue_kernel_termination_status_update(
     event: KernelCancelledEvent | KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+
+    app_ctx = app[events_context_app_key]
 
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
@@ -274,7 +276,7 @@ async def enqueue_session_creation_status_update(
     ),
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+    app_ctx = app[events_context_app_key]
 
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
@@ -310,7 +312,7 @@ async def enqueue_session_termination_status_update(
     event: SessionTerminatingEvent | SessionTerminatedEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+    app_ctx = app[events_context_app_key]
 
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
@@ -346,7 +348,7 @@ async def enqueue_batch_task_result_update(
     event: SessionSuccessEvent | SessionFailureEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+    app_ctx = app[events_context_app_key]
 
     async def _fetch():
         async with root_ctx.db.begin_readonly() as conn:
@@ -380,9 +382,12 @@ class PrivateContext:
     session_event_queues: Set[asyncio.Queue[Sentinel | SessionEventInfo]]
 
 
+events_context_app_key = web.AppKey("events_context", PrivateContext)
+
+
 async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["events.context"]
+    app_ctx = app[events_context_app_key]
     app_ctx.session_event_queues = set()
     event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
     event_dispatcher.subscribe(SessionEnqueuedEvent, app, enqueue_session_creation_status_update)
@@ -413,7 +418,7 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
 async def events_shutdown(app: web.Application) -> None:
     # shutdown handler is called before waiting for closing active connections.
     # We need to put sentinels here to ensure delivery of them to active SSE connections.
-    app_ctx: PrivateContext = app["events.context"]
+    app_ctx = app[events_context_app_key]
     join_tasks = []
     for sq in app_ctx.session_event_queues:
         sq.put_nowait(sentinel)
@@ -426,7 +431,9 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "events"
-    app["events.context"] = PrivateContext()
+    from ..appkey import api_versions_app_key
+
+    app[events_context_app_key] = PrivateContext()
     app[api_versions_app_key] = (3, 4)
     app.on_shutdown.append(events_shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

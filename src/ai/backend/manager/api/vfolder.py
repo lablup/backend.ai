@@ -50,7 +50,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 
-from ..appkey import api_versions_app_key
 from ..models import (
     ACTIVE_USER_STATUSES,
     DEAD_VFOLDER_STATUSES,
@@ -3279,6 +3278,8 @@ async def shutdown(app: web.Application) -> None:
 def create_app(default_cors_options):
     app = web.Application()
     app["prefix"] = "folders"
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

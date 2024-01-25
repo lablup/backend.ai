@@ -49,7 +49,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
-from ..appkey import api_versions_app_key
 from ..defs import DEFAULT_ROLE
 from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
@@ -811,6 +810,8 @@ def create_app(
     app.cleanup_ctx.append(stream_app_ctx)
     app.on_shutdown.append(stream_shutdown)
     app["prefix"] = "stream"
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (2, 3, 4)
     app["stream.context"] = PrivateContext()
     app["database_ptask_group"] = aiotools.PersistentTaskGroup()

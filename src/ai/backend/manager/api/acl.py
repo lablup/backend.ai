@@ -7,7 +7,6 @@ from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..appkey import api_versions_app_key
 from ..models.acl import get_all_permissions
 from .auth import auth_required
 from .manager import ALL_ALLOWED, server_status_required
@@ -35,6 +34,8 @@ async def shutdown(app: web.Application) -> None:
 def create_app(default_cors_options):
     app = web.Application()
     app["prefix"] = "acl"
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (4,)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

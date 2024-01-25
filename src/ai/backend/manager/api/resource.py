@@ -34,7 +34,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
 
-from ..appkey import api_versions_app_key
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
@@ -858,6 +857,8 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (4,)
     app["prefix"] = "resource"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

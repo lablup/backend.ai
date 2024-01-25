@@ -14,7 +14,6 @@ from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
-from ..appkey import api_versions_app_key
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
@@ -112,6 +111,8 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
+    from ..appkey import api_versions_app_key
+
     app[api_versions_app_key] = (1, 2, 3, 4)
     app["ratelimit.context"] = PrivateContext()
     app.on_startup.append(init)
