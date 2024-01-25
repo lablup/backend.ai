@@ -47,7 +47,7 @@ class GQLLoggingMiddleware:
 
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["admin.context"]
+    app_ctx = request.app[admin_context_app_key]
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
     if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
@@ -144,8 +144,11 @@ class PrivateContext:
     gql_schema: graphene.Schema
 
 
+admin_context_app_key = web.AppKey("admin.context", PrivateContext)
+
+
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["admin.context"]
+    app_ctx = app[admin_context_app_key]
     app_ctx.gql_schema = graphene.Schema(
         query=Queries,
         mutation=Mutations,
@@ -169,7 +172,7 @@ def create_app(
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["admin.context"] = PrivateContext()
+    app[admin_context_app_key] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))

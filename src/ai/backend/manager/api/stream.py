@@ -77,7 +77,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 @adefer
 async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["stream.context"]
+    app_ctx = request.app[stream_context_app_key]
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
@@ -288,7 +288,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     WebSocket-version of gateway.kernel.execute().
     """
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["stream.context"]
+    app_ctx = request.app[stream_context_app_key]
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
@@ -430,7 +430,7 @@ async def stream_proxy(
     defer, request: web.Request, params: Mapping[str, Any]
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["stream.context"]
+    app_ctx = request.app[stream_context_app_key]
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
     session_name: str = request.match_info["session_name"]
@@ -663,7 +663,7 @@ async def handle_kernel_terminating(
     event: KernelTerminatingEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["stream.context"]
+    app_ctx = app[stream_context_app_key]
     try:
         kernel = await KernelRow.get_kernel(
             root_ctx.db,
@@ -755,9 +755,12 @@ class PrivateContext:
     active_session_ids: DefaultDict[SessionId, int]
 
 
+stream_context_app_key = web.AppKey("stream.context", PrivateContext)
+
+
 async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["stream.context"]
+    app_ctx = app[stream_context_app_key]
 
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_execute_handlers = defaultdict(weakref.WeakSet)
@@ -782,7 +785,7 @@ async def stream_shutdown(app: web.Application) -> None:
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
     cancelled_tasks: List[asyncio.Task] = []
-    app_ctx: PrivateContext = app["stream.context"]
+    app_ctx = app[stream_context_app_key]
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)
     for per_kernel_handlers in app_ctx.stream_pty_handlers.values():
@@ -813,7 +816,7 @@ def create_app(
 
     app[prefix_app_key] = "stream"
     app[api_versions_app_key] = (2, 3, 4)
-    app["stream.context"] = PrivateContext()
+    app[stream_context_app_key] = PrivateContext()
     app["database_ptask_group"] = aiotools.PersistentTaskGroup()
     app["rpc_ptask_group"] = aiotools.PersistentTaskGroup()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)

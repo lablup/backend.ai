@@ -2292,7 +2292,7 @@ async def purge(request: web.Request) -> web.Response:
         request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["folders.context"]
+    app_ctx = request.app[folders_context_app_key]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
@@ -3261,8 +3261,11 @@ class PrivateContext:
     storage_ptask_group: aiotools.PersistentTaskGroup
 
 
+folders_context_app_key = web.AppKey("folders.context", PrivateContext)
+
+
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["folders.context"]
+    app_ctx = app[folders_context_app_key]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup(
         exception_handler=storage_task_exception_handler
@@ -3270,7 +3273,7 @@ async def init(app: web.Application) -> None:
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["folders.context"]
+    app_ctx = app[folders_context_app_key]
     await app_ctx.database_ptask_group.shutdown()
     await app_ctx.storage_ptask_group.shutdown()
 
@@ -3283,7 +3286,7 @@ def create_app(default_cors_options):
     app[api_versions_app_key] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["folders.context"] = PrivateContext()
+    app[folders_context_app_key] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))

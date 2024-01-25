@@ -238,9 +238,12 @@ class PrivateContext:
     log_cleanup_timer_evh: EventHandler[web.Application, DoLogCleanupEvent]
 
 
+logs_context_app_key = web.AppKey("logs.context", PrivateContext)
+
+
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["logs.context"]
+    app_ctx = app[logs_context_app_key]
     app_ctx.log_cleanup_timer_evh = root_ctx.event_dispatcher.consume(
         DoLogCleanupEvent,
         app,
@@ -259,7 +262,7 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["logs.context"]
+    app_ctx = app[logs_context_app_key]
     await app_ctx.log_cleanup_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
 
@@ -274,7 +277,7 @@ def create_app(
 
     app[api_versions_app_key] = (4, 5)
     app[prefix_app_key] = "logs/error"
-    app["logs.context"] = PrivateContext()
+    app[logs_context_app_key] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", append))
     cors.add(app.router.add_route("GET", "", list_logs))

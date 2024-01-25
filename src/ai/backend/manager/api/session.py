@@ -722,7 +722,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
+    app_ctx = request.app[session_context_app_key]
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
@@ -941,7 +941,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
 async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
+    app_ctx = request.app[session_context_app_key]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     filename: str | None = params["filename"]
 
@@ -1969,9 +1969,12 @@ class PrivateContext:
     webhook_ptask_group: aiotools.PersistentTaskGroup
 
 
+session_context_app_key = web.AppKey("session.context", PrivateContext)
+
+
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["session.context"]
+    app_ctx = app[session_context_app_key]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.webhook_ptask_group = aiotools.PersistentTaskGroup()
@@ -1989,7 +1992,7 @@ async def init(app: web.Application) -> None:
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["session.context"]
+    app_ctx = app[session_context_app_key]
     app_ctx.agent_lost_checker.cancel()
     await app_ctx.agent_lost_checker
     app_ctx.stats_task.cancel()
@@ -2009,7 +2012,7 @@ def create_app(
     from ..appkey import api_versions_app_key, prefix_app_key
 
     app[api_versions_app_key] = (1, 2, 3, 4)
-    app["session.context"] = PrivateContext()
+    app[session_context_app_key] = PrivateContext()
     app[prefix_app_key] = "session"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create_from_params))

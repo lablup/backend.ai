@@ -50,7 +50,7 @@ async def rlim_middleware(
     handler: WebRequestHandler,
 ) -> web.StreamResponse:
     # This is a global middleware: request.app is the root app.
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx = app[ratelimit_context_app_key]
     now = Decimal(time.time()).quantize(_time_prec)
     rr = app_ctx.redis_rlim
     if request["is_authorized"]:
@@ -90,9 +90,12 @@ class PrivateContext:
     redis_rlim_script: str
 
 
+ratelimit_context_app_key = web.AppKey("ratelimit.context", PrivateContext)
+
+
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx = app[ratelimit_context_app_key]
     app_ctx.redis_rlim = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
     )
@@ -102,7 +105,7 @@ async def init(app: web.Application) -> None:
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx = app[ratelimit_context_app_key]
     await redis_helper.execute(app_ctx.redis_rlim, lambda r: r.flushdb())
     await app_ctx.redis_rlim.close()
 
@@ -114,7 +117,7 @@ def create_app(
     from ..appkey import api_versions_app_key
 
     app[api_versions_app_key] = (1, 2, 3, 4)
-    app["ratelimit.context"] = PrivateContext()
+    app[ratelimit_context_app_key] = PrivateContext()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     # middleware must be wrapped by web.middleware at the outermost level.
