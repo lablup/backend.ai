@@ -129,3 +129,28 @@ class QuotaScope(BaseFunction):
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["set_quota_scope"]["quota_scope"]
+
+    @api_function
+    @classmethod
+    async def unset_quota_scope(
+        cls,
+        host: str,
+        qsid: str,
+        fields: Sequence[FieldSpec] = _default_quota_scope_fields,
+    ):
+        query = textwrap.dedent(
+            """\
+            mutation($storage_host_name: String!, $quota_scope_id: String!) {
+                unset_quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id) {
+                    quota_scope {$fields}
+                }
+            }
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {
+            "storage_host_name": host,
+            "quota_scope_id": qsid,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["unset_quota_scope"]["quota_scope"]
