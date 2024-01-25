@@ -35,7 +35,7 @@ from .base import (
     set_if_set,
     simple_db_mutate,
 )
-from .image import Image, ImageRow
+from .image import Image, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
 
 if TYPE_CHECKING:
@@ -649,7 +649,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     desired_session_count = graphene.Int()
-    image = graphene.JSONString()
+    image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
     open_to_public = graphene.Boolean()
@@ -686,16 +686,15 @@ class ModifyEndpoint(graphene.Mutation):
         set_if_set(props, data, "image")
         image = data.pop("image", None)
         if image is not None:
-            image_name = image.get("name")
+            image_name = image["name"]
+            registry = image.get("registry") or ["*"]
             arch = image.get("architecture")
-            if image_name is None:
-                raise ValueError("Expected not null value on `name` of `image` field")
             if arch is not None:
-                image_ref = ImageRef(image_name, ["*"], arch)
+                image_ref = ImageRef(image_name, registry, arch)
             else:
                 image_ref = ImageRef(
                     image_name,
-                    ["*"],
+                    registry,
                 )
             async with graph_ctx.db.begin_readonly_session() as db_session:
                 image_row = await ImageRow.resolve(db_session, [image_ref])

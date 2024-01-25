@@ -952,3 +952,9 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class ImageRefType(graphene.InputObjectType):
+    name = graphene.String(required=True)
+    registry = graphene.JSONString()
+    architecture = graphene.String()
