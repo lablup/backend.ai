@@ -45,9 +45,11 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 async def container_resolver_middleware(
     request: web.Request, handler: Handler
 ) -> web.StreamResponse:
+    from ...appkey import docker_mode_app_key
+
     if (
         request.headers.get("X-Forwarded-For") is not None
-        and request.app["docker-mode"] == "linuxkit"
+        and request.app[docker_mode_app_key] == "linuxkit"
     ):
         container_ip = request.headers["X-Forwarded-For"]
     elif remote_ip := request.remote:
@@ -109,11 +111,11 @@ class MetadataServer(aobject):
         self.route_structure = {"latest": {"extension": {}}}
 
     async def __ainit__(self):
-        from ...appkey import root_context_app_key
+        from ...appkey import docker_mode_app_key, root_context_app_key
 
         local_config = self.app[root_context_app_key].local_config
         await prepare_kernel_metadata_uri_handling(local_config)
-        self.app["docker-mode"] = local_config["agent"]["docker-mode"]
+        self.app[docker_mode_app_key] = local_config["agent"]["docker-mode"]
         log.info("Loading metadata plugin: meta-data")
         metadata_plugin = ContainerMetadataPlugin({}, local_config)
         await metadata_plugin.init(None)
