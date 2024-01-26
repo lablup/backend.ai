@@ -1,16 +1,16 @@
 """Replace status_history's type map with list
 
-Revision ID: 37fb8b8e98e5
-Revises: 8c74e7df26f8
-Create Date: 2023-10-30 08:02:27.845105
+Revision ID: 8c8e90aebacd
+Revises: 8b2ec7e3d22a
+Create Date: 2024-01-26 11:19:23.075014
 
 """
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "37fb8b8e98e5"
-down_revision = "8c74e7df26f8"
+revision = "8c8e90aebacd"
+down_revision = "8b2ec7e3d22a"
 branch_labels = None
 depends_on = None
 

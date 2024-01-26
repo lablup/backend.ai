@@ -1007,10 +1007,12 @@ class AgentRegistry:
         session_data = {
             "id": session_id,
             "status": SessionStatus.PENDING,
-            "status_history": {
-                "status": SessionStatus.PENDING.name,
-                "timestamp": datetime.now(tzutc()).isoformat(),
-            },
+            "status_history": [
+                {
+                    "status": SessionStatus.PENDING.name,
+                    "timestamp": datetime.now(tzutc()).isoformat(),
+                }
+            ],
             "creation_id": session_creation_id,
             "name": session_name,
             "session_type": session_type,
@@ -1031,10 +1033,12 @@ class AgentRegistry:
 
         kernel_shared_data = {
             "status": KernelStatus.PENDING,
-            "status_history": {
-                "status": KernelStatus.PENDING.name,
-                "timestamp": datetime.now(tzutc()).isoformat(),
-            },
+            "status_history": [
+                {
+                    "status": KernelStatus.PENDING.name,
+                    "timestamp": datetime.now(tzutc()).isoformat(),
+                },
+            ],
             "session_creation_id": session_creation_id,
             "session_id": session_id,
             "session_name": session_name,
