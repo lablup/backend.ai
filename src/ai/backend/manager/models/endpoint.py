@@ -383,6 +383,7 @@ class Endpoint(graphene.ObjectType):
 
     endpoint_id = graphene.UUID()
     image = graphene.String()
+    architecture = graphene.String()
     image_row = Image
     domain = graphene.String()
     project = graphene.String()
@@ -433,6 +434,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             image=row.image_row.name,
+            architecture=row.image_row.architecture,
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
