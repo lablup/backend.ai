@@ -5,6 +5,7 @@ import pytest
 import yarl
 from aiohttp import web
 
+from ai.backend.web.appkey import config_app_key
 from ai.backend.web.auth import get_anonymous_session, get_api_session
 
 
@@ -16,7 +17,7 @@ class DummyRequest:
 @pytest.mark.asyncio
 async def test_get_api_session(mocker):
     mock_request = DummyRequest({
-        "config": {
+        config_app_key: {
             "api": {
                 "domain": "default",
                 "endpoint": [yarl.URL("https://api.backend.ai")],
