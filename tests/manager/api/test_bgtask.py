@@ -15,7 +15,7 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.types import AgentId
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import root_context_app_key
 from ai.backend.manager.server import background_task_ctx, event_dispatcher_ctx, shared_config_ctx
 
 
@@ -25,7 +25,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         [shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
         [".events"],
     )
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     producer: EventProducer = root_ctx.event_producer
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
     update_handler_ctx = {}
@@ -90,7 +90,7 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         [shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
         [".events"],
     )
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     producer: EventProducer = root_ctx.event_producer
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
     fail_handler_ctx = {}

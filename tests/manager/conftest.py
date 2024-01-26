@@ -39,7 +39,7 @@ from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_c
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import root_context_app_key
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -282,7 +282,7 @@ def etcd_fixture(
 
 @pytest.fixture
 async def shared_config(app, etcd_fixture):
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     shared_config = SharedConfig(
         root_ctx.local_config["etcd"]["addr"],
         root_ctx.local_config["etcd"]["user"],
@@ -290,7 +290,7 @@ async def shared_config(app, etcd_fixture):
         root_ctx.local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     root_ctx.shared_config = shared_config
     yield shared_config
 
@@ -579,7 +579,7 @@ async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
                 **scheduler_opts,
             },
         )
-        root_ctx: RootContext = app["_root.context"]
+        root_ctx = app[root_context_app_key]
         for octx_cls in _outer_ctx_classes:
             octx = octx_cls(root_ctx)  # type: ignore
             _outer_ctxs.append(octx)
@@ -654,7 +654,7 @@ def get_headers(app, default_keypair):
         keypair=default_keypair,
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
-        root_ctx: RootContext = app["_root.context"]
+        root_ctx = app[root_context_app_key]
         hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
         headers = {
             "Date": now.isoformat(),
@@ -723,7 +723,7 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
         ],
         spawn_agent=True,
     )
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
 
     async def create_kernel(image="lua:5.3-alpine", tag=None):
         url = "/v3/kernel/"

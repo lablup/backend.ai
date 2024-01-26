@@ -7,7 +7,7 @@ import pytest
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import root_context_app_key
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerHost,
@@ -96,7 +96,7 @@ async def new_user_grace_period_checker(
         ],
         [".etcd"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    root_ctx = test_app[root_context_app_key]
 
     # test config
     grace_period = 30
@@ -145,7 +145,7 @@ async def network_timeout_idle_checker(
         ],
         [".etcd"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    root_ctx = test_app[root_context_app_key]
 
     # test 1
     # remaining time is positive and no grace period
@@ -396,7 +396,7 @@ async def session_lifetime_checker(
         ],
         [".etcd"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    root_ctx = test_app[root_context_app_key]
 
     # test 1
     # remaining time is positive and no grace period
@@ -619,7 +619,7 @@ async def utilization_idle_checker__utilization(
         ],
         [".etcd"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    root_ctx = test_app[root_context_app_key]
 
     kernel_id = KernelId(uuid4())
     expected = {
@@ -703,7 +703,7 @@ async def utilization_idle_checker(
         ],
         [".etcd"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    root_ctx = test_app[root_context_app_key]
 
     # test 1
     # remaining time is positive and no utilization.

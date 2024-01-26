@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import sqlalchemy as sa
 
 import ai.backend.manager.models as models
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import root_context_app_key
 
 
 def get_random_string(length=10):
@@ -33,7 +33,7 @@ class ModelFactory(ABC):
         self.defaults = self.get_creation_defaults()
         self.defaults.update(**kwargs)
         await self.before_creation()
-        root_ctx: RootContext = self.app["_root.context"]
+        root_ctx = self.app[root_context_app_key]
         async with root_ctx.db.begin() as conn:
             query = self.model.insert().returning(self.model).values(self.defaults)
             result = await conn.execute(query)
@@ -43,7 +43,7 @@ class ModelFactory(ABC):
         return row
 
     async def get(self, **kwargs):
-        root_ctx: RootContext = self.app["_root.context"]
+        root_ctx = self.app[root_context_app_key]
         async with root_ctx.db.begin() as conn:
             filters = [sa.sql.column(key) == value for key, value in kwargs.items()]
             query = sa.select([self.model]).where(sa.and_(*filters))
@@ -53,7 +53,7 @@ class ModelFactory(ABC):
             return rows[0] if len(rows) == 1 else None
 
     async def list(self, **kwargs):
-        root_ctx: RootContext = self.app["_root.context"]
+        root_ctx = self.app[root_context_app_key]
         async with root_ctx.db.begin() as conn:
             filters = [sa.sql.column(key) == value for key, value in kwargs.items()]
             query = sa.select([self.model]).where(sa.and_(*filters))
