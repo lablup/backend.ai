@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import Any, Iterable, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -15,12 +15,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..models import query_allowed_sgroups
 from .auth import auth_required
+from .context import root_context_app_key
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -47,7 +45,7 @@ async def query_wsproxy_status(
     }),
 )
 async def list_available_sgroups(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     is_admin = request["is_admin"]
@@ -75,7 +73,7 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
     })
 )
 async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     scaling_group_name = request.match_info["scaling_group"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]

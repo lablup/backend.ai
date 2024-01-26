@@ -50,16 +50,17 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
+from ..appkey import api_versions_app_key, prefix_app_key
 from ..models import UserRole, groups, kernels
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
     from .types import CORSOptions, WebMiddleware
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -88,7 +89,7 @@ async def push_session_events(
     request: web.Request,
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     app_ctx = request.app[events_context_app_key]
     session_name = params["session_name"]
@@ -177,7 +178,7 @@ async def push_background_task_events(
     request: web.Request,
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     task_id = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
@@ -192,7 +193,7 @@ async def enqueue_kernel_creation_status_update(
     source: AgentId,
     event: KernelPreparingEvent | KernelPullingEvent | KernelCreatingEvent | KernelStartedEvent,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
 
     app_ctx = app[events_context_app_key]
 
@@ -230,7 +231,7 @@ async def enqueue_kernel_termination_status_update(
     agent_id: AgentId,
     event: KernelCancelledEvent | KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
 
     app_ctx = app[events_context_app_key]
 
@@ -275,7 +276,7 @@ async def enqueue_session_creation_status_update(
         SessionEnqueuedEvent | SessionScheduledEvent | SessionStartedEvent | SessionCancelledEvent
     ),
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[events_context_app_key]
 
     async def _fetch():
@@ -311,7 +312,7 @@ async def enqueue_session_termination_status_update(
     agent_id: AgentId,
     event: SessionTerminatingEvent | SessionTerminatedEvent,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[events_context_app_key]
 
     async def _fetch():
@@ -347,7 +348,7 @@ async def enqueue_batch_task_result_update(
     agent_id: AgentId,
     event: SessionSuccessEvent | SessionFailureEvent,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[events_context_app_key]
 
     async def _fetch():
@@ -386,7 +387,7 @@ events_context_app_key = web.AppKey("events_context", PrivateContext)
 
 
 async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[events_context_app_key]
     app_ctx.session_event_queues = set()
     event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
@@ -430,7 +431,6 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    from ..appkey import api_versions_app_key, prefix_app_key
 
     app[events_context_app_key] = PrivateContext()
     app[prefix_app_key] = "events"

@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
+from typing import Any, Dict, List, Mapping, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -16,14 +16,12 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -49,7 +47,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     resp = []
     async with root_ctx.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
@@ -102,7 +100,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     user_uuid = request["user"]["uuid"]
     log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         entries: List[Mapping[str, Any]]
         j = session_templates.join(
@@ -175,7 +173,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
     template_id = request.match_info["template_id"]
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         query = (
             sa.select([
@@ -228,7 +226,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         query = (
@@ -286,7 +284,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         query = (
             sa.select([session_templates.c.id])

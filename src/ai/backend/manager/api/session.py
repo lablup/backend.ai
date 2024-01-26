@@ -79,6 +79,7 @@ from ..models.session import SessionDependencyRow
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -298,7 +299,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         params["session_name"],
     )
 
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
@@ -396,7 +397,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 async def create_from_template(request: web.Request, params: dict[str, Any]) -> web.Response:
     # TODO: we need to refactor session_template model to load the template configs
     #       by one batch. Currently, we need to set every template configs one by one.
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     if params["image"] is None and params["template_id"] is None:
         raise InvalidAPIParameters("Both image and template_id can't be None!")
@@ -634,7 +635,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     loads=_json_loads,
 )
 async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if params["domain"] is None:
         domain_name = request["user"]["domain_name"]
     else:
@@ -720,7 +721,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
     })
 )
 async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name: str = request.match_info["session_name"]
     app_ctx = request.app[session_context_app_key]
     access_key: AccessKey = request["keypair"]["access_key"]
@@ -847,7 +848,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     loads=_json_loads,
 )
 async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
@@ -882,7 +883,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     loads=_json_loads,
 )
 async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
@@ -913,7 +914,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
     }),
 )
 async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
     agent_id = AgentId(params["agent"])
@@ -939,7 +940,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     loads=_json_loads,
 )
 async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name: str = request.match_info["session_name"]
     app_ctx = request.app[session_context_app_key]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1049,7 +1050,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
     }),
 )
 async def rename_session(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     new_name = params["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1086,7 +1087,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def destroy(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     if requester_access_key != owner_access_key and request["user"]["role"] not in (
@@ -1180,7 +1181,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
     """
     A quick session-ID matcher API for use with auto-completion in CLI.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     id_or_name_prefix = params["id"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info(
@@ -1216,7 +1217,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def get_direct_access_info(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     _, owner_access_key = await get_access_key_scopes(request)
 
@@ -1250,7 +1251,7 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
     resp = {}
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
@@ -1314,7 +1315,7 @@ async def get_info(request: web.Request) -> web.Response:
     })
 )
 async def restart(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
@@ -1342,7 +1343,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
 @auth_required
 async def execute(request: web.Request) -> web.Response:
     resp = {}
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     try:
@@ -1442,7 +1443,7 @@ async def execute(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def interrupt(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("INTERRUPT(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
@@ -1471,7 +1472,7 @@ async def complete(request: web.Request) -> web.Response:
             "completions": [],
         },
     }
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     try:
@@ -1512,7 +1513,7 @@ async def complete(request: web.Request) -> web.Response:
     })
 )
 async def shutdown_service(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info(
@@ -1633,7 +1634,7 @@ async def find_dependency_sessions(
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def get_dependency_graph(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     root_session_name = request.match_info["session_name"]
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1657,7 +1658,7 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
 async def upload_files(request: web.Request) -> web.Response:
     loop = asyncio.get_event_loop()
     reader = await request.multipart()
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info(
@@ -1709,7 +1710,7 @@ async def upload_files(request: web.Request) -> web.Response:
     })
 )
 async def download_files(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     files = params.get("files")
@@ -1768,7 +1769,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     """
     Download a single file from the scratch root. Only for small files.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     file = params["file"]
@@ -1806,7 +1807,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def list_files(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     try:
         session_name = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1855,7 +1856,7 @@ async def list_files(request: web.Request) -> web.Response:
     })
 )
 async def get_container_logs(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info(
@@ -1902,7 +1903,7 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
 )
 async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse:
     log.info("GET_TASK_LOG (ak:{}, k:{})", request["keypair"]["access_key"], params["kernel_id"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
@@ -1973,7 +1974,7 @@ session_context_app_key = web.AppKey("session.context", PrivateContext)
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[session_context_app_key]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()

@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import Any, Iterable, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -55,6 +55,7 @@ from ..models import (
 )
 from ..types import UserScope
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
@@ -66,9 +67,6 @@ from .utils import (
     pydantic_response_api_handler,
     undefined,
 )
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -130,7 +128,7 @@ class CompactServeInfoModel(BaseModel):
 async def list_serve(
     request: web.Request, params: ListServeRequestModel
 ) -> list[CompactServeInfoModel]:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
@@ -202,7 +200,7 @@ class ServeInfoModel(BaseModel):
 @server_status_required(READ_ALLOWED)
 @pydantic_response_api_handler
 async def get_info(request: web.Request) -> ServeInfoModel:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -330,7 +328,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
     Creates a new model service. If `desired_session_count` is greater than zero,
     then inference sessions will be automatically scheduled upon successful creation of model service.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     scopes_param = {
         "owner_access_key": (
             None if params.owner_access_key is undefined else params.owner_access_key
@@ -545,7 +543,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
     """
     Removes model service (and inference sessions for the service also).
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -589,7 +587,7 @@ async def sync(request: web.Request) -> SuccessResponseModel:
     In normal situations this will be automatically handled by Backend.AI schedulers,
     but this API is left open in case of unexpected restart of AppProxy process.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -626,7 +624,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
     Updates ideal inference session count manually. Based on the difference of this number,
     inference sessions will be created or removed automatically.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -669,7 +667,7 @@ async def update_route(
     """
     Updates traffic bias of specific route.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
     route_id = uuid.UUID(request.match_info["route_id"])
@@ -714,7 +712,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
     """
     Scales down the service by removing specific inference session.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
     route_id = uuid.UUID(request.match_info["route_id"])
@@ -772,7 +770,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
     If both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.
     duration and valid_until can't be both specified.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -855,7 +853,7 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
     up. The only way to clear the error and retry spawning session is to call
     `clear_error` (POST /services/{service_id}/errors/clear) API.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 
@@ -889,7 +887,7 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def clear_error(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
 

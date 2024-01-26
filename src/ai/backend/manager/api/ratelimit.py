@@ -14,7 +14,7 @@ from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
-from .context import RootContext
+from .context import root_context_app_key
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
@@ -94,7 +94,7 @@ ratelimit_context_app_key = web.AppKey("ratelimit.context", PrivateContext)
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[ratelimit_context_app_key]
     app_ctx.redis_rlim = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB

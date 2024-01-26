@@ -20,6 +20,7 @@ from ..models import (
 )
 from ..models import association_groups_users as agus
 from .auth import admin_required, auth_required
+from .context import root_context_app_key
 from .exceptions import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -33,7 +34,7 @@ from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -53,7 +54,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.CREATE_DOTFILE (group: {0})", params["group"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
         if isinstance(group_id_or_name, str):
@@ -116,7 +117,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 )
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.LIST_OR_GET_DOTFILE (group: {0})", params["group"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     resp = []
     group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
@@ -190,7 +191,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
 )
 async def update(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.UPDATE_DOTFILE (domain:{0})", params["domain"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
         if isinstance(group_id_or_name, str):
@@ -244,7 +245,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
         if isinstance(group_id_or_name, str):

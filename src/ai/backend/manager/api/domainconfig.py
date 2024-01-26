@@ -11,6 +11,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required
+from .context import root_context_app_key
 from .exceptions import (
     DomainNotFound,
     DotfileAlreadyExists,
@@ -24,7 +25,7 @@ from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -45,7 +46,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     log.info("DOMAINCOFNIG.CREATE_DOTFILE (domain: {0})", params["domain"])
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot create dotfiles of other domains")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         dotfiles, leftover_space = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:
@@ -92,7 +93,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Users cannot access dotfiles of other domains")
     resp = []
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         if params["path"]:
             dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
@@ -131,7 +132,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
     log.info("DOMAINCONFIG.UPDATE_DOTFILE (domain:{0})", params["domain"])
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot update dotfiles of other domains")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:
@@ -170,7 +171,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("DOMAINCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot delete dotfiles of other domains")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:

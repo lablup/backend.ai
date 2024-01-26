@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import attrs
+from aiohttp import web
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -53,3 +54,6 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+
+
+root_context_app_key = web.AppKey("_root.context", RootContext)

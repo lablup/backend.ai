@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -11,11 +11,9 @@ from ai.backend.manager.openapi import generate_openapi
 
 from ..appkey import root_app_app_key
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import GenericForbidden
 from .types import CORSOptions, Iterable, WebMiddleware
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -43,7 +41,7 @@ HTML = """
 
 @auth_required
 async def render_html(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
         raise GenericForbidden
 
@@ -56,7 +54,7 @@ async def render_html(request: web.Request) -> web.Response:
 
 @auth_required
 async def generate_spec(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
         raise GenericForbidden
 
@@ -64,7 +62,7 @@ async def generate_spec(request: web.Request) -> web.Response:
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     if root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
         log.warning(
             "OpenAPI schema introspection is enabled. "

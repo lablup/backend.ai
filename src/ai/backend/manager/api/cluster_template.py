@@ -25,13 +25,14 @@ from ..models import (
 from ..models import association_groups_users as agus
 from ..models.session_template import check_cluster_template
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -60,7 +61,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
     user_uuid = request["user"]["uuid"]
 
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     async with root_ctx.db.begin() as conn:
         if requester_access_key != owner_access_key:
@@ -179,7 +180,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 )
 async def list_template(request: web.Request, params: Any) -> web.Response:
     resp = []
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -270,7 +271,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
     )
 
     template_id = request.match_info["template_id"]
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     async with root_ctx.db.begin() as conn:
         query = (
@@ -302,7 +303,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def put(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     template_id = request.match_info["template_id"]
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
@@ -351,7 +352,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     template_id = request.match_info["template_id"]
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)

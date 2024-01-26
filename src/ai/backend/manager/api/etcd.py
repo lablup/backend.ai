@@ -24,12 +24,13 @@ from ai.backend.common.types import AcceleratorMetadata
 
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -88,7 +89,7 @@ KNOWN_SLOT_METADATA: dict[str, AcceleratorMetadata] = {
 
 async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     known_slots = await root_ctx.shared_config.get_resource_slots()
     return web.json_response(known_slots, status=200)
 
@@ -100,7 +101,7 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 )
 async def get_resource_metadata(request: web.Request, params: Any) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params["sgroup"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     known_slots = await root_ctx.shared_config.get_resource_slots()
 
     # Collect plugin-reported accelerator metadata
@@ -146,7 +147,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
     log.info("ETCD.GET_VFOLDER_TYPES ()")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     return web.json_response(vfolder_types, status=200)
 
@@ -157,7 +158,7 @@ async def get_docker_registries(request: web.Request) -> web.Response:
     Returns the list of all registered docker registries.
     """
     log.info("ETCD.GET_DOCKER_REGISTRIES ()")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     _registries = await get_known_registries(root_ctx.shared_config.etcd)
     # ``yarl.URL`` is not JSON-serializable, so we need to represent it as string.
     known_registries: Mapping[str, str] = {k: v.human_repr() for k, v in _registries.items()}
@@ -195,7 +196,7 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
        **To avoid this issue, developers must use dedicated CRUD APIs
        instead of relying on the etcd raw access APIs whenever possible.**
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info(
         "ETCD.GET_CONFIG (ak:{}, key:{}, prefix:{})",
         request["keypair"]["access_key"],
@@ -222,7 +223,7 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
     """
     A raw access API to write key-value pairs into the etcd.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info(
         "ETCD.SET_CONFIG (ak:{}, key:{}, val:{})",
         request["keypair"]["access_key"],
@@ -281,7 +282,7 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
        **To avoid this issue, developers must use dedicated CRUD APIs
        instead of relying on the etcd raw access APIs whenever possible.**
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info(
         "ETCD.DELETE_CONFIG (ak:{}, key:{}, prefix:{})",
         request["keypair"]["access_key"],
@@ -296,7 +297,7 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
 
 
 async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     if root_ctx.pidx == 0:
         await root_ctx.shared_config.register_myself()
     yield

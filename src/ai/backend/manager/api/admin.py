@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import Any, Iterable, Tuple
 
 import aiohttp_cors
 import attrs
@@ -20,13 +20,11 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..models.base import DataLoaderManager
 from ..models.gql import GQLMutationPrivilegeCheckMiddleware, GraphQueryContext, Mutations, Queries
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import GraphQLError as BackendGQLError
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -46,7 +44,7 @@ class GQLLoggingMiddleware:
 
 
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     app_ctx = request.app[admin_context_app_key]
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
@@ -154,7 +152,7 @@ async def init(app: web.Application) -> None:
         mutation=Mutations,
         auto_camelcase=False,
     )
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     if root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
         log.warning(
             "GraphQL schema introspection is enabled. "

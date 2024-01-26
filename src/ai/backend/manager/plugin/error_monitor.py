@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import Any, Mapping
 
 from ai.backend.common.events import AgentErrorEvent
 from ai.backend.common.logging import BraceStyleAdapter
@@ -11,9 +11,6 @@ from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId, LogSeverity
 
 from ..models import error_logs
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -29,7 +26,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             return
         else:
             self.enabled = True
-        root_ctx: RootContext = context["_root.context"]  # type: ignore
+        root_ctx = context["_root.context"]  # type: ignore
         self.event_dispatcher = root_ctx.event_dispatcher
         self._evh = self.event_dispatcher.consume(AgentErrorEvent, None, self.handle_agent_error)
         self.db = root_ctx.db

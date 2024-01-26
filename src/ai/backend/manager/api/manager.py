@@ -26,6 +26,7 @@ from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
+from .context import root_context_app_key
 from .exceptions import (
     GenericBadRequest,
     InstanceNotFound,
@@ -53,7 +54,7 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
     def decorator(handler):
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs):
-            root_ctx: RootContext = request.app["_root.context"]
+            root_ctx = request.app[root_context_app_key]
             status = await root_ctx.shared_config.get_manager_status()
             if status not in allowed_status:
                 if status == ManagerStatus.FROZEN:
@@ -102,7 +103,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def fetch_manager_status(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info("MANAGER.FETCH_MANAGER_STATUS ()")
     try:
         status = await root_ctx.shared_config.get_manager_status()
@@ -152,7 +153,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
     })
 )
 async def update_manager_status(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info(
         "MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})",
         params["status"],
@@ -174,7 +175,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
 
 
 async def get_announcement(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     data = await root_ctx.shared_config.etcd.get("manager/announcement")
     if data is None:
         ret = {"enabled": False, "message": ""}
@@ -191,7 +192,7 @@ async def get_announcement(request: web.Request) -> web.Response:
     })
 )
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if params["enabled"]:
         if not params["message"]:
             raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
@@ -215,7 +216,7 @@ iv_scheduler_ops_args = {
     })
 )
 async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     try:
         args = iv_scheduler_ops_args[params["op"]].check(params["args"])
     except t.DataError as e:
@@ -245,7 +246,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
     })
 )
 async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     match params["event"]:
         case SchedulerEvent.SCHEDULE:
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
@@ -258,7 +259,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     manager_id = root_ctx.local_config["manager"]["id"]
 
     scheduler_status = {}
@@ -281,7 +282,7 @@ manager_context_app_key = web.AppKey("manager.context", PrivateContext)
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[manager_context_app_key]
     app_ctx.status_watch_task = asyncio.create_task(detect_status_update(root_ctx))
 

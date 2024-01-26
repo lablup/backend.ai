@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import Any, MutableMapping, Tuple
 
 import aiohttp_cors
 import attrs
@@ -23,12 +23,10 @@ from ..defs import LockID
 from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
 from .auth import auth_required
+from .context import root_context_app_key
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -54,7 +52,7 @@ class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
     )
 )
 async def append(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     params["domain"] = request["user"]["domain_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     requester_uuid = request["user"]["uuid"]
@@ -94,7 +92,7 @@ async def append(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def list_logs(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     resp: MutableMapping[str, Any] = {"logs": []}
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -173,7 +171,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 async def mark_cleared(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
@@ -209,7 +207,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
 
 
 async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     etcd = root_ctx.shared_config.etcd
     raw_lifetime = await etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
@@ -242,7 +240,7 @@ logs_context_app_key = web.AppKey("logs.context", PrivateContext)
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[logs_context_app_key]
     app_ctx.log_cleanup_timer_evh = root_ctx.event_dispatcher.consume(
         DoLogCleanupEvent,
@@ -261,7 +259,7 @@ async def init(app: web.Application) -> None:
 
 
 async def shutdown(app: web.Application) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[logs_context_app_key]
     await app_ctx.log_cleanup_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)

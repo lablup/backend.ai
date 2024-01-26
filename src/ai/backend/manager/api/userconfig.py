@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import Any, Tuple
 
 import aiohttp_cors
 import trafaret as t
@@ -19,6 +19,7 @@ from ..models import (
     vfolders,
 )
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -28,9 +29,6 @@ from .exceptions import (
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -54,7 +52,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     user_uuid = request["user"]["uuid"]
     async with root_ctx.db.begin() as conn:
         path: str = params["path"]
@@ -98,7 +96,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 )
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
     resp = []
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     access_key = request["keypair"]["access_key"]
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
@@ -144,7 +142,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         path: str = params["path"]
         dotfiles, _ = await query_owned_dotfiles(conn, owner_access_key)
@@ -181,7 +179,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     path = params["path"]
     async with root_ctx.db.begin() as conn:
         dotfiles, _ = await query_owned_dotfiles(conn, owner_access_key)
@@ -210,7 +208,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
 async def update_bootstrap_script(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("UPDATE_BOOTSTRAP_SCRIPT (ak:{0})", access_key)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         script = params.get("script", "").strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
@@ -229,7 +227,7 @@ async def update_bootstrap_script(request: web.Request, params: Any) -> web.Resp
 async def get_bootstrap_script(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("USERCONFIG.GET_BOOTSTRAP_SCRIPT (ak:{0})", access_key)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         script, _ = await query_bootstrap_script(conn, access_key)
         return web.json_response(script)

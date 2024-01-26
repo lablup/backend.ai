@@ -37,6 +37,7 @@ from ..models.user import (
     compare_to_hashed_password,
 )
 from ..models.utils import execute_with_retry
+from .context import root_context_app_key
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
     from sqlalchemy.engine.row import Row
 
     from ..models.utils import ExtendedAsyncSAEngine
-    from .context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -429,7 +429,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     attributes.
     """
     # This is a global middleware: request.app is the root app.
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     request["is_authorized"] = False
     request["is_admin"] = False
     request["is_superadmin"] = False
@@ -632,7 +632,7 @@ async def test(request: web.Request, params: Any) -> web.Response:
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
     group_role = None
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log.info(
         "AUTH.ROLES(ak:{}, d:{}, g:{})",
         request["keypair"]["access_key"],
@@ -679,7 +679,7 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         # other types are not implemented yet.
         raise InvalidAPIParameters("Unsupported authorization type")
     log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     # [Hooking point for AUTHORIZE with the FIRST_COMPLETED requirement]
     # The hook handlers should accept the whole ``params`` dict, and optional
@@ -754,7 +754,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
     log_fmt = "AUTH.SIGNUP(d:{}, email:{}, passwd:****)"
     log_args = (params["domain"], params["email"])
     log.info(log_fmt, *log_args)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     # [Hooking point for PRE_SIGNUP with the ALL_COMPLETED requirement]
     # The hook handlers should accept the whole ``params`` dict.
@@ -885,7 +885,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
 async def signout(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, params["email"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if request["user"]["email"] != params["email"]:
         raise GenericForbidden("Not the account owner")
     result = await check_credential(root_ctx.db, domain_name, params["email"], params["password"])
@@ -915,7 +915,7 @@ async def signout(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def update_full_name(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
     log_fmt = "AUTH.UPDATE_FULL_NAME(d:{}, email:{})"
@@ -953,7 +953,7 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def update_password(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
     log_fmt = "AUTH.UDPATE_PASSWORD(d:{}, email:{})"
@@ -1008,7 +1008,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     because it's been too long since a user changed the password.
     """
 
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     log_fmt = "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)"
     log_args = (params["domain"], params["username"])
     log.info(log_fmt, *log_args)
@@ -1063,7 +1063,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
 
 @auth_required
 async def get_ssh_keypair(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})"
@@ -1083,7 +1083,7 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
     log_fmt = "AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})"
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         pubkey, privkey = _gen_ssh_keypair()
         data = {
@@ -1110,7 +1110,7 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         data = {
             "ssh_public_key": pubkey,

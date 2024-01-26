@@ -18,13 +18,14 @@ from ..models import association_groups_users as agus
 from ..models import domains, groups, query_allowed_sgroups
 from ..types import UserScope
 from .auth import admin_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    pass
 
 
 DOCKERFILE_TEMPLATE = r"""# syntax = docker/dockerfile:1.0-experimental
@@ -84,7 +85,7 @@ LABEL ai.backend.kernelspec="1" \
 @server_status_required(READ_ALLOWED)
 @admin_required
 async def get_import_image_form(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin() as conn:
         query = (
             sa.select([groups.c.name])
@@ -326,7 +327,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
     """
 
     tpl = jinja2.Template(DOCKERFILE_TEMPLATE)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
 
     async with root_ctx.db.begin() as conn:
         query = (

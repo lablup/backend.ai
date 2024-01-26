@@ -55,7 +55,7 @@ from ai.backend.manager.appkey import root_app_app_key
 from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
-from .api.context import RootContext
+from .api.context import RootContext, root_context_app_key
 from .api.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -231,7 +231,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
     try:
@@ -302,7 +302,7 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     from .plugin.webapp import WebappPluginContext
 
-    root_ctx: RootContext = root_app["_root.context"]
+    root_ctx = root_app[root_context_app_key]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     await plugin_ctx.init(
         context=root_ctx,
@@ -690,7 +690,7 @@ def _init_subapp(
     async def _set_root_ctx(subapp: web.Application):
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
-        subapp["_root.context"] = root_app["_root.context"]
+        subapp[root_context_app_key] = root_app[root_context_app_key]
         subapp[root_app_app_key] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
@@ -698,7 +698,7 @@ def _init_subapp(
 
     from .appkey import prefix_app_key
 
-    if "prefix" not in subapp:
+    if prefix_app_key not in subapp:
         subapp[prefix_app_key] = pkg_name.split(".")[-1].replace("_", "-")
     prefix = subapp[prefix_app_key]
     root_app.add_subapp("/" + prefix, subapp)
@@ -706,7 +706,7 @@ def _init_subapp(
 
 
 def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCreator) -> None:
-    root_ctx: RootContext = root_app["_root.context"]
+    root_ctx = root_app[root_context_app_key]
     subapp, global_middlewares = create_subapp(root_ctx.cors_options)
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
@@ -767,7 +767,7 @@ def build_root_app(
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
-    app["_root.context"] = root_ctx
+    app[root_context_app_key] = root_ctx
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
@@ -806,7 +806,7 @@ def build_root_app(
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        cctx_instance = cctx(app["_root.context"])
+        cctx_instance = cctx(app[root_context_app_key])
         app[cctx_instances_app_key].append(cctx_instance)
         try:
             async with cctx_instance:
@@ -854,7 +854,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
-    root_ctx: RootContext = root_app["_root.context"]
+    root_ctx = root_app[root_context_app_key]
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).

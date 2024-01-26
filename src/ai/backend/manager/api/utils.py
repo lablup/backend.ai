@@ -12,7 +12,6 @@ import traceback
 import uuid
 from collections import defaultdict
 from typing import (
-    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -43,14 +42,12 @@ from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
+from .context import root_context_app_key
 from .exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
     QueryNotImplemented,
 )
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -69,7 +66,7 @@ async def get_access_key_scopes(
 ) -> Tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     owner_access_key: Optional[AccessKey] = (params or {}).get("owner_access_key", None)
     if owner_access_key is None or owner_access_key == request["keypair"]["access_key"]:
         return request["keypair"]["access_key"], request["keypair"]["access_key"]
@@ -93,7 +90,7 @@ async def get_user_uuid_scopes(
 ) -> Tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     owner_uuid: Optional[uuid.UUID] = (params or {}).get("owner_uuid", None)
     if owner_uuid is None or owner_uuid == request["user"]["uuid"]:
         return request["user"]["uuid"], request["user"]["uuid"]
@@ -116,7 +113,7 @@ async def get_user_scopes(
     request: web.Request,
     params: Optional[dict[str, Any]] = None,
 ) -> tuple[uuid.UUID, UserRole]:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have user scopes.")
     if params is not None and (owner_user_email := params.get("owner_user_email")) is not None:

@@ -52,6 +52,7 @@ from ai.backend.manager.idle import AppStreamingStatus
 from ..defs import DEFAULT_ROLE
 from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
+from .context import root_context_app_key
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -81,7 +82,7 @@ rpc_ptask_group_app_key: web.AppKey = web.AppKey("rpc_ptask_group", aiotools.Per
 @auth_required
 @adefer
 async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     app_ctx = request.app[stream_context_app_key]
     database_ptask_group = request.app[database_ptask_group_app_key]
     session_name = request.match_info["session_name"]
@@ -292,7 +293,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     """
     WebSocket-version of gateway.kernel.execute().
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     app_ctx = request.app[stream_context_app_key]
     database_ptask_group = request.app[database_ptask_group_app_key]
     rpc_ptask_group = request.app[rpc_ptask_group_app_key]
@@ -434,7 +435,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
 async def stream_proxy(
     defer, request: web.Request, params: Mapping[str, Any]
 ) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     app_ctx = request.app[stream_context_app_key]
     database_ptask_group = request.app[database_ptask_group_app_key]
     rpc_ptask_group = request.app[rpc_ptask_group_app_key]
@@ -634,7 +635,7 @@ async def stream_proxy(
 async def get_stream_apps(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
@@ -667,7 +668,7 @@ async def handle_kernel_terminating(
     source: AgentId,
     event: KernelTerminatingEvent,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[stream_context_app_key]
     try:
         kernel = await KernelRow.get_kernel(
@@ -764,7 +765,7 @@ stream_context_app_key = web.AppKey("stream.context", PrivateContext)
 
 
 async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
-    root_ctx: RootContext = app["_root.context"]
+    root_ctx = app[root_context_app_key]
     app_ctx = app[stream_context_app_key]
 
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)

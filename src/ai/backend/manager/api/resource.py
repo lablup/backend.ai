@@ -57,6 +57,7 @@ from ..models.resource_usage import (
     parse_total_resource_group,
 )
 from .auth import auth_required, superadmin_required
+from .context import root_context_app_key
 from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -76,7 +77,7 @@ async def list_presets(request: web.Request) -> web.Response:
     Returns the list of all resource presets.
     """
     log.info("LIST_PRESETS (ak:{})", request["keypair"]["access_key"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     await root_ctx.shared_config.get_resource_slots()
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([resource_presets]).select_from(resource_presets)
@@ -109,7 +110,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     with additional information including allocatability of each preset,
     amount of total remaining resources, and the current keypair resource limits.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     try:
         access_key = request["keypair"]["access_key"]
         resource_policy = request["keypair"]["resource_policy"]
@@ -303,7 +304,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     re-calculates the values for running containers and updates them in DB.
     """
     log.info("RECALCULATE_USAGE ()")
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     await root_ctx.registry.recalc_resource_usage()
     return web.json_response({}, status=200)
 
@@ -327,7 +328,7 @@ async def get_container_stats_for_period(
     end_date: datetime,
     group_ids: Optional[Sequence[UUID]] = None,
 ):
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin_readonly() as conn:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
             users, users.c.uuid == kernels.c.user_uuid
@@ -526,7 +527,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     :param month: The year-month to query usage statistics. ex) "202006" to query for Jun 2020
     """
     log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["month"], "%Y%m").replace(tzinfo=local_tz)
@@ -558,7 +559,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     project_id = params["project_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
@@ -603,7 +604,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     stat_length = 2880  # 15 * 4 * 24 * 30
     now = datetime.now(tzutc())
     start_date = now - timedelta(days=30)
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([
@@ -741,7 +742,7 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
     :return token: agent watcher token ("insecure" if not set in config server)
     """
-    root_ctx: RootContext = request.app["_root.context"]
+    root_ctx = request.app[root_context_app_key]
     token = root_ctx.shared_config["watcher"]["token"]
     if token is None:
         token = "insecure"
