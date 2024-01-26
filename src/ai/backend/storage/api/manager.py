@@ -42,7 +42,7 @@ from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
-from ..appkey import ctx_app_key
+from ..context import ctx_app_key
 from ..exception import (
     ExternalError,
     InvalidQuotaConfig,

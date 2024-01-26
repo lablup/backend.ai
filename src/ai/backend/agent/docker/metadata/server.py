@@ -15,6 +15,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 
+from ...appkey import docker_mode_app_key, kernel_registry_app_key
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
@@ -36,6 +37,9 @@ class RootContext(BaseContext):
     metadata_plugin_ctx: MetadataPluginContext
 
 
+root_context_app_key = web.AppKey("_root.context", RootContext)
+
+
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
@@ -44,8 +48,6 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 async def container_resolver_middleware(
     request: web.Request, handler: Handler
 ) -> web.StreamResponse:
-    from ...appkey import docker_mode_app_key, kernel_registry_app_key
-
     if (
         request.headers.get("X-Forwarded-For") is not None
         and request.app[docker_mode_app_key] == "linuxkit"
@@ -99,7 +101,6 @@ class MetadataServer(aobject):
                 self.route_structure_fallback_middleware,
             ],
         )
-        from ...appkey import kernel_registry_app_key, root_context_app_key
 
         app[root_context_app_key] = RootContext()
         app[root_context_app_key].local_config = local_config
@@ -110,8 +111,6 @@ class MetadataServer(aobject):
         self.route_structure = {"latest": {"extension": {}}}
 
     async def __ainit__(self):
-        from ...appkey import docker_mode_app_key, root_context_app_key
-
         local_config = self.app[root_context_app_key].local_config
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app[docker_mode_app_key] = local_config["agent"]["docker-mode"]
@@ -173,7 +172,6 @@ class MetadataServer(aobject):
         async def _set_root_ctx(subapp: web.Application):
             # Allow subapp's access to the root app properties.
             # These are the public APIs exposed to plugins as well.
-            from ...appkey import root_context_app_key
 
             subapp[root_context_app_key] = root_app[root_context_app_key]
 
@@ -190,8 +188,6 @@ class MetadataServer(aobject):
         self.loaded_apps.append(prefix)
 
     async def load_metadata_plugins(self):
-        from ...appkey import root_context_app_key
-
         root_ctx = self.app[root_context_app_key]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
@@ -206,7 +202,6 @@ class MetadataServer(aobject):
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
-        from ...appkey import root_context_app_key
 
         local_config = self.app[root_context_app_key].local_config
         site = web.TCPSite(
@@ -218,8 +213,6 @@ class MetadataServer(aobject):
         await site.start()
 
     async def cleanup(self):
-        from ...appkey import root_context_app_key
-
         plugin_context = self.app[root_context_app_key].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()

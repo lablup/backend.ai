@@ -35,7 +35,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderID
 
 from .. import __version__
-from ..appkey import ctx_app_key
+from ..context import ctx_app_key
 from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params

@@ -24,6 +24,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
 from .api.types import WebMiddleware
+from .appkey import prefix_app_key
 from .cephfs import CephFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
@@ -78,13 +79,11 @@ def _init_subapp(
     async def _set_root_ctx(subapp: web.Application):
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
-        from .appkey import ctx_app_key
 
         subapp[ctx_app_key] = root_app[ctx_app_key]
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
-    from .appkey import prefix_app_key
 
     if prefix_app_key not in subapp:
         subapp[prefix_app_key] = pkg_name.split(".")[-1].replace("_", "-")
@@ -198,3 +197,6 @@ class RootContext:
             yield volume_obj
         finally:
             await volume_obj.shutdown()
+
+
+ctx_app_key = web.AppKey("_root.context", RootContext)
