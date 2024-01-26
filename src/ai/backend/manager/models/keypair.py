@@ -331,15 +331,9 @@ class KeyPair(graphene.ObjectType):
         is_active: bool = None,
         filter: str = None,
     ) -> int:
-        from .group import association_groups_users, groups
         from .user import users
 
-        j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
-        )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count()]).select_from(keypairs)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
