@@ -49,8 +49,8 @@ class DictTransformer(Transformer):
 
     def value(self, token: list[lexer.Token]) -> str:
         result = "".join(token)
-        for pair in self._escape_map.items():
-            result = result.replace(*pair)
+        for escape, alternative in self._escape_map.items():
+            result = result.replace(escape, alternative)
         return result
 
 
