@@ -956,5 +956,5 @@ class ModifyImage(graphene.Mutation):
 
 class ImageRefType(graphene.InputObjectType):
     name = graphene.String(required=True)
-    registry = graphene.JSONString()
+    registry = graphene.String()
     architecture = graphene.String()
