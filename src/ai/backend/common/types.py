@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
+from ssl import SSLContext
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -41,6 +42,7 @@ import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
+from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
@@ -1191,6 +1193,8 @@ class RoundRobinState(JSONSerializableMixin):
 
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+SSLContextType: TypeAlias = Literal[False] | Fingerprint | SSLContext | None
 
 
 class ModelServiceStatus(enum.Enum):
