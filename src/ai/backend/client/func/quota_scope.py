@@ -32,7 +32,7 @@ _default_quota_scope_fields = (
 class QuotaScope(BaseFunction):
     @api_function
     @classmethod
-    async def get_user_qsid(
+    async def get_user_info(
         cls,
         domain_name: str,
         email: str,
@@ -55,7 +55,7 @@ class QuotaScope(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_project_qsid(
+    async def get_project_info(
         cls,
         domain_name: str,
         name: str,

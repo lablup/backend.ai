@@ -32,7 +32,7 @@ def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, sess
                 user_id = uuid.UUID(identifier)
             except ValueError:
                 # In case identifier is the user email
-                user_info = session.QuotaScope.get_user_qsid(
+                user_info = session.QuotaScope.get_user_info(
                     domain_name=domain_name,
                     email=identifier,
                     fields=_user_query_fields,
@@ -50,7 +50,7 @@ def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, sess
                 project_id = uuid.UUID(identifier)
             except ValueError:
                 # In case identifier is the project name
-                project_info = session.QuotaScope.get_project_qsid(
+                project_info = session.QuotaScope.get_project_info(
                     domain_name=domain_name,
                     name=identifier,
                     fields=_project_query_fields,
