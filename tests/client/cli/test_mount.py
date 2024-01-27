@@ -122,7 +122,13 @@ def test_vfolder_mount__edge_cases_with_v2():
     ]
 
     # when
-    mount, *_ = prepare_mount_arg_v2(mount)
+    mount_unescaped, *_ = prepare_mount_arg_v2(mount, escape=False)
 
     # then
-    assert set(mount) == {"vf-abc,zxc", "vf-abc=zxc"}
+    assert set(mount_unescaped) == {"vf-abc\\,zxc", "vf-abc\\=zxc"}
+
+    # when
+    mount_escaped, *_ = prepare_mount_arg_v2(mount, escape=True)
+
+    # then
+    assert set(mount_escaped) == {"vf-abc,zxc", "vf-abc=zxc"}

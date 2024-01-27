@@ -20,12 +20,11 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import MountPoint
+from ai.backend.common.types import MountExpression
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
-from ...models.minilang.mount import MountPointParser
 from ...session import AsyncSession
 from ..pretty import (
     format_info,
@@ -277,6 +276,8 @@ def prepare_mount_arg(
 
 def prepare_mount_arg_v2(
     mount_args: Optional[Sequence[str]] = None,
+    *,
+    escape: bool = True,
 ) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
@@ -296,9 +297,7 @@ def prepare_mount_arg_v2(
     mount_options = {}
     if mount_args is not None:
         for mount_arg in mount_args:
-            parser = MountPointParser()
-            result = parser.parse_mount(mount_arg)
-            mountpoint = MountPoint(**result).model_dump()  # type: ignore[arg-type]
+            mountpoint = {**MountExpression(mount_arg).parse(escape=escape)}
             mount = str(mountpoint.pop("source"))
             mounts.add(mount)
             if target := mountpoint.pop("target", None):
@@ -488,7 +487,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+    mount, mount_map, mount_options = prepare_mount_arg_v2(mount, escape=True)
 
     if env_range is None:
         env_range = []  # noqa

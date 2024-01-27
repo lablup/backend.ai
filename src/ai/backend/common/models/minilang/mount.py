@@ -24,17 +24,10 @@ PairType: TypeAlias = tuple[str, str]
 
 
 class DictTransformer(Transformer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._escape_map = {
-            "\\,": ",",
-            "\\:": ":",
-            "\\=": "=",
-        }
-        self._reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
+    reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
 
     def start(self, pairs: Sequence[PairType]) -> Mapping[str, str]:
-        if pairs[0][0] not in self._reserved_keys:  # [["vf-000", "/home/work"]]
+        if pairs[0][0] not in self.reserved_keys:  # [["vf-000", "/home/work"]]
             result = {"source": pairs[0][0]}
             if target := pairs[0][1]:
                 result["target"] = target
@@ -48,10 +41,7 @@ class DictTransformer(Transformer):
         return "".join(token)
 
     def value(self, token: list[lexer.Token]) -> str:
-        result = "".join(token)
-        for escape, alternative in self._escape_map.items():
-            result = result.replace(escape, alternative)
-        return result
+        return "".join(token)
 
 
 _parser = Lark(_grammar, parser="lalr")
