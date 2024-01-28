@@ -7,6 +7,7 @@ Create Date: 2023-02-15 15:24:29.112938
 Reference: https://www.postgresql.org/message-id/CANu8FiwwBxZZGX23=Na_7bc4DZ-yzd_poKhaoPmN3+SHG08MAg@mail.gmail.com
 
 """
+
 import textwrap
 
 from alembic import op
@@ -26,9 +27,15 @@ typename = SessionTypes.__name__.lower()
 
 def upgrade():
     op.execute(text("ALTER TYPE {} ADD VALUE IF NOT EXISTS 'INFERENCE';".format(typename)))
-    op.execute(text(textwrap.dedent("""\
+    op.execute(
+        text(
+            textwrap.dedent(
+                """\
                 ALTER TABLE sessions ALTER COLUMN session_type TYPE {} USING session_type::text::sessiontypes;
-            """.format(typename))))
+            """.format(typename)
+            )
+        )
+    )
 
 
 def downgrade():
@@ -40,22 +47,34 @@ def downgrade():
         )
     )
 
-    cursor = conn.execute(text(textwrap.dedent("""\
+    cursor = conn.execute(
+        text(
+            textwrap.dedent(
+                """\
                 SELECT t.typname, e.enumlabel, e.enumsortorder, e.enumtypid
                 FROM pg_type t
                 JOIN pg_enum e ON e.enumtypid = t.oid
                 WHERE t.typtype = 'e'
                 AND e.enumlabel = 'INFERENCE'
                 ORDER BY 1, enumsortorder;
-            """)))
+            """
+            )
+        )
+    )
 
     if (row := next(cursor, None)) is None:
         return
 
     typname, enumlabel, enumsortorder, enumtypid = row
 
-    conn.execute(text(textwrap.dedent("""\
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
                 DELETE FROM pg_enum
                 WHERE enumtypid = {enumtypid}
                 AND enumlabel = 'INFERENCE';
-            """.format(enumtypid=enumtypid))))
+            """.format(enumtypid=enumtypid)
+            )
+        )
+    )

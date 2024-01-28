@@ -4,8 +4,8 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.params import OptionalType
+from ai.backend.cli.params import OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.types import VFolderHostPermission
 
 from ...func.keypair_resource_policy import (
@@ -13,7 +13,6 @@ from ...func.keypair_resource_policy import (
     _default_list_fields,
 )
 from ...session import Session
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
@@ -114,11 +113,9 @@ def list(ctx: CLIContext) -> None:
     "--vfhost-perms",
     "--allowed-vfolder-hosts",  # legacy name
     type=str,
-    default=json.dumps(
-        {
-            "local:volume1": [perm.value for perm in VFolderHostPermission],
-        }
-    ),
+    default=json.dumps({
+        "local:volume1": [perm.value for perm in VFolderHostPermission],
+    }),
     help=(
         "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
