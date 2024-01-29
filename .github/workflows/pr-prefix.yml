@@ -12,7 +12,7 @@ jobs:
         run: |
           if echo "${{ github.event.pull_request.title }}" | tr ':' '\n' | head -n 1 | grep -qE 'feat|fix|docs|refactor|ci|chore(\([^)]+\)|$)';
           then
-            echo "PR title is valid"
+            echo "PR title is valid."
           else
             echo "PR title is invalid."
             echo "Use the title prefixes like:"
