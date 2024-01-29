@@ -60,9 +60,10 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    check_api_params_v2,
     get_access_key_scopes,
     get_user_uuid_scopes,
+    pydantic_params_api_handler,
+    pydantic_response_api_handler,
     undefined,
 )
 
@@ -125,7 +126,7 @@ class CompactServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(ListServeRequestModel)
+@pydantic_params_api_handler(ListServeRequestModel)
 async def list_serve(
     request: web.Request, params: ListServeRequestModel
 ) -> list[CompactServeInfoModel]:
@@ -199,6 +200,7 @@ class ServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def get_info(request: web.Request) -> ServeInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -253,8 +255,8 @@ class ServiceConfigModel(BaseModel):
         description="Name of the resource group to spawn inference sessions",
         examples=["nvidia-H100"],
     )
-    resources: dict[str, str] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
-    resource_opts: dict[str, str] = Field(examples=[{"shmem": "2g"}], default={})
+    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
 
 class NewServiceRequestModel(BaseModel):
@@ -322,7 +324,7 @@ class NewServiceRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params_v2(NewServiceRequestModel)
+@pydantic_params_api_handler(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
     """
     Creates a new model service. If `desired_session_count` is greater than zero,
@@ -538,6 +540,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def delete(request: web.Request) -> SuccessResponseModel:
     """
     Removes model service (and inference sessions for the service also).
@@ -579,6 +582,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def sync(request: web.Request) -> SuccessResponseModel:
     """
     Force syncs up-to-date model service information with AppProxy.
@@ -616,7 +620,7 @@ class ScaleResponseModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(ScaleRequestModel)
+@pydantic_params_api_handler(ScaleRequestModel)
 async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
     """
     Updates ideal inference session count manually. Based on the difference of this number,
@@ -658,7 +662,7 @@ class UpdateRouteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(UpdateRouteRequestModel)
+@pydantic_params_api_handler(UpdateRouteRequestModel)
 async def update_route(
     request: web.Request, params: UpdateRouteRequestModel
 ) -> SuccessResponseModel:
@@ -705,6 +709,7 @@ async def update_route(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def delete_route(request: web.Request) -> SuccessResponseModel:
     """
     Scales down the service by removing specific inference session.
@@ -760,7 +765,7 @@ class TokenResponseModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(TokenRequestModel)
+@pydantic_params_api_handler(TokenRequestModel)
 async def generate_token(request: web.Request, params: TokenRequestModel) -> TokenResponseModel:
     """
     Generates a token which acts as an API key to authenticate when calling model service endpoint.
@@ -842,6 +847,7 @@ class ErrorListResponseModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def list_errors(request: web.Request) -> ErrorListResponseModel:
     """
     List errors raised while trying to create the inference sessions. Backend.AI will

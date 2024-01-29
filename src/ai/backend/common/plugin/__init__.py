@@ -12,7 +12,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
-from ..logging_utils import BraceStyleAdapter
+from ..logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
