@@ -88,6 +88,8 @@ logging_config_iv = t.Dict({
         t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
         t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
         t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("fqdn", default=True): t.Bool,
+        t.Key("localname", default=None): t.Null | t.String(allow_blank=True),
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -209,6 +211,8 @@ def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler
         ca_certs=drv_config["ca-certs"],
         keyfile=drv_config["keyfile"],
         certfile=drv_config["certfile"],
+        fqdn=drv_config["fqdn"],
+        localname=drv_config["localname"],
     )
     graylog_handler.setLevel(config["level"])
     return graylog_handler
