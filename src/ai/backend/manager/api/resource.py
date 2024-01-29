@@ -370,7 +370,7 @@ async def get_container_stats_for_period(
         last_stat = row["last_stat"]
         if not last_stat:
             if raw_stat is None:
-                log.warn("stat object for {} not found on redis, skipping", str(row["id"]))
+                log.warning("stat object for {} not found on redis, skipping", str(row["id"]))
                 continue
             last_stat = msgpack.unpackb(raw_stat)
         nfs = None
