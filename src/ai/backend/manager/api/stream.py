@@ -702,7 +702,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                 )
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn(
+                    log.warning(
                         "stream_conn_tracker_gc(): error while connecting to Etcd server,"
                         " retrying..."
                     )
