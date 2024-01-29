@@ -51,7 +51,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
 from ..models import UserRole, groups, kernels
-from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
 from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
@@ -59,6 +58,8 @@ from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
     from .context import RootContext
     from .types import CORSOptions, WebMiddleware
 
@@ -194,29 +195,29 @@ async def enqueue_kernel_creation_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.cluster_role,
-                    kernels.c.cluster_idx,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.kernel_id),
-                )
+    async def _fetch(conn: SAConnection):
+        query = (
+            sa.select([
+                kernels.c.id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.cluster_role,
+                kernels.c.cluster_idx,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.user_uuid,
+            ])
+            .select_from(kernels)
+            .where(
+                (kernels.c.id == event.kernel_id),
             )
-            result = await conn.execute(query)
-            return result.first()
+        )
+        result = await conn.execute(query)
+        return result.first()
 
-    row = await execute_with_retry(_fetch)
+    async with root_ctx.db.connect() as conn:
+        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -231,29 +232,29 @@ async def enqueue_kernel_termination_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.cluster_role,
-                    kernels.c.cluster_idx,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.kernel_id),
-                )
+    async def _fetch(conn: SAConnection):
+        query = (
+            sa.select([
+                kernels.c.id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.cluster_role,
+                kernels.c.cluster_idx,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.user_uuid,
+            ])
+            .select_from(kernels)
+            .where(
+                (kernels.c.id == event.kernel_id),
             )
-            result = await conn.execute(query)
-            return result.first()
+        )
+        result = await conn.execute(query)
+        return result.first()
 
-    row = await execute_with_retry(_fetch)
+    async with root_ctx.db.connect() as conn:
+        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -275,28 +276,28 @@ async def enqueue_session_creation_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.session_id),
-                    # for the main kernel, kernel ID == session ID
-                )
+    async def _fetch(conn: SAConnection):
+        query = (
+            sa.select([
+                kernels.c.id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.user_uuid,
+            ])
+            .select_from(kernels)
+            .where(
+                (kernels.c.id == event.session_id),
+                # for the main kernel, kernel ID == session ID
             )
-            result = await conn.execute(query)
-            return result.first()
+        )
+        result = await conn.execute(query)
+        return result.first()
 
-    row = await execute_with_retry(_fetch)
+    async with root_ctx.db.connect() as conn:
+        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -311,28 +312,28 @@ async def enqueue_session_termination_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.session_id == event.session_id),
-                    # for the main kernel, kernel ID == session ID
-                )
+    async def _fetch(conn: SAConnection):
+        query = (
+            sa.select([
+                kernels.c.id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.user_uuid,
+            ])
+            .select_from(kernels)
+            .where(
+                (kernels.c.session_id == event.session_id),
+                # for the main kernel, kernel ID == session ID
             )
-            result = await conn.execute(query)
-            return result.first()
+        )
+        result = await conn.execute(query)
+        return result.first()
 
-    row = await execute_with_retry(_fetch)
+    async with root_ctx.db.connect() as conn:
+        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -347,27 +348,27 @@ async def enqueue_batch_task_result_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.session_id == event.session_id),
-                )
+    async def _fetch(conn: SAConnection):
+        query = (
+            sa.select([
+                kernels.c.id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.user_uuid,
+            ])
+            .select_from(kernels)
+            .where(
+                (kernels.c.session_id == event.session_id),
             )
-            result = await conn.execute(query)
-            return result.first()
+        )
+        result = await conn.execute(query)
+        return result.first()
 
-    row = await execute_with_retry(_fetch)
+    async with root_ctx.db.connect() as conn:
+        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:

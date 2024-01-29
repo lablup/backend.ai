@@ -17,6 +17,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -36,7 +37,6 @@ from ..models.user import (
     check_credential,
     compare_to_hashed_password,
 )
-from ..models.utils import execute_with_retry
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
@@ -456,24 +456,25 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         access_key = hook_result.result
         if access_key is not None:
 
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
+            async def _query_cred(conn: SAConnection):
+                j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
+                    keypair_resource_policies,
+                    keypairs.c.resource_policy == keypair_resource_policies.c.name,
+                )
+                query = (
+                    sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
+                    .select_from(j)
+                    .where(
+                        (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
                     )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
+                )
+                result = await conn.execute(query)
                 return result.first()
 
-            row = await execute_with_retry(_query_cred)
+            async with root_ctx.db.connect() as conn:
+                row = await root_ctx.db.execute_with_txn_retry(
+                    _query_cred, root_ctx.db.begin_readonly, conn
+                )
             if row is None:
                 raise AuthorizationFailed("Access key not found")
 
@@ -501,24 +502,25 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         if params:
             sign_method, access_key, signature = params
 
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
+            async def _query_cred(conn: SAConnection):
+                j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
+                    keypair_resource_policies,
+                    keypairs.c.resource_policy == keypair_resource_policies.c.name,
+                )
+                query = (
+                    sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
+                    .select_from(j)
+                    .where(
+                        (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
                     )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
-                    return result.first()
+                )
+                result = await conn.execute(query)
+                return result.first()
 
-            row = await execute_with_retry(_query_cred)
+            async with root_ctx.db.connect() as conn:
+                row = await root_ctx.db.execute_with_txn_retry(
+                    _query_cred, root_ctx.db.begin_readonly, conn
+                )
             if row is None:
                 raise AuthorizationFailed("Access key not found")
             my_signature = await sign_request(sign_method, request, row["keypairs_secret_key"])
@@ -1040,24 +1042,24 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         hook_result.reason = hook_result.reason or "invalid password format"
         raise RejectedByHook.from_hook_result(hook_result)
 
-    async def _update() -> datetime:
-        async with root_ctx.db.begin() as conn:
-            # Update user password.
-            data = {
-                "password": new_password,
-                "need_password_change": False,
-                "password_changed_at": sa.func.now(),
-            }
-            query = (
-                sa.update(users)
-                .values(data)
-                .where(users.c.uuid == checked_user["uuid"])
-                .returning(users.c.password_changed_at)
-            )
-            result = await conn.execute(query)
-            return result.scalar()
+    async def _update(conn: SAConnection) -> datetime:
+        # Update user password.
+        data = {
+            "password": new_password,
+            "need_password_change": False,
+            "password_changed_at": sa.func.now(),
+        }
+        query = (
+            sa.update(users)
+            .values(data)
+            .where(users.c.uuid == checked_user["uuid"])
+            .returning(users.c.password_changed_at)
+        )
+        result = await conn.execute(query)
+        return result.scalar()
 
-    changed_at = await execute_with_retry(_update)
+    async with root_ctx.db.connect() as conn:
+        changed_at = await root_ctx.db.execute_with_txn_retry(_update, root_ctx.db.begin, conn)
     return web.json_response({"password_changed_at": changed_at.isoformat()}, status=201)
 
 

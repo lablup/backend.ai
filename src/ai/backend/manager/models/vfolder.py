@@ -68,7 +68,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -817,25 +817,25 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    async def _update() -> None:
-        async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: datetime.now(tzutc()).isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
+    async def _update(db_session: SASession) -> None:
+        query = (
+            sa.update(vfolders)
+            .values(
+                status=update_status,
+                status_history=sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        update_status.name: datetime.now(tzutc()).isoformat(),
+                    },
+                ),
             )
-            await db_session.execute(query)
+            .where(cond)
+        )
+        await db_session.execute(query)
 
-    await execute_with_retry(_update)
+    async with engine.connect() as conn:
+        await engine.execute_with_txn_retry(_update, engine.begin_session, conn)
     if do_log:
         log.debug(
             "Successfully updated status of VFolder(s) {} to {}",
@@ -897,21 +897,8 @@ async def initiate_vfolder_clone(
     background_task_manager: BackgroundTaskManager,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
-
-    async def _update_status() -> None:
-        async with db_engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(status=VFolderOperationStatus.CLONING)
-                .where(source_vf_cond)
-            )
-            await db_session.execute(query)
-
-    await execute_with_retry(_update_status)
-
     target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
     source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
-
     # Generate the ID of the destination vfolder.
     # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
     #       the actual object (with RETURNING clause).  In that case, we need to temporarily
@@ -919,34 +906,39 @@ async def initiate_vfolder_clone(
     #       vfolder.  After done, we need to make another transaction to clear the unusable state.
     target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
+    async def _update_and_insert(db_session: SASession) -> None:
+        query = (
+            sa.update(vfolders).values(status=VFolderOperationStatus.CLONING).where(source_vf_cond)
+        )
+        await db_session.execute(query)
+
+        insert_values = {
+            "id": target_folder_id.folder_id,
+            "name": vfolder_info.target_vfolder_name,
+            "usage_mode": vfolder_info.usage_mode,
+            "permission": vfolder_info.permission,
+            "last_used": None,
+            "host": vfolder_info.target_host,
+            # TODO: add quota_scope_id
+            "creator": vfolder_info.email,
+            "ownership_type": VFolderOwnershipType("user"),
+            "user": vfolder_info.user_id,
+            "group": None,
+            "unmanaged_path": "",
+            "cloneable": vfolder_info.cloneable,
+            "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+        }
+        insert_query = sa.insert(vfolders, insert_values)
+        try:
+            await db_session.execute(insert_query)
+        except sa.exc.DataError:
+            # TODO: pass exception info
+            raise InvalidAPIParameters
+
+    async with db_engine.connect() as conn:
+        await db_engine.execute_with_txn_retry(_update_and_insert, db_engine.begin_session, conn)
+
     async def _clone(reporter: ProgressReporter) -> None:
-        async def _insert_vfolder() -> None:
-            async with db_engine.begin_session() as db_session:
-                insert_values = {
-                    "id": target_folder_id.folder_id,
-                    "name": vfolder_info.target_vfolder_name,
-                    "usage_mode": vfolder_info.usage_mode,
-                    "permission": vfolder_info.permission,
-                    "last_used": None,
-                    "host": vfolder_info.target_host,
-                    # TODO: add quota_scope_id
-                    "creator": vfolder_info.email,
-                    "ownership_type": VFolderOwnershipType("user"),
-                    "user": vfolder_info.user_id,
-                    "group": None,
-                    "unmanaged_path": "",
-                    "cloneable": vfolder_info.cloneable,
-                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
-                }
-                insert_query = sa.insert(vfolders, insert_values)
-                try:
-                    await db_session.execute(insert_query)
-                except sa.exc.DataError:
-                    # TODO: pass exception info
-                    raise InvalidAPIParameters
-
-        await execute_with_retry(_insert_vfolder)
-
         try:
             async with storage_manager.request(
                 source_proxy,
@@ -963,16 +955,18 @@ async def initiate_vfolder_clone(
         except aiohttp.ClientResponseError:
             raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
 
-        async def _update_source_vfolder() -> None:
-            async with db_engine.begin_session() as db_session:
-                query = (
-                    sa.update(vfolders)
-                    .values(status=VFolderOperationStatus.READY)
-                    .where(source_vf_cond)
-                )
-                await db_session.execute(query)
+        async def _update_source_vfolder(db_session: SASession) -> None:
+            query = (
+                sa.update(vfolders)
+                .values(status=VFolderOperationStatus.READY)
+                .where(source_vf_cond)
+            )
+            await db_session.execute(query)
 
-        await execute_with_retry(_update_source_vfolder)
+        async with db_engine.connect() as conn:
+            await db_engine.execute_with_txn_retry(
+                _update_source_vfolder, db_engine.begin_session, conn
+            )
 
     task_id = await background_task_manager.start(_clone)
     return task_id, target_folder_id.folder_id
@@ -1025,13 +1019,11 @@ async def initiate_vfolder_purge(
         if row_deletion_infos:
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
-            async def _delete_row() -> None:
-                async with db_engine.begin_session() as db_session:
-                    await db_session.execute(
-                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
-                    )
+            async def _delete_row(db_session: SASession) -> None:
+                await db_session.execute(sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids)))
 
-            await execute_with_retry(_delete_row)
+            async with db_engine.connect() as conn:
+                await db_engine.execute_with_txn_retry(_delete_row, db_engine.begin_session, conn)
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}

@@ -56,7 +56,7 @@ from .gql_relay import (
 )
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -527,35 +527,37 @@ class ModifyGroup(graphene.Mutation):
         if not data and props.user_update_mode is None:
             return cls(ok=False, msg="nothing to update", group=None)
 
-        async def _do_mutate() -> ModifyGroup:
-            async with graph_ctx.db.begin() as conn:
-                # TODO: refactor user addition/removal in groups as separate mutations
-                #       (to apply since 21.09)
-                if props.user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
-                    await conn.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-                elif props.user_update_mode == "remove":
-                    await conn.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(props.user_uuids))
-                            & (association_groups_users.c.group_id == gid),
-                        ),
-                    )
-                if data:
-                    result = await conn.execute(
-                        sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
-                    )
-                    if result.rowcount > 0:
-                        o = Group.from_row(graph_ctx, result.first())
-                        return cls(ok=True, msg="success", group=o)
-                    return cls(ok=False, msg="no such group", group=None)
-                else:  # updated association_groups_users table
-                    return cls(ok=True, msg="success", group=None)
+        async def _do_mutate(_conn: SAConnection) -> ModifyGroup:
+            # TODO: refactor user addition/removal in groups as separate mutations
+            #       (to apply since 21.09)
+            if props.user_update_mode == "add":
+                values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
+                await _conn.execute(
+                    sa.insert(association_groups_users).values(values),
+                )
+            elif props.user_update_mode == "remove":
+                await _conn.execute(
+                    sa.delete(association_groups_users).where(
+                        (association_groups_users.c.user_id.in_(props.user_uuids))
+                        & (association_groups_users.c.group_id == gid),
+                    ),
+                )
+            if data:
+                result = await _conn.execute(
+                    sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
+                )
+                if result.rowcount > 0:
+                    o = Group.from_row(graph_ctx, result.first())
+                    return cls(ok=True, msg="success", group=o)
+                return cls(ok=False, msg="no such group", group=None)
+            else:  # updated association_groups_users table
+                return cls(ok=True, msg="success", group=None)
 
         try:
-            return await execute_with_retry(_do_mutate)
+            async with graph_ctx.db.connect() as conn:
+                return await graph_ctx.db.execute_with_txn_retry(
+                    _do_mutate, graph_ctx.db.begin, conn
+                )
         except sa.exc.IntegrityError as e:
             return cls(ok=False, msg=f"integrity error: {e}", group=None)
         except (asyncio.CancelledError, asyncio.TimeoutError):

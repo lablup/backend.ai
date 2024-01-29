@@ -65,7 +65,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
@@ -949,23 +948,23 @@ async def simple_db_mutate(
     """
     raw_query = "(unknown)"
 
-    async def _do_mutate() -> ResultType:
+    async def _do_mutate(_conn: SAConnection) -> ResultType:
         nonlocal raw_query
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            raw_query = str(_query)
-            result = await conn.execute(_query)
-            if post_func:
-                await post_func(conn, result)
+        if pre_func:
+            await pre_func(_conn)
+        _query = mutation_query() if callable(mutation_query) else mutation_query
+        raw_query = str(_query)
+        result = await _conn.execute(_query)
+        if post_func:
+            await post_func(_conn, result)
         if result.rowcount > 0:
             return result_cls(True, "success")
         else:
             return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
     try:
-        return await execute_with_retry(_do_mutate)
+        async with graph_ctx.db.connect() as conn:
+            return await graph_ctx.db.execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
     except sa.exc.IntegrityError as e:
         log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
@@ -1014,26 +1013,26 @@ async def simple_db_mutate_returning_item(
     """
     raw_query = "(unknown)"
 
-    async def _do_mutate() -> ResultType:
+    async def _do_mutate(_conn: SAConnection) -> ResultType:
         nonlocal raw_query
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            _query = _query.returning(_query.table)
-            raw_query = str(_query)
-            result = await conn.execute(_query)
-            if post_func:
-                row = await post_func(conn, result)
-            else:
-                row = result.first()
-            if result.rowcount > 0:
-                return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            else:
-                return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+        if pre_func:
+            await pre_func(_conn)
+        _query = mutation_query() if callable(mutation_query) else mutation_query
+        _query = _query.returning(_query.table)
+        raw_query = str(_query)
+        result = await _conn.execute(_query)
+        if post_func:
+            row = await post_func(_conn, result)
+        else:
+            row = result.first()
+        if result.rowcount > 0:
+            return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
+        else:
+            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
     try:
-        return await execute_with_retry(_do_mutate)
+        async with graph_ctx.db.connect() as conn:
+            return await graph_ctx.db.execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
     except sa.exc.IntegrityError as e:
         log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)

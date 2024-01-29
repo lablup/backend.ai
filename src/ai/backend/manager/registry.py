@@ -44,7 +44,7 @@ from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, selectinload
 from yarl import URL
 
@@ -164,10 +164,8 @@ from .models import (
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
-    execute_with_retry,
     is_db_retry_error,
     reenter_txn,
-    reenter_txn_session,
     sql_json_merge,
 )
 from .types import UserScope
@@ -356,12 +354,12 @@ class AgentRegistry:
                 yield row
 
     async def update_instance(self, inst_id, updated_fields):
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                query = sa.update(agents).values(**updated_fields).where(agents.c.id == inst_id)
-                await conn.execute(query)
+        async def _update(conn: SAConnection) -> None:
+            query = sa.update(agents).values(**updated_fields).where(agents.c.id == inst_id)
+            await conn.execute(query)
 
-        await execute_with_retry(_update)
+        async with self.db.connect() as conn:
+            await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def gather_agent_hwinfo(self, instance_id: AgentId) -> Mapping[str, HardwareMetadata]:
         agent = await self.get_instance(instance_id, agents.c.addr)
@@ -1200,55 +1198,53 @@ class AgentRegistry:
         session_data["images"] = session_images
         try:
 
-            async def _enqueue() -> None:
-                async with self.db.begin_session() as db_sess:
-                    matched_dependency_session_ids = []
-                    if dependency_sessions:
-                        for dependency_id in dependency_sessions:
-                            try:
-                                match_info = await SessionRow.get_session(
-                                    db_sess,
-                                    dependency_id,
-                                    access_key,
-                                    allow_stale=True,
-                                )
-                            except SessionNotFound:
-                                raise InvalidAPIParameters(
-                                    "Unknown session ID or name in the dependency list",
-                                    extra_data={"session_ref": dependency_id},
-                                )
-                            else:
-                                matched_dependency_session_ids.append(match_info.id)
+            async def _enqueue(db_sess: SASession) -> None:
+                matched_dependency_session_ids = []
+                if dependency_sessions:
+                    for dependency_id in dependency_sessions:
+                        try:
+                            match_info = await SessionRow.get_session(
+                                db_sess,
+                                dependency_id,
+                                access_key,
+                                allow_stale=True,
+                            )
+                        except SessionNotFound:
+                            raise InvalidAPIParameters(
+                                "Unknown session ID or name in the dependency list",
+                                extra_data={"session_ref": dependency_id},
+                            )
+                        else:
+                            matched_dependency_session_ids.append(match_info.id)
 
-                    if sudo_session_enabled:
-                        environ["SUDO_SESSION_ENABLED"] = "1"
+                if sudo_session_enabled:
+                    environ["SUDO_SESSION_ENABLED"] = "1"
 
-                    session_data["environ"] = environ
-                    session_data["requested_slots"] = session_requested_slots
-                    session = SessionRow(**session_data)
-                    kernels = [KernelRow(**kernel) for kernel in kernel_data]
-                    db_sess.add(session)
-                    db_sess.add_all(kernels)
-                    await db_sess.flush()
+                session_data["environ"] = environ
+                session_data["requested_slots"] = session_requested_slots
+                session = SessionRow(**session_data)
+                kernels = [KernelRow(**kernel) for kernel in kernel_data]
+                db_sess.add(session)
+                db_sess.add_all(kernels)
+                await db_sess.flush()
 
-                    if matched_dependency_session_ids:
-                        dependency_rows = [
-                            SessionDependencyRow(session_id=session_id, depends_on=depend_id)
-                            for depend_id in matched_dependency_session_ids
-                        ]
-                        db_sess.add_all(dependency_rows)
+                if matched_dependency_session_ids:
+                    dependency_rows = [
+                        SessionDependencyRow(session_id=session_id, depends_on=depend_id)
+                        for depend_id in matched_dependency_session_ids
+                    ]
+                    db_sess.add_all(dependency_rows)
 
-            await execute_with_retry(_enqueue)
+            async def _post_enqueue(db_sess: SASession) -> None:
+                if route_id:
+                    routing_row = await RoutingRow.get(db_sess, route_id)
+                    routing_row.session = session_id
 
-            async def _post_enqueue() -> None:
-                async with self.db.begin_session() as db_sess:
-                    if route_id:
-                        routing_row = await RoutingRow.get(db_sess, route_id)
-                        routing_row.session = session_id
+                await db_sess.commit()
 
-                    await db_sess.commit()
-
-            await execute_with_retry(_post_enqueue)
+            async with self.db.connect() as conn:
+                await self.db.execute_with_txn_retry(_enqueue, self.db.begin_session, conn)
+                await self.db.execute_with_txn_retry(_post_enqueue, self.db.begin_session, conn)
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "23503":
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
@@ -1611,20 +1607,20 @@ class AgentRegistry:
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
 
-        async def _update_kernel() -> None:
-            async with self.db.begin_session() as db_sess:
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=agent_alloc_ctx.scaling_group,
-                    )
+        async def _update_kernel(db_sess: SASession) -> None:
+            kernel_query = (
+                sa.update(KernelRow)
+                .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
+                .values(
+                    agent=agent_alloc_ctx.agent_id,
+                    agent_addr=agent_alloc_ctx.agent_addr,
+                    scaling_group=agent_alloc_ctx.scaling_group,
                 )
-                await db_sess.execute(kernel_query)
+            )
+            await db_sess.execute(kernel_query)
 
-        await execute_with_retry(_update_kernel)
+        async with self.db.connect() as conn:
+            await self.db.execute_with_txn_retry(_update_kernel, self.db.begin_session, conn)
 
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
@@ -1707,32 +1703,34 @@ class AgentRegistry:
                 for binding in items:
                     kernel_id = binding.kernel.id
 
-                    async def _update_failure() -> None:
-                        async with self.db.begin_session() as db_sess:
-                            now = datetime.now(tzutc())
-                            query = (
-                                sa.update(KernelRow)
-                                .where(KernelRow.id == kernel_id)
-                                .values(
-                                    status=KernelStatus.ERROR,
-                                    status_info=f"other-error ({ex!r})",
-                                    status_changed=now,
-                                    terminated_at=now,
-                                    status_history=sql_json_merge(
-                                        KernelRow.status_history,
-                                        (),
-                                        {
-                                            KernelStatus.ERROR.name: (
-                                                now.isoformat()
-                                            ),  # ["PULLING", "PREPARING"]
-                                        },
-                                    ),
-                                    status_data=convert_to_status_data(ex, self.debug),
-                                )
+                    async def _update_failure(db_sess: SASession) -> None:
+                        now = datetime.now(tzutc())
+                        query = (
+                            sa.update(KernelRow)
+                            .where(KernelRow.id == kernel_id)
+                            .values(
+                                status=KernelStatus.ERROR,
+                                status_info=f"other-error ({ex!r})",
+                                status_changed=now,
+                                terminated_at=now,
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.ERROR.name: (
+                                            now.isoformat()
+                                        ),  # ["PULLING", "PREPARING"]
+                                    },
+                                ),
+                                status_data=convert_to_status_data(ex, self.debug),
                             )
-                            await db_sess.execute(query)
+                        )
+                        await db_sess.execute(query)
 
-                    await execute_with_retry(_update_failure)
+                    async with self.db.connect() as conn:
+                        await self.db.execute_with_txn_retry(
+                            _update_failure, self.db.begin_session, conn
+                        )
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -1756,97 +1754,81 @@ class AgentRegistry:
             "public_key": public_key.decode("utf-8"),
         }
 
-    async def get_user_occupancy(self, user_id, *, db_sess=None):
+    async def get_user_occupancy(self, user_id, *, db_sess: SASession) -> ResourceSlot:
         known_slot_types = await self.shared_config.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.user_uuid == user_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
-                )
-                zero = ResourceSlot()
-                user_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                user_occupied = ResourceSlot({
-                    key: val for key, val in user_occupied.items() if key in known_slot_types
-                })
-                return user_occupied
+        query = sa.select(KernelRow.occupied_slots).where(
+            (KernelRow.user_uuid == user_id)
+            & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+        )
+        zero = ResourceSlot()
+        user_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))], zero
+        )
+        # drop no-longer used slot types
+        user_occupied = ResourceSlot({
+            key: val for key, val in user_occupied.items() if key in known_slot_types
+        })
+        return user_occupied
 
-        return await execute_with_retry(_query)
-
-    async def get_keypair_occupancy(self, access_key, *, db_sess=None):
+    async def get_keypair_occupancy(self, access_key, *, db_sess: SASession) -> ResourceSlot:
         known_slot_types = await self.shared_config.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+        query = sa.select(KernelRow.occupied_slots).where(
+            (KernelRow.access_key == access_key)
+            & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+        )
+        zero = ResourceSlot()
+        key_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))], zero
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
-        return await execute_with_retry(_query)
-
-    async def get_domain_occupancy(self, domain_name, *, db_sess=None):
+    async def get_domain_occupancy(self, domain_name, *, db_sess: SASession) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.domain_name == domain_name)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+        query = sa.select(KernelRow.occupied_slots).where(
+            (KernelRow.domain_name == domain_name)
+            & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+        )
+        zero = ResourceSlot()
+        key_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))],
+            zero,
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
-        return await execute_with_retry(_query)
-
-    async def get_group_occupancy(self, group_id, *, db_sess=None):
+    async def get_group_occupancy(self, group_id, *, db_sess: SASession) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
-        async def _query() -> ResourceSlot:
-            async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.group_id == group_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
-                )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
-
-        return await execute_with_retry(_query)
+        query = sa.select(KernelRow.occupied_slots).where(
+            (KernelRow.group_id == group_id)
+            & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+        )
+        zero = ResourceSlot()
+        key_occupied = sum(
+            [row.occupied_slots async for row in (await db_sess.stream(query))],
+            zero,
+        )
+        # drop no-longer used slot types
+        drops = [k for k in key_occupied.keys() if k not in known_slot_types]
+        for k in drops:
+            del key_occupied[k]
+        return key_occupied
 
     async def update_scaling_group(self, id, scaling_group) -> None:
         agent = await self.get_instance(id, agents.c.addr)
@@ -1887,24 +1869,24 @@ class AgentRegistry:
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
 
-                async def _update_agent_resource() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        select_query = sa.select(AgentRow.occupied_slots).where(
-                            AgentRow.id == agent_id
+                async def _update_agent_resource(db_sess: SASession) -> None:
+                    select_query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id)
+                    result = await db_sess.execute(select_query)
+                    occupied_slots: ResourceSlot = result.scalar()
+                    diff = actual_allocated_slots - requested_slots
+                    update_query = (
+                        sa.update(AgentRow)
+                        .values(
+                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
                         )
-                        result = await db_sess.execute(select_query)
-                        occupied_slots: ResourceSlot = result.scalar()
-                        diff = actual_allocated_slots - requested_slots
-                        update_query = (
-                            sa.update(AgentRow)
-                            .values(
-                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
-                            )
-                            .where(AgentRow.id == agent_id)
-                        )
-                        await db_sess.execute(update_query)
+                        .where(AgentRow.id == agent_id)
+                    )
+                    await db_sess.execute(update_query)
 
-                await execute_with_retry(_update_agent_resource)
+                async with self.db.connect() as conn:
+                    await self.db.execute_with_txn_retry(
+                        _update_agent_resource, self.db.begin_session, conn
+                    )
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
@@ -1914,75 +1896,75 @@ class AgentRegistry:
             set
         )  # key: access_key, value: set of session_id
 
-        async def _recalc() -> None:
+        async def _recalc(db_sess: SASession) -> None:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
 
-            async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK and
-                # occupied_slots per agent.
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(
-                        (
-                            SessionRow.status.in_({
-                                *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                                *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                            })
-                        )
-                    )
-                    .options(
-                        load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
-                        selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
-                        ),
+            # Query running containers and calculate concurrency_used per AK and
+            # occupied_slots per agent.
+            session_query = (
+                sa.select(SessionRow)
+                .where(
+                    (
+                        SessionRow.status.in_({
+                            *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                            *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                        })
                     )
                 )
-                async for session_row in await db_sess.stream_scalars(session_query):
-                    for kernel in session_row.kernels:
-                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            occupied_slots_per_agent[kernel.agent] += ResourceSlot(
-                                kernel.occupied_slots
-                            )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-                            if kernel.role in PRIVATE_KERNEL_ROLES:
-                                sftp_concurrency_used_per_key[session_row.access_key].add(
-                                    session_row.id
-                                )
-                            else:
-                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
-
-                if len(occupied_slots_per_agent) > 0:
-                    # Update occupied_slots for agents with running containers.
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .where(AgentRow.id == sa.bindparam("agent_id"))
-                            .values(occupied_slots=sa.bindparam("occupied_slots"))
-                        ),
-                        [
-                            {"agent_id": aid, "occupied_slots": slots}
-                            for aid, slots in occupied_slots_per_agent.items()
-                        ],
-                    )
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .values(occupied_slots=ResourceSlot({}))
-                            .where(AgentRow.status == AgentStatus.ALIVE)
-                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                .options(
+                    load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
+                    selectinload(SessionRow.kernels).options(
+                        load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                    ),
+                )
+            )
+            async for session_row in await db_sess.stream_scalars(session_query):
+                for kernel in session_row.kernels:
+                    if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                        occupied_slots_per_agent[kernel.agent] += ResourceSlot(
+                            kernel.occupied_slots
                         )
-                    )
-                else:
-                    query = (
+                    if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                        if kernel.role in PRIVATE_KERNEL_ROLES:
+                            sftp_concurrency_used_per_key[session_row.access_key].add(
+                                session_row.id
+                            )
+                        else:
+                            concurrency_used_per_key[session_row.access_key].add(session_row.id)
+
+            if len(occupied_slots_per_agent) > 0:
+                # Update occupied_slots for agents with running containers.
+                await db_sess.execute(
+                    (
+                        sa.update(AgentRow)
+                        .where(AgentRow.id == sa.bindparam("agent_id"))
+                        .values(occupied_slots=sa.bindparam("occupied_slots"))
+                    ),
+                    [
+                        {"agent_id": aid, "occupied_slots": slots}
+                        for aid, slots in occupied_slots_per_agent.items()
+                    ],
+                )
+                await db_sess.execute(
+                    (
                         sa.update(AgentRow)
                         .values(occupied_slots=ResourceSlot({}))
                         .where(AgentRow.status == AgentStatus.ALIVE)
+                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
                     )
-                    await db_sess.execute(query)
+                )
+            else:
+                query = (
+                    sa.update(AgentRow)
+                    .values(occupied_slots=ResourceSlot({}))
+                    .where(AgentRow.status == AgentStatus.ALIVE)
+                )
+                await db_sess.execute(query)
 
-        await execute_with_retry(_recalc)
+        async with self.db.connect() as conn:
+            await self.db.execute_with_txn_retry(_recalc, self.db.begin_session, conn)
 
         # Update keypair resource usage for keypairs with running containers.
         kp_key = "keypair.concurrency_used"
@@ -2248,32 +2230,31 @@ class AgentRegistry:
                             else:
                                 to_be_terminated.append(kernel)
 
-                            async def _update() -> None:
+                            async def _update(db_sess: SASession) -> None:
                                 kern_stat = await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.get(str(kernel.id)),
                                 )
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATED,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "terminated_at": now,
-                                        "status_history": sql_json_merge(
-                                            KernelRow.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATED.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    if kern_stat:
-                                        values["last_stat"] = msgpack.unpackb(kern_stat)
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
+                                values = {
+                                    "status": KernelStatus.TERMINATED,
+                                    "status_info": reason,
+                                    "status_changed": now,
+                                    "terminated_at": now,
+                                    "status_history": sql_json_merge(
+                                        KernelRow.status_history,
+                                        (),
+                                        {
+                                            KernelStatus.TERMINATED.name: now.isoformat(),
+                                        },
+                                    ),
+                                }
+                                if kern_stat:
+                                    values["last_stat"] = msgpack.unpackb(kern_stat)
+                                await db_sess.execute(
+                                    sa.update(KernelRow)
+                                    .values(**values)
+                                    .where(KernelRow.id == kernel.id),
+                                )
 
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
@@ -2290,35 +2271,37 @@ class AgentRegistry:
                                     ),
                                 )
 
-                            await execute_with_retry(_update)
+                            async with self.db.connect() as conn:
+                                await self.db.execute_with_txn_retry(
+                                    _update, self.db.begin_session, conn
+                                )
                             await self.event_producer.produce_event(
                                 KernelTerminatedEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
 
-                            async def _update() -> None:
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATING,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "status_data": {
-                                            "kernel": {"exit_code": None},
-                                            "session": {"status": "terminating"},
+                            async def _update(db_sess: SASession) -> None:
+                                values = {
+                                    "status": KernelStatus.TERMINATING,
+                                    "status_info": reason,
+                                    "status_changed": now,
+                                    "status_data": {
+                                        "kernel": {"exit_code": None},
+                                        "session": {"status": "terminating"},
+                                    },
+                                    "status_history": sql_json_merge(
+                                        KernelRow.status_history,
+                                        (),
+                                        {
+                                            KernelStatus.TERMINATING.name: now.isoformat(),
                                         },
-                                        "status_history": sql_json_merge(
-                                            KernelRow.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATING.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
+                                    ),
+                                }
+                                await db_sess.execute(
+                                    sa.update(KernelRow)
+                                    .values(**values)
+                                    .where(KernelRow.id == kernel.id),
+                                )
 
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
@@ -2335,7 +2318,10 @@ class AgentRegistry:
                                     ),
                                 )
 
-                            await execute_with_retry(_update)
+                            async with self.db.connect() as conn:
+                                await self.db.execute_with_txn_retry(
+                                    _update, self.db.begin_session, conn
+                                )
                             await self.event_producer.produce_event(
                                 KernelTerminatingEvent(kernel.id, target_session.id, reason),
                             )
@@ -2411,27 +2397,26 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
-        async def _fetch_session() -> Row:
-            async with self.db.begin_readonly() as conn:
-                query = (
-                    sa.select([
-                        kernels.c.session_id,
-                        kernels.c.cluster_mode,
-                        kernels.c.cluster_size,
-                        kernels.c.agent,
-                        kernels.c.agent_addr,
-                        kernels.c.use_host_network,
-                    ])
-                    .select_from(kernels)
-                    .where(
-                        (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE)
-                    )
+        async def _fetch_session(conn: SAConnection) -> Row:
+            query = (
+                sa.select([
+                    kernels.c.session_id,
+                    kernels.c.cluster_mode,
+                    kernels.c.cluster_size,
+                    kernels.c.agent,
+                    kernels.c.agent_addr,
+                    kernels.c.use_host_network,
+                ])
+                .select_from(kernels)
+                .where(
+                    (kernels.c.session_id == session_id) & (kernels.c.cluster_role == DEFAULT_ROLE)
                 )
-                result = await conn.execute(query)
-                return result.first()
+            )
+            result = await conn.execute(query)
+            return result.first()
 
-        session = await execute_with_retry(_fetch_session)
+        async with self.db.connect() as conn:
+            session = await self.db.execute_with_txn_retry(_fetch_session, self.db.begin, conn)
         if session is None:
             return
         # Get the main container's agent info
@@ -2470,25 +2455,25 @@ class AgentRegistry:
     ) -> None:
         log.warning("restart_session({})", session.id)
 
-        async def _restarting_session() -> None:
-            async with self.db.begin_session() as db_sess:
-                query = (
-                    sa.update(SessionRow)
-                    .values(
-                        status=SessionStatus.RESTARTING,
-                        status_history=sql_json_merge(
-                            SessionRow.status_history,
-                            (),
-                            {
-                                SessionStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
-                            },
-                        ),
-                    )
-                    .where(SessionRow.id == session.id)
+        async def _restarting_session(db_sess: SASession) -> None:
+            query = (
+                sa.update(SessionRow)
+                .values(
+                    status=SessionStatus.RESTARTING,
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            SessionStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
                 )
-                await db_sess.execute(query)
+                .where(SessionRow.id == session.id)
+            )
+            await db_sess.execute(query)
 
-        await execute_with_retry(_restarting_session)
+        async with self.db.connect() as conn:
+            await self.db.execute_with_txn_retry(_restarting_session, self.db.begin_session, conn)
 
         kernel_list = session.kernels
 
@@ -2739,125 +2724,125 @@ class AgentRegistry:
             )
 
             # Check and update status of the agent record in DB
-            async def _update() -> None:
+            async def _update(conn: SAConnection) -> None:
                 nonlocal instance_rejoin
-                async with self.db.begin() as conn:
-                    fetch_query = (
-                        sa.select([
-                            agents.c.status,
-                            agents.c.addr,
-                            agents.c.public_host,
-                            agents.c.public_key,
-                            agents.c.scaling_group,
-                            agents.c.available_slots,
-                            agents.c.version,
-                            agents.c.compute_plugins,
-                            agents.c.architecture,
-                            agents.c.auto_terminate_abusing_kernel,
-                        ])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                        .with_for_update()
-                    )
-                    result = await conn.execute(fetch_query)
-                    row = result.first()
+                fetch_query = (
+                    sa.select([
+                        agents.c.status,
+                        agents.c.addr,
+                        agents.c.public_host,
+                        agents.c.public_key,
+                        agents.c.scaling_group,
+                        agents.c.available_slots,
+                        agents.c.version,
+                        agents.c.compute_plugins,
+                        agents.c.architecture,
+                        agents.c.auto_terminate_abusing_kernel,
+                    ])
+                    .select_from(agents)
+                    .where(agents.c.id == agent_id)
+                    .with_for_update()
+                )
+                result = await conn.execute(fetch_query)
+                row = result.first()
 
-                    if row is None or row["status"] is None:
-                        # new agent detected!
-                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.shared_config.update_resource_slots(slot_key_and_units)
+                if row is None or row["status"] is None:
+                    # new agent detected!
+                    log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
+                    await self.shared_config.update_resource_slots(slot_key_and_units)
+                    self.agent_cache.update(
+                        agent_id,
+                        current_addr,
+                        agent_info["public_key"],
+                    )
+                    insert_query = sa.insert(agents).values({
+                        "id": agent_id,
+                        "status": AgentStatus.ALIVE,
+                        "region": agent_info["region"],
+                        "scaling_group": sgroup,
+                        "available_slots": available_slots,
+                        "occupied_slots": {},
+                        "addr": agent_info["addr"],
+                        "public_host": agent_info["public_host"],
+                        "public_key": agent_info["public_key"],
+                        "first_contact": now,
+                        "lost_at": sa.null(),
+                        "version": agent_info["version"],
+                        "compute_plugins": agent_info["compute_plugins"],
+                        "architecture": agent_info.get("architecture", "x86_64"),
+                        "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
+                    })
+                    result = await conn.execute(insert_query)
+                    assert result.rowcount == 1
+                elif row["status"] == AgentStatus.ALIVE:
+                    updates = {}
+                    invalidate_agent_cache = False
+                    if row["available_slots"] != available_slots:
+                        updates["available_slots"] = available_slots
+                    if row["scaling_group"] != sgroup:
+                        updates["scaling_group"] = sgroup
+                    if row["addr"] != current_addr:
+                        updates["addr"] = current_addr
+                        invalidate_agent_cache = True
+                    if row["public_host"] != agent_info["public_host"]:
+                        updates["public_host"] = agent_info["public_host"]
+                    if row["public_key"] != agent_info["public_key"]:
+                        updates["public_key"] = agent_info["public_key"]
+                        invalidate_agent_cache = True
+                    if row["version"] != agent_info["version"]:
+                        updates["version"] = agent_info["version"]
+                    if row["compute_plugins"] != agent_info["compute_plugins"]:
+                        updates["compute_plugins"] = agent_info["compute_plugins"]
+                    if row["architecture"] != agent_info["architecture"]:
+                        updates["architecture"] = agent_info["architecture"]
+                    if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
+                        updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
+                    # occupied_slots are updated when kernels starts/terminates
+                    if invalidate_agent_cache:
                         self.agent_cache.update(
                             agent_id,
                             current_addr,
                             agent_info["public_key"],
                         )
-                        insert_query = sa.insert(agents).values({
-                            "id": agent_id,
+                    if updates:
+                        await self.shared_config.update_resource_slots(slot_key_and_units)
+                        update_query = (
+                            sa.update(agents).values(updates).where(agents.c.id == agent_id)
+                        )
+                        await conn.execute(update_query)
+                elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
+                    await self.shared_config.update_resource_slots(slot_key_and_units)
+                    instance_rejoin = True
+                    self.agent_cache.update(
+                        agent_id,
+                        current_addr,
+                        agent_info["public_key"],
+                    )
+                    update_query = (
+                        sa.update(agents)
+                        .values({
                             "status": AgentStatus.ALIVE,
                             "region": agent_info["region"],
                             "scaling_group": sgroup,
-                            "available_slots": available_slots,
-                            "occupied_slots": {},
                             "addr": agent_info["addr"],
                             "public_host": agent_info["public_host"],
                             "public_key": agent_info["public_key"],
-                            "first_contact": now,
                             "lost_at": sa.null(),
+                            "available_slots": available_slots,
                             "version": agent_info["version"],
                             "compute_plugins": agent_info["compute_plugins"],
-                            "architecture": agent_info.get("architecture", "x86_64"),
+                            "architecture": agent_info["architecture"],
                             "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                         })
-                        result = await conn.execute(insert_query)
-                        assert result.rowcount == 1
-                    elif row["status"] == AgentStatus.ALIVE:
-                        updates = {}
-                        invalidate_agent_cache = False
-                        if row["available_slots"] != available_slots:
-                            updates["available_slots"] = available_slots
-                        if row["scaling_group"] != sgroup:
-                            updates["scaling_group"] = sgroup
-                        if row["addr"] != current_addr:
-                            updates["addr"] = current_addr
-                            invalidate_agent_cache = True
-                        if row["public_host"] != agent_info["public_host"]:
-                            updates["public_host"] = agent_info["public_host"]
-                        if row["public_key"] != agent_info["public_key"]:
-                            updates["public_key"] = agent_info["public_key"]
-                            invalidate_agent_cache = True
-                        if row["version"] != agent_info["version"]:
-                            updates["version"] = agent_info["version"]
-                        if row["compute_plugins"] != agent_info["compute_plugins"]:
-                            updates["compute_plugins"] = agent_info["compute_plugins"]
-                        if row["architecture"] != agent_info["architecture"]:
-                            updates["architecture"] = agent_info["architecture"]
-                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
-                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
-                        # occupied_slots are updated when kernels starts/terminates
-                        if invalidate_agent_cache:
-                            self.agent_cache.update(
-                                agent_id,
-                                current_addr,
-                                agent_info["public_key"],
-                            )
-                        if updates:
-                            await self.shared_config.update_resource_slots(slot_key_and_units)
-                            update_query = (
-                                sa.update(agents).values(updates).where(agents.c.id == agent_id)
-                            )
-                            await conn.execute(update_query)
-                    elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.shared_config.update_resource_slots(slot_key_and_units)
-                        instance_rejoin = True
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        update_query = (
-                            sa.update(agents)
-                            .values({
-                                "status": AgentStatus.ALIVE,
-                                "region": agent_info["region"],
-                                "scaling_group": sgroup,
-                                "addr": agent_info["addr"],
-                                "public_host": agent_info["public_host"],
-                                "public_key": agent_info["public_key"],
-                                "lost_at": sa.null(),
-                                "available_slots": available_slots,
-                                "version": agent_info["version"],
-                                "compute_plugins": agent_info["compute_plugins"],
-                                "architecture": agent_info["architecture"],
-                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                            })
-                            .where(agents.c.id == agent_id)
-                        )
-                        await conn.execute(update_query)
-                    else:
-                        log.error("should not reach here! {0}", type(row["status"]))
+                        .where(agents.c.id == agent_id)
+                    )
+                    await conn.execute(update_query)
+                else:
+                    log.error("should not reach here! {0}", type(row["status"]))
 
             try:
-                await execute_with_retry(_update)
+                async with self.db.connect() as conn:
+                    await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
             except sa.exc.IntegrityError:
                 log.error("Scaling group named [{}] does not exist.", sgroup)
                 return
@@ -2895,41 +2880,41 @@ class AgentRegistry:
                 await pipe.srem(imgname, agent_id)
             return pipe
 
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                fetch_query = (
-                    sa.select([
-                        agents.c.status,
-                        agents.c.addr,
-                    ])
-                    .select_from(agents)
-                    .where(agents.c.id == agent_id)
-                    .with_for_update()
-                )
-                result = await conn.execute(fetch_query)
-                row = result.first()
-                prev_status = row["status"]
-                if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                    return
+        async def _update(conn: SAConnection) -> None:
+            fetch_query = (
+                sa.select([
+                    agents.c.status,
+                    agents.c.addr,
+                ])
+                .select_from(agents)
+                .where(agents.c.id == agent_id)
+                .with_for_update()
+            )
+            result = await conn.execute(fetch_query)
+            row = result.first()
+            prev_status = row["status"]
+            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
+                return
 
-                if status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", agent_id)
-                elif status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", agent_id)
-                now = datetime.now(tzutc())
-                update_query = (
-                    sa.update(agents)
-                    .values({
-                        "status": status,
-                        "status_changed": now,
-                        "lost_at": now,
-                    })
-                    .where(agents.c.id == agent_id)
-                )
-                await conn.execute(update_query)
+            if status == AgentStatus.LOST:
+                log.warning("agent {0} heartbeat timeout detected.", agent_id)
+            elif status == AgentStatus.TERMINATED:
+                log.info("agent {0} has terminated.", agent_id)
+            now = datetime.now(tzutc())
+            update_query = (
+                sa.update(agents)
+                .values({
+                    "status": status,
+                    "status_changed": now,
+                    "lost_at": now,
+                })
+                .where(agents.c.id == agent_id)
+            )
+            await conn.execute(update_query)
 
         await redis_helper.execute(self.redis_image, _pipe_builder)
-        await execute_with_retry(_update)
+        async with self.db.connect() as conn:
+            await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def sync_kernel_stats(
         self,
@@ -2949,23 +2934,23 @@ class AgentRegistry:
             else:
                 per_kernel_updates[kernel_id] = msgpack.unpackb(kern_stat)
 
-        async def _update():
-            async with self.db.begin() as conn:
-                update_query = (
-                    sa.update(kernels)
-                    .where(kernels.c.id == sa.bindparam("kernel_id"))
-                    .values({kernels.c.last_stat: sa.bindparam("last_stat")})
-                )
-                params = []
-                for kernel_id, updates in per_kernel_updates.items():
-                    params.append({
-                        "kernel_id": kernel_id,
-                        "last_stat": updates,
-                    })
-                await conn.execute(update_query, params)
+        async def _update(conn: SAConnection):
+            update_query = (
+                sa.update(kernels)
+                .where(kernels.c.id == sa.bindparam("kernel_id"))
+                .values({kernels.c.last_stat: sa.bindparam("last_stat")})
+            )
+            params = []
+            for kernel_id, updates in per_kernel_updates.items():
+                params.append({
+                    "kernel_id": kernel_id,
+                    "last_stat": updates,
+                })
+            await conn.execute(update_query, params)
 
         if per_kernel_updates:
-            await execute_with_retry(_update)
+            async with self.db.connect() as conn:
+                await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
@@ -3015,68 +3000,68 @@ class AgentRegistry:
             lambda r: r.get(str(kernel_id)),
         )
 
-        async def _update_kernel() -> tuple[AccessKey, AgentId] | None:
-            async with self.db.begin_session() as db_sess:
-                # Check the current status.
-                select_query = (
-                    sa.select(
-                        KernelRow.access_key,
-                        KernelRow.agent,
-                        KernelRow.status,
-                        KernelRow.occupied_slots,
-                        KernelRow.session_id,
-                    )
-                    .where(KernelRow.id == kernel_id)
-                    .with_for_update()
+        async def _update_kernel(db_sess: SASession) -> tuple[AccessKey, AgentId] | None:
+            # Check the current status.
+            select_query = (
+                sa.select(
+                    KernelRow.access_key,
+                    KernelRow.agent,
+                    KernelRow.status,
+                    KernelRow.occupied_slots,
+                    KernelRow.session_id,
                 )
-                result = await db_sess.execute(select_query)
-                kernel = result.first()
-                if kernel is None or kernel.status in (
-                    KernelStatus.CANCELLED,
-                    KernelStatus.TERMINATED,
-                    KernelStatus.RESTARTING,
-                ):
-                    # Skip if non-existent, already terminated, or restarting.
-                    return None
+                .where(KernelRow.id == kernel_id)
+                .with_for_update()
+            )
+            result = await db_sess.execute(select_query)
+            kernel = result.first()
+            if kernel is None or kernel.status in (
+                KernelStatus.CANCELLED,
+                KernelStatus.TERMINATED,
+                KernelStatus.RESTARTING,
+            ):
+                # Skip if non-existent, already terminated, or restarting.
+                return None
 
-                # Change the status to TERMINATED.
-                # (we don't delete the row for later logging and billing)
-                now = datetime.now(tzutc())
-                values = {
-                    "status": KernelStatus.TERMINATED,
-                    "status_info": reason,
-                    "status_changed": now,
-                    "status_data": sql_json_merge(
-                        KernelRow.status_data,
-                        ("kernel",),
-                        {"exit_code": exit_code},
-                    ),
-                    "status_history": sql_json_merge(
-                        KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.TERMINATED.name: now.isoformat(),
-                        },
-                    ),
-                    "terminated_at": now,
-                }
-                if kern_stat:
-                    values["last_stat"] = msgpack.unpackb(kern_stat)
-                update_query = (
-                    sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
-                )
-                await db_sess.execute(update_query)
-                return kernel.access_key, kernel.agent
+            # Change the status to TERMINATED.
+            # (we don't delete the row for later logging and billing)
+            now = datetime.now(tzutc())
+            values = {
+                "status": KernelStatus.TERMINATED,
+                "status_info": reason,
+                "status_changed": now,
+                "status_data": sql_json_merge(
+                    KernelRow.status_data,
+                    ("kernel",),
+                    {"exit_code": exit_code},
+                ),
+                "status_history": sql_json_merge(
+                    KernelRow.status_history,
+                    (),
+                    {
+                        KernelStatus.TERMINATED.name: now.isoformat(),
+                    },
+                ),
+                "terminated_at": now,
+            }
+            if kern_stat:
+                values["last_stat"] = msgpack.unpackb(kern_stat)
+            update_query = sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
+            await db_sess.execute(update_query)
+            return kernel.access_key, kernel.agent
 
-        result = await execute_with_retry(_update_kernel)
+        async with self.db.connect() as conn:
+            result = await self.db.execute_with_txn_retry(
+                _update_kernel,
+                self.db.begin_session,
+                conn,
+            )
+            if result is None:
+                return
 
-        if result is None:
-            return
+            access_key, agent = result
 
-        access_key, agent = result
-
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
+            async def _recalc(conn: SAConnection) -> None:
                 log.debug(
                     "recalculate concurrency used in kernel termination (ak: {})",
                     access_key,
@@ -3088,7 +3073,7 @@ class AgentRegistry:
                 )
                 await recalc_agent_resource_occupancy(conn, agent)
 
-        await execute_with_retry(_recalc)
+            await self.db.execute_with_txn_retry(_recalc, self.db.begin, conn)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
@@ -3206,7 +3191,7 @@ class AgentRegistry:
         }
 
     async def update_appproxy_endpoint_routes(
-        self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
+        self, db_sess: SASession, endpoint: EndpointRow, active_routes: list[RoutingRow]
     ) -> None:
         target_sessions = await SessionRow.list_sessions(
             db_sess,
@@ -3274,7 +3259,7 @@ class AgentRegistry:
                     )
                     await db_sess.execute(query)
 
-    async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
+    async def delete_appproxy_endpoint(self, db_sess: SASession, endpoint: EndpointRow) -> None:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
@@ -3417,8 +3402,9 @@ async def handle_model_service_status_update(
     event: ModelServiceStatusEvent,
 ) -> None:
     log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
-    try:
-        async with context.db.begin_readonly_session() as db_sess:
+
+    async def _update(db_sess: SASession):
+        try:
             session = await SessionRow.get_session(
                 db_sess,
                 event.session_id,
@@ -3426,39 +3412,37 @@ async def handle_model_service_status_update(
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
             route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-    except SessionNotFound:
-        return
+        except SessionNotFound:
+            return
+        data: dict[str, Any] = {}
+        match event.new_status:
+            case ModelServiceStatus.HEALTHY:
+                data["status"] = RouteStatus.HEALTHY
+            case ModelServiceStatus.UNHEALTHY:
+                data["status"] = RouteStatus.UNHEALTHY
+        query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
+        await db_sess.execute(query)
 
-    async def _update():
-        async with context.db.begin_session() as db_sess:
-            data: dict[str, Any] = {}
-            match event.new_status:
-                case ModelServiceStatus.HEALTHY:
-                    data["status"] = RouteStatus.HEALTHY
-                case ModelServiceStatus.UNHEALTHY:
-                    data["status"] = RouteStatus.UNHEALTHY
-            query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
-            await db_sess.execute(query)
+        query = sa.select(RoutingRow).where(
+            (RoutingRow.endpoint == route.endpoint) & (RoutingRow.status == RouteStatus.HEALTHY)
+        )
+        result = await db_sess.execute(query)
+        latest_routes = result.fetchall()
+        latest_routes = await RoutingRow.list(
+            db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
+        )
 
-            query = sa.select(RoutingRow).where(
-                (RoutingRow.endpoint == route.endpoint) & (RoutingRow.status == RouteStatus.HEALTHY)
+        try:
+            await context.update_appproxy_endpoint_routes(
+                db_sess, route.endpoint_row, latest_routes
             )
-            result = await db_sess.execute(query)
-            latest_routes = result.fetchall()
-            latest_routes = await RoutingRow.list(
-                db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
-            )
+        except Exception as e:
+            if is_db_retry_error(e):
+                raise
+            log.exception("failed to communicate with AppProxy endpoint:")
 
-            try:
-                await context.update_appproxy_endpoint_routes(
-                    db_sess, route.endpoint_row, latest_routes
-                )
-            except Exception as e:
-                if is_db_retry_error(e):
-                    raise
-                log.exception("failed to communicate with AppProxy endpoint:")
-
-    await execute_with_retry(_update)
+    async with context.db.connect() as conn:
+        await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
 
 
 async def invoke_session_callback(
@@ -3493,13 +3477,13 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_readonly_session() as db_sess:
-                route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+            async with context.db.connect() as conn:
+                async with context.db.begin_readonly_session(bind=conn) as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-            async def _update() -> None:
-                new_routes: list[RoutingRow]
-                async with context.db.begin_session() as db_sess:
+                async def _update(db_sess: SASession) -> None:
+                    new_routes: list[RoutingRow]
                     if isinstance(event, SessionCancelledEvent):
                         update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
@@ -3572,10 +3556,7 @@ async def invoke_session_callback(
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
 
-            await execute_with_retry(_update)
-
-            async def _clear_error() -> None:
-                async with context.db.begin_session() as db_sess:
+                async def _clear_error(db_sess: SASession) -> None:
                     query = sa.select([sa.func.count("*")]).where(
                         (RoutingRow.endpoint == endpoint.id)
                         & (RoutingRow.status == RouteStatus.HEALTHY)
@@ -3594,7 +3575,10 @@ async def invoke_session_callback(
                         )
                         await db_sess.execute(query)
 
-            await execute_with_retry(_clear_error)
+                await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
+                await context.db.execute_with_txn_retry(
+                    _clear_error, context.db.begin_session, conn
+                )
     except Exception:
         log.exception("error while updating route status:")
 
@@ -3717,39 +3701,39 @@ async def handle_route_creation(
                 query_on_behalf_of=session_owner["access_key"],
             )
 
-            await context.create_session(
-                f"{endpoint.name}-{str(event.route_id)}",
-                endpoint.image_row.name,
-                endpoint.image_row.architecture,
-                UserScope(
-                    domain_name=endpoint.domain,
-                    group_id=group_id,
-                    user_uuid=created_user.uuid,
-                    user_role=created_user.role,
-                ),
-                session_owner["access_key"],
-                resource_policy,
-                SessionTypes.INFERENCE,
-                {
-                    "mounts": [endpoint.model],
-                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
-                    "environ": endpoint.environ,
-                    "scaling_group": endpoint.resource_group,
-                    "resources": endpoint.resource_slots,
-                    "resource_opts": endpoint.resource_opts,
-                    "preopen_ports": None,
-                    "agent_list": None,
-                },
-                ClusterMode[endpoint.cluster_mode],
-                endpoint.cluster_size,
-                bootstrap_script=endpoint.bootstrap_script,
-                startup_command=endpoint.startup_command,
-                tag=endpoint.tag,
-                callback_url=endpoint.callback_url,
-                enqueue_only=True,
-                route_id=route.id,
-                sudo_session_enabled=session_owner.sudo_session_enabled,
-            )
+        await context.create_session(
+            f"{endpoint.name}-{str(event.route_id)}",
+            endpoint.image_row.name,
+            endpoint.image_row.architecture,
+            UserScope(
+                domain_name=endpoint.domain,
+                group_id=group_id,
+                user_uuid=created_user.uuid,
+                user_role=created_user.role,
+            ),
+            session_owner["access_key"],
+            resource_policy,
+            SessionTypes.INFERENCE,
+            {
+                "mounts": [endpoint.model],
+                "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                "environ": endpoint.environ,
+                "scaling_group": endpoint.resource_group,
+                "resources": endpoint.resource_slots,
+                "resource_opts": endpoint.resource_opts,
+                "preopen_ports": None,
+                "agent_list": None,
+            },
+            ClusterMode[endpoint.cluster_mode],
+            endpoint.cluster_size,
+            bootstrap_script=endpoint.bootstrap_script,
+            startup_command=endpoint.startup_command,
+            tag=endpoint.tag,
+            callback_url=endpoint.callback_url,
+            enqueue_only=True,
+            route_id=route.id,
+            sudo_session_enabled=session_owner.sudo_session_enabled,
+        )
     except Exception as e:
         log.exception("error while creating session:")
         error_data = {
@@ -3763,23 +3747,23 @@ async def handle_route_creation(
             ],
         }
 
-        async def _update():
-            async with context.db.begin_session() as db_sess:
+        async def _update(db_sess: SASession):
+            query = (
+                sa.update(RoutingRow)
+                .values({"status": RouteStatus.FAILED_TO_START, "error_data": error_data})
+                .where(RoutingRow.id == event.route_id)
+            )
+            await db_sess.execute(query)
+            if endpoint:
                 query = (
-                    sa.update(RoutingRow)
-                    .values({"status": RouteStatus.FAILED_TO_START, "error_data": error_data})
-                    .where(RoutingRow.id == event.route_id)
+                    sa.update(EndpointRow)
+                    .values({"retries": endpoint.retries + 1})
+                    .where(EndpointRow.id == endpoint.id)
                 )
                 await db_sess.execute(query)
-                if endpoint:
-                    query = (
-                        sa.update(EndpointRow)
-                        .values({"retries": endpoint.retries + 1})
-                        .where(EndpointRow.id == endpoint.id)
-                    )
-                    await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        async with context.db.connect() as conn:
+            await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
 
 
 async def handle_check_agent_resource(
@@ -3883,16 +3867,16 @@ async def handle_kernel_log(
         try:
             log_data = log_buffer.getvalue()
 
-            async def _update_log() -> None:
-                async with context.db.begin() as conn:
-                    update_query = (
-                        sa.update(kernels)
-                        .values(container_log=log_data)
-                        .where(kernels.c.id == event.kernel_id)
-                    )
-                    await conn.execute(update_query)
+            async def _update_log(conn: SAConnection) -> None:
+                update_query = (
+                    sa.update(kernels)
+                    .values(container_log=log_data)
+                    .where(kernels.c.id == event.kernel_id)
+                )
+                await conn.execute(update_query)
 
-            await execute_with_retry(_update_log)
+            async with context.db.connect() as conn:
+                await context.db.execute_with_txn_retry(_update_log, context.db.begin, conn)
         finally:
             # Clear the log data from Redis when done.
             await redis_helper.execute(

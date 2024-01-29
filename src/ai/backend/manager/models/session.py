@@ -79,7 +79,6 @@ from .user import UserRow
 from .utils import (
     ExtendedAsyncSAEngine,
     agg_to_array,
-    execute_with_retry,
     sql_json_merge,
 )
 
@@ -786,7 +785,8 @@ class SessionRow(Base):
             await db_session.execute(update_query)
             return determined_status
 
-        return await db.execute_with_cnx_retry(_check_and_update)
+        async with db.connect() as conn:
+            return await db.execute_with_txn_retry(_check_and_update, db.begin_session, conn)
 
     @staticmethod
     async def set_session_status(
@@ -819,12 +819,12 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
+        async def _update(db_sess: SASession) -> None:
+            query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
+            await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        async with db.connect() as conn:
+            await db.execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def set_session_result(
@@ -839,12 +839,12 @@ class SessionRow(Base):
             "result": SessionResult.SUCCESS if success else SessionResult.FAILURE,
         }
 
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
+        async def _update(db_sess: SASession) -> None:
+            query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
+            await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        async with db.connect() as conn:
+            await db.execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def match_sessions(

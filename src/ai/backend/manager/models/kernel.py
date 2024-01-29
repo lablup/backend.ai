@@ -77,7 +77,7 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -586,31 +586,31 @@ class KernelRow(Base):
     ) -> KernelRow:
         from .agent import AgentStatus
 
-        async def _query():
-            async with db.begin_readonly_session() as db_sess:
-                query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kern_id)
-                    .options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).options(noload("*")),
-                    )
+        async def _query(db_sess: SASession):
+            query = (
+                sa.select(KernelRow)
+                .where(KernelRow.id == kern_id)
+                .options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).options(noload("*")),
                 )
-                result = (await db_sess.execute(query)).scalars().all()
+            )
+            result = (await db_sess.execute(query)).scalars().all()
 
-                cand = result
-                if not allow_stale:
-                    cand = [
-                        k
-                        for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row.status == AgentStatus.ALIVE)
-                    ]
-                if not cand:
-                    raise SessionNotFound
-                return cand[0]
+            cand = result
+            if not allow_stale:
+                cand = [
+                    k
+                    for k in result
+                    if (k.status not in DEAD_KERNEL_STATUSES)
+                    and (k.agent_row.status == AgentStatus.ALIVE)
+                ]
+            if not cand:
+                raise SessionNotFound
+            return cand[0]
 
-        return await execute_with_retry(_query)
+        async with db.connect() as conn:
+            return await db.execute_with_txn_retry(_query, db.begin_readonly_session, conn)
 
     @classmethod
     async def set_kernel_status(
@@ -703,7 +703,8 @@ class KernelRow(Base):
             await db_session.execute(update_query)
             return True
 
-        return await db.execute_with_cnx_retry(_update)
+        async with db.connect() as conn:
+            return await db.execute_with_txn_retry(_update, db.begin_session, conn)
 
 
 DEFAULT_KERNEL_ORDERING = [

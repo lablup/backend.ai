@@ -20,7 +20,6 @@ from ..models import (
     UserRow,
 )
 from ..models.session import SessionStatus
-from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
@@ -67,21 +66,19 @@ async def check_concurrency(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    async def _get_max_concurrent_sessions() -> int:
-        resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
-            KeyPairRow.access_key == sess_ctx.access_key
-        )
-        if sess_ctx.is_private:
-            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
-        else:
-            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sessions
-        select_query = sa.select(concurrent_session_column).where(
-            KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
-        )
-        result = await db_sess.execute(select_query)
-        return result.scalar()
+    resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
+        KeyPairRow.access_key == sess_ctx.access_key
+    )
+    if sess_ctx.is_private:
+        concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
+    else:
+        concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sessions
+    select_query = sa.select(concurrent_session_column).where(
+        KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
+    )
+    result = await db_sess.execute(select_query)
 
-    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    max_concurrent_sessions = result.scalar()
     if sess_ctx.is_private:
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
