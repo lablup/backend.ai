@@ -33,7 +33,7 @@ from .base import (
     ResourceSlotColumn,
     URLColumn,
     set_if_set,
-    simple_db_mutate,
+    simple_db_mutate_returning_item,
 )
 from .image import Image, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
@@ -664,6 +664,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    endpoint = graphene.Field(lambda: Endpoint, required=False)
 
     @classmethod
     async def mutate(
@@ -703,7 +704,9 @@ class ModifyEndpoint(graphene.Mutation):
             data["image"] = image_row.id
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
-        return await simple_db_mutate(cls, graph_ctx, update_query)
+        return await simple_db_mutate_returning_item(
+            cls, graph_ctx, update_query, item_cls=Endpoint
+        )
 
 
 class EndpointToken(graphene.ObjectType):
