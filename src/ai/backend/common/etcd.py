@@ -494,7 +494,7 @@ class AsyncEtcd:
                 ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch(): error while connecting to Etcd server, retrying...")
+                    log.warning("watch(): error while connecting to Etcd server, retrying...")
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
@@ -532,7 +532,9 @@ class AsyncEtcd:
                 ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch_prefix(): error while connecting to Etcd server, retrying...")
+                    log.warning(
+                        "watch_prefix(): error while connecting to Etcd server, retrying..."
+                    )
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
