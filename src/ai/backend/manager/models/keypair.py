@@ -168,7 +168,9 @@ class KeyPair(graphene.ObjectType):
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
     user = graphene.UUID()
-    projects = graphene.List(lambda: graphene.String)
+    projects = graphene.List(
+        lambda: graphene.String, deprecation_reason="Deprecated since 24.03.0;"
+    )
 
     ssh_public_key = graphene.String()
 
@@ -216,7 +218,7 @@ class KeyPair(graphene.ObjectType):
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
-            projects=row["groups_name"] if "groups_name" in row.keys() else [],
+            projects=row["groups_name"] if "groups_name" in row.keys() else [],  # deprecated
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -331,15 +333,10 @@ class KeyPair(graphene.ObjectType):
         is_active: bool = None,
         filter: str = None,
     ) -> int:
-        from .group import association_groups_users, groups
         from .user import users
 
-        j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
-        )
-        query = sa.select([sa.func.count()]).select_from(j)
+        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+        query = sa.select([sa.func.count(sa.distinct(keypairs.c.user_id))]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -366,20 +363,14 @@ class KeyPair(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[KeyPair]:
-        from .group import association_groups_users, groups
         from .user import users
 
-        j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
-        )
+        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
         query = (
             sa.select([
                 keypairs,
                 users.c.email,
                 users.c.full_name,
-                agg_to_array(groups.c.name).label("groups_name"),
             ])
             .select_from(j)
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -416,20 +407,14 @@ class KeyPair(graphene.ObjectType):
         domain_name: str = None,
         is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
-        from .group import association_groups_users, groups
         from .user import users
 
-        j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
-        )
+        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
         query = (
             sa.select([
                 keypairs,
                 users.c.email,
                 users.c.full_name,
-                agg_to_array(groups.c.name).label("groups_name"),
             ])
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
@@ -457,20 +442,14 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str = None,
     ) -> Sequence[Optional[KeyPair]]:
-        from .group import association_groups_users, groups
         from .user import users
 
-        j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
-        )
+        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
         query = (
             sa.select([
                 keypairs,
                 users.c.email,
                 users.c.full_name,
-                agg_to_array(groups.c.name).label("groups_name"),
             ])
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
