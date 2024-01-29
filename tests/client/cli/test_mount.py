@@ -2,7 +2,7 @@ from ai.backend.client.cli.session.execute import prepare_mount_arg, prepare_mou
 from ai.backend.common.types import MountPermission, MountTypes
 
 
-def test_vfolder_mount_simple():
+def test_vfolder_mount_v1():
     # given
     mount = [
         "vf-5194d5d8",
@@ -23,25 +23,25 @@ def test_vfolder_mount_simple():
     }
 
 
-def test_vfolder_mount_complex():
+def test_vfolder_mount_v2():
     # given
     mount = [
         "type=bind,source=/colon\\:path/test,target=/data",
         "type=bind,source=/usr/abcd,target=/home/work/zxcv,perm=ro",
         "type=bind,source=/usr/lorem,target=/home/work/ipsum,permission=ro",
-        "type=bind,source=/usr/dolor,target=/home/work/sit,permission=rw",
+        "source=/src/hello,target=/trg/hello,perm=rw",
     ]
 
     # when
     mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
 
     # then
-    assert set(mount) == {"/colon:path/test", "/usr/abcd", "/usr/lorem", "/usr/dolor"}
+    assert set(mount) == {"/colon:path/test", "/usr/abcd", "/usr/lorem", "/src/hello"}
     assert mount_map == {
         "/colon:path/test": "/data",
         "/usr/abcd": "/home/work/zxcv",
         "/usr/lorem": "/home/work/ipsum",
-        "/usr/dolor": "/home/work/sit",
+        "/src/hello": "/trg/hello",
     }
     assert mount_options == {
         "/colon:path/test": {
@@ -56,7 +56,7 @@ def test_vfolder_mount_complex():
             "type": MountTypes.BIND,
             "permission": MountPermission.READ_ONLY,
         },
-        "/usr/dolor": {
+        "/src/hello": {
             "type": MountTypes.BIND,
             "permission": MountPermission.READ_WRITE,
         },
