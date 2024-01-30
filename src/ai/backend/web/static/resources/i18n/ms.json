@@ -237,7 +237,19 @@
       "preopen": "prabuka",
       "Network": "Rangkaian",
       "Enable": "Dayakan",
-      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan."
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Peruntukan Sumber Setiap Bekas",
+      "NumberOfContainer": "Bilangan bekas",
+      "EnterEnvironmentVariable": "Masukkan nama Pembolehubah",
+      "EnvironmentVariableNamePatternError": "Nama pembolehubah mesti bermula dengan huruf atau garis bawah, dan hanya boleh mengandungi huruf, nombor dan garis bawah.",
+      "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -295,7 +307,7 @@
       "SluggedStrings": "Rentetan slugged (>3 aksara)",
       "SessionNameAlreadyExist": "Nama sesi sudah wujud",
       "SessionNameTooLong64": "Sila masukkan 64 aksara atau kurang.",
-      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 3 huruf, nombor, '.', '_' dan '-'."
+      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 4 huruf, nombor, '.', '_' dan '-'."
     },
     "Interactive": "Interaktif",
     "Batch": "Kumpulan",
@@ -428,7 +440,9 @@
     "Control": "Kawal",
     "NewPassword": "Kata laluan baharu",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Stor"
+    "StorageProxies": "Stor",
+    "None": "tiada",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -505,7 +519,8 @@
     "KeypairDetail": "Butiran pasangan kekunci",
     "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
-    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan"
+    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Folder",
@@ -762,7 +777,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
-    "Deleted": "Pratetap sumber berjaya dipadamkan."
+    "Deleted": "Pratetap sumber berjaya dipadamkan.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Am",
@@ -898,7 +914,8 @@
     "PleaseSelectOption": "Sila pilih satu pilihan.",
     "RegistrySuccessfullyModified": "Pendaftaran berjaya diubah suai.",
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
-    "ModifyRegistry": "Ubah suai Pendaftaran"
+    "ModifyRegistry": "Ubah suai Pendaftaran",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1376,7 +1393,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 64 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",

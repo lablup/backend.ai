@@ -74,7 +74,8 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
         nodes = []
         sentinels = []
-        sentinel_config = textwrap.dedent(f"""
+        sentinel_config = textwrap.dedent(
+            f"""
         sentinel resolve-hostnames yes
         sentinel monitor {self.service_name} 127.0.0.1 16379 2
         sentinel auth-pass {self.service_name} {self.password}
@@ -82,7 +83,8 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
         sentinel failover-timeout {self.service_name} 5000
         sentinel parallel-syncs {self.service_name} 2
         protected-mode no
-        """).lstrip()
+        """
+        ).lstrip()
         for node_port in [16379, 16380, 16381]:
             rdb_path = Path(f"node.{node_port}.rdb")
             try:

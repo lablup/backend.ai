@@ -111,6 +111,8 @@ class KeyPairRow(Base):
         back_populates="keypairs",
     )
 
+    user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+
 
 class UserInfo(graphene.ObjectType):
     email = graphene.String()
@@ -373,14 +375,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
@@ -425,14 +425,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -468,14 +466,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -501,8 +497,8 @@ class KeyPairList(graphene.ObjectType):
 
 
 class KeyPairInput(graphene.InputObjectType):
-    is_active = graphene.Boolean(required=False, default=True)
-    is_admin = graphene.Boolean(required=False, default=False)
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=True)
@@ -555,6 +551,7 @@ class CreateKeyPair(graphene.Mutation):
                 "is_admin": props.is_admin,
                 "resource_policy": props.resource_policy,
                 "rate_limit": props.rate_limit,
+                # props.concurrency_limit is always ignored
             },
         )
         insert_query = sa.insert(keypairs).values(
@@ -606,6 +603,7 @@ class ModifyKeyPair(graphene.Mutation):
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "rate_limit")
+        # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
 
@@ -626,13 +624,25 @@ class DeleteKeyPair(graphene.Mutation):
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
+        from .user import UserRow
+
         ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_readonly_session() as db_session:
+            user_query = (
+                sa.select([sa.func.count()])
+                .select_from(UserRow)
+                .where(UserRow.main_access_key == access_key)
+            )
+            if (await db_session.scalar(user_query)) > 0:
+                return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-        await redis_helper.execute(
-            ctx.redis_stat,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        result = await simple_db_mutate(cls, ctx, delete_query)
+        if result.ok:
+            await redis_helper.execute(
+                ctx.redis_stat,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
+        return result
 
 
 class Dotfile(TypedDict):

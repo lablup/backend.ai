@@ -10,13 +10,12 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole
 from .base import privileged_mutation, set_if_set
+from .gql_relay import AsyncNode
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(
-    logging.getLogger("ai.backend.manager.models.etcd")
-)  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "ContainerRegistry",
@@ -36,8 +35,8 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
-    url = graphene.String(required=True)
-    type = graphene.String(required=True)
+    url = graphene.String()
+    type = graphene.String()
     project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
@@ -58,7 +57,7 @@ class ContainerRegistry(graphene.ObjectType):
     config = graphene.Field(ContainerRegistryConfig)
 
     class Meta:
-        interfaces = (graphene.relay.Node,)
+        interfaces = (AsyncNode,)
 
     # TODO: `get_node()` should be implemented to query a scalar object directly by ID
     #       (https://docs.graphene-python.org/en/latest/relay/nodes/#nodes)
@@ -159,11 +158,15 @@ class ModifyContainerRegistry(graphene.Mutation):
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        input_config: Dict[str, Any] = {"": props.url, "type": props.type}
+        input_config: Dict[str, Any] = {}
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "type")
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        if "url" in input_config:
+            input_config[""] = input_config.pop("url")
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,

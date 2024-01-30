@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
@@ -8,9 +9,8 @@ import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphene.validation import DisableIntrospection
-from graphql import Undefined, parse, validate
+from graphql import parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
@@ -89,18 +89,25 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             GQLMutationPrivilegeCheckMiddleware(),
         ],
     )
+
+    if result.errors:
+        for e in result.errors:
+            if isinstance(e, GraphQLError):
+                errmsg = e.formatted
+            else:
+                errmsg = {"message": str(e)}
+            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
@@ -109,13 +116,11 @@ async def handle_gql(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     # FIXME: remove in v21.09
@@ -165,7 +170,6 @@ def create_app(
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["admin.context"] = PrivateContext()
-    set_input_object_type_default_value(Undefined)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))

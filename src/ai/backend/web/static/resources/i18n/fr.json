@@ -237,7 +237,20 @@
       "preopen": "préouverture",
       "Network": "Réseau",
       "Enable": "Activer",
-      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés."
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
+      "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
+      "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
+      "NumberOfContainer": "Nombre de conteneurs",
+      "EnterEnvironmentVariable": "Saisir le nom de la variable",
+      "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
+      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -305,7 +318,7 @@
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
       "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
       "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
-      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 3 lettres, chiffres, '.', '_' et '-'."
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -428,7 +441,9 @@
     "Control": "Contrôler",
     "NewPassword": "nouveau mot de passe",
     "Enabled": "Activée",
-    "StorageProxies": "Stockages"
+    "StorageProxies": "Stockages",
+    "None": "Aucun",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -505,7 +520,8 @@
     "AdminCanOnlyRemoveTotp": "Seule la désactivation du 2FA des autres utilisateurs est possible.",
     "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
     "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
-    "ModifyUserDetail": "Modifier les détails de l'utilisateur"
+    "ModifyUserDetail": "Modifier les détails de l'utilisateur",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Dossiers",
@@ -762,7 +778,8 @@
     "RAM": "RAM (Go)",
     "SharedMemory": "Mémoire partagée (Go)",
     "Deleted": "Le préréglage des ressources a été supprimé avec succès.",
-    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher"
+    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher",
+    "SHMEMShouldBeSmallerThanMemory": "La mémoire partagée doit être plus petite que la mémoire"
   },
   "usersettings": {
     "General": "Général",
@@ -1412,7 +1429,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 64 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image"
   },

@@ -5,7 +5,16 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+    Tuple,
+    TypeVar,
+)
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
@@ -362,3 +371,17 @@ def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
 
 def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
+
+
+def description_msg(version: str, detail: str | None = None) -> str:
+    val = f"Added since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val
+
+
+def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
+    val = f"Deprecated since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val

@@ -33,6 +33,7 @@ __all__ = (
     "api_session",
 )
 
+from ..common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
 
@@ -49,11 +50,9 @@ async def _negotiate_api_version(
             sock_connect=config.connection_timeout,
             sock_read=config.read_timeout,
         )
-        headers = CIMultiDict(
-            [
-                ("User-Agent", config.user_agent),
-            ]
-        )
+        headers = CIMultiDict([
+            ("User-Agent", config.user_agent),
+        ])
         probe_url = (
             config.endpoint / "func/" if config.endpoint_type == "session" else config.endpoint
         )
@@ -410,7 +409,7 @@ class Session(BaseSession):
         self._worker_thread.start()
 
         async def _create_aiohttp_session() -> aiohttp.ClientSession:
-            ssl = None
+            ssl: SSLContextType = None
             if self._config.skip_sslcert_validation:
                 ssl = False
             connector = aiohttp.TCPConnector(ssl=ssl)
@@ -481,7 +480,7 @@ class AsyncSession(BaseSession):
         proxy_mode: bool = False,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        ssl = None
+        ssl: SSLContextType = None
         if self._config.skip_sslcert_validation:
             ssl = False
         connector = aiohttp.TCPConnector(ssl=ssl)

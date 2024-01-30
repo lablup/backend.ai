@@ -31,7 +31,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -100,7 +100,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -173,7 +173,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -216,11 +216,18 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build-wheels:
+  build-scies:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    environment: deploy-to-pypi
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest: intel
+        # linux-aarch64: aarch64 (self-hosted)
+        # macos-12: intel
+        # macos-13: apple silicon
+        os: [ubuntu-latest, linux-aarch64, macos-13-xlarge, macos-12-large]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Fetch remote tags
@@ -228,7 +235,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -237,25 +244,123 @@ jobs:
       run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Prepare the pip cache directory
-      run: mkdir -p ~/.cache/pip
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+
+    - name: Install coreutils for macOS
+      if: ${{ startsWith(matrix.os, 'macos') }}
+      run: brew install coreutils
+    - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
+      # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
+
+    - name: Unpack local-proxy binaries
+      run: |
+        OS_TYPE=$(uname -s)
+        CPU_ARCH=$(uname -m)
+        SYSTEM="$OS_TYPE $CPU_ARCH"
+        case "$SYSTEM" in
+          "Linux x86_64" )
+            SRC_PLATFORM="linux-x64"
+            DST_PLATFORM="linux-x86_64"
+            CHECKSUM_CMD="sha256sum"
+            ;;
+          "Linux aarch64" )
+            SRC_PLATFORM="linux-arm64"
+            DST_PLATFORM="linux-aarch64"
+            CHECKSUM_CMD="sha256sum"
+            ;;
+          "Darwin x86_64" )
+            SRC_PLATFORM="macos-x64"
+            DST_PLATFORM="macos-x86_64"
+            CHECKSUM_CMD="shasum -a 256"
+            ;;
+          "Darwin arm64" )
+            SRC_PLATFORM="macos-arm64"
+            DST_PLATFORM="macos-aarch64"
+            CHECKSUM_CMD="shasum -a 256"
+            ;;
+        esac
+        mkdir dist-local-proxy
+        # Normalize the package naming
+        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
+        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$DST_PLATFORM"
+        cd dist-local-proxy
+        ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
+    - name: Upload local-proxy binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: local-proxy
+        path: dist-local-proxy/*
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        cache-lmdb-store: 'false'
+    - name: Build fat packages
+      run: |
+        pants --tag="scie" package '::'
+        # 'pants run' does not support parallelization
+        pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
+    - name: Clean up intermediate pex files
+      run: |
+        rm -rf dist/src.*/
+    - name: Upload scies
+      uses: actions/upload-artifact@v3
+      with:
+        name: scies
+        path: dist/*
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  build-wheels:
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v4
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
-    - name: Build packages
+        pip install -U 'packaging>=21.3'
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      with:
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'false'
+    - name: Build wheel packages
       run: |
         # Normalize the package version
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
@@ -279,6 +384,81 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
+    - name: Upload wheels
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist/*.whl
+    - name: Upload source tarballs
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist/*.tar.gz
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+  build-sbom:
+    uses: ./.github/workflows/sbom.yml
+
+  make-final-release:
+    needs: [build-scies, build-wheels, build-sbom]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: deploy-to-pypi
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Install towncrier requirements
+      run: |
+        pip install -U -r tools/towncrier-requirements.txt
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Download wheels
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels
+        path: dist
+    - name: Download scies
+      uses: actions/download-artifact@v3
+      with:
+        name: scies
+        path: dist
+    - name: Download local-proxy
+      uses: actions/download-artifact@v3
+      with:
+        name: local-proxy
+        path: dist
+    - name: Download SBOM report
+      uses: actions/download-artifact@v3
+      with:
+        name: SBOM report
+        path: dist
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
+          dist/*
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -287,33 +467,10 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
-    - name: Upload wheels
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*.whl
-    - name: Extract the release changelog
-      run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*.whl
-          dist/*.tar.gz
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
-      if: always()  # We want the log even on failures.
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels]
+    needs: [build-wheels, make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
@@ -323,7 +480,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -338,7 +495,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
@@ -370,47 +527,3 @@ jobs:
     - name: Upload conda-pack to GitHub release
       run: |
         gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
-
-
-  build-client-image:
-    needs: [build-wheels]
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
-    environment: deploy-to-docker-hub
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Extract Python version from pants.toml
-        shell: bash
-        run: |
-          export LANG=C.UTF-8
-          PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-          echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-          echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-      - name: Download wheels
-        uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./backend.ai-client.Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            lablup/backend.ai-client:${{ github.ref_name }}
-            lablup/backend.ai-client:latest
-          build-args: |
-            PYTHON_VERSION=${{ env.PROJECT_PYTHON_VERSION }}
-            PKGVER=${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

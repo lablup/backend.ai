@@ -1,10 +1,11 @@
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Sequence
 
-from ai.backend.client.output.fields import keypair_fields
-from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import fetch_paginated_result
-from ai.backend.client.session import api_session
-
+from ...cli.types import Undefined, undefined
+from ..output.fields import keypair_fields
+from ..output.types import FieldSpec, PaginatedResult
+from ..pagination import fetch_paginated_result
+from ..session import api_session
+from ..types import set_if_set
 from .base import BaseFunction, api_function
 
 __all__ = ("KeyPair",)
@@ -44,11 +45,11 @@ class KeyPair(BaseFunction):
     @classmethod
     async def create(
         cls,
-        user_id: Union[int, str],
+        user_id: int | str,
         is_active: bool = True,
         is_admin: bool = False,
-        resource_policy: str = None,
-        rate_limit: int = None,
+        resource_policy: str | Undefined = undefined,
+        rate_limit: int | Undefined = undefined,
         fields: Sequence[FieldSpec] = _default_result_fields,
     ) -> dict:
         """
@@ -64,14 +65,15 @@ class KeyPair(BaseFunction):
             "}"
         )
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        inputs = {
+            "is_active": is_active,
+            "is_admin": is_admin,
+        }
+        set_if_set(inputs, "resource_policy", resource_policy)
+        set_if_set(inputs, "rate_limit", rate_limit)
         variables = {
             "user_id": user_id,
-            "input": {
-                "is_active": is_active,
-                "is_admin": is_admin,
-                "resource_policy": resource_policy,
-                "rate_limit": rate_limit,
-            },
+            "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["create_keypair"]
@@ -81,10 +83,10 @@ class KeyPair(BaseFunction):
     async def update(
         cls,
         access_key: str,
-        is_active: bool = None,
-        is_admin: bool = None,
-        resource_policy: str = None,
-        rate_limit: int = None,
+        is_active: bool | Undefined = undefined,
+        is_admin: bool | Undefined = undefined,
+        resource_policy: str | Undefined = undefined,
+        rate_limit: int | Undefined = undefined,
     ) -> dict:
         """
         Creates a new keypair with the given options.
@@ -94,14 +96,14 @@ class KeyPair(BaseFunction):
             "mutation($access_key: String!, $input: ModifyKeyPairInput!) {"
             + "  modify_keypair(access_key: $access_key, props: $input) {    ok msg  }}"
         )
+        inputs: dict[str, Any] = {}
+        set_if_set(inputs, "is_active", is_active)
+        set_if_set(inputs, "is_admin", is_admin)
+        set_if_set(inputs, "resource_policy", resource_policy)
+        set_if_set(inputs, "rate_limit", rate_limit)
         variables = {
             "access_key": access_key,
-            "input": {
-                "is_active": is_active,
-                "is_admin": is_admin,
-                "resource_policy": resource_policy,
-                "rate_limit": rate_limit,
-            },
+            "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["modify_keypair"]
@@ -129,8 +131,8 @@ class KeyPair(BaseFunction):
     @classmethod
     async def list(
         cls,
-        user_id: Union[int, str] = None,
-        is_active: bool = None,
+        user_id: int | str | None = None,
+        is_active: bool | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
     ) -> Sequence[dict]:
         """
@@ -158,15 +160,15 @@ class KeyPair(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        is_active: bool = None,
-        domain_name: str = None,
+        is_active: bool | None = None,
+        domain_name: str | None = None,
         *,
-        user_id: str = None,
+        user_id: str | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Lists the keypairs.
