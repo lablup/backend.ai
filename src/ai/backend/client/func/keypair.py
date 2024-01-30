@@ -25,6 +25,8 @@ _default_detail_fields = (
     keypair_fields["secret_key"],
     keypair_fields["is_active"],
     keypair_fields["is_admin"],
+    keypair_fields["rate_limit"],
+    keypair_fields["resource_policy"],
 )
 
 _default_result_fields = (

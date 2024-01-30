@@ -39,6 +39,7 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..audit_log_util import update_after_data
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
     RESERVED_VFOLDER_PATTERNS,
@@ -819,6 +820,7 @@ async def update_vfolder_status(
 
     async def _update() -> None:
         async with engine.begin_session() as db_session:
+            # change to orm someday
             query = (
                 sa.update(vfolders)
                 .values(
@@ -832,8 +834,16 @@ async def update_vfolder_status(
                     ),
                 )
                 .where(cond)
+                .returning(vfolders)
             )
-            await db_session.execute(query)
+            result = await db_session.execute(query)
+            updated_rows_list = [dict(row) for row in result.all()]
+            updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
+            after_data_to_insert = (
+                updated_rows_list[0] if len(updated_rows_list) == 1 else updated_rows_list
+            )
+
+            update_after_data(after_data_to_insert)
 
     await execute_with_retry(_update)
     if do_log:
