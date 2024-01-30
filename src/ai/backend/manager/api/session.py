@@ -1052,7 +1052,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
             """
     except (sqlalchemy.exc.InterfaceError, ConnectionRefusedError):
-        log.warn("report_stats(): error while connecting to PostgreSQL server")
+        log.warning("report_stats(): error while connecting to PostgreSQL server")
 
 
 @server_status_required(ALL_ALLOWED)
