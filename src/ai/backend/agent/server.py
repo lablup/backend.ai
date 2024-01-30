@@ -929,7 +929,8 @@ def main(
             case AgentBackend.DOCKER:
                 config.check(raw_cfg, docker_extra_config_iv)
             case AgentBackend.DUMMY:
-                cfg["dummy"] = config.check(cfg["dummy"], dummy_local_config)
+                dummy_cfg, _ = config.read_from_file(config_path, "agent.dummy")
+                cfg["dummy"] = config.check(dummy_cfg, dummy_local_config)
             case AgentBackend.KUBERNETES:
                 pass
             case _:
