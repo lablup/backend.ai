@@ -5,7 +5,6 @@ Manager-facing API
 from __future__ import annotations
 
 import asyncio
-import errno
 import json
 import logging
 import os
@@ -799,8 +798,8 @@ async def mkdir(request: web.Request) -> web.Response:
                 raise web.HTTPInternalServerError(
                     body=json.dumps(
                         {
-                            "msg": "FileExistsError None of directories created!",
-                            "errno": errno.EEXIST,
+                            "msg": f'{repr(result_group[0])} occurred while creating directory "{relpaths[0]}"',
+                            "errno": getattr(result_group[0], "errno", None),
                         },
                     ),
                     content_type="application/json",
