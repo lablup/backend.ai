@@ -26,7 +26,6 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
-etcetra==0.1.17
 faker~=13.12.0
 graphene~=3.3.0
 graypy==2.1.0

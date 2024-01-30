@@ -44,7 +44,6 @@
 //     "cryptography>=2.8",
 //     "dataclasses-json~=0.5.7",
 //     "etcd-client-py-test==0.1.4",
-//     "etcetra==0.1.17",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
@@ -1459,41 +1458,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5771fb86235b3ceffd64a9e65d569e8f36ced70217339b6732769ead988b1f9b",
-              "url": "https://files.pythonhosted.org/packages/98/f0/9b51a30c4b16662c54479e5e70507a8ecb0dd1169f846f811900e0b8c146/etcetra-0.1.17-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "9ab0e0f85127ec25f5538bc056cb0fee035d838e81412f2d067e792d49dd9dd2",
-              "url": "https://files.pythonhosted.org/packages/9c/7d/570279472f280f26762212135da86aa6a25c8d9c4ddf5bf1a74fca1dae32/etcetra-0.1.17.tar.gz"
-            }
-          ],
-          "project_name": "etcetra",
-          "requires_dists": [
-            "async-timeout~=4.0.0",
-            "codecov; extra == \"test\"",
-            "flake8-commas>=2.1; extra == \"lint\"",
-            "flake8>=4.0.1; extra == \"lint\"",
-            "grpcio-tools==1.56.2",
-            "grpcio==1.56.2",
-            "mypy>=1.4.1; extra == \"typecheck\"",
-            "protobuf~=4.23.4",
-            "pytest-asyncio~=0.16.0; extra == \"test\"",
-            "pytest-cov>=2.11; extra == \"test\"",
-            "pytest-mock>=3.5.0; extra == \"test\"",
-            "pytest~=6.2.5; extra == \"test\"",
-            "twine>=3.4.1; extra == \"build\"",
-            "types-protobuf; extra == \"typecheck\"",
-            "types-setuptools; extra == \"typecheck\"",
-            "wheel>=0.36.2; extra == \"build\""
-          ],
-          "requires_python": ">=3.10",
-          "version": "0.1.17"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "0122b75e7960cbb1e2bbbf10ef9b8c183377878e38466854953539c6d822e7c0",
               "url": "https://files.pythonhosted.org/packages/5a/65/c0aabfe3343b1699bc7cddcfbfba60177b1ac47bea44f5b5331a15c4d9c9/Faker-13.12.1-py3-none-any.whl"
             },
@@ -1802,108 +1766,6 @@
           ],
           "requires_python": ">=3.7",
           "version": "3.0.3"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "89a49cc5ad08a38b6141af17e00d1dd482dc927c7605bc77af457b5a0fca807c",
-              "url": "https://files.pythonhosted.org/packages/47/60/bec05dbb5f8f2d61d79d4e16fb7222e7c0f25a50aaa4a9bc5dcf5df6fb38/grpcio-1.56.2-cp311-cp311-musllinux_1_1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "6108e5933eb8c22cd3646e72d5b54772c29f57482fd4c41a0640aab99eb5071d",
-              "url": "https://files.pythonhosted.org/packages/06/ed/4c7651a5af2628273a80ae55376f21c8e6fcababadfa0d6ec771aa02ee9b/grpcio-1.56.2-cp311-cp311-macosx_10_10_universal2.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "8391cea5ce72f4a12368afd17799474015d5d3dc00c936a907eb7c7eaaea98a5",
-              "url": "https://files.pythonhosted.org/packages/0a/3c/beb0a37a0ed1073642ec59a2b6df1739d425e58557d415feebd18bd93fc3/grpcio-1.56.2-cp311-cp311-manylinux_2_17_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "0ff789ae7d8ddd76d2ac02e7d13bfef6fc4928ac01e1dcaa182be51b6bcc0aaa",
-              "url": "https://files.pythonhosted.org/packages/2f/7e/ddf5d42c77418ebf6d57f1503084e2955e8cf1d49671372fbdff7a82cbe5/grpcio-1.56.2.tar.gz"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c435f5ce1705de48e08fcbcfaf8aee660d199c90536e3e06f2016af7d6a938dd",
-              "url": "https://files.pythonhosted.org/packages/39/c7/ca186f4414db098ea1dc58928762d70198bc4735d0274dd2747e01639469/grpcio-1.56.2-cp311-cp311-linux_armv7l.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "9e04d4e4cfafa7c5264e535b5d28e786f0571bea609c3f0aaab13e891e933e9c",
-              "url": "https://files.pythonhosted.org/packages/55/68/41fc4465ed2f3fbc245d94ebfa14f7089771cd8546112fc91e46ccda2933/grpcio-1.56.2-cp311-cp311-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "750de923b456ca8c0f1354d6befca45d1f3b3a789e76efc16741bd4132752d95",
-              "url": "https://files.pythonhosted.org/packages/6c/30/503b9d5a36f7f10a77207f1cb3baf13545251efa4283fd161138072c9db9/grpcio-1.56.2-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "fda2783c12f553cdca11c08e5af6eecbd717280dc8fbe28a110897af1c15a88c",
-              "url": "https://files.pythonhosted.org/packages/b4/29/3ab0489eb3c5dde0a5f05298c70c11a409d3aa5ac02544dc9b8ab8f58e3f/grpcio-1.56.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            }
-          ],
-          "project_name": "grpcio",
-          "requires_dists": [
-            "grpcio-tools>=1.56.2; extra == \"protobuf\""
-          ],
-          "requires_python": ">=3.7",
-          "version": "1.56.2"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "c0640728d63c9fa56e9a1679943ae4e33ad43a10802dd7a93255870731f44d07",
-              "url": "https://files.pythonhosted.org/packages/84/b6/68ec7446ee475a18a21dc62ccc128f2703cdba94bc12fbcf9dde8c69a138/grpcio_tools-1.56.2-cp311-cp311-musllinux_1_1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "41af279cf5359b123138236c0980440f4cb4d3d18f03b5c1c314cc1512048351",
-              "url": "https://files.pythonhosted.org/packages/06/a3/ac4c38e2a59cca7500e99cfbbc369507e3da8088a31d34bf190d5a90f509/grpcio_tools-1.56.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "e7009623635ebcd3dd7fe974883fc2d9a3ff0fcef419bfc0a2da8071b372d9f5",
-              "url": "https://files.pythonhosted.org/packages/1a/36/31426616863f132eb740b9fa6a0fad96e1b58188df8717f662eee17bfa3a/grpcio_tools-1.56.2-cp311-cp311-macosx_10_10_universal2.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "857d72e991d449ec4d2f8337e5e24ddf77b4539965f5cabc84d4b63585832982",
-              "url": "https://files.pythonhosted.org/packages/27/81/6e95d852a3484e58d54a5424a739fda5283367187deb0c4b05f11a596fb1/grpcio_tools-1.56.2-cp311-cp311-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c7ca2272022f90b73efe900244aaebe9dd7cf3b379e99e08a88984e2fdd229c2",
-              "url": "https://files.pythonhosted.org/packages/2b/47/0ea575abb273e7338c900f87fe596e737aa731768f08ec49c0aeba5e64c4/grpcio_tools-1.56.2-cp311-cp311-manylinux_2_17_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "82af2f4040084141a732f0ef1ecf3f14fdf629923d74d850415e4d09a077e77a",
-              "url": "https://files.pythonhosted.org/packages/39/a2/ea95bdc99687a454bbfa60f0eeeda151ee0911b6d27ea59fd83d1b587558/grpcio-tools-1.56.2.tar.gz"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "493775d17ea09cea6047ba81e4d3f0eb82e34d2fbd3b96e43f72b44ce74726ee",
-              "url": "https://files.pythonhosted.org/packages/3c/0a/13f28e02ad8d93d23580f26a34694179a02170b6cc726c3a6d0fde5c0213/grpcio_tools-1.56.2-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "6dc43300189a69807857c52a3d782e9d3bbfb1cb72dcb27b4043c25161919601",
-              "url": "https://files.pythonhosted.org/packages/a9/18/05b6135ceecdf0b4258b5cd864b0ffc89f720e8eba853b258d612b076794/grpcio_tools-1.56.2-cp311-cp311-linux_armv7l.whl"
-            }
-          ],
-          "project_name": "grpcio-tools",
-          "requires_dists": [
-            "grpcio>=1.56.2",
-            "protobuf<5.0dev,>=4.21.6",
-            "setuptools"
-          ],
-          "requires_python": ">=3.7",
-          "version": "1.56.2"
         },
         {
           "artifacts": [
@@ -2933,39 +2795,6 @@
           ],
           "requires_python": ">=3.7.0",
           "version": "3.0.43"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "e9d0be5bf34b275b9f87ba7407796556abeeba635455d036c7351f7c183ef8ff",
-              "url": "https://files.pythonhosted.org/packages/b0/07/fb712cce15ba456f7c24b82b97c8a7db2233f07037ffe61c9011660c592a/protobuf-4.23.4-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "effeac51ab79332d44fba74660d40ae79985901ac21bca408f8dc335a81aa597",
-              "url": "https://files.pythonhosted.org/packages/01/cb/445b3e465abdb8042a41957dc8f60c54620dc7540dbcf9b458a921531ca2/protobuf-4.23.4-cp37-abi3-manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "fee88269a090ada09ca63551bf2f573eb2424035bcf2cb1b121895b01a46594a",
-              "url": "https://files.pythonhosted.org/packages/71/42/3a7fc57f360f728f38eca6656e8d00edaf22bc0ffc35dd2936f23e5fbb3e/protobuf-4.23.4-cp37-abi3-manylinux2014_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "8547bf44fe8cec3c69e3042f5c4fb3e36eb2a7a013bb0a44c018fc1e427aafbd",
-              "url": "https://files.pythonhosted.org/packages/cb/d3/a164038605494d49acc4f9cda1c0bc200b96382c53edd561387263bb181d/protobuf-4.23.4-cp37-abi3-macosx_10_9_universal2.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "ccd9430c0719dce806b93f89c91de7977304729e55377f872a92465d548329a9",
-              "url": "https://files.pythonhosted.org/packages/d3/1c/de86d82a5fc780feca36ef52c1231823bb3140266af8a04ed6286957aa6e/protobuf-4.23.4.tar.gz"
-            }
-          ],
-          "project_name": "protobuf",
-          "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "4.23.4"
         },
         {
           "artifacts": [
@@ -4804,7 +4633,6 @@
     "cryptography>=2.8",
     "dataclasses-json~=0.5.7",
     "etcd-client-py-test==0.1.4",
-    "etcetra==0.1.17",
     "faker~=13.12.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
