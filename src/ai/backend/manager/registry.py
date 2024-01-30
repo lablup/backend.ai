@@ -3524,7 +3524,9 @@ async def invoke_session_callback(
                             except Exception as e:
                                 if is_db_retry_error(e):
                                     raise
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                                log.warning(
+                                    "failed to communicate with AppProxy endpoint: {}", str(e)
+                                )
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
@@ -3553,7 +3555,9 @@ async def invoke_session_callback(
                             except Exception as e:
                                 if is_db_retry_error(e):
                                     raise
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                                log.warning(
+                                    "failed to communicate with AppProxy endpoint: {}", str(e)
+                                )
                         await db_sess.commit()
 
                 async def _clear_error(db_sess: SASession) -> None:
