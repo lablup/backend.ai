@@ -198,8 +198,8 @@ creation_config_v5 = t.Dict({
     | t.Mapping(
         t.String,
         t.Dict({
-            t.Key("type", default=MountTypes.BIND): MountTypes,
-            tx.AliasedKey(["permission", "perm"], default=None): t.Null | MountPermission,
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
         }).ignore_extra("*"),
     ),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),

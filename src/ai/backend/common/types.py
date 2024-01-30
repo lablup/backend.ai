@@ -358,7 +358,7 @@ class HandlerForUnknownSlotName(str, enum.Enum):
 Quantum = Decimal("0.000")
 
 
-class MountPermission(str, enum.Enum):
+class MountPermission(enum.StrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -367,7 +367,7 @@ class MountPermission(str, enum.Enum):
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
-class MountTypes(str, enum.Enum):
+class MountTypes(enum.StrEnum):
     VOLUME = "volume"
     BIND = "bind"
     TMPFS = "tmpfs"
