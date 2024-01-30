@@ -23,7 +23,7 @@ from .api.exceptions import (
     AgentError,
 )
 from .models.agent import agents
-from .models.utils import ExtendedAsyncSAEngine
+from .models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -110,7 +110,7 @@ class AgentRPCCache:
             return result.first()
 
         async with self.db.connect() as conn:
-            agent = await self.db.execute_with_txn_retry(_fetch_agent, self.db.begin_readonly, conn)
+            agent = await execute_with_txn_retry(_fetch_agent, self.db.begin_readonly, conn)
         return agent["addr"], agent["public_key"]
 
     @actxmgr

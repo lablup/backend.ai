@@ -4,7 +4,7 @@ import aiotools
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
 
 
 @pytest.mark.asyncio
@@ -73,25 +73,25 @@ async def test_execute_with_trx_retry(database_engine):
 
     with pytest.raises(sa.exc.IntegrityError):
         async with database_engine.connect() as conn:
-            await database_engine.execute_with_txn_retry(
+            await execute_with_txn_retry(
                 txn_func_generic_failure, database_engine.begin_session, conn
             )
 
     with pytest.raises(ZeroDivisionError):
         async with database_engine.connect() as conn:
-            await database_engine.execute_with_txn_retry(
+            await execute_with_txn_retry(
                 txn_func_generic_failure_2, database_engine.begin_session, conn
             )
 
     with pytest.raises(asyncio.TimeoutError) as e:
         async with database_engine.connect() as conn:
-            await database_engine.execute_with_txn_retry(
+            await execute_with_txn_retry(
                 txn_func_permanent_serialization_failure, database_engine.begin_session, conn
             )
     assert "serialization failed" in e.value.args[0].lower()
 
     async with database_engine.connect() as conn:
-        ret = await database_engine.execute_with_txn_retry(
+        ret = await execute_with_txn_retry(
             txn_func_temporary_serialization_failure, database_engine.begin_session, conn
         )
     assert ret == 1234

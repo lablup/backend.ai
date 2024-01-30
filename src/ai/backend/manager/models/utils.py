@@ -236,114 +236,43 @@ class ExtendedAsyncSAEngine(SAEngine):
                         f"SELECT pg_advisory_unlock({lock_id:d})",
                     )
 
-    # Mypy does not recognize any types from `sqlalchemy`, it just assume all sqlalchemy's types are `Any`
-    # including `SASession` and `SAConnection` etc.
-    # So, we cannot overload anything here.
-    # async def execute_with_txn_retry(
-    #     self,
-    #     txn_func: Callable[[SASession], Awaitable[TQueryResult]],
-    #     connection: SAConnection,
-    #     read_only: bool = False,
-    # ) -> TQueryResult:
-    #     open_trx = self.begin_session if not read_only else self.begin_readonly_session
-    #     return await self._execute_with_txn_retry(open_trx, txn_func, connection)
 
-    # async def execute_with_txn_retry_core_api(
-    #     self,
-    #     txn_func: Callable[[SAConnection], Awaitable[TQueryResult]],
-    #     connection: SAConnection,
-    #     read_only: bool = False,
-    # ) -> TQueryResult:
-    #     open_trx = self.begin if not read_only else self.begin_readonly
-    #     return await self._execute_with_txn_retry(open_trx, txn_func, connection)
+# Mypy does not recognize any types from `sqlalchemy`, it just assume all sqlalchemy's types are `Any`
+# including `SASession` and `SAConnection` etc.
+async def execute_with_txn_retry(
+    txn_func: Callable[[SASession], Awaitable[TQueryResult]]
+    | Callable[[SAConnection], Awaitable[TQueryResult]],
+    begin_trx: Callable[..., AbstractAsyncCtxMgr],
+    connection: SAConnection,
+) -> TQueryResult:
+    """
+    Execute DB related function by retrying transaction in a given connection.
 
-    # @overload
-    # async def _execute_with_txn_retry(
-    #     self,
-    #     begin_trx: Callable[[SAConnection], AbstractAsyncCtxMgr[SASession]],
-    #     txn_func: Callable[[SASession], Awaitable[TQueryResult]],
-    #     connection: SAConnection,
-    # ) -> TQueryResult: ...
-
-    # @overload
-    # async def _execute_with_txn_retry(
-    #     self,
-    #     begin_trx: Callable[[SAConnection], AbstractAsyncCtxMgr[SAConnection]],
-    #     txn_func: Callable[[SAConnection], Awaitable[TQueryResult]],
-    #     connection: SAConnection,
-    # ) -> TQueryResult: ...
-
-    async def execute_with_txn_retry(
-        self,
-        txn_func: Callable[[SASession], Awaitable[TQueryResult]]
-        | Callable[[SAConnection], Awaitable[TQueryResult]],
-        begin_trx: Callable[..., AbstractAsyncCtxMgr],
-        connection: SAConnection,
-    ) -> TQueryResult:
-        """
-        Execute DB related function by retrying transaction in a given connection.
-
-        Used to resolve Postgres Serialization error that require transaction retry.
-        Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
-        """
-        result: TQueryResult | Sentinel = Sentinel.token
-        max_attempts = 10
-        try:
-            async for attempt in AsyncRetrying(
-                wait=wait_exponential(multiplier=0.02, min=0.02, max=1.0),
-                stop=stop_after_attempt(max_attempts),
-                retry=retry_if_exception_type(TryAgain),
-            ):
-                with attempt:
-                    async with begin_trx(bind=connection) as session_or_conn:
-                        try:
-                            result = await txn_func(session_or_conn)
-                        except DBAPIError as e:
-                            if is_db_retry_error(e):
-                                raise TryAgain
-                            raise
-        except RetryError:
-            raise asyncio.TimeoutError(
-                f"DB serialization failed after {max_attempts} retry transactions"
-            )
-        assert result is not Sentinel.token
-        return result
-
-    # async def execute_with_single_conn_trx_retry(self, txn_func: Callable[[SASession | SAConnection], Awaitable[TQueryResult]]) -> TQueryResult:
-    #     async with self.db.connect() as conn:
-    #         return await self.execu
-
-    # async def execute_with_conn_retry(
-    #     self,
-    #     txn_func: Callable[[SASession], Awaitable[TQueryResult]],
-    # ) -> TQueryResult:
-    #     """
-    #     Execute DB related function by retrying connection.
-
-    #     Used to ensure execution of the given function.
-    #     """
-    #     result: TQueryResult | Sentinel = Sentinel.token
-    #     max_attempts = 5
-
-    #     try:
-    #         async for attempt in AsyncRetrying(
-    #             wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
-    #             stop=stop_after_attempt(max_attempts),
-    #             retry=retry_if_exception_type(TryAgain),
-    #         ):
-    #             with attempt:
-    #                 try:
-    #                     async with asyncio.timeout(self.conn_timeout):
-    #                         async with self.connect() as _conn:
-    #                             result = await self.execute_with_txn_retry(txn_func, _conn)
-    #                 except asyncio.TimeoutError:
-    #                     raise TryAgain
-    #     except RetryError:
-    #         raise asyncio.TimeoutError(
-    #             f"DB serialization failed after {max_attempts} retry connections"
-    #         )
-    #     assert result is not Sentinel.token
-    #     return result
+    Used to resolve Postgres Serialization error that require transaction retry.
+    Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
+    """
+    result: TQueryResult | Sentinel = Sentinel.token
+    max_attempts = 10
+    try:
+        async for attempt in AsyncRetrying(
+            wait=wait_exponential(multiplier=0.02, min=0.02, max=1.0),
+            stop=stop_after_attempt(max_attempts),
+            retry=retry_if_exception_type(TryAgain),
+        ):
+            with attempt:
+                async with begin_trx(bind=connection) as session_or_conn:
+                    try:
+                        result = await txn_func(session_or_conn)
+                    except DBAPIError as e:
+                        if is_db_retry_error(e):
+                            raise TryAgain
+                        raise
+    except RetryError:
+        raise asyncio.TimeoutError(
+            f"DB serialization failed after {max_attempts} retry transactions"
+        )
+    assert result is not Sentinel.token
+    return result
 
 
 def create_async_engine(

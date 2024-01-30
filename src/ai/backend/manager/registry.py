@@ -164,6 +164,7 @@ from .models import (
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
+    execute_with_txn_retry,
     is_db_retry_error,
     reenter_txn,
     sql_json_merge,
@@ -359,7 +360,7 @@ class AgentRegistry:
             await conn.execute(query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
+            await execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def gather_agent_hwinfo(self, instance_id: AgentId) -> Mapping[str, HardwareMetadata]:
         agent = await self.get_instance(instance_id, agents.c.addr)
@@ -1243,8 +1244,8 @@ class AgentRegistry:
                 await db_sess.commit()
 
             async with self.db.connect() as conn:
-                await self.db.execute_with_txn_retry(_enqueue, self.db.begin_session, conn)
-                await self.db.execute_with_txn_retry(_post_enqueue, self.db.begin_session, conn)
+                await execute_with_txn_retry(_enqueue, self.db.begin_session, conn)
+                await execute_with_txn_retry(_post_enqueue, self.db.begin_session, conn)
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "23503":
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
@@ -1620,7 +1621,7 @@ class AgentRegistry:
             await db_sess.execute(kernel_query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_update_kernel, self.db.begin_session, conn)
+            await execute_with_txn_retry(_update_kernel, self.db.begin_session, conn)
 
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
@@ -1728,9 +1729,7 @@ class AgentRegistry:
                         await db_sess.execute(query)
 
                     async with self.db.connect() as conn:
-                        await self.db.execute_with_txn_retry(
-                            _update_failure, self.db.begin_session, conn
-                        )
+                        await execute_with_txn_retry(_update_failure, self.db.begin_session, conn)
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -1884,7 +1883,7 @@ class AgentRegistry:
                     await db_sess.execute(update_query)
 
                 async with self.db.connect() as conn:
-                    await self.db.execute_with_txn_retry(
+                    await execute_with_txn_retry(
                         _update_agent_resource, self.db.begin_session, conn
                     )
 
@@ -1964,7 +1963,7 @@ class AgentRegistry:
                 await db_sess.execute(query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_recalc, self.db.begin_session, conn)
+            await execute_with_txn_retry(_recalc, self.db.begin_session, conn)
 
         # Update keypair resource usage for keypairs with running containers.
         kp_key = "keypair.concurrency_used"
@@ -2272,9 +2271,7 @@ class AgentRegistry:
                                 )
 
                             async with self.db.connect() as conn:
-                                await self.db.execute_with_txn_retry(
-                                    _update, self.db.begin_session, conn
-                                )
+                                await execute_with_txn_retry(_update, self.db.begin_session, conn)
                             await self.event_producer.produce_event(
                                 KernelTerminatedEvent(kernel.id, target_session.id, reason),
                             )
@@ -2319,9 +2316,7 @@ class AgentRegistry:
                                 )
 
                             async with self.db.connect() as conn:
-                                await self.db.execute_with_txn_retry(
-                                    _update, self.db.begin_session, conn
-                                )
+                                await execute_with_txn_retry(_update, self.db.begin_session, conn)
                             await self.event_producer.produce_event(
                                 KernelTerminatingEvent(kernel.id, target_session.id, reason),
                             )
@@ -2416,7 +2411,7 @@ class AgentRegistry:
             return result.first()
 
         async with self.db.connect() as conn:
-            session = await self.db.execute_with_txn_retry(_fetch_session, self.db.begin, conn)
+            session = await execute_with_txn_retry(_fetch_session, self.db.begin, conn)
         if session is None:
             return
         # Get the main container's agent info
@@ -2473,7 +2468,7 @@ class AgentRegistry:
             await db_sess.execute(query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_restarting_session, self.db.begin_session, conn)
+            await execute_with_txn_retry(_restarting_session, self.db.begin_session, conn)
 
         kernel_list = session.kernels
 
@@ -2842,7 +2837,7 @@ class AgentRegistry:
 
             try:
                 async with self.db.connect() as conn:
-                    await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
+                    await execute_with_txn_retry(_update, self.db.begin, conn)
             except sa.exc.IntegrityError:
                 log.error("Scaling group named [{}] does not exist.", sgroup)
                 return
@@ -2914,7 +2909,7 @@ class AgentRegistry:
 
         await redis_helper.execute(self.redis_image, _pipe_builder)
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
+            await execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def sync_kernel_stats(
         self,
@@ -2950,7 +2945,7 @@ class AgentRegistry:
 
         if per_kernel_updates:
             async with self.db.connect() as conn:
-                await self.db.execute_with_txn_retry(_update, self.db.begin, conn)
+                await execute_with_txn_retry(_update, self.db.begin, conn)
 
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
@@ -3051,7 +3046,7 @@ class AgentRegistry:
             return kernel.access_key, kernel.agent
 
         async with self.db.connect() as conn:
-            result = await self.db.execute_with_txn_retry(
+            result = await execute_with_txn_retry(
                 _update_kernel,
                 self.db.begin_session,
                 conn,
@@ -3073,7 +3068,7 @@ class AgentRegistry:
                 )
                 await recalc_agent_resource_occupancy(conn, agent)
 
-            await self.db.execute_with_txn_retry(_recalc, self.db.begin, conn)
+            await execute_with_txn_retry(_recalc, self.db.begin, conn)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
@@ -3442,7 +3437,7 @@ async def handle_model_service_status_update(
             log.exception("failed to communicate with AppProxy endpoint:")
 
     async with context.db.connect() as conn:
-        await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
+        await execute_with_txn_retry(_update, context.db.begin_session, conn)
 
 
 async def invoke_session_callback(
@@ -3579,10 +3574,8 @@ async def invoke_session_callback(
                         )
                         await db_sess.execute(query)
 
-                await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
-                await context.db.execute_with_txn_retry(
-                    _clear_error, context.db.begin_session, conn
-                )
+                await execute_with_txn_retry(_update, context.db.begin_session, conn)
+                await execute_with_txn_retry(_clear_error, context.db.begin_session, conn)
     except Exception:
         log.exception("error while updating route status:")
 
@@ -3767,7 +3760,7 @@ async def handle_route_creation(
                 await db_sess.execute(query)
 
         async with context.db.connect() as conn:
-            await context.db.execute_with_txn_retry(_update, context.db.begin_session, conn)
+            await execute_with_txn_retry(_update, context.db.begin_session, conn)
 
 
 async def handle_check_agent_resource(
@@ -3880,7 +3873,7 @@ async def handle_kernel_log(
                 await conn.execute(update_query)
 
             async with context.db.connect() as conn:
-                await context.db.execute_with_txn_retry(_update_log, context.db.begin, conn)
+                await execute_with_txn_retry(_update_log, context.db.begin, conn)
         finally:
             # Clear the log data from Redis when done.
             await redis_helper.execute(

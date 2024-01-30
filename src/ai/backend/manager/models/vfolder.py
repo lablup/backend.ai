@@ -68,7 +68,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -835,7 +835,7 @@ async def update_vfolder_status(
         await db_session.execute(query)
 
     async with engine.connect() as conn:
-        await engine.execute_with_txn_retry(_update, engine.begin_session, conn)
+        await execute_with_txn_retry(_update, engine.begin_session, conn)
     if do_log:
         log.debug(
             "Successfully updated status of VFolder(s) {} to {}",
@@ -936,7 +936,7 @@ async def initiate_vfolder_clone(
             raise InvalidAPIParameters
 
     async with db_engine.connect() as conn:
-        await db_engine.execute_with_txn_retry(_update_and_insert, db_engine.begin_session, conn)
+        await execute_with_txn_retry(_update_and_insert, db_engine.begin_session, conn)
 
     async def _clone(reporter: ProgressReporter) -> None:
         try:
@@ -964,9 +964,7 @@ async def initiate_vfolder_clone(
             await db_session.execute(query)
 
         async with db_engine.connect() as conn:
-            await db_engine.execute_with_txn_retry(
-                _update_source_vfolder, db_engine.begin_session, conn
-            )
+            await execute_with_txn_retry(_update_source_vfolder, db_engine.begin_session, conn)
 
     task_id = await background_task_manager.start(_clone)
     return task_id, target_folder_id.folder_id
@@ -1023,7 +1021,7 @@ async def initiate_vfolder_purge(
                 await db_session.execute(sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids)))
 
             async with db_engine.connect() as conn:
-                await db_engine.execute_with_txn_retry(_delete_row, db_engine.begin_session, conn)
+                await execute_with_txn_retry(_delete_row, db_engine.begin_session, conn)
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}

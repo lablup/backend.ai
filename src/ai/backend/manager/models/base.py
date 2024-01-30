@@ -75,6 +75,7 @@ from .gql_relay import (
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -964,7 +965,7 @@ async def simple_db_mutate(
 
     try:
         async with graph_ctx.db.connect() as conn:
-            return await graph_ctx.db.execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
     except sa.exc.IntegrityError as e:
         log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
@@ -1032,7 +1033,7 @@ async def simple_db_mutate_returning_item(
 
     try:
         async with graph_ctx.db.connect() as conn:
-            return await graph_ctx.db.execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
     except sa.exc.IntegrityError as e:
         log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)

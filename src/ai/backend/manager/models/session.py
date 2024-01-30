@@ -79,6 +79,7 @@ from .user import UserRow
 from .utils import (
     ExtendedAsyncSAEngine,
     agg_to_array,
+    execute_with_txn_retry,
     sql_json_merge,
 )
 
@@ -786,7 +787,7 @@ class SessionRow(Base):
             return determined_status
 
         async with db.connect() as conn:
-            return await db.execute_with_txn_retry(_check_and_update, db.begin_session, conn)
+            return await execute_with_txn_retry(_check_and_update, db.begin_session, conn)
 
     @staticmethod
     async def set_session_status(
@@ -824,7 +825,7 @@ class SessionRow(Base):
             await db_sess.execute(query)
 
         async with db.connect() as conn:
-            await db.execute_with_txn_retry(_update, db.begin_session, conn)
+            await execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def set_session_result(
@@ -844,7 +845,7 @@ class SessionRow(Base):
             await db_sess.execute(query)
 
         async with db.connect() as conn:
-            await db.execute_with_txn_retry(_update, db.begin_session, conn)
+            await execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def match_sessions(

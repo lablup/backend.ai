@@ -89,6 +89,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
+from ..models.utils import execute_with_txn_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -3237,7 +3238,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             )
             await _conn.execute(query)
 
-        await root_ctx.db.execute_with_txn_retry(_update, root_ctx.db.begin, conn)
+        await execute_with_txn_retry(_update, root_ctx.db.begin, conn)
 
         async def _delete_vfolder_related_rows(_conn: SAConnection) -> None:
             # delete vfolder_invitation if the new owner user has already been shared with the vfolder
@@ -3253,9 +3254,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             )
             await _conn.execute(query)
 
-        await root_ctx.db.execute_with_txn_retry(
-            _delete_vfolder_related_rows, root_ctx.db.begin, conn
-        )
+        await execute_with_txn_retry(_delete_vfolder_related_rows, root_ctx.db.begin, conn)
 
     return web.json_response({}, status=200)
 

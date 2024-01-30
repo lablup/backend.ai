@@ -37,6 +37,7 @@ from ..models.user import (
     check_credential,
     compare_to_hashed_password,
 )
+from ..models.utils import execute_with_txn_retry
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
@@ -472,9 +473,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 return result.first()
 
             async with root_ctx.db.connect() as conn:
-                row = await root_ctx.db.execute_with_txn_retry(
-                    _query_cred, root_ctx.db.begin_readonly, conn
-                )
+                row = await execute_with_txn_retry(_query_cred, root_ctx.db.begin_readonly, conn)
             if row is None:
                 raise AuthorizationFailed("Access key not found")
 
@@ -518,9 +517,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 return result.first()
 
             async with root_ctx.db.connect() as conn:
-                row = await root_ctx.db.execute_with_txn_retry(
-                    _query_cred, root_ctx.db.begin_readonly, conn
-                )
+                row = await execute_with_txn_retry(_query_cred, root_ctx.db.begin_readonly, conn)
             if row is None:
                 raise AuthorizationFailed("Access key not found")
             my_signature = await sign_request(sign_method, request, row["keypairs_secret_key"])
@@ -1059,7 +1056,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         return result.scalar()
 
     async with root_ctx.db.connect() as conn:
-        changed_at = await root_ctx.db.execute_with_txn_retry(_update, root_ctx.db.begin, conn)
+        changed_at = await execute_with_txn_retry(_update, root_ctx.db.begin, conn)
     return web.json_response({"password_changed_at": changed_at.isoformat()}, status=201)
 
 

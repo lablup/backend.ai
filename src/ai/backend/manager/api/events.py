@@ -51,6 +51,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
 from ..models import UserRole, groups, kernels
+from ..models.utils import execute_with_txn_retry
 from ..types import Sentinel
 from .auth import auth_required
 from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
@@ -217,7 +218,7 @@ async def enqueue_kernel_creation_status_update(
         return result.first()
 
     async with root_ctx.db.connect() as conn:
-        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
+        row = await execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -254,7 +255,7 @@ async def enqueue_kernel_termination_status_update(
         return result.first()
 
     async with root_ctx.db.connect() as conn:
-        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
+        row = await execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -297,7 +298,7 @@ async def enqueue_session_creation_status_update(
         return result.first()
 
     async with root_ctx.db.connect() as conn:
-        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
+        row = await execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -333,7 +334,7 @@ async def enqueue_session_termination_status_update(
         return result.first()
 
     async with root_ctx.db.connect() as conn:
-        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
+        row = await execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:
@@ -368,7 +369,7 @@ async def enqueue_batch_task_result_update(
         return result.first()
 
     async with root_ctx.db.connect() as conn:
-        row = await root_ctx.db.execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
+        row = await execute_with_txn_retry(_fetch, root_ctx.db.begin_readonly, conn)
     if row is None:
         return
     for q in app_ctx.session_event_queues:

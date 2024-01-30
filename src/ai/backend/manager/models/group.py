@@ -56,7 +56,7 @@ from .gql_relay import (
 )
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
-from .utils import ExtendedAsyncSAEngine
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -555,9 +555,7 @@ class ModifyGroup(graphene.Mutation):
 
         try:
             async with graph_ctx.db.connect() as conn:
-                return await graph_ctx.db.execute_with_txn_retry(
-                    _do_mutate, graph_ctx.db.begin, conn
-                )
+                return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
         except sa.exc.IntegrityError as e:
             return cls(ok=False, msg=f"integrity error: {e}", group=None)
         except (asyncio.CancelledError, asyncio.TimeoutError):

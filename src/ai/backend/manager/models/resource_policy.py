@@ -27,7 +27,7 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
-from .utils import deprecation_reason_msg, description_msg
+from .utils import deprecation_reason_msg, description_msg, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -588,9 +588,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
             )
 
         async with graph_ctx.db.connect() as conn:
-            return await graph_ctx.db.execute_with_txn_retry(
-                _do_mutate, graph_ctx.db.begin_session, conn
-            )
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin_session, conn)
 
 
 class ModifyUserResourcePolicy(graphene.Mutation):
@@ -768,9 +766,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
             )
 
         async with graph_ctx.db.connect() as conn:
-            return await graph_ctx.db.execute_with_txn_retry(
-                _do_mutate, graph_ctx.db.begin_session, conn
-            )
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin_session, conn)
 
 
 class ModifyProjectResourcePolicy(graphene.Mutation):

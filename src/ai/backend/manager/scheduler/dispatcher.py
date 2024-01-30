@@ -87,7 +87,7 @@ from ..models import (
     recalc_concurrency_used,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
-from ..models.utils import sql_json_increment, sql_json_merge
+from ..models.utils import execute_with_txn_retry, sql_json_increment, sql_json_merge
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -432,7 +432,7 @@ class SchedulerDispatcher(aobject):
                 await _apply_cancellation(db_sess, session_ids)
 
             async with self.db.connect() as conn:
-                await self.db.execute_with_txn_retry(_update, self.db.begin_session, conn)
+                await execute_with_txn_retry(_update, self.db.begin_session, conn)
             for item in cancelled_sessions:
                 await self.event_producer.produce_event(
                     SessionCancelledEvent(
@@ -526,7 +526,7 @@ class SchedulerDispatcher(aobject):
                 return check_results
 
             async with self.db.connect() as conn:
-                check_results = await self.db.execute_with_txn_retry(
+                check_results = await execute_with_txn_retry(
                     _check_predicates, self.db.begin_session, conn
                 )
             failed_predicates = []
@@ -559,7 +559,7 @@ class SchedulerDispatcher(aobject):
                 )
 
             async with self.db.connect() as conn:
-                hook_result = await self.db.execute_with_txn_retry(
+                hook_result = await execute_with_txn_retry(
                     _check_predicates_hook, self.db.begin_session, conn
                 )
             match hook_result.src_plugin:
@@ -618,7 +618,7 @@ class SchedulerDispatcher(aobject):
                         )
 
                 async with self.db.connect() as conn:
-                    await self.db.execute_with_txn_retry(
+                    await execute_with_txn_retry(
                         _cancel_failed_system_session, self.db.begin_session, conn
                     )
                 # Predicate failures are *NOT* permanent errors.
@@ -653,7 +653,7 @@ class SchedulerDispatcher(aobject):
                     await db_sess.execute(session_query)
 
                 async with self.db.connect() as conn:
-                    await self.db.execute_with_txn_retry(
+                    await execute_with_txn_retry(
                         _update_session_status_data, self.db.begin_session, conn
                     )
 
@@ -909,7 +909,7 @@ class SchedulerDispatcher(aobject):
                 await kernel_db_sess.execute(query)
 
             async with self.db.connect() as conn:
-                await self.db.execute_with_txn_retry(
+                await execute_with_txn_retry(
                     partial(_update_sched_failure, sched_failure), self.db.begin_session, conn
                 )
             raise
@@ -937,9 +937,7 @@ class SchedulerDispatcher(aobject):
                 await kernel_db_sess.execute(query)
 
             async with self.db.connect() as conn:
-                await self.db.execute_with_txn_retry(
-                    _update_generic_failure, self.db.begin_session, conn
-                )
+                await execute_with_txn_retry(_update_generic_failure, self.db.begin_session, conn)
             raise
 
         async def _finalize_scheduled(db_sess: SASession) -> None:
@@ -991,7 +989,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.execute(session_query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_finalize_scheduled, self.db.begin_session, conn)
+            await execute_with_txn_retry(_finalize_scheduled, self.db.begin_session, conn)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -1138,7 +1136,7 @@ class SchedulerDispatcher(aobject):
                         await agent_db_sess.execute(query)
 
                     async with self.db.connect() as conn:
-                        await self.db.execute_with_txn_retry(
+                        await execute_with_txn_retry(
                             partial(_update_sched_failure, sched_failure),
                             self.db.begin_session,
                             conn,
@@ -1168,7 +1166,7 @@ class SchedulerDispatcher(aobject):
                         await kernel_db_sess.execute(query)
 
                     async with self.db.connect() as conn:
-                        await self.db.execute_with_txn_retry(
+                        await execute_with_txn_retry(
                             _update_generic_failure, self.db.begin_session, conn
                         )
                     raise
@@ -1229,7 +1227,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.execute(session_query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_finalize_scheduled, self.db.begin_session, conn)
+            await execute_with_txn_retry(_finalize_scheduled, self.db.begin_session, conn)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -1330,7 +1328,7 @@ class SchedulerDispatcher(aobject):
 
                 scheduled_sessions: Sequence[SessionRow]
                 async with self.db.connect() as conn:
-                    scheduled_sessions = await self.db.execute_with_txn_retry(
+                    scheduled_sessions = await execute_with_txn_retry(
                         _mark_session_preparing, self.db.begin_session, conn
                     )
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
@@ -1542,7 +1540,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.execute(query)
 
         async with self.db.connect() as conn:
-            await self.db.execute_with_txn_retry(_delete, self.db.begin_session, conn)
+            await execute_with_txn_retry(_delete, self.db.begin_session, conn)
 
         async with self.db.begin_readonly_session() as db_sess:
             for endpoint in endpoints_to_mark_terminated:
@@ -1622,9 +1620,7 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 async with self.db.connect() as conn:
-                    await self.db.execute_with_txn_retry(
-                        _mark_session_cancelled, self.db.begin, conn
-                    )
+                    await execute_with_txn_retry(_mark_session_cancelled, self.db.begin, conn)
                 await self.registry.event_producer.produce_event(
                     SessionCancelledEvent(
                         session.id,
