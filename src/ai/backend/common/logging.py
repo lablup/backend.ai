@@ -89,7 +89,7 @@ logging_config_iv = t.Dict({
         t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
         t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
         t.Key("fqdn", default=True): t.Bool,
-        t.Key("localname", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
 
