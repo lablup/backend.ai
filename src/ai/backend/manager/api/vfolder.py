@@ -3303,6 +3303,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
     cors.add(add_route("POST", r"/{name}/purge", purge))
+    cors.add(add_route("POST", r"/{name}/recover", recover))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
