@@ -664,7 +664,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    endpoint = graphene.Field(lambda: Endpoint, required=False)
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added since 23.09.9.")
 
     @classmethod
     async def mutate(
