@@ -11,7 +11,7 @@ import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.docker import ImageRef
@@ -704,8 +704,24 @@ class ModifyEndpoint(graphene.Mutation):
             data["image"] = image_row.id
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
+
+        async def _post(conn, result) -> EndpointRow:
+            db_session = AsyncSession(conn)
+            row = result.first()
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == row.id)
+                .options(
+                    joinedload(EndpointRow.image_row),
+                    selectinload(EndpointRow.routings),
+                    joinedload(EndpointRow.session_owner_row),
+                    joinedload(EndpointRow.created_user_row),
+                )
+            )
+            return (await db_session.scalars(query)).first()
+
         return await simple_db_mutate_returning_item(
-            cls, graph_ctx, update_query, item_cls=Endpoint
+            cls, graph_ctx, update_query, item_cls=Endpoint, post_func=_post
         )
 
 
