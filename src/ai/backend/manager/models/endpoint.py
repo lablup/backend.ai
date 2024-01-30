@@ -687,6 +687,7 @@ class ModifyEndpoint(graphene.Mutation):
         set_if_set(props, data, "cluster_size")
         set_if_set(props, data, "desired_session_count")
         set_if_set(props, data, "image")
+        set_if_set(props, data, "resource_group")
         image = data.pop("image", None)
         if image is not None:
             image_name = image["name"]
