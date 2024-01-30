@@ -280,25 +280,6 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
-        # from contextlib import asynccontextmanager as actxmgr
-
-        # @actxmgr
-        # async def hello(num: int):
-        #     @actxmgr
-        #     async def _in(_num: int):
-        #         print(f"Inner got the number {_num}, plus 1")
-        #         yield _num + 1
-        #     print(f"Outer got the number {num}")
-
-        #     async with _in(num) as innum:
-        #         print(f"inner num is {innum}")
-        #         yield num
-
-        # f = hello(10)
-        # print(f"Hello, number is {10}")
-        # async with f as n:
-        #     print(f"generated number is {n = }")
-
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
