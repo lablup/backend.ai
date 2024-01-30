@@ -267,9 +267,10 @@ class DummyAgent(
         )
 
     async def scan_images(self) -> Mapping[str, str]:
+        existing_imgs: dict[str, str] = self.dummy_agent_cfg["image"]["already-have"]
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return {}
+        return existing_imgs
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
@@ -280,7 +281,7 @@ class DummyAgent(
     ) -> bool:
         if (
             existing_imgs := self.dummy_agent_cfg["image"]["already-have"]
-        ) is not None and image_ref in existing_imgs:
+        ) is not None and image_ref.canonical in existing_imgs:
             return True
         return False
 

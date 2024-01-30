@@ -25,10 +25,8 @@ create-network = 0.1
 destroy-network = 0.1
 
 
-[agent.image]
-already-have = []
-need-to-pull = []
-missing = []
+[agent.image.already-have]
+'cr.backend.ai/multiarch/python:3.9-ubuntu20.04' = ''
 
 
 [kernel-creation-ctx.delay]

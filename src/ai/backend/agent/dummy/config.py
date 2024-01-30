@@ -41,9 +41,14 @@ dummy_local_config = t.Dict({
             t.Key("destroy-network", default=1.0): tx.Delay,
         }),
         t.Key("image"): t.Dict({
-            t.Key("already-have", default=None): t.Null | t.List(t.String),
-            t.Key("need-to-pull", default=None): t.Null | t.List(t.String),
-            t.Key("missing", default=None): t.Null | t.List(t.String),
+            t.Key("already-have", default=None): t.Null
+            | t.Mapping(
+                t.String, t.String(allow_blank=True)
+            ),  # Key: a string of image canonical, Value: hash. it can be a random string.
+            t.Key("need-to-pull", default=None): t.Null
+            | t.List(t.String),  # A string list of image canonical
+            t.Key("missing", default=None): t.Null
+            | t.List(t.String),  # A string list of image canonical
         }),
     }),
     t.Key("kernel-creation-ctx"): t.Dict({

@@ -93,7 +93,5 @@ async def scan_available_resources(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "
                     "Try to adjust the reserved resources or use a larger machine."
                 )
-    log.info("Resource slots: {!r}", slots)
-    log.info("Slot types: {!r}", known_slot_types)
 
     return slots
