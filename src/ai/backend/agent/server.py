@@ -917,14 +917,6 @@ def main(
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, agent_local_config_iv)
-        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
-            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
-                cfg["container"]["scratch-nfs-address"] is None
-                or cfg["container"]["scratch-nfs-options"] is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
         match cfg["agent"]["backend"]:
             case AgentBackend.DOCKER:
                 config.check(raw_cfg, docker_extra_config_iv)
@@ -932,7 +924,13 @@ def main(
                 dummy_cfg, _ = config.read_from_file(config_path, "agent.dummy")
                 cfg["dummy"] = config.check(dummy_cfg, dummy_local_config)
             case AgentBackend.KUBERNETES:
-                pass
+                if cfg["container"]["scratch-type"] == "k8s-nfs" and (
+                    cfg["container"]["scratch-nfs-address"] is None
+                    or cfg["container"]["scratch-nfs-options"] is None
+                ):
+                    raise ValueError(
+                        "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
+                    )
             case _:
                 # Unable to reach here because trafaret check beforehand.
                 raise click.Abort()
