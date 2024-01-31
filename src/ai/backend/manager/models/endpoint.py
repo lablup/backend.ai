@@ -11,7 +11,7 @@ import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, relationship, selectinload
+from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.docker import ImageRef
@@ -706,22 +706,22 @@ class ModifyEndpoint(graphene.Mutation):
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
 
-        async def _post(ctx, conn, result) -> EndpointRow:
+        async def _post(conn, result) -> EndpointRow:
             endpoint = result.first()
             try:
-                async with ctx.db.begin_readonly_session() as session:
+                async with graph_ctx.db.begin_readonly_session() as session:
                     row = await EndpointRow.get(
-                    session,
-                    endpoint_id=endpoint.id,
-                    domain=endpoint.domain,
-                    user_uuid=endpoint.user_uuid,
-                    project=endpoint.project,
-                    load_image=True,
-                    load_routes=True,
-                    load_created_user=True,
-                    load_session_owner=True,
-                )
-                return await Endpoint.from_row(ctx, row)
+                        session,
+                        endpoint_id=endpoint.id,
+                        domain=endpoint.domain,
+                        user_uuid=endpoint.created_user,
+                        project=endpoint.project,
+                        load_image=True,
+                        load_routes=True,
+                        load_created_user=True,
+                        load_session_owner=True,
+                    )
+                return row
             except NoResultFound:
                 raise EndpointNotFound
 
