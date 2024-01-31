@@ -199,7 +199,7 @@ certfile = ""
 
 # If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
 # fqdn = false
-# localname = ""
+# localname = "manager"
 
 
 # Specify additional package namespaces to include in the logs
