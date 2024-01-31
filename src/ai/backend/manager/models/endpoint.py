@@ -706,20 +706,24 @@ class ModifyEndpoint(graphene.Mutation):
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
 
-        async def _post(conn, result) -> EndpointRow:
-            db_session = AsyncSession(conn)
-            row = result.first()
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == row.id)
-                .options(
-                    joinedload(EndpointRow.image_row),
-                    selectinload(EndpointRow.routings),
-                    joinedload(EndpointRow.session_owner_row),
-                    joinedload(EndpointRow.created_user_row),
+        async def _post(ctx, conn, result) -> EndpointRow:
+            endpoint = result.first()
+            try:
+                async with ctx.db.begin_readonly_session() as session:
+                    row = await EndpointRow.get(
+                    session,
+                    endpoint_id=endpoint.id,
+                    domain=endpoint.domain,
+                    user_uuid=endpoint.user_uuid,
+                    project=endpoint.project,
+                    load_image=True,
+                    load_routes=True,
+                    load_created_user=True,
+                    load_session_owner=True,
                 )
-            )
-            return (await db_session.scalars(query)).first()
+                return await Endpoint.from_row(ctx, row)
+            except NoResultFound:
+                raise EndpointNotFound
 
         return await simple_db_mutate_returning_item(
             cls, graph_ctx, update_query, item_cls=Endpoint, post_func=_post
