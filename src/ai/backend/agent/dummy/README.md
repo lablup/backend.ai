@@ -63,5 +63,23 @@ mode = "dummy" # or backend = "dummy"
 ...
 ```
 
+If you want to run multiple dummy agents in one machine, you need multiple `agent.toml` files.
+Copy and paste the original "agent.toml" file and change `rpc-listen-addr`, `agent-sock-port`, `id` and `pid-file`.
+```toml
+# File name "agent2.toml"
+[agent]
+mode = "dummy"
+rpc-listen-addr = { host = "127.0.0.1", port = 6012 }
+agent-sock-port = 6008
+id = "dummy-agent2"
+pid-file = "./agent2.pid"
+ipc-base-path = "/tmp/backend.ai/ipc"
+var-base-path = "var/lib/backend.ai"
+```
+Then run agent.
+```sh
+./backend.ai ag start-server --debug -f agent2.toml
+```
+
 ### How to set compute devices.
 Dummy agents can use mock accelerators to set up heterogeneous computing devices, similar to how they do with *regular* agents. For more information, see `src/ai/backend/accelerator/mock`.
