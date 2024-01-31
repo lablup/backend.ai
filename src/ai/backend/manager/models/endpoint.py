@@ -37,6 +37,7 @@ from .base import (
 )
 from .image import Image, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
+from .user import UserRole
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -675,6 +676,7 @@ class ModifyEndpoint(graphene.Mutation):
         props: ModifyEndpointInput,
     ) -> "ModifyEndpoint":
         graph_ctx: GraphQueryContext = info.context
+        # raise ValueError(f"{type(graph_ctx.user) = }, {graph_ctx.user = }")
         data: dict[str, Any] = {}
         set_if_set(
             props,
@@ -689,20 +691,35 @@ class ModifyEndpoint(graphene.Mutation):
         set_if_set(props, data, "image")
         set_if_set(props, data, "resource_group")
         image = data.pop("image", None)
-        if image is not None:
-            image_name = image["name"]
-            registry = image.get("registry") or ["*"]
-            arch = image.get("architecture")
-            if arch is not None:
-                image_ref = ImageRef(image_name, registry, arch)
-            else:
-                image_ref = ImageRef(
-                    image_name,
-                    registry,
+
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            if graph_ctx.user["role"] not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+                user_id = graph_ctx.user["uuid"]
+                stmt = (
+                    sa.select(EndpointRow)
+                    .where(EndpointRow.id == endpoint_id)
+                    .where(
+                        (EndpointRow.session_owner == user_id)
+                        | (EndpointRow.created_user == user_id)
+                    )
                 )
-            async with graph_ctx.db.begin_readonly_session() as db_session:
+                endpoint_row = (await db_session.scalars(stmt)).first()
+                if endpoint_row is None:
+                    raise EndpointNotFound
+
+            if image is not None:
+                image_name = image["name"]
+                registry = image.get("registry") or ["*"]
+                arch = image.get("architecture")
+                if arch is not None:
+                    image_ref = ImageRef(image_name, registry, arch)
+                else:
+                    image_ref = ImageRef(
+                        image_name,
+                        registry,
+                    )
                 image_row = await ImageRow.resolve(db_session, [image_ref])
-            data["image"] = image_row.id
+                data["image"] = image_row.id
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
 
