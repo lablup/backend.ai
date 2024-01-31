@@ -8,6 +8,8 @@ from ai.backend.common.types import (
     DefaultForUnspecified,
     HardwareMetadata,
     ResourceSlot,
+    SlotName,
+    SlotTypes,
     aobject,
     check_typed_dict,
 )
@@ -212,7 +214,8 @@ def test_resource_slot_serialization_filter_null():
     assert "x" not in r1.to_json()
 
 
-def test_resource_slot_serialization_typeless():
+def test_resource_slot_parsing_typeless_user_input():
+    # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
     r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
     assert r1["a"] == Decimal(1)
     assert r1["cuda.mem"] == Decimal(2 * (2**30))
@@ -221,12 +224,41 @@ def test_resource_slot_serialization_typeless():
     assert r1["a"].is_infinite()
     assert r1["cuda.mem"].is_infinite()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot convert to decimal"):
         r1 = ResourceSlot.from_user_input({"a": "1", "cuda.smp": "2g"}, None)
 
     r1 = ResourceSlot.from_user_input({"a": "inf", "cuda.smp": "inf"}, None)
     assert r1["a"].is_infinite()
     assert r1["cuda.smp"].is_infinite()
+
+
+def test_resource_slot_parsing_typeless_user_input_serialize_again():
+    # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
+    r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
+    assert r1["a"] == Decimal(1)
+    assert r1["cuda.mem"] == Decimal(2 * (2**30))
+
+    s1 = r1.to_json()
+    # when serialized again, now the "cuda.mem" is an expanded integer
+    # (i.e., saving into database)
+    print(s1)
+
+    # now we can use `from_json()` safely
+    # (i.e., loaded from database)
+    r2 = ResourceSlot.from_json(s1)
+    assert r2 == r1
+
+
+def test_resource_slot_parsing_typeless_user_input_serialize_again_2():
+    with pytest.raises(ValueError, match="unit unknown"):
+        ResourceSlot.from_user_input(
+            {"a": "1", "shmem": "2g"},
+            {
+                SlotName("a"): SlotTypes("count"),
+                SlotName("mem"): SlotTypes("bytes"),
+                # missing "shmem": should raise an unknown slot error
+            },
+        )
 
 
 def test_resource_slot_comparison_simple_equality():
