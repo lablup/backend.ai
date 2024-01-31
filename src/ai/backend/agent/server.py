@@ -886,7 +886,7 @@ def main(
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
     except config.ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            "ConfigurationError: Could not read or validate the agent local config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -921,7 +921,7 @@ def main(
             case AgentBackend.DOCKER:
                 config.check(raw_cfg, docker_extra_config_iv)
             case AgentBackend.DUMMY:
-                dummy_cfg, _ = config.read_from_file(config_path, "agent.dummy")
+                dummy_cfg, _ = config.read_from_file(None, "agent.dummy")
                 cfg["dummy"] = config.check(dummy_cfg, dummy_local_config)
             case AgentBackend.KUBERNETES:
                 if cfg["container"]["scratch-type"] == "k8s-nfs" and (
