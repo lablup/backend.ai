@@ -761,7 +761,10 @@ class ResourceSlot(UserDict):
                     if k not in data:
                         data[k] = Decimal(0)
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            extra_guide = ""
+            if e.args[0] == "shmem":
+                extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
