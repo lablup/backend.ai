@@ -990,6 +990,7 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
+            "use_host_network": use_host_network,
         }
 
         kernel_shared_data = {
