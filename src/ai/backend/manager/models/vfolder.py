@@ -671,7 +671,7 @@ async def prepare_vfolder_mounts(
     for key, value in requested_mount_map.items():
         requested_vfolder_dstpaths[key] = value
 
-    # Check if there are overlapping mounts
+    # Check if there are overlapping mount maps
     for i, p1 in enumerate(requested_mount_map.values()):
         for j, p2 in enumerate(requested_mount_map.values()):
             if i == j:
