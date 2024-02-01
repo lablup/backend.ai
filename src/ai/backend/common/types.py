@@ -694,7 +694,10 @@ class ResourceSlot(UserDict):
                 value = Decimal(value)
                 if value.is_finite():
                     value = value.quantize(Quantum).normalize()
-        except ArithmeticError:
+        except (
+            ArithmeticError,
+            ValueError,  # catch wrapped errors from BinarySize.from_str()
+        ):
             raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
         return value
 
