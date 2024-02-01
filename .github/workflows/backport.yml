@@ -1,0 +1,75 @@
+name: backport
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  backport-target-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 병합된 pr의 commit인지 확인
+        run: |
+          latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
+          echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
+          commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
+          echo "commit_message=$commit_message" >> $GITHUB_OUTPUT
+          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)$" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
+      - name: 최신릴리즈버전 가져오기
+        run: |
+          latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
+          echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
+      - name: pr에서 target milestone 가져오기
+        run: |
+          tartget_milestone=$(gh pr view $pr_number --json milestone.title --jq .milestone.title)
+      - uses: actions/checkout@v4
+      - name: milestone 리스트 가져오기
+        run: |
+          milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
+      - name: milstone 리스트에서 Backlog 제거
+        run: |
+          milestones=($milestones)
+          for i in "${!milestones[@]}"; do
+            if [[ "${milestones[$i]}" == "Backlog" ]]; then
+              unset 'milestones[$i]'
+            fi
+          done
+      - name: milestone 리스트 정렬
+        run: |
+          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort))
+      - name: target milestone까지 범위 설정
+        run: |
+          for i in "${!sort_milestones[@]}"; do
+            echo "$i: ${sort_milestones[$i]}"
+            if [[ "${sort_milestones[$i]}" == "$target_milestone" ]]; then
+              target_milestones=("${sort_milestones[@]:0:$((i+1))}")
+              break
+            fi
+          done
+          echo "matrix={\"milestone\":$(printf "%s," "${target_milestones[@]}")}" >> $GITHUB_OUTPUT
+
+  backport:
+    runs-on: ubuntu-latest
+    needs: backport-target-branch
+    strategy:
+      matrix: ${{fromJson(needs.backport-target-branch.outputs.matrix)}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.milestone }}
+      - name: backport pr 생성
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            ${{ needs.backport-target-branch.outputs.commit_message }}
+            Backported-from: main($latest_release)
+            Backported-to: ${{ matrix.milestone }}
+          title: "backport: ${{ needs.backport-target-branch.outputs.pr_number }} to ${{ matrix.milestone }}"
+          body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
+          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number}}"
+          base: ${{ matrix.milestone }}
+          labels: backport
+          assignees: ${{ github.actor }}
