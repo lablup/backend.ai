@@ -676,6 +676,8 @@ async def prepare_vfolder_mounts(
         for p2 in requested_mounts:
             if p1 == p2:
                 continue
+            # TODO: breaking change: doesn't it have to check mount_map than mount?
+            # ref: https://github.com/lablup/backend.ai-manager/pull/537
             if PurePosixPath(p1).is_relative_to(PurePosixPath(p2)):
                 raise InvalidAPIParameters(
                     f"VFolder source path '{p1}' overlaps with '{p2}'",
