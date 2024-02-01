@@ -48,7 +48,7 @@ jobs:
               break
             fi
           done
-          echo "matrix={\"milestone\":$(printf "%s," "${target_milestones[@]}")}" >> $GITHUB_OUTPUT
+          echo "matrix={\"milestone\":[$(printf "%s," "${target_milestones[@]}")]}" >> $GITHUB_OUTPUT
 
   backport:
     runs-on: ubuntu-latest
