@@ -672,9 +672,9 @@ async def prepare_vfolder_mounts(
         requested_vfolder_dstpaths[key] = value
 
     # Check if there are overlapping mount maps
-    for i, p1 in enumerate(requested_mount_map.values()):
-        for j, p2 in enumerate(requested_mount_map.values()):
-            if i == j:
+    for m1, p1 in requested_mount_map.items():
+        for m2, p2 in requested_mount_map.items():
+            if m1 == m2:
                 continue
             if PurePosixPath(p1).is_relative_to(PurePosixPath(p2)):
                 raise InvalidAPIParameters(
