@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
-import decimal
 import itertools
 import logging
 import re
@@ -441,19 +440,10 @@ class AgentRegistry:
 
         if _resources := config["resources"]:
             available_resource_slots = await self.shared_config.get_resource_slots()
-            unknown_resource_slots = _resources.keys() - available_resource_slots.keys()
-            if (
-                len(unknown_resource_slots) > 0
-            ):  # request contains resource request for unknown accelerator
-                raise InvalidAPIParameters(f"Unknown resource type: {list(unknown_resource_slots)}")
-            interim_value: Dict[str, Any] = _resources
-            mem = _resources.get("mem")
             try:
-                if isinstance(mem, str) and not mem.isdigit():
-                    interim_value["mem"] = BinarySize.from_str(mem)
-                ResourceSlot.from_json(interim_value)
-            except (decimal.InvalidOperation, ValueError):
-                raise InvalidAPIParameters("Invalid value passed to resource allocation amount")
+                ResourceSlot.from_user_input(_resources, available_resource_slots)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
 
         # Resolve the image reference.
         try:

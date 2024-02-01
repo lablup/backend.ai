@@ -224,7 +224,7 @@ def test_resource_slot_parsing_typeless_user_input():
     assert r1["a"].is_infinite()
     assert r1["cuda.mem"].is_infinite()
 
-    with pytest.raises(ValueError, match="Cannot convert to decimal"):
+    with pytest.raises(ValueError, match="Cannot convert"):
         r1 = ResourceSlot.from_user_input({"a": "1", "cuda.smp": "2g"}, None)
 
     r1 = ResourceSlot.from_user_input({"a": "inf", "cuda.smp": "inf"}, None)
@@ -250,7 +250,7 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again():
 
 
 def test_resource_slot_parsing_typeless_user_input_serialize_again_2():
-    with pytest.raises(ValueError, match="unit unknown"):
+    with pytest.raises(ValueError, match="Unknown slot type"):
         ResourceSlot.from_user_input(
             {"a": "1", "shmem": "2g"},
             {
