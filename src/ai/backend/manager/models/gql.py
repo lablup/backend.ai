@@ -359,6 +359,13 @@ class Queries(graphene.ObjectType):
         Project,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=(
+                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
+        ),
     )
 
     # legacy
