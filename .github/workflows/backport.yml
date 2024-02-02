@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: backport-target-branch
     strategy:
-      matrix: ${{fromJson(needs.backport-target-branch.outputs.matrix)}}
+      matrix: ${{ fromJson(needs.backport-target-branch.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,7 +69,7 @@ jobs:
             Backported-to: ${{ matrix.milestone }}
           title: "backport: ${{ needs.backport-target-branch.outputs.pr_number }} to ${{ matrix.milestone }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
-          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number}}"
+          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number}}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ github.actor }}
