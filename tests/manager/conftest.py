@@ -176,6 +176,7 @@ def local_config(
             "user": "postgres",
             "password": "develove",
             "pool-size": 8,
+            "pool-recycle": -1,
             "max-overflow": 64,
         },
         "manager": {
