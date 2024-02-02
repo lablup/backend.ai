@@ -59,6 +59,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ matrix.milestone }}
+      - name: cherry-pick
+        run: |
+          git cherry-pick ${{ needs.backport-target-branch.outputs.latest_commit }}
       - name: backport pr 생성
         uses: peter-evans/create-pull-request@v6
         with:
@@ -67,9 +70,9 @@ jobs:
             ${{ needs.backport-target-branch.outputs.commit_message }}
             Backported-from: main($latest_release)
             Backported-to: ${{ matrix.milestone }}
-          title: "backport: ${{ needs.backport-target-branch.outputs.pr_number }} to ${{ matrix.milestone }}"
+          title: "${{ needs.backport-target-branch.outputs.commit_message }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
-          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number}}-to-${{ matrix.milestone }}"
+          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ github.actor }}
