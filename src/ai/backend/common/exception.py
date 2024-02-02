@@ -58,11 +58,18 @@ class InvalidImageTag(ValueError):
     ```
     """
 
+    def __init__(self, tag: str, value: str | None = None) -> None:
+        super(InvalidImageTag, self).__init__(tag, value)
+        self._tag = tag
+        self._value = value
+
     def __str__(self) -> str:
-        if len(self.args) > 1 and self.args[1] is not None:
-            return f"Invalid or duplicate image name tag: {self.args[0]}, full image name: {self.args[1]}"
+        if self._value is not None:
+            return (
+                f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._value}"
+            )
         else:
-            return f"Invalid or duplicate image name tag: {self.args[0]}"
+            return f"Invalid or duplicate image name tag: {self._tag}"
 
 
 class AliasResolutionFailed(ValueError):
