@@ -369,7 +369,7 @@ async def reenter_txn_session(
 TQueryResult = TypeVar("TQueryResult")
 
 
-async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
+async def execute_with_conn_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
     max_attempts = 20
     result: TQueryResult | Sentinel = Sentinel.token
     try:

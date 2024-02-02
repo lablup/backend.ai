@@ -4,11 +4,11 @@ import aiotools
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
+from ai.backend.manager.models.utils import execute_with_conn_retry, execute_with_txn_retry
 
 
 @pytest.mark.asyncio
-async def test_execute_with_retry():
+async def test_execute_with_conn_retry():
     class DummyDBError(Exception):
         def __init__(self, pgcode):
             self.pgcode = pgcode
@@ -34,16 +34,16 @@ async def test_execute_with_retry():
     vclock = aiotools.VirtualClock()
     with vclock.patch_loop():
         with pytest.raises(sa.exc.IntegrityError):
-            await execute_with_retry(txn_func_generic_failure)
+            await execute_with_conn_retry(txn_func_generic_failure)
 
         with pytest.raises(ZeroDivisionError):
-            await execute_with_retry(txn_func_generic_failure_2)
+            await execute_with_conn_retry(txn_func_generic_failure_2)
 
         with pytest.raises(RuntimeError) as e:
-            await execute_with_retry(txn_func_permanent_serialization_failure)
+            await execute_with_conn_retry(txn_func_permanent_serialization_failure)
         assert "serialization failed" in e.value.args[0].lower()
 
-        ret = await execute_with_retry(txn_func_temporary_serialization_failure)
+        ret = await execute_with_conn_retry(txn_func_temporary_serialization_failure)
         assert ret == 1234
 
 
