@@ -360,7 +360,7 @@ class PlatformTagSet(Mapping):
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str], value: str = None):
+    def __init__(self, tags: Iterable[str], value: str = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
@@ -413,7 +413,7 @@ class ImageRef:
         known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
         architecture: str = "x86_64",
         is_local: bool = False,
-    ):
+    ) -> None:
         self._value = value
         self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
