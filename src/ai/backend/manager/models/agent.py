@@ -599,11 +599,9 @@ class AgentSummaryList(graphene.ObjectType):
 
 async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:
     query = (
-        sa.select(
-            [
-                kernels.c.occupied_slots,
-            ]
-        )
+        sa.select([
+            kernels.c.occupied_slots,
+        ])
         .select_from(kernels)
         .where(
             (kernels.c.agent == agent_id)
@@ -616,11 +614,9 @@ async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: Agent
         occupied_slots += row["occupied_slots"]
     query = (
         sa.update(agents)
-        .values(
-            {
-                "occupied_slots": occupied_slots,
-            }
-        )
+        .values({
+            "occupied_slots": occupied_slots,
+        })
         .where(agents.c.id == agent_id)
     )
     await db_conn.execute(query)

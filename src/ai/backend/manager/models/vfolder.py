@@ -13,6 +13,8 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
+import yaml
+from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -24,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -36,7 +39,12 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
+from ..defs import (
+    DEFAULT_CHUNK_SIZE,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+    VFOLDER_DSTPATHS_MAP,
+)
 from ..types import UserScope
 from .base import (
     GUID,
@@ -48,10 +56,17 @@ from .base import (
     PaginatedList,
     QuotaScopeIDType,
     batch_multiresult,
+    generate_sql_info_for_gql_connection,
     metadata,
+)
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .project import ProjectRow, ProjectType
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -314,6 +329,15 @@ vfolder_permissions = sa.Table(
 class VFolderRow(Base):
     __table__ = vfolders
 
+    def __contains__(self, key):
+        return key in self.__dir__()
+
+    def __getitem__(self, item):
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
+
 
 def verify_vfolder_name(folder: str) -> bool:
     if folder in RESERVED_VFOLDERS:
@@ -379,31 +403,33 @@ async def query_accessible_vfolders(
                 if "vfolder_permissions_permission" in row_keys
                 else row.vfolders_permission
             )
-            entries.append(
-                {
-                    "name": row.vfolders_name,
-                    "id": row.vfolders_id,
-                    "host": row.vfolders_host,
-                    "quota_scope_id": row.vfolders_quota_scope_id,
-                    "usage_mode": row.vfolders_usage_mode,
-                    "created_at": row.vfolders_created_at,
-                    "last_used": row.vfolders_last_used,
-                    "max_size": row.vfolders_max_size,
-                    "max_files": row.vfolders_max_files,
-                    "ownership_type": row.vfolders_ownership_type,
-                    "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "project_id": str(row.vfolders_project_id) if row.vfolders_project_id else None,
-                    "creator": row.vfolders_creator,
-                    "user_email": row.users_email if "users_email" in row_keys else None,
-                    "project_name": row.projects_name if "projects_name" in row_keys else None,
-                    "is_owner": _is_owner,
-                    "permission": _perm,
-                    "unmanaged_path": row.vfolders_unmanaged_path,
-                    "cloneable": row.vfolders_cloneable,
-                    "status": row.vfolders_status,
-                    "cur_size": row.vfolders_cur_size,
-                }
-            )
+            entries.append({
+                "name": row.vfolders_name,
+                "id": row.vfolders_id,
+                "host": row.vfolders_host,
+                "quota_scope_id": row.vfolders_quota_scope_id,
+                "usage_mode": row.vfolders_usage_mode,
+                "created_at": row.vfolders_created_at,
+                "last_used": row.vfolders_last_used,
+                "max_size": row.vfolders_max_size,
+                "max_files": row.vfolders_max_files,
+                "ownership_type": row.vfolders_ownership_type,
+                "user": str(row.vfolders_user) if row.vfolders_user else None,
+                "group": str(row.vfolders_project_id)
+                if row.vfolders_project_id
+                else None,  # legacy
+                "project_id": str(row.vfolders_project_id) if row.vfolders_project_id else None,
+                "creator": row.vfolders_creator,
+                "user_email": row.users_email if "users_email" in row_keys else None,
+                "group_name": row.projects_name if "projects_name" in row_keys else None,  # legacy
+                "project_name": row.projects_name if "projects_name" in row_keys else None,
+                "is_owner": _is_owner,
+                "permission": _perm,
+                "unmanaged_path": row.vfolders_unmanaged_path,
+                "cloneable": row.vfolders_cloneable,
+                "status": row.vfolders_status,
+                "cur_size": row.vfolders_cur_size,
+            })
 
     entries: List[dict] = []
     # User vfolders.
@@ -868,10 +894,10 @@ async def filter_host_allowed_permission(
     if (
         "group" in allowed_vfolder_types or "project" in allowed_vfolder_types
     ) and project_id is not None:
-        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_project(
+        allowed_hosts_by_project = await get_allowed_vfolder_hosts_by_project(
             db_conn, resource_policy, domain_name, project_id
         )
-        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+        allowed_hosts = allowed_hosts | allowed_hosts_by_project
     return allowed_hosts
 
 
@@ -1051,15 +1077,15 @@ async def ensure_quota_scope_accessible_by_user(
                     return
         raise InvalidAPIParameters
 
-    # Lookup group table to match if quota is scoped to the group
+    # Lookup project table to match if quota is scoped to the project
     query = sa.select(ProjectRow).where(ProjectRow.id == quota_scope.scope_id)
-    quota_scope_group = await conn.scalar(query)
-    if quota_scope_group:
+    quota_scope_project = await conn.scalar(query)
+    if quota_scope_project:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_group.domain == user["domain"]:
+                if quota_scope_project.domain == user["domain"]:
                     return
             case _:
                 query = (
@@ -1115,9 +1141,15 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
         if row is None:
             return None
+
+        def _get_field(name: str) -> Any:
+            try:
+                return row[name]
+            except sa.exc.NoSuchColumnError:
+                return None
 
         return cls(
             id=row["id"],
@@ -1125,11 +1157,11 @@ class VirtualFolder(graphene.ObjectType):
             quota_scope_id=row["quota_scope_id"],
             name=row["name"],
             user=row["user"],
-            user_email=row["users_email"] if "users_email" in row else None,
-            project_id=row["project_id"],
-            project_name=row["projects_name"] if "projects_name" in row else None,
-            group=row["project_id"],  # legacy
-            group_name=row["projects_name"] if "projects_name" in row else None,  # legacy
+            user_email=_get_field("users_email"),
+            project_id=_get_field("projects_id"),
+            project_name=_get_field("projects_name"),
+            group=_get_field("projects_id"),  # legacy
+            group_name=_get_field("projects_name"),  # legacy
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
@@ -1215,9 +1247,12 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
+        from .project import projects
         from .user import users
 
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
+        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
+            projects, vfolders.c.project_id == projects.c.id, isouter=True
+        )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -1285,7 +1320,7 @@ class VirtualFolder(graphene.ObjectType):
         ids: list[str],
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID | None = None,
+        project_id: uuid.UUID | None = None,
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
@@ -1302,8 +1337,8 @@ class VirtualFolder(graphene.ObjectType):
             query = query.where(VFolderRow.user == user_id)
             if domain_name is not None:
                 query = query.where(UserRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(VFolderRow.group == group_id)
+        if project_id is not None:
+            query = query.where(VFolderRow.project_id == project_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1356,7 +1391,7 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
@@ -1394,7 +1429,7 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
@@ -1441,7 +1476,7 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
@@ -1456,8 +1491,12 @@ class VirtualFolder(graphene.ObjectType):
 
         project_rows = result.fetchall()
         project_ids = [project_row.project_id for project_row in project_rows]
-        j = sa.join(vfolders, projects, vfolders.c.group == projects.c.id)
-        query = sa.select([sa.func.count()]).select_from(j).where(vfolders.c.group.in_(project_ids))
+        j = sa.join(vfolders, projects, vfolders.c.project_id == projects.c.id)
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(j)
+            .where(vfolders.c.project_id.in_(project_ids))
+        )
 
         if domain_name is not None:
             query = query.where(projects.c.domain_name == domain_name)
@@ -1476,7 +1515,7 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
@@ -1490,16 +1529,14 @@ class VirtualFolder(graphene.ObjectType):
             result = await conn.execute(query)
         project_rows = result.fetchall()
         project_ids = [project_row.project_id for project_row in project_rows]
-        j = vfolders.join(projects, vfolders.c.group == projects.c.id)
+        j = vfolders.join(projects, vfolders.c.project_id == projects.c.id)
         query = (
-            sa.select(
-                [
-                    vfolders,
-                    projects.c.name.label("projects_name"),
-                ]
-            )
+            sa.select([
+                vfolders,
+                projects.c.name.label("projects_name"),
+            ])
             .select_from(j)
-            .where(vfolders.c.group.in_(project_ids))
+            .where(vfolders.c.project_id.in_(project_ids))
             .limit(limit)
             .offset(offset)
         )
@@ -1817,3 +1854,260 @@ class UnsetQuotaScope(graphene.Mutation):
                 storage_host_name=storage_host_name,
             )
         )
+
+
+class ModelCard(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    name = graphene.String()
+    vfolder = graphene.Field(VirtualFolder)
+    author = graphene.String()
+    title = graphene.String(description="Human readable name of the model.")
+    version = graphene.String()
+    created_at = GQLDateTime(description="The time the model was created.")
+    modified_at = GQLDateTime(description="The last time the model was modified.")
+    description = graphene.String()
+    task = graphene.String()
+    category = graphene.String()
+    architecture = graphene.String()
+    framework = graphene.List(lambda: graphene.String)
+    label = graphene.List(lambda: graphene.String)
+    license = graphene.String()
+    min_resource = graphene.JSONString()
+    readme = graphene.String()
+    readme_filetype = graphene.String(
+        description=(
+            "Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ..."
+        )
+    )
+
+    def resolve_created_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
+        try:
+            return dtparse(self.created_at)
+        except ParserError:
+            return self.created_at
+
+    def resolve_modified_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
+        try:
+            return dtparse(self.modified_at)
+        except ParserError:
+            return self.modified_at
+
+    @classmethod
+    def parse_model(
+        cls,
+        resolve_info: graphene.ResolveInfo,
+        vfolder_row: VFolderRow,
+        *,
+        model_def: dict[str, Any] | None = None,
+        readme: str | None = None,
+        readme_filetype: str | None = None,
+    ) -> ModelCard:
+        if model_def is not None:
+            models = model_def["models"]
+        else:
+            models = []
+        try:
+            metadata = models[0]["metadata"]
+            name = models[0]["name"]
+        except (IndexError, KeyError):
+            metadata = {}
+            name = vfolder_row.name
+        return cls(
+            id=vfolder_row.id,
+            name=name,
+            author=metadata.get("author") or vfolder_row.creator or "",
+            title=metadata.get("title") or vfolder_row.name,
+            version=metadata.get("version") or "",
+            created_at=metadata.get("created") or vfolder_row.created_at,
+            modified_at=metadata.get("last_modified") or vfolder_row.created_at,
+            description=metadata.get("description") or "",
+            task=metadata.get("task") or "",
+            architecture=metadata.get("architecture") or "",
+            framework=metadata.get("framework") or [],
+            label=metadata.get("label") or [],
+            category=metadata.get("category") or "",
+            license=metadata.get("license") or "",
+            min_resource=metadata.get("min_resource") or {},
+            readme=readme,
+            readme_filetype=readme_filetype,
+        )
+
+    @classmethod
+    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelCard:
+        async def _fetch_file(
+            filename: str,
+        ) -> bytes:  # FIXME: We should avoid fetching files from disk
+            chunks = bytes()
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/file/fetch",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(vfolder_id),
+                    "relpath": f"./{filename}",
+                },
+            ) as (_, storage_resp):
+                while True:
+                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    chunks += chunk
+            return chunks
+
+        graph_ctx: GraphQueryContext = info.context
+
+        vfolder_row_id = vfolder_row.id
+        quota_scope_id = vfolder_row.quota_scope_id
+        host = vfolder_row.host
+        folder_name = vfolder_row.name
+        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfolder_id),
+                "relpath": ".",
+            },
+        ) as (_, storage_resp):
+            vfolder_files = (await storage_resp.json())["items"]
+
+        model_definition_filename: str | None = None
+        readme_idx: int | None = None
+
+        for idx, item in zip(range(len(vfolder_files)), vfolder_files):
+            if (item["name"] in ("model-definition.yml", "model-definition.yaml")) and (
+                not model_definition_filename
+            ):
+                model_definition_filename = item["name"]
+            if item["name"].lower().startswith("readme."):
+                readme_idx = idx
+
+        if readme_idx is not None:
+            readme_filename: str = vfolder_files[readme_idx]["name"]
+            chunks = await _fetch_file(readme_filename)
+            readme = chunks.decode("utf-8")
+            readme_filetype = readme_filename.split(".")[-1]
+        else:
+            readme = None
+            readme_filetype = None
+
+        if model_definition_filename:
+            chunks = await _fetch_file(model_definition_filename)
+            model_definition_yaml = chunks.decode("utf-8")
+            model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            try:
+                model_definition = model_definition_iv.check(model_definition_dict)
+                assert model_definition is not None
+            except t.DataError as e:
+                raise InvalidAPIParameters(
+                    f"Failed to validate model definition from vFolder {folder_name} (ID"
+                    f" {vfolder_row_id}): {e}",
+                ) from e
+            except yaml.error.YAMLError as e:
+                raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+            model_definition["id"] = vfolder_row_id
+        else:
+            model_definition = None
+
+        return cls.parse_model(
+            info,
+            vfolder_row,
+            model_def=model_definition,
+            readme=readme,
+            readme_filetype=readme_filetype,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_row = (await db_session.scalars(query)).first()
+            if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
+                raise ValueError(
+                    f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
+                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
+                )
+            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+                raise ValueError(
+                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+                )
+            return await cls.from_row(info, vfolder_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            VFolderRow,
+            VFolderRow.id,
+            filter_expr,
+            order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            model_store_project_gids = (
+                (
+                    await db_session.execute(
+                        sa.select([ProjectRow.id]).where(
+                            (ProjectRow.type == ProjectType.MODEL_STORE)
+                            & (ProjectRow.domain_name == graph_ctx.user["domain_name"])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+            VFolderRow.project_id.in_(model_store_project_gids)
+        )
+        query = query.where(additional_cond)
+        cnt_query = cnt_query.where(additional_cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class ModelCardConnection(Connection):
+    class Meta:
+        node = ModelCard

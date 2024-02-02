@@ -4,8 +4,9 @@ from typing import Any, Iterable, Optional, Sequence
 from ai.backend.client.output.fields import project_fields
 from ai.backend.client.output.types import FieldSpec
 
+from ...cli.types import Undefined, undefined
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Project",)
@@ -59,11 +60,13 @@ class Project(BaseFunction):
         :param domain_name: Name of domain to get projects from.
         :param fields: Per-project query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($name: String!, $domain_name: String) {
                 projects_by_name(name: $name, domain_name: $domain_name) {$fields}
             }
-        """)
+        """
+        )
         resolved_fields = resolve_fields(fields, project_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -88,11 +91,13 @@ class Project(BaseFunction):
         """
         if fields is None:
             fields = _default_list_fields
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($domain_name: String) {
                 projects(domain_name: $domain_name) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
@@ -102,24 +107,26 @@ class Project(BaseFunction):
     @classmethod
     async def detail(
         cls,
-        gid: str,
+        pid: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
         """
         Fetch information of a project with project ID.
 
-        :param gid: ID of the project to fetch.
+        :param pid: ID of the project to fetch.
         :param fields: Additional per-project query fields to fetch.
         """
         if fields is None:
             fields = _default_detail_fields
-        query = textwrap.dedent("""\
-            query($gid: UUID!) {
-                project(id: $gid) {$fields}
+        query = textwrap.dedent(
+            """\
+            query($pid: UUID!) {
+                project(id: $pid) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
-        variables = {"gid": gid}
+        variables = {"pid": pid}
         data = await api_session.get().Admin._query(query, variables)
         return data["project"]
 
@@ -141,13 +148,15 @@ class Project(BaseFunction):
         Creates a new project with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: ProjectInput!) {
                 create_project(name: $name, props: $input) {
                     ok msg project {$fields}
                 }
             }
-        """)
+        """
+        )
         resolved_fields = resolve_fields(
             fields,
             project_fields,
@@ -172,7 +181,7 @@ class Project(BaseFunction):
     @classmethod
     async def update(
         cls,
-        gid: str,
+        pid: str,
         *,
         name: str | Undefined = undefined,
         description: str | Undefined = undefined,
@@ -186,13 +195,15 @@ class Project(BaseFunction):
         Update existing project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
-            mutation($gid: UUID!, $input: ModifyProjectInput!) {
-                modify_project(gid: $gid, props: $input) {
+        query = textwrap.dedent(
+            """\
+            mutation($pid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(pid: $pid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "name", name)
         set_if_set(inputs, "description", description)
@@ -201,7 +212,7 @@ class Project(BaseFunction):
         set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
         set_if_set(inputs, "integration_id", integration_id)
         variables = {
-            "gid": gid,
+            "pid": pid,
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -209,56 +220,62 @@ class Project(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, gid: str):
+    async def delete(cls, pid: str):
         """
         Inactivates the existing project. Does not actually delete it for safety.
         """
-        query = textwrap.dedent("""\
-            mutation($gid: UUID!) {
-                delete_project(gid: $gid) {
+        query = textwrap.dedent(
+            """\
+            mutation($pid: UUID!) {
+                delete_project(pid: $pid) {
                     ok msg
                 }
             }
-        """)
-        variables = {"gid": gid}
+        """
+        )
+        variables = {"pid": pid}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_project"]
 
     @api_function
     @classmethod
-    async def purge(cls, gid: str):
+    async def purge(cls, pid: str):
         """
         Delete the existing project. This action cannot be undone.
         """
-        query = textwrap.dedent("""\
-            mutation($gid: UUID!) {
-                purge_project(gid: $gid) {
+        query = textwrap.dedent(
+            """\
+            mutation($pid: UUID!) {
+                purge_project(pid: $pid) {
                     ok msg
                 }
             }
-        """)
-        variables = {"gid": gid}
+        """
+        )
+        variables = {"pid": pid}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_project"]
 
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
+        cls, pid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Add users to a project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
-            mutation($gid: UUID!, $input: ModifyProjectInput!) {
-                modify_project(gid: $gid, props: $input) {
+        query = textwrap.dedent(
+            """\
+            mutation($pid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(pid: $pid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
-            "gid": gid,
+            "pid": pid,
             "input": {
                 "user_update_mode": "add",
                 "user_uuids": user_uuids,
@@ -270,21 +287,23 @@ class Project(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
+        cls, pid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Remove users from a project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
-            mutation($gid: UUID!, $input: ModifyProjectInput!) {
-                modify_project(gid: $gid, props: $input) {
+        query = textwrap.dedent(
+            """\
+            mutation($pid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(pid: $pid, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
-            "gid": gid,
+            "pid": pid,
             "input": {
                 "user_update_mode": "remove",
                 "user_uuids": user_uuids,

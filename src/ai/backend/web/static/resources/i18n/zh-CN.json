@@ -237,7 +237,20 @@
       "preopen": "预开放端口",
       "Network": "网络",
       "Enable": "启用",
-      "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。"
+      "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
+      "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
+      "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "每个集装箱的资源分配",
+      "NumberOfContainer": "集装箱数量",
+      "EnterEnvironmentVariable": "输入变量名称",
+      "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
+      "EnvironmentVariableDuplicateName": "已经存在的变量名。"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -295,7 +308,7 @@
       "SluggedStrings": "多字符串（>3 字符）",
       "SessionNameAlreadyExist": "会话名称已存在",
       "SessionNameTooLong64": "请输入不超过 64 个字符。",
-      "PleaseFollowSessionNameRule": "请输入至少 3 个字母、数字、“.”、“_”和“-”的组合字符。"
+      "PleaseFollowSessionNameRule": "请输入至少 4 个字母、数字、“.”、“_”和“-”的组合字符。"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -428,7 +441,9 @@
     "Control": "控制",
     "NewPassword": "新密码",
     "Enabled": "启用",
-    "StorageProxies": "存储"
+    "StorageProxies": "存储",
+    "None": "无",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "允许",
@@ -763,7 +778,8 @@
     "RAM": "内存 (GB)",
     "SharedMemory": "共享内存 (GB)",
     "NoResourcePresetToDisplay": "无资源预置显示",
-    "Deleted": "资源预置已成功删除。"
+    "Deleted": "资源预置已成功删除。",
+    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存"
   },
   "usersettings": {
     "General": "一般的",

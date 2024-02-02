@@ -237,7 +237,22 @@
       "preopen": "wstępnie otwarte",
       "Network": "Sieć",
       "Enable": "Włączać",
-      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-)."
+      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
+      "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
+      "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Alokacja zasobów na kontener",
+      "NumberOfContainer": "Liczba pojemników",
+      "EnterEnvironmentVariable": "Wprowadź nazwę zmiennej",
+      "EnvironmentVariableNamePatternError": "Nazwa zmiennej musi zaczynać się od litery lub podkreślenia i może zawierać tylko litery, cyfry i podkreślenia.",
+      "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -295,7 +310,7 @@
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
       "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
       "SessionNameTooLong64": "Wprowadź maksymalnie 64 znaki.",
-      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 3 liter, cyfr, „.”, „_” i „-”."
+      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 4 liter, cyfr, „.”, „_” i „-”."
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -428,7 +443,9 @@
     "Control": "Kontrola",
     "NewPassword": "nowe hasło",
     "Enabled": "Włączone",
-    "StorageProxies": "Magazyny"
+    "StorageProxies": "Magazyny",
+    "None": "Brak",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -763,7 +780,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Pamięć współdzielona (GB)",
     "NoResourcePresetToDisplay": "Brak ustawień wstępnych zasobów do wyświetlenia",
-    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte."
+    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte.",
+    "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć"
   },
   "usersettings": {
     "General": "Generał",

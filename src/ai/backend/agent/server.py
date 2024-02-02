@@ -437,7 +437,6 @@ class AgentRPCServer(aobject):
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
-        raw_results = []
         coros = []
         throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
@@ -458,29 +457,32 @@ class AgentRPCServer(aobject):
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
-        errors = [*filter(lambda item: isinstance(item, Exception), results)]
+        raw_results = []
+        errors = []
+        for result in results:
+            match result:
+                case BaseException():
+                    errors.append(result)
+                case _:
+                    raw_results.append({
+                        "id": str(result["id"]),
+                        "kernel_host": result["kernel_host"],
+                        "repl_in_port": result["repl_in_port"],
+                        "repl_out_port": result["repl_out_port"],
+                        "stdin_port": result["stdin_port"],  # legacy
+                        "stdout_port": result["stdout_port"],  # legacy
+                        "service_ports": result["service_ports"],
+                        "container_id": result["container_id"],
+                        "resource_spec": result["resource_spec"],
+                        "attached_devices": result["attached_devices"],
+                        "agent_addr": result["agent_addr"],
+                        "scaling_group": result["scaling_group"],
+                    })
         if errors:
             # Raise up the first error.
             if len(errors) == 1:
                 raise errors[0]
             raise aiotools.TaskGroupError("agent.create_kernels() failed", errors)
-        raw_results = [
-            {
-                "id": str(result["id"]),
-                "kernel_host": result["kernel_host"],
-                "repl_in_port": result["repl_in_port"],
-                "repl_out_port": result["repl_out_port"],
-                "stdin_port": result["stdin_port"],  # legacy
-                "stdout_port": result["stdout_port"],  # legacy
-                "service_ports": result["service_ports"],
-                "container_id": result["container_id"],
-                "resource_spec": result["resource_spec"],
-                "attached_devices": result["attached_devices"],
-                "agent_addr": result["agent_addr"],
-                "scaling_group": result["scaling_group"],
-            }
-            for result in results
-        ]
         return raw_results
 
     @rpc_function
@@ -951,6 +953,13 @@ def main(
     if os.getuid() != 0 and cfg["container"]["stats-type"] == "cgroup":
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
+            file=sys.stderr,
+        )
+        raise click.Abort()
+
+    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+        print(
+            "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()

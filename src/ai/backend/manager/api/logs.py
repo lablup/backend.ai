@@ -68,19 +68,17 @@ async def append(request: web.Request, params: Any) -> web.Response:
         resp = {
             "success": True,
         }
-        query = error_logs.insert().values(
-            {
-                "severity": params["severity"],
-                "source": params["source"],
-                "user": requester_uuid,
-                "message": params["message"],
-                "context_lang": params["context_lang"],
-                "context_env": params["context_env"],
-                "request_url": params["request_url"],
-                "request_status": params["request_status"],
-                "traceback": params["traceback"],
-            }
-        )
+        query = error_logs.insert().values({
+            "severity": params["severity"],
+            "source": params["source"],
+            "user": requester_uuid,
+            "message": params["message"],
+            "context_lang": params["context_lang"],
+            "context_env": params["context_env"],
+            "request_url": params["request_url"],
+            "request_status": params["request_status"],
+            "traceback": params["traceback"],
+        })
         result = await conn.execute(query)
         assert result.rowcount == 1
     return web.json_response(resp)
@@ -89,13 +87,11 @@ async def append(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("mark_read", default=False): t.ToBool(),
-            t.Key("page_size", default=20): t.ToInt(lt=101),
-            t.Key("page_no", default=1): t.ToInt(),
-        }
-    ),
+    t.Dict({
+        t.Key("mark_read", default=False): t.ToBool(),
+        t.Key("page_size", default=20): t.ToInt(lt=101),
+        t.Key("page_no", default=1): t.ToInt(),
+    }),
 )
 async def list_logs(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]

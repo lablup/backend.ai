@@ -33,13 +33,11 @@ async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
         if task.cancelled():
             continue
         if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during loop shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+            loop.call_exception_handler({
+                "message": "unhandled exception during loop shutdown",
+                "exception": task.exception(),
+                "task": task,
+            })
 
 
 # Using extra_procs
@@ -115,13 +113,11 @@ class ChownTask(AbstractTask):
         os.chown(self.directory, self.uid, self.gid)
 
     def serialize(self) -> bytes:
-        return msgpack.packb(
-            (
-                self.directory,
-                self.uid,
-                self.gid,
-            )
-        )
+        return msgpack.packb((
+            self.directory,
+            self.uid,
+            self.gid,
+        ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> ChownTask:
@@ -178,19 +174,17 @@ class MountTask(AbstractTask):
         )
 
     def serialize(self) -> bytes:
-        return msgpack.packb(
-            (
-                self.mount_path,
-                str(self.quota_scope_id),
-                self.fs_location,
-                self.fs_type,
-                self.cmd_options,
-                self.scaling_group,
-                self.edit_fstab,
-                self.fstab_path,
-                self.mount_prefix,
-            )
-        )
+        return msgpack.packb((
+            self.mount_path,
+            str(self.quota_scope_id),
+            self.fs_location,
+            self.fs_type,
+            self.cmd_options,
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+            self.mount_prefix,
+        ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> MountTask:
@@ -253,17 +247,15 @@ class UmountTask(AbstractTask):
         )
 
     def serialize(self) -> bytes:
-        return msgpack.packb(
-            (
-                self.mount_path,
-                str(self.quota_scope_id),
-                self.scaling_group,
-                self.edit_fstab,
-                self.fstab_path,
-                self.mount_prefix,
-                self.timeout,
-            )
-        )
+        return msgpack.packb((
+            self.mount_path,
+            str(self.quota_scope_id),
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+            self.mount_prefix,
+            self.timeout,
+        ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> UmountTask:

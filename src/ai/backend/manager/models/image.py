@@ -15,6 +15,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    cast,
 )
 
 import aiotools
@@ -32,10 +33,10 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
-from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from ..api.exceptions import ImageNotFound
+from ..container_registry import get_container_registry_cls
+from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
     Base,
     BigInt,
@@ -53,8 +54,8 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
-    from ai.backend.manager.config import SharedConfig
 
+    from ..config import SharedConfig
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -78,13 +79,13 @@ __all__ = (
 async def rescan_images(
     etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
-    registry: str = None,
-    local: bool = False,
+    registry_or_image: str | None = None,
     *,
-    reporter: ProgressReporter = None,
+    local: bool | None = False,
+    reporter: ProgressReporter | None = None,
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
-    from ai.backend.manager.config import container_registry_iv
+    from ..config import container_registry_iv
 
     if local:
         registries = {
@@ -98,18 +99,38 @@ async def rescan_images(
         }
     else:
         registry_config_iv = t.Mapping(t.String, container_registry_iv)
-        latest_registry_config = registry_config_iv.check(
-            await etcd.get_prefix("config/docker/registry"),
+        latest_registry_config = cast(
+            dict[str, Any],
+            registry_config_iv.check(
+                await etcd.get_prefix("config/docker/registry"),
+            ),
         )
         # TODO: delete images from registries removed from the previous config?
-        if registry is None:
+        if registry_or_image is None:
             # scan all configured registries
             registries = latest_registry_config
         else:
-            try:
-                registries = {registry: latest_registry_config[registry]}
-            except KeyError:
-                raise RuntimeError("It is an unknown registry.", registry)
+            # find if it's a full image ref of one of configured registries
+            for registry_name, registry_info in latest_registry_config.items():
+                if registry_or_image.startswith(registry_name + "/"):
+                    repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+                    log.debug(
+                        "running a per-image metadata scan: {}, {}",
+                        registry_name,
+                        repo_with_tag,
+                    )
+                    scanner_cls = get_container_registry_cls(registry_info)
+                    scanner = scanner_cls(db, registry_name, registry_info)
+                    await scanner.scan_single_ref(repo_with_tag)
+                    return
+            else:
+                # treat it as a normal registry name
+                registry = registry_or_image
+                try:
+                    registries = {registry: latest_registry_config[registry]}
+                    log.debug("running a per-registry metadata scan")
+                except KeyError:
+                    raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -157,12 +178,10 @@ class ImageRow(Base):
         StructuredJSONColumn(
             t.Mapping(
                 t.String,
-                t.Dict(
-                    {
-                        t.Key("min"): t.String,
-                        t.Key("max", default=None): t.Null | t.String,
-                    }
-                ),
+                t.Dict({
+                    t.Key("min"): t.String,
+                    t.Key("max", default=None): t.Null | t.String,
+                }),
             ),
         ),
         nullable=False,
@@ -374,13 +393,11 @@ class ImageRow(Base):
             max_value = slot_range.get("max")
             if max_value is None:
                 max_value = Decimal("Infinity")
-            res_limits.append(
-                {
-                    "key": slot_key,
-                    "min": min_value,
-                    "max": max_value,
-                }
-            )
+            res_limits.append({
+                "key": slot_key,
+                "min": min_value,
+                "max": max_value,
+            })
 
         accels = self.accelerators
         if accels is None:

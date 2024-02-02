@@ -42,13 +42,16 @@ async def query_wsproxy_status(
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(
-                ["project", "project_id", "project_name", "group", "group_id", "group_name"]
-            ): (tx.UUID | t.String),
-        }
-    ),
+    t.Dict({
+        tx.AliasedKey([
+            "project",
+            "project_id",
+            "project_name",
+            "group",
+            "group_id",
+            "group_name",
+        ]): tx.UUID | t.String,
+    }),
 )
 async def list_available_sgroups(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -72,16 +75,12 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(
-                ["project", "project_id", "project_name", "group", "group_id", "group_name"],
-                default=None,
-            ): (
-                t.Null | tx.UUID | t.String
-            ),
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(
+            ["project", "project_id", "project_name", "group", "group_id", "group_name"],
+            default=None,
+        ): (t.Null | tx.UUID | t.String),
+    })
 )
 async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -110,11 +109,9 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                             wsproxy_addr,
                         )
                         return ServerMisconfiguredError()
-                return web.json_response(
-                    {
-                        "wsproxy_version": wsproxy_version,
-                    }
-                )
+                return web.json_response({
+                    "wsproxy_version": wsproxy_version,
+                })
         else:
             raise ObjectNotFound(object_name="scaling group")
 

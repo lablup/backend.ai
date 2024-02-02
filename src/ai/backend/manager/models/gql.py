@@ -13,6 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
 from .etcd import (
     ContainerRegistry,
@@ -49,7 +50,7 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
-from .base import DataLoaderManager, privileged_query, scoped_query
+from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
 from .image import (
@@ -70,7 +71,16 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .project import CreateProject, DeleteProject, ModifyProject, Project, PurgeProject
+from .project import (
+    CreateProject,
+    DeleteProject,
+    ModifyProject,
+    Project,
+    ProjectConnection,
+    ProjectNode,
+    ProjectType,
+    PurgeProject,
+)
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
@@ -114,11 +124,15 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
+    UserConnection,
     UserList,
+    UserNode,
     UserRole,
     UserStatus,
 )
 from .vfolder import (
+    ModelCard,
+    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -251,7 +265,7 @@ class Queries(graphene.ObjectType):
     All available GraphQL queries.
     """
 
-    node = graphene.relay.Node.Field()
+    node = AsyncNode.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -310,6 +324,22 @@ class Queries(graphene.ObjectType):
         id=graphene.UUID(required=True),
         domain_name=graphene.String(),
     )
+    project_node = graphene.Field(
+        ProjectNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    project_nodes = PaginatedConnectionField(ProjectConnection, description="Added in 24.03.0.")
+
+    # legacy
+    group_node = graphene.Field(
+        ProjectNode,
+        id=graphene.String(required=True),
+        deprecation_reason="Deprecated since 24.03.0.",
+    )
+    # legacy
+    group_nodes = PaginatedConnectionField(
+        ProjectConnection, deprecation_reason="Deprecated since 24.03.0."
+    )
+
     # legacy
     group = graphene.Field(
         Project,
@@ -341,6 +371,13 @@ class Queries(graphene.ObjectType):
         Project,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=(
+                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
+        ),
     )
 
     image = graphene.Field(
@@ -389,6 +426,11 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
+
+    user_node = graphene.Field(
+        UserNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    user_nodes = PaginatedConnectionField(UserConnection, description="Added in 24.03.0.")
 
     keypair = graphene.Field(
         KeyPair,
@@ -687,6 +729,11 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    model_card = graphene.Field(
+        ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
@@ -838,6 +885,68 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    async def resolve_project_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ProjectNode.get_node(info, id)
+
+    # legacy
+    async def resolve_group_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ProjectNode.get_node(info, id)
+
+    async def resolve_project_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ProjectNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    # legacy
+    async def resolve_group_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ProjectNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     @staticmethod
     async def resolve_project(
         root: Any,
@@ -845,6 +954,7 @@ class Queries(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Project:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -879,8 +989,8 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Project.by_user",
             )
-            client_projects = await loader.load(client_user_id)
-            if project.id not in (g.id for g in client_projects):
+            client_projects = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            if project.id not in (p.id for p in client_projects):
                 raise InsufficientPrivilege
         else:
             raise InvalidAPIParameters("Unknown client role")
@@ -1032,6 +1142,7 @@ class Queries(graphene.ObjectType):
             raise InvalidAPIParameters("Unknown client role")
         return projects
 
+    # legacy
     @staticmethod
     async def resolve_projects(
         root: Any,
@@ -1039,6 +1150,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Project]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1059,7 +1171,12 @@ class Queries(graphene.ObjectType):
             return client_projects
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return await Project.load_all(info.context, domain_name=domain_name, is_active=is_active)
+        return await Project.load_all(
+            info.context,
+            domain_name=domain_name,
+            is_active=is_active,
+            type=[ProjectType[t] for t in type],
+        )
 
     # legacy
     @staticmethod
@@ -1069,6 +1186,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Project]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1089,7 +1207,12 @@ class Queries(graphene.ObjectType):
             return client_projects
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return await Project.load_all(info.context, domain_name=domain_name, is_active=is_active)
+        return await Project.load_all(
+            info.context,
+            domain_name=domain_name,
+            is_active=is_active,
+            type=[ProjectType[t] for t in type],
+        )
 
     @staticmethod
     async def resolve_image(
@@ -1264,6 +1387,36 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return UserList(user_list, total_count)
+
+    async def resolve_user_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await UserNode.get_node(info, id)
+
+    async def resolve_user_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await UserNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
@@ -2156,6 +2309,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
+
+    async def resolve_model_card(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelCard.get_node(info, id)
+
+    async def resolve_model_cards(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ModelCard.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
 
 class GQLMutationPrivilegeCheckMiddleware:

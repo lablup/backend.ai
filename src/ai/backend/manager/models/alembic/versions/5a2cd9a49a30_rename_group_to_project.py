@@ -1,10 +1,11 @@
 """rename_group_to_project
 
 Revision ID: 5a2cd9a49a30
-Revises: 8c74e7df26f8
+Revises: a5319bfc7d7c
 Create Date: 2023-10-06 13:58:25.940687
 
 """
+
 import enum
 import textwrap
 from uuid import UUID
@@ -19,7 +20,7 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType, vfolders
 
 # revision identifiers, used by Alembic.
 revision = "5a2cd9a49a30"
-down_revision = "8c74e7df26f8"
+down_revision = "a5319bfc7d7c"
 branch_labels = None
 depends_on = None
 
@@ -45,11 +46,17 @@ legacy_names = legacy_values - new_values
 
 
 def _delete_enum_value(connection, enum_name, val):
-    connection.execute(text(textwrap.dedent(f"""DELETE FROM pg_enum
+    connection.execute(
+        text(
+            textwrap.dedent(
+                f"""DELETE FROM pg_enum
                     WHERE enumlabel = '{val}'
                     AND enumtypid = (
                     SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-                );""")))
+                );"""
+            )
+        )
+    )
 
 
 def upgrade():

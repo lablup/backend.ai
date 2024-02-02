@@ -4,6 +4,7 @@ import asyncio
 import functools
 import grp
 import importlib
+import importlib.resources
 import logging
 import os
 import pwd
@@ -62,53 +63,56 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
+from .api.types import (
+    AppCreator,
+    CleanupContext,
+    WebMiddleware,
+    WebRequestHandler,
+)
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
 from .models import SessionRow
 from .types import DistributedLockFactory
 
-VALID_VERSIONS: Final = frozenset(
-    [
-        # 'v1.20160915',  # deprecated
-        # 'v2.20170315',  # deprecated
-        # 'v3.20170615',  # deprecated
-        # authentication changed not to use request bodies
-        "v4.20181215",
-        # added & enabled streaming-execute API
-        "v4.20190115",
-        # changed resource/image formats
-        "v4.20190315",
-        # added user mgmt and ID/password authentication
-        # added domain/group/scaling-group
-        # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
-        "v4.20190615",
-        # added mount_map parameter when creating kernel
-        # changed GraphQL query structures for multi-container bundled sessions
-        "v5.20191215",
-        # rewrote vfolder upload/download APIs to migrate to external storage proxies
-        "v6.20200815",
-        # added standard-compliant /admin/gql endpoint
-        # deprecated /admin/graphql endpoint (still present for backward compatibility)
-        # added "groups_by_name" GQL query
-        # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
-        # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
-        "v6.20210815",
-        # added session dependencies and state callback URLs configs when creating sessions
-        # added session event webhook option to session creation API
-        # added architecture option when making image aliases
-        "v6.20220315",
-        # added payload encryption / decryption on selected transfer
-        "v6.20220615",
-        # added config/resource-slots/details, model mgmt & serving APIs
-        "v6.20230315",
-        # added quota scopes (per-user/per-project quota configs)
-        # added user & project resource policies
-        # deprecated per-vfolder quota configs (BREAKING)
-        "v7.20230615",
-    ]
-)
+VALID_VERSIONS: Final = frozenset([
+    # 'v1.20160915',  # deprecated
+    # 'v2.20170315',  # deprecated
+    # 'v3.20170615',  # deprecated
+    # authentication changed not to use request bodies
+    "v4.20181215",
+    # added & enabled streaming-execute API
+    "v4.20190115",
+    # changed resource/image formats
+    "v4.20190315",
+    # added user mgmt and ID/password authentication
+    # added domain/group/scaling-group
+    # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
+    "v4.20190615",
+    # added mount_map parameter when creating kernel
+    # changed GraphQL query structures for multi-container bundled sessions
+    "v5.20191215",
+    # rewrote vfolder upload/download APIs to migrate to external storage proxies
+    "v6.20200815",
+    # added standard-compliant /admin/gql endpoint
+    # deprecated /admin/graphql endpoint (still present for backward compatibility)
+    # added "groups_by_name" GQL query
+    # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
+    # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
+    "v6.20210815",
+    # added session dependencies and state callback URLs configs when creating sessions
+    # added session event webhook option to session creation API
+    # added architecture option when making image aliases
+    "v6.20220315",
+    # added payload encryption / decryption on selected transfer
+    "v6.20220615",
+    # added config/resource-slots/details, model mgmt & serving APIs
+    "v6.20230315",
+    # added quota scopes (per-user/per-project quota configs)
+    # added user & project resource policies
+    # deprecated per-vfolder quota configs (BREAKING)
+    "v7.20230615",
+])
 LATEST_REV_DATES: Final = {
     1: "20160915",
     2: "20170915",
@@ -152,6 +156,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".ratelimit",
     ".vfolder",
     ".admin",
+    ".spec",
     ".service",
     ".session",
     ".stream",
@@ -174,12 +179,10 @@ async def hello(request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
-    return web.json_response(
-        {
-            "version": LATEST_API_VERSION,
-            "manager": __version__,
-        }
-    )
+    return web.json_response({
+        "version": LATEST_API_VERSION,
+        "manager": __version__,
+    })
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -298,6 +301,7 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     await plugin_ctx.init(
+        context=root_ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
@@ -436,6 +440,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
+        context=root_ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
@@ -682,6 +687,7 @@ def _init_subapp(
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
+        subapp["_root_app"] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
@@ -827,6 +833,10 @@ def build_root_app(
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+
+    vendor_path = importlib.resources.files("ai.backend.manager.vendor")
+    assert isinstance(vendor_path, Path)
+    app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 
 
@@ -891,9 +901,9 @@ async def server_main(
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
                 gid = root_ctx.local_config["manager"]["group"]
-                os.setgroups(
-                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem]
-                )
+                os.setgroups([
+                    g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+                ])
                 os.setgid(gid)
                 os.setuid(uid)
                 log.info("changed process uid and gid to {}:{}", uid, gid)

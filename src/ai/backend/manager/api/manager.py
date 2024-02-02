@@ -134,13 +134,11 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
                     "api_version": request["api_version"],
                 },
             ]
-            return web.json_response(
-                {
-                    "nodes": nodes,
-                    "status": status.value,  # legacy?
-                    "active_sessions": active_sessions_num,  # legacy?
-                }
-            )
+            return web.json_response({
+                "nodes": nodes,
+                "status": status.value,  # legacy?
+                "active_sessions": active_sessions_num,  # legacy?
+            })
     except Exception:
         log.exception("GET_MANAGER_STATUS: exception")
         raise
@@ -148,12 +146,10 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("status"): tx.Enum(ManagerStatus),
-            t.Key("force_kill", default=False): t.ToBool,
-        }
-    )
+    t.Dict({
+        t.Key("status"): tx.Enum(ManagerStatus),
+        t.Key("force_kill", default=False): t.ToBool,
+    })
 )
 async def update_manager_status(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -189,12 +185,10 @@ async def get_announcement(request: web.Request) -> web.Response:
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("enabled", default="false"): t.ToBool,
-            t.Key("message", default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("enabled", default="false"): t.ToBool,
+        t.Key("message", default=None): t.Null | t.String,
+    })
 )
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -215,12 +209,10 @@ iv_scheduler_ops_args = {
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("op"): tx.Enum(SchedulerOps),
-            t.Key("args"): t.Any,
-        }
-    )
+    t.Dict({
+        t.Key("op"): tx.Enum(SchedulerOps),
+        t.Key("args"): t.Any,
+    })
 )
 async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -248,11 +240,9 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
 
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("event"): tx.Enum(SchedulerEvent),
-        }
-    )
+    t.Dict({
+        t.Key("event"): tx.Enum(SchedulerEvent),
+    })
 )
 async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]

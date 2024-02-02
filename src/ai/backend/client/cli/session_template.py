@@ -205,7 +205,6 @@ def update(template_id, template_path, owner_access_key):
 @click.option(
     "-f",
     "--force",
-    type=bool,
     is_flag=True,
     help="If specified, delete task template without asking.",
 )

@@ -1,6 +1,7 @@
 """
 Manager-facing API
 """
+
 from __future__ import annotations
 
 import json
@@ -77,7 +78,7 @@ async def token_auth_middleware(
 
 
 def skip_token_auth(
-    handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     setattr(handler, "skip_token_auth", True)
     return handler
@@ -106,10 +107,17 @@ def handle_fs_errors(
     except OSError as e:
         related_paths = []
         msg = str(e) if e.strerror is None else e.strerror
+
+        def _append_fpath(fname: Any) -> None:
+            try:
+                related_paths.append(str(volume.strip_vfpath(vfid, Path(fname))))
+            except (ValueError, OSError):
+                related_paths.append(fname)
+
         if e.filename:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename))))
+            _append_fpath(e.filename)
         if e.filename2:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename2))))
+            _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
             body=json.dumps(
                 {
@@ -128,11 +136,9 @@ def handle_external_errors() -> Iterator[None]:
         yield
     except ExternalError as e:
         raise web.HTTPInternalServerError(
-            body=json.dumps(
-                {
-                    "msg": str(e),
-                }
-            ),
+            body=json.dumps({
+                "msg": str(e),
+            }),
             content_type="application/json",
         )
 
@@ -245,14 +251,10 @@ async def get_quota_scope(request: web.Request) -> web.Response:
                 quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
-            return web.json_response(
-                {
-                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                    "limit_bytes": (
-                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
-                    ),
-                }
-            )
+            return web.json_response({
+                "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+            })
 
 
 async def update_quota_scope(request: web.Request) -> web.Response:
