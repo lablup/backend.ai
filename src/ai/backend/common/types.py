@@ -1191,7 +1191,7 @@ class RoundRobinState(JSONSerializableMixin):
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
-SSLContextType: TypeAlias = Literal[False] | Fingerprint | SSLContext | None
+SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):
