@@ -2,9 +2,9 @@ python_sources(
     name="src",
     sources=[
         "*.py",
-# FIXME: remove watcher.py from agent artifact after we settle down
-# binary-based agent watcher deployments
-#        "!watcher.py",
+        # FIXME: remove watcher.py from agent artifact after we settle down
+        # binary-based agent watcher deployments
+        # "!watcher.py",
     ],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
