@@ -355,16 +355,14 @@ class CUDAPlugin(AbstractComputePlugin):
             if device.device_id in device_ids:
                 proc = device.processing_units
                 mem = BinarySize(device.memory_size)
-                attached_devices.append(
-                    {  # TODO: update common.types.DeviceModelInfo
-                        "device_id": device.device_id,
-                        "model_name": device.model_name,
-                        "data": {
-                            "smp": proc,
-                            "mem": mem,
-                        },
-                    }
-                )
+                attached_devices.append({  # TODO: update common.types.DeviceModelInfo
+                    "device_id": device.device_id,
+                    "model_name": device.model_name,
+                    "data": {
+                        "smp": proc,
+                        "mem": mem,
+                    },
+                })
         return attached_devices
 
     async def restore_from_container(
@@ -378,17 +376,15 @@ class CUDAPlugin(AbstractComputePlugin):
         if resource_spec is None:
             return
         if hasattr(alloc_map, "apply_allocation"):
-            alloc_map.apply_allocation(
-                {
-                    SlotName("cuda.device"): resource_spec.allocations.get(
-                        DeviceName("cuda"),
-                        {},
-                    ).get(
-                        SlotName("cuda.device"),
-                        {},
-                    ),
-                }
-            )
+            alloc_map.apply_allocation({
+                SlotName("cuda.device"): resource_spec.allocations.get(
+                    DeviceName("cuda"),
+                    {},
+                ).get(
+                    SlotName("cuda.device"),
+                    {},
+                ),
+            })
         else:
             alloc_map.allocations[SlotName("cuda.device")].update(
                 resource_spec.allocations.get(
