@@ -118,13 +118,11 @@ class AsyncEtcd:
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:
-        self.scope_prefix_map = t.Dict(
-            {
-                t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
-                t.Key(ConfigScopes.SGROUP, optional=True): t.String,
-                t.Key(ConfigScopes.NODE, optional=True): t.String,
-            }
-        ).check(scope_prefix_map)
+        self.scope_prefix_map = t.Dict({
+            t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
+            t.Key(ConfigScopes.SGROUP, optional=True): t.String,
+            t.Key(ConfigScopes.NODE, optional=True): t.String,
+        }).check(scope_prefix_map)
         if credentials is not None:
             self._creds = EtcdCredential(credentials["user"], credentials["password"])
         else:
@@ -496,7 +494,7 @@ class AsyncEtcd:
                 ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch(): error while connecting to Etcd server, retrying...")
+                    log.warning("watch(): error while connecting to Etcd server, retrying...")
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
@@ -534,7 +532,9 @@ class AsyncEtcd:
                 ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch_prefix(): error while connecting to Etcd server, retrying...")
+                    log.warning(
+                        "watch_prefix(): error while connecting to Etcd server, retrying..."
+                    )
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:

@@ -17,7 +17,9 @@ from ..models import (
     KeyPairRow,
     SessionDependencyRow,
     SessionRow,
+    UserRow,
 )
+from ..models.session import SessionStatus
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
@@ -119,6 +121,7 @@ async def check_dependencies(
         sa.select(
             SessionRow.id,
             SessionRow.name,
+            SessionRow.status,
             SessionRow.result,
         )
         .select_from(j)
@@ -128,7 +131,7 @@ async def check_dependencies(
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row.result != SessionResult.SUCCESS:
+        if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
@@ -173,6 +176,52 @@ async def check_keypair_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_keypair_allowed.to_humanized(
+                        sched_ctx.known_slot_types
+                    ).items()
+                )
+            ),
+        )
+    return PredicateResult(True)
+
+
+async def check_user_resource_limit(
+    db_sess: SASession,
+    sched_ctx: SchedulingContext,
+    sess_ctx: SessionRow,
+) -> PredicateResult:
+    main_ak = (
+        sa.select(UserRow.main_access_key)
+        .where(UserRow.uuid == sess_ctx.user_uuid)
+        .scalar_subquery()
+    )
+    resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(KeyPairRow.access_key == main_ak)
+    select_query = sa.select(KeyPairResourcePolicyRow).where(
+        KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
+    )
+    resource_policy: KeyPairResourcePolicyRow | None = (await db_sess.scalars(select_query)).first()
+    if resource_policy is None:
+        return PredicateResult(
+            False,
+            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.user_uuid})",
+        )
+
+    resource_policy_map = {
+        "total_resource_slots": resource_policy.total_resource_slots,
+        "default_for_unspecified": resource_policy.default_for_unspecified,
+    }
+    total_main_keypair_allowed = ResourceSlot.from_policy(
+        resource_policy_map, sched_ctx.known_slot_types
+    )
+    user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.user_uuid, db_sess=db_sess)
+    log.debug("user:{} current-occupancy: {}", sess_ctx.user_uuid, user_occupied)
+    log.debug("user:{} total-allowed: {}", sess_ctx.user_uuid, total_main_keypair_allowed)
+    if not (user_occupied + sess_ctx.requested_slots <= total_main_keypair_allowed):
+        return PredicateResult(
+            False,
+            "Your main-keypair resource quota is exceeded. ({})".format(
+                " ".join(
+                    f"{k}={v}"
+                    for k, v in total_main_keypair_allowed.to_humanized(
                         sched_ctx.known_slot_types
                     ).items()
                 )

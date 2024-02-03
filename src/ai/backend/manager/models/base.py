@@ -54,7 +54,6 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
-    BinarySize,
     EndpointId,
     JSONSerializableMixin,
     KernelId,
@@ -243,17 +242,14 @@ class ResourceSlotColumn(TypeDecorator):
             return value.to_json()
         return value
 
-    def process_result_value(
-        self, raw_value: dict[str, str] | None, dialect
-    ) -> ResourceSlot | None:
-        if raw_value is None:
+    def process_result_value(self, value: dict[str, str] | None, dialect) -> ResourceSlot | None:
+        if value is None:
             return None
-        # legacy handling
-        interim_value: Dict[str, Any] = raw_value
-        mem = raw_value.get("mem")
-        if isinstance(mem, str) and not mem.isdigit():
-            interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value)
+        try:
+            return ResourceSlot.from_json(value)
+        except ArithmeticError:
+            # for legacy-compat scenario
+            return ResourceSlot.from_user_input(value, None)
 
     def copy(self):
         return ResourceSlotColumn()
@@ -446,9 +442,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()
-        return VFolderHostPermissionMap(
-            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
-        )
+        return VFolderHostPermissionMap({
+            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+        })
 
 
 class CurrencyTypes(enum.Enum):
