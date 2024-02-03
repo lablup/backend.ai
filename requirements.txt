@@ -93,4 +93,4 @@ types-redis
 types-tabulate
 
 backend.ai-krunner-alpine==5.1.0
-backend.ai-krunner-static-gnu==4.1.0
+backend.ai-krunner-static-gnu==4.1.1
