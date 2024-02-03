@@ -108,7 +108,7 @@ class CUDAPlugin(AbstractComputePlugin):
     async def init(self, context: Any = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
-        # Basic docker version & nvidia contaienr runtime check
+        # Basic docker version & nvidia container runtime check
         try:
             async with closing_async(aiodocker.Docker()) as docker:
                 docker_info = await docker.system.info()
