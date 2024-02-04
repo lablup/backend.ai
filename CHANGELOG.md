@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.9rc1 (2024-02-04)
+
+### Breaking Changes
+* Drop the support for nvidia-docker v1 from the open source CUDA plugin ([#1755](https://github.com/lablup/backend.ai/issues/1755))
+
+### Fixes
+* Update the open source version of the CUDA plugin to work with latest NVIDIA container runtimes ([#1755](https://github.com/lablup/backend.ai/issues/1755))
+* Add `id` column and restore incorrectly dropped unique constraints to DB association tables. ([#1818](https://github.com/lablup/backend.ai/issues/1818))
+* Fix mistakes on SQL queries in the manager's vfolder share API handler when checking target user's status and inconsistent where clauses in the vfolder ownership change API ([#1850](https://github.com/lablup/backend.ai/issues/1850))
+* Fix image rescan not working when scanning Harbor v1 registry ([#1854](https://github.com/lablup/backend.ai/issues/1854))
+* Improve the resource slot validation logic during session creation and related error messages to display explicit slot names and values with an extra guide on the "shmem" mistake ([#1871](https://github.com/lablup/backend.ai/issues/1871))
+* Enqueue session with `use_host_network` field along the scaling_group to which the session belongs. ([#1873](https://github.com/lablup/backend.ai/issues/1873))
+* Fix session not created with CentOS 7 based images ([#1878](https://github.com/lablup/backend.ai/issues/1878))
+* Bring `watcher.py` back to Backend.AI Agent wheel ([#1880](https://github.com/lablup/backend.ai/issues/1880))
+
+### Miscellaneous
+* Replace all usage of `log.warn()` to  `log.warning()` since [it is now deprecated](https://github.com/python/cpython/blob/bf9cccb2b54ad2c641ea78435a8618a6d251491e/Lib/logging/__init__.py#L1252-L1253) ([#1792](https://github.com/lablup/backend.ai/issues/1792))
+
+
 ## 23.09.8 (2024-01-21)
 
 ### Features
