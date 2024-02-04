@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -982,65 +982,28 @@ async def initiate_vfolder_purge(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
-    storage_ptask_group: aiotools.PersistentTaskGroup,
-) -> int:
+    background_task_manager: BackgroundTaskManager,
+) -> uuid.UUID | None:
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
-        return 0
+        return None
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
         db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
     )
 
-    row_deletion_infos: list[VFolderDeletionInfo] = []
-    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+    async def _purge_task(reporter: ProgressReporter) -> None:
+        await purge_vfolders(
+            requested_vfolders, db=db_engine, storage_manager=storage_manager, reporter=reporter
+        )
 
-    async def _delete():
-        for vfolder_info in requested_vfolders:
-            folder_id, host_name = vfolder_info
-            proxy_name, volume_name = storage_manager.split_host(host_name)
-            try:
-                async with storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": volume_name,
-                        "vfid": str(folder_id),
-                    },
-                ) as (_, resp):
-                    pass
-            except (VFolderOperationFailed, InvalidAPIParameters) as e:
-                if e.status == 404:
-                    row_deletion_infos.append(vfolder_info)
-                else:
-                    failed_deletion.append((vfolder_info, repr(e)))
-            except Exception as e:
-                failed_deletion.append((vfolder_info, repr(e)))
-            else:
-                row_deletion_infos.append(vfolder_info)
-        if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
-
-            async def _delete_row() -> None:
-                async with db_engine.begin_session() as db_session:
-                    await db_session.execute(
-                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
-                    )
-
-            await execute_with_retry(_delete_row)
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
-        if failed_deletion:
-            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
-            raise VFolderOperationFailed(extra_data=extra_data)
-
-    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
+    task_id = await background_task_manager.start(_purge_task)
     log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
 
-    return vfolder_info_len
+    return task_id
 
 
 async def ensure_quota_scope_accessible_by_user(
@@ -1535,6 +1498,215 @@ class VirtualFolderList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolder, required=True)
+
+
+class VFolderNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    host = graphene.String()
+    quota_scope_id = graphene.String()
+    name = graphene.String()
+    user = graphene.UUID()  # User.id (current owner, null in project vfolders)
+    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
+    group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
+    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
+    creator = graphene.String()  # User.email (always set)
+    unmanaged_path = graphene.String()
+    usage_mode = graphene.String()
+    permission = graphene.String()
+    ownership_type = graphene.String()
+    max_files = graphene.Int()
+    max_size = BigInt()  # in MiB
+    created_at = GQLDateTime()
+    last_used = GQLDateTime()
+
+    num_files = graphene.Int()
+    cur_size = BigInt()
+    cloneable = graphene.Boolean()
+    status = graphene.String()
+
+    @classmethod
+    async def from_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> VFolderNode:
+        return cls(
+            id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user,
+            user_email=row.users_email,
+            group=row.group,
+            group_name=row.groups_name,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,  # in MiB
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VFolderNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_row = (await db_session.scalars(query)).first()
+        if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+            raise ValueError(
+                f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+            )
+        return await cls.from_row(info, vfolder_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            VFolderRow,
+            VFolderRow.id,
+            filter_expr,
+            order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
+        for cond in [*conditions, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)]:
+            cnt_query = cnt_query.where(cond)
+            query = query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class VFolderConnection(Connection):
+    class Meta:
+        node = VFolderNode
+
+
+async def purge_vfolders(
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    *,
+    storage_manager: StorageSessionManager,
+    db: ExtendedAsyncSAEngine,
+    reporter: ProgressReporter,
+) -> None:
+    async def _task(reporter: ProgressReporter):
+        row_deletion_infos: list[VFolderDeletionInfo] = []
+        failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
+            proxy_name, volume_name = storage_manager.split_host(host_name)
+            try:
+                async with storage_manager.request(
+                    proxy_name,
+                    "POST",
+                    "folder/delete",
+                    json={
+                        "volume": volume_name,
+                        "vfid": str(folder_id),
+                    },
+                ) as (_, resp):
+                    pass
+            except (VFolderOperationFailed, InvalidAPIParameters) as e:
+                if e.status == 404:
+                    row_deletion_infos.append(vfolder_info)
+                    progress_msg = f"VFolder not found, delete DB record (id: {folder_id})"
+                else:
+                    err_str = repr(e)
+                    failed_deletion.append((vfolder_info, err_str))
+                    progress_msg = f"Purge fail due to error, (id: {folder_id}, status: {e.status}, e: {err_str})"
+            except Exception as e:
+                err_str = repr(e)
+                failed_deletion.append((vfolder_info, err_str))
+                progress_msg = f"Purge fail due to error, (id: {folder_id}, e: {err_str})"
+            else:
+                row_deletion_infos.append(vfolder_info)
+                progress_msg = f"Purge successs (id: {folder_id})"
+            await reporter.update(1, message=progress_msg)
+        if row_deletion_infos:
+            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+
+            async def _delete_row() -> None:
+                async with db.begin_session() as db_session:
+                    await db_session.execute(
+                        sa.delete(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+                    )
+
+            await execute_with_retry(_delete_row)
+            log.debug("Successfully remove vfolder {}", [str(x) for x in vfolder_ids])
+
+    async with aiotools.TaskGroup() as tg:
+        tg.create_task(_task(reporter))
+
+
+class PurgeVFolder(graphene.Mutation):
+    class Arguments:
+        vfolder_id = graphene.UUID(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    task_id = graphene.UUID()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root: Any,
+        info: graphene.ResolveInfo,
+        vfolder_ids: uuid.UUID,
+    ) -> PurgeVFolder:
+        graph_ctx: GraphQueryContext = info.context
+
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            stmt = (
+                sa.select(VFolderRow)
+                .where(VFolderRow.id.in_(vfolder_ids))
+                .options(load_only(VFolderRow.id, VFolderRow.host))
+            )
+            vfolder_rows = (await db_session.scalars(stmt)).all()
+            vfolder_infos = [
+                VFolderDeletionInfo(VFolderID.from_row(row), row.host) for row in vfolder_rows
+            ]
+
+        async def _purge_task(reporter: ProgressReporter) -> None:
+            await purge_vfolders(
+                vfolder_infos,
+                db=graph_ctx.db,
+                storage_manager=graph_ctx.storage_manager,
+                reporter=reporter,
+            )
+
+        task_id = await graph_ctx.background_task_manager.start(_purge_task)
+        return PurgeVFolder(ok=True, msg="", task_id=task_id)
 
 
 class VirtualFolderPermission(graphene.ObjectType):

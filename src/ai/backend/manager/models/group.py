@@ -17,7 +17,6 @@ from typing import (
     overload,
 )
 
-import aiotools
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -59,6 +58,8 @@ from .user import ModifyUserInput, UserConnection, UserNode, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
+    from ai.backend.common.bgtask import BackgroundTaskManager
+
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
 
@@ -631,7 +632,9 @@ class PurgeGroup(graphene.Mutation):
                 raise RuntimeError(
                     "Group has some active session. Terminate them first to proceed removal.",
                 )
-            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(
+                graph_ctx.db, gid, graph_ctx.storage_manager, graph_ctx.background_task_manager
+            )
             await cls.delete_kernels(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
@@ -643,6 +646,7 @@ class PurgeGroup(graphene.Mutation):
         engine: ExtendedAsyncSAEngine,
         group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
+        background_task_manager: BackgroundTaskManager,
     ) -> int:
         """
         Delete group's all virtual folders as well as their physical data.
@@ -665,13 +669,12 @@ class PurgeGroup(graphene.Mutation):
             delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
             result = await db_conn.execute(delete_query)
 
-        storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_purge(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
-                storage_ptask_group,
+                background_task_manager,
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)

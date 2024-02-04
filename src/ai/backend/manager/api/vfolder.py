@@ -2292,7 +2292,6 @@ async def purge(request: web.Request) -> web.Response:
         request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["folders.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
@@ -2337,13 +2336,13 @@ async def purge(request: web.Request) -> web.Response:
     folder_host = entry["host"]
     # fs-level deletion may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
-    await initiate_vfolder_purge(
+    task_id = await initiate_vfolder_purge(
         root_ctx.db,
         [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
-        app_ctx.storage_ptask_group,
+        root_ctx.background_task_manager,
     )
-    return web.Response(status=204)
+    return web.json_response({"task_id": task_id}, status=200)
 
 
 @auth_required
