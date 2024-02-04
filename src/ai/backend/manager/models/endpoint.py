@@ -676,7 +676,6 @@ class ModifyEndpoint(graphene.Mutation):
         props: ModifyEndpointInput,
     ) -> "ModifyEndpoint":
         graph_ctx: GraphQueryContext = info.context
-        # raise ValueError(f"{type(graph_ctx.user) = }, {graph_ctx.user = }")
         data: dict[str, Any] = {}
         set_if_set(
             props,
