@@ -1120,10 +1120,16 @@ async def populate_fixture(
                     # Extract the data column names from the FIRST row
                     # (Therefore a fixture dataset for a single table in the udpate mode should
                     # have consistent set of attributes!)
-                    datacols: list[sa.Column] = [
-                        getattr(table.columns, name)
-                        for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
-                    ]
+                    try:
+                        datacols: list[sa.Column] = [
+                            getattr(table.columns, name)
+                            for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
+                        ]
+                    except AttributeError as e:
+                        raise ValueError(
+                            f"fixture for table {table_name!r} has an invalid column name: "
+                            f"{e.args[0]!r}"
+                        )
                     stmt = stmt.values({
                         datacol.name: sa.bindparam(datacol.name) for datacol in datacols
                     })
@@ -1135,7 +1141,7 @@ async def populate_fixture(
                             except KeyError:
                                 raise ValueError(
                                     f"fixture for table {table_name!r} has a missing primary key column for update"
-                                    f"query: {pkcol.name}"
+                                    f"query: {pkcol.name!r}"
                                 )
                         for datacol in datacols:
                             try:
@@ -1143,7 +1149,7 @@ async def populate_fixture(
                             except KeyError:
                                 raise ValueError(
                                     f"fixture for table {table_name!r} has a missing data column for update"
-                                    f"query: {datacol.name}"
+                                    f"query: {datacol.name!r}"
                                 )
                         update_data.append(update_row)
                     await conn.execute(stmt, update_data)

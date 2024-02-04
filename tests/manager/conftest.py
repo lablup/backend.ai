@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -81,6 +82,8 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 here = Path(__file__).parent
+
+log = logging.getLogger("tests.manager.conftest")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -440,7 +443,11 @@ def database_fixture(local_config, test_db, database):
             for fixture_path in fixture_paths:
                 with open(fixture_path, "rb") as f:
                     data = json.load(f)
-                await populate_fixture(engine, data)
+                try:
+                    await populate_fixture(engine, data)
+                except ValueError:
+                    log.error("Failed to populate fixtures from %s", fixture_path)
+                    raise
         finally:
             await engine.dispose()
 
