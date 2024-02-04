@@ -693,19 +693,32 @@ class ModifyEndpoint(graphene.Mutation):
         image = data.pop("image", None)
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            if graph_ctx.user["role"] not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-                user_id = graph_ctx.user["uuid"]
-                stmt = (
-                    sa.select(EndpointRow)
-                    .where(EndpointRow.id == endpoint_id)
-                    .where(
-                        (EndpointRow.session_owner == user_id)
-                        | (EndpointRow.created_user == user_id)
+            match graph_ctx.user["role"]:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    domain_name = graph_ctx.user["domain_name"]
+                    stmt = (
+                        sa.select(EndpointRow)
+                        .where(EndpointRow.id == endpoint_id)
+                        .where(EndpointRow.domain == domain_name)
                     )
-                )
-                endpoint_row = (await db_session.scalars(stmt)).first()
-                if endpoint_row is None:
-                    raise EndpointNotFound
+                    endpoint_row = (await db_session.scalars(stmt)).first()
+                    if endpoint_row is None:
+                        raise EndpointNotFound
+                case _:
+                    user_id = graph_ctx.user["uuid"]
+                    stmt = (
+                        sa.select(EndpointRow)
+                        .where(EndpointRow.id == endpoint_id)
+                        .where(
+                            (EndpointRow.session_owner == user_id)
+                            | (EndpointRow.created_user == user_id)
+                        )
+                    )
+                    endpoint_row = (await db_session.scalars(stmt)).first()
+                    if endpoint_row is None:
+                        raise EndpointNotFound
 
             if image is not None:
                 image_name = image["name"]
