@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -65,7 +66,10 @@ from ai.backend.manager.models import (
     users,
     vfolders,
 )
-from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
+from ai.backend.manager.models.base import (
+    pgsql_connect_opts,
+    populate_fixture,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -78,6 +82,8 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 here = Path(__file__).parent
+
+log = logging.getLogger("tests.manager.conftest")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -420,19 +426,13 @@ def database_fixture(local_config, test_db, database):
     db_pass = local_config["db"]["password"]
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
-    fixtures = {}
-    # NOTE: The fixtures must be loaded in the order that they are present.
-    #       Normal dicts on Python 3.6 or later guarantees the update ordering.
-    fixtures.update(
-        json.loads(
-            (Path(__file__).parent / "fixtures" / "example-keypairs.json").read_text(),
-        )
-    )
-    fixtures.update(
-        json.loads(
-            (Path(__file__).parent / "fixtures" / "example-resource-presets.json").read_text(),
-        )
-    )
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+    fixture_paths = [
+        build_root / "fixtures" / "manager" / "example-users.json",
+        build_root / "fixtures" / "manager" / "example-keypairs.json",
+        build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
+        build_root / "fixtures" / "manager" / "example-resource-presets.json",
+    ]
 
     async def init_fixture():
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
@@ -440,7 +440,14 @@ def database_fixture(local_config, test_db, database):
             connect_args=pgsql_connect_opts,
         )
         try:
-            await populate_fixture(engine, fixtures)
+            for fixture_path in fixture_paths:
+                with open(fixture_path, "rb") as f:
+                    data = json.load(f)
+                try:
+                    await populate_fixture(engine, data)
+                except ValueError:
+                    log.error("Failed to populate fixtures from %s", fixture_path)
+                    raise
         finally:
             await engine.dispose()
 
