@@ -45,7 +45,7 @@ def populate(cli_ctx: CLIContext, fixture_path, override) -> None:
             f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
         )
         try:
-            await populate_fixture(engine, fixture, override)
+            await populate_fixture(engine, fixture)
         except Exception:
             log.exception("Failed to populate fixtures due to the following error:")
         else:

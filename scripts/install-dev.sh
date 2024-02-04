@@ -957,7 +957,7 @@ configure_backendai() {
   ./backend.ai mgr schema oneshot
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-  ./backend.ai mgr fixture populate  --override fixtures/manager/example-set-user-main-access-keys.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
 
   # Docker registry setup
