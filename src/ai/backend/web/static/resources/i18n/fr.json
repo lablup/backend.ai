@@ -60,7 +60,8 @@
       "Tasks": "Tâches",
       "YouMushChangeYourPassword": "Il est recommandé de modifier périodiquement votre mot de passe pour des raisons de sécurité. Étant donné qu'un certain temps s'est écoulé depuis la dernière modification de votre mot de passe, vous devez le modifier pour pouvoir continuer à utiliser le service.",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
-      "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe"
+      "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Télécharger l'application Backend.AI Web UI",
     "IPUEnabled": "IPU NPU Activé",
     "ATOMEnabled": "ATOM NPU Activé",
-    "WarboyEnabled": "Warboy NPU activé"
+    "WarboyEnabled": "Warboy NPU activé",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Pré-ouverture des ports à définir (optionnel)",
       "PreOpenPortRange": "Les ports préouverts sont uniquement disponibles entre 1024 et 65535.",
       "MinMemory": "La capacité de mémoire minimale pour l'environnement d'exécution actuellement sélectionné est de {{taille}}iB.",
-      "ModelStorage": "Stockage de modèles"
+      "ModelStorage": "Stockage de modèles",
+      "PreOpenPortRangeGuide": "Entrez plusieurs valeurs séparées par une virgule (,) ou un espace.",
+      "preopen": "préouverture",
+      "Network": "Réseau",
+      "Enable": "Activer",
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
+      "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
+      "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
+      "NumberOfContainer": "Nombre de conteneurs",
+      "EnterEnvironmentVariable": "Saisir le nom de la variable",
+      "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
+      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -296,7 +316,9 @@
       "SessionNameRequired": "Le nom de la session est obligatoire",
       "EnterValidSessionName": "Saisir un nom de session valide",
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
-      "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)"
+      "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
+      "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -341,7 +363,12 @@
     "ConnectionNotice": "Avis",
     "Readless": "Lire moins",
     "Readmore": "Lire la suite...",
-    "SessionType": "Type de session"
+    "SessionType": "Type de session",
+    "ExpiresAfter": "Temps restant",
+    "CPU": "UNITÉ CENTRALE",
+    "MEM": "Mémoire",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (mémoire)"
   },
   "button": {
     "Cancel": "Annuler",
@@ -362,7 +389,6 @@
     "DeleteAll": "Tout supprimer",
     "Update": "Mettre à jour",
     "Delete": "Effacer",
-    "Dismiss": "Rejeter",
     "DismissAndProceed": "Ignorer et continuer",
     "Close": "Fermer",
     "Confirm": "Confirmer",
@@ -415,7 +441,9 @@
     "Control": "Contrôler",
     "NewPassword": "nouveau mot de passe",
     "Enabled": "Activée",
-    "StorageProxies": "Stockages"
+    "StorageProxies": "Stockages",
+    "None": "Aucun",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -492,7 +520,8 @@
     "AdminCanOnlyRemoveTotp": "Seule la désactivation du 2FA des autres utilisateurs est possible.",
     "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
     "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
-    "ModifyUserDetail": "Modifier les détails de l'utilisateur"
+    "ModifyUserDetail": "Modifier les détails de l'utilisateur",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Dossiers",
@@ -657,7 +686,8 @@
     "HostDetails": "Affiche les informations sur les quotas pour l'hôte de stockage sélectionné.",
     "Used": "Utilisé",
     "Pipeline": "Dossiers du pipeline",
-    "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack."
+    "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack.",
+    "SearchByName": "Rechercher par nom"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "RAM (Go)",
     "SharedMemory": "Mémoire partagée (Go)",
     "Deleted": "Le préréglage des ressources a été supprimé avec succès.",
-    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher"
+    "NoResourcePresetToDisplay": "Pas de préréglages de ressources à afficher",
+    "SHMEMShouldBeSmallerThanMemory": "La mémoire partagée doit être plus petite que la mémoire"
   },
   "usersettings": {
     "General": "Général",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Veuillez sélectionner une option.",
     "RegistrySuccessfullyModified": "Registre modifié avec succès.",
     "ModifyRegistry": "Modifier le registre",
-    "NoRegistryToDisplay": "Aucun registre à afficher"
+    "NoRegistryToDisplay": "Aucun registre à afficher",
+    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -991,14 +1023,27 @@
     "UsageHistoryNote": "L'historique d'utilisation présenté ici est basé sur les sessions de calcul terminées. En outre, l'historique d'utilisation d'une semaine peut ne pas être affiché pour les utilisateurs dont le compte n'est pas créé plus d'une semaine."
   },
   "language": {
-    "English": "Anglais",
-    "Korean": "coréen",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Langue",
     "OSDefault": "Système d'exploitation par défaut",
-    "Russian": "Russe",
+    "Russian": "русский",
     "French": "Français",
-    "Mongolian": "Mongol",
-    "Indonesian": "Indonésien"
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Erreur de mise à jour",
     "APIEndpointIsEmpty": "Le point de terminaison de l'API est vide. Veuillez spécifier le point de terminaison de l'API Backend.AI pour vous inscrire.",
-    "LoginSucceededManagerNotResponding": "La connexion a réussi mais le gestionnaire ne répond pas."
+    "LoginSucceededManagerNotResponding": "La connexion a réussi mais le gestionnaire ne répond pas.",
+    "NetworkConnectionFailed": "La connexion réseau a échoué. Vérifier l'état du réseau.",
+    "LoginFailed": "La connexion a échoué. Vérifier les informations de connexion.",
+    "AuthenticationFailed": "L'authentification a échoué. Vérifier les informations et le statut du gestionnaire.",
+    "VirtualFolderAlreadyExist": "Un dossier virtuel portant le même nom existe déjà. Supprimez votre propre dossier ou déclinez l'invitation.",
+    "TooManyLoginFailures": "Il y a eu trop d'échecs de connexion en peu de temps. La connexion est bloquée pendant un certain temps.",
+    "MaximumVfolderCreation": "Vous ne pouvez pas créer d'autres dossiers virtuels en raison de la politique de ressources.",
+    "CannotChangeVirtualFolderOption": "Vous ne pouvez pas modifier les options d'un dossier v qui ne m'appartient pas.",
+    "CannotSharePrivateAutomountFolder": "Impossible de partager les dossiers virtuels d'automount conformément à la politique.",
+    "FolderSharingNotAvailableToUser": "Le partage de dossiers n'est pas disponible pour le(s) utilisateur(s) demandé(s).",
+    "ReachedResourceLimit": "Vous avez atteint votre limite de ressources. Vérifiez les ressources et les sessions.",
+    "UserHasNoGroup": "L'utilisateur n'a pas de groupe. Veuillez contacter l'administrateur pour résoudre ce problème.",
+    "InvalidSignupToken": "Jeton d'inscription invalide",
+    "LoginInformationMismatch": "Les informations de connexion ne correspondent pas. Vérifiez vos informations",
+    "ResourcePolicyAlreadyExist": "Une politique de ressources portant le même nom existe déjà.",
+    "ScalingGroupAlreadyExist": "Un groupe de ressources portant le même nom existe déjà.",
+    "UserNameAlreadyExist": "Le nom d'utilisateur existe déjà. Il ne peut pas être dupliqué.",
+    "ResourceLimitExceed": "Limite de ressources dépassée. Vérifiez vos ressources libres.",
+    "ResourcePolicyStillReferenced": "Il existe des paires de clés qui font référence à cette politique de ressources.",
+    "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
+    "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
+    "WrongAPIServerAddress": "Mauvaise adresse du serveur API."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
@@ -1363,7 +1429,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 64 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image"
   },

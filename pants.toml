@@ -1,15 +1,18 @@
 [GLOBAL]
-pants_version = "2.16.0"
+pants_version = "2.19.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
-    "pants.backend.python.lint.black",
     "pants.backend.python.typecheck.mypy",
+    "pants.backend.shell",
     "pants.backend.experimental.python",
-    "pants.backend.experimental.python.lint.ruff",
+    # "pants.backend.experimental.python.lint.ruff",
+    "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
+    "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
+    "scie",
     "towncrier_tool",
 ]
 pants_ignore = [
@@ -23,6 +26,7 @@ pants_ignore = [
     "*.log",
     "/tools/pants-plugins",
 ]
+build_file_prelude_globs = ["tools/build-macros.py"]
 
 [anonymous-telemetry]
 enabled = false
@@ -37,7 +41,8 @@ root_patterns = [
 ]
 
 [test]
-extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s"]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
+attempts_default = 3
 
 [python]
 enable_resolves = true
@@ -48,11 +53,14 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.4"]
+interpreter_constraints = ["CPython==3.11.6"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
+
+[python-infer]
+use_rust_parser = true
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
@@ -71,20 +79,20 @@ towncrier = "tools/towncrier.lock"
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
-# [pex-cli]
-# version = "v2.1.99"
-# known_versions = [
-#     "v2.1.99|macos_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|macos_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-# ]
+[pex-cli]
+version = "v2.1.148"
+known_versions = [
+    "v2.1.148|macos_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|macos_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|linux_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|linux_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.4"]  # don't know why this is required... (maybe a Pants bug?)
+interpreter_constraints = ["CPython==3.11.6"]  # don't know why this is required... (maybe a Pants bug?)
 
 [ruff]
 install_from_resolve = "ruff"

@@ -60,7 +60,8 @@
       "Tasks": "Tugas",
       "YouMushChangeYourPassword": "Disarankan untuk mengubah kata sandi Anda secara berkala untuk alasan keamanan. Karena sejumlah waktu telah berlalu sejak terakhir kali Anda mengubah kata sandi, Anda harus mengubahnya agar dapat terus menggunakan layanan ini.",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
-      "PleaseConfirmYourPassword": "Harap konfirmasi kata sandi Anda"
+      "PleaseConfirmYourPassword": "Harap konfirmasi kata sandi Anda",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Unduh Aplikasi UI Web Backend.AI",
     "IPUEnabled": "IPU NPU Diaktifkan",
     "ATOMEnabled": "ATOM NPU Diaktifkan",
-    "WarboyEnabled": "Warboy NPU Diaktifkan"
+    "WarboyEnabled": "Warboy NPU Diaktifkan",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Port yang sudah dibuka sebelumnya untuk diatur (opsional)",
       "PreOpenPortRange": "Port yang sudah dibuka sebelumnya hanya tersedia dari 1024 hingga 65535.",
       "MinMemory": "Kapasitas memori minimum untuk lingkungan runtime yang saat ini dipilih adalah {{size}}iB.",
-      "ModelStorage": "Penyimpanan Model"
+      "ModelStorage": "Penyimpanan Model",
+      "PreOpenPortRangeGuide": "Masukkan beberapa nilai yang dipisahkan dengan koma (,) atau spasi.",
+      "preopen": "pra-buka",
+      "Network": "Jaringan",
+      "Enable": "Memungkinkan",
+      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
+      "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
+      "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Alokasi Sumber Daya Per Kontainer",
+      "NumberOfContainer": "Jumlah kontainer",
+      "EnterEnvironmentVariable": "Masukkan nama variabel",
+      "EnvironmentVariableNamePatternError": "Nama variabel harus dimulai dengan huruf atau garis bawah, dan hanya boleh terdiri dari huruf, angka, dan garis bawah.",
+      "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -296,7 +316,9 @@
       "SessionNameRequired": "Nama sesi harus diisi",
       "EnterValidSessionName": "Masukkan nama sesi yang valid",
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
-      "SluggedStrings": "String yang disumbat (>3 karakter)"
+      "SluggedStrings": "String yang disumbat (>3 karakter)",
+      "SessionNameTooLong64": "Silakan masukkan 64 karakter atau kurang.",
+      "PleaseFollowSessionNameRule": "Silakan masukkan kombinasi minimal 4 huruf, angka, '.', '_', dan '-'."
     },
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
     "NoSessionToDisplay": "Tidak ada sesi yang ditampilkan",
@@ -341,7 +363,12 @@
     "ConnectionNotice": "Pemberitahuan",
     "Readless": "Baca lebih sedikit",
     "Readmore": "Baca Selengkapnya...",
-    "SessionType": "Jenis Sesi"
+    "SessionType": "Jenis Sesi",
+    "ExpiresAfter": "Sisa waktu",
+    "CPU": "CPU",
+    "MEM": "Memori",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (memori)"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -362,7 +389,6 @@
     "DeleteAll": "Hapus Semua",
     "Update": "Perbarui",
     "Delete": "Hapus",
-    "Dismiss": "Tutup",
     "DismissAndProceed": "Tutup dan Lanjutkan",
     "Close": "Tutup",
     "Confirm": "Konfirmasi",
@@ -415,7 +441,9 @@
     "Control": "Kontrol",
     "NewPassword": "Kata Sandi Baru",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Penyimpanan"
+    "StorageProxies": "Penyimpanan",
+    "None": "Tidak ada",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Izin",
@@ -492,7 +520,8 @@
     "AdminCanOnlyRemoveTotp": "Hanya menonaktifkan 2FA pengguna lain yang dapat dilakukan.",
     "KeySeccessfullyDeleted": "KeyPair dihapus dengan aman.",
     "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
-    "ModifyUserDetail": "Ubah Detail Pengguna"
+    "ModifyUserDetail": "Ubah Detail Pengguna",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Folder",
@@ -657,7 +686,8 @@
     "HostDetails": "Menampilkan informasi kuota untuk host penyimpanan yang dipilih.",
     "Used": "Digunakan",
     "Pipeline": "Folder Pipa",
-    "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack."
+    "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack.",
+    "SearchByName": "Cari berdasarkan nama"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "Deleted": "Preset sumber daya berhasil dihapus.",
-    "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan"
+    "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan",
+    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori"
   },
   "usersettings": {
     "General": "Umum",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Silakan pilih salah satu opsi.",
     "RegistrySuccessfullyModified": "Registry berhasil dimodifikasi.",
     "ModifyRegistry": "Memodifikasi Registri",
-    "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan"
+    "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
+    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -991,14 +1023,27 @@
     "UsageHistoryNote": "Riwayat penggunaan yang ditampilkan di sini didasarkan pada sesi komputasi yang dihentikan. Selain itu, riwayat penggunaan selama satu minggu mungkin tidak ditampilkan untuk pengguna yang akunnya dibuat tidak lebih dari satu minggu."
   },
   "language": {
-    "English": "Bahasa Inggris",
-    "Korean": "Bahasa Korea",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Bahasa",
     "OSDefault": "OS Standar",
-    "Russian": "Bahasa Rusia",
-    "French": "Bahasa Perancis",
-    "Mongolian": "Bahasa Mongolia",
-    "Indonesian": "Bahasa Indonesia"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Galat pembaruan",
     "APIEndpointIsEmpty": "Titik Akhir API kosong. Harap tentukan titik akhir API Backend.AI untuk mendaftar.",
-    "LoginSucceededManagerNotResponding": "Login berhasil tetapi pengelola tidak merespons."
+    "LoginSucceededManagerNotResponding": "Login berhasil tetapi pengelola tidak merespons.",
+    "NetworkConnectionFailed": "Koneksi jaringan gagal. Periksa status jaringan.",
+    "LoginFailed": "Login gagal. Periksa informasi login.",
+    "AuthenticationFailed": "Otentikasi gagal. Memeriksa informasi dan status manajer.",
+    "VirtualFolderAlreadyExist": "Folder virtual dengan nama yang sama sudah ada. Hapus folder Anda sendiri atau tolak undangan.",
+    "TooManyLoginFailures": "Terlalu banyak kegagalan login dalam waktu singkat. Login diblokir untuk sementara waktu.",
+    "MaximumVfolderCreation": "Anda tidak dapat membuat lebih banyak vfolder karena kebijakan sumber daya",
+    "CannotChangeVirtualFolderOption": "Anda tidak dapat mengubah opsi vfolder yang bukan milik saya sendiri.",
+    "CannotSharePrivateAutomountFolder": "Tidak dapat berbagi vfolder otomatis sesuai dengan kebijakan.",
+    "FolderSharingNotAvailableToUser": "Berbagi folder tidak tersedia untuk pengguna yang diminta.",
+    "ReachedResourceLimit": "Mencapai batas sumber daya Anda. Memeriksa sumber daya dan sesi.",
+    "UserHasNoGroup": "Pengguna tidak memiliki grup. Silakan hubungi administrator untuk memperbaikinya.",
+    "InvalidSignupToken": "Token pendaftaran tidak valid",
+    "LoginInformationMismatch": "Ketidakcocokan informasi login. Periksa informasi Anda",
+    "ResourcePolicyAlreadyExist": "Kebijakan sumber daya dengan nama yang sama sudah ada.",
+    "ScalingGroupAlreadyExist": "Grup sumber daya dengan nama yang sama sudah ada.",
+    "UserNameAlreadyExist": "Nama pengguna sudah ada. Nama pengguna tidak dapat diduplikasi.",
+    "ResourceLimitExceed": "Batas sumber daya terlampaui. Periksa sumber daya gratis Anda.",
+    "ResourcePolicyStillReferenced": "Ada pasangan kunci yang merujuk pada kebijakan sumber daya ini.",
+    "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
+    "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
+    "WrongAPIServerAddress": "Alamat server API salah."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1363,7 +1429,7 @@
     "TokenExpiredDateHelp": "Waktu kedaluwarsa token default adalah 24 jam kemudian.",
     "TokenExpiredDateError": "Waktu kedaluwarsa token harus setelah waktu saat ini",
     "FormValidationFailed": "Validasi formulir gagal",
-    "ServiceNameRule": "Hanya mengizinkan 4 hingga 64 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
     "Image": "Gambar"
   },

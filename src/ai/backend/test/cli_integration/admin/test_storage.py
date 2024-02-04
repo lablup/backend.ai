@@ -4,12 +4,12 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_list_storage(run: ClientRunnerFunc):
+def test_list_storage(run_admin: ClientRunnerFunc):
     """
     Test list storage.
     """
     print("[ List storage ]")
-    with closing(run(["--output=json", "admin", "storage", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "storage", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -17,12 +17,12 @@ def test_list_storage(run: ClientRunnerFunc):
         assert isinstance(storage_list, list), "Storage list not printed properly"
 
 
-def test_info_storage(run: ClientRunnerFunc):
+def test_info_storage(run_admin: ClientRunnerFunc):
     """
     Test storage info.
     """
     print("[ Print storage info ]")
-    with closing(run(["--output=json", "admin", "storage", "info", "local:volume1"])) as p:
+    with closing(run_admin(["--output=json", "admin", "storage", "info", "local:volume1"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)

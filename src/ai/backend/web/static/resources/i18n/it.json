@@ -60,7 +60,8 @@
       "Serving": "Servire",
       "PasswordChangePlace": "Fare clic sull'icona della persona nella barra superiore e accedere al menu \"Il mio account\".",
       "Notifications": "Notifiche",
-      "Tasks": "Compiti"
+      "Tasks": "Compiti",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Ora sei offline",
     "YouAreOnline": "Ora sei online",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU abilitata",
     "ATOMEnabled": "NPU ATOM abilitata",
     "WarboyEnabled": "NPU Warboy abilitata",
-    "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI"
+    "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Porte pre-aperte da impostare (opzionale)",
       "PortsTitleWithRange": "Valore della porta (tra 1024 e 65535)",
       "PrePortConfigWillDisappear": "Tutte le porte preaperture non salvate scompariranno.",
-      "StartModelServing": "Avvio del modello di servizio"
+      "StartModelServing": "Avvio del modello di servizio",
+      "PreOpenPortRangeGuide": "Inserisci più valori separati da una virgola (,) o da uno spazio.",
+      "preopen": "preaperto",
+      "Network": "Rete",
+      "Enable": "Abilitare",
+      "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-).",
+      "PreOpenPortMaxCountLimit": "È possibile impostare fino a {{count}} porte pre-aperte.",
+      "StartTimeMustBeInTheFuture": "L'ora di inizio deve essere successiva all'ora corrente.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Allocazione delle risorse per contenitore",
+      "NumberOfContainer": "Numero di contenitori",
+      "EnterEnvironmentVariable": "Inserire il nome della variabile",
+      "EnvironmentVariableNamePatternError": "Il nome della variabile deve iniziare con una lettera o un trattino basso e può contenere solo lettere, numeri e trattini bassi.",
+      "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -286,7 +306,9 @@
       "EnterValidSessionName": "Inserire un nome di sessione valido",
       "SessionNameRequired": "Il nome della sessione è obbligatorio",
       "SluggedStrings": "Stringhe con slugged (>3 caratteri)",
-      "SessionNameAlreadyExist": "Il nome della sessione esiste già"
+      "SessionNameAlreadyExist": "Il nome della sessione esiste già",
+      "SessionNameTooLong64": "Inserisci 64 caratteri o meno.",
+      "PleaseFollowSessionNameRule": "Inserisci una combinazione di almeno 4 lettere, numeri, \".\", \"_\" e \"-\"."
     },
     "Interactive": "Interattivo",
     "Batch": "Lotto",
@@ -341,7 +363,12 @@
     "DescCommitSession": "Si sta per impegnare il contenitore corrispondente alla sessione sottostante:",
     "NoSessionToDisplay": "Nessuna sessione da visualizzare",
     "StatusInfo": "Informazioni sullo stato",
-    "System": "Sessioni di caricamento"
+    "System": "Sessioni di caricamento",
+    "ExpiresAfter": "Tempo rimanente",
+    "CPU": "CPU",
+    "MEM": "Memoria",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (memoria)"
   },
   "button": {
     "Cancel": "Annulla",
@@ -362,7 +389,6 @@
     "DeleteAll": "Cancella tutto",
     "Update": "Aggiornare",
     "Delete": "Elimina",
-    "Dismiss": "Respingere",
     "DismissAndProceed": "Ignora e procedi",
     "Close": "Vicino",
     "Confirm": "Confermare",
@@ -415,7 +441,9 @@
     "Control": "Controllo",
     "NewPassword": "nuova password",
     "Enabled": "Abilitato",
-    "StorageProxies": "Depositi"
+    "StorageProxies": "Depositi",
+    "None": "Nessuno",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -492,7 +520,8 @@
     "KeypairDetail": "Dettaglio coppia di chiavi",
     "SignoutSeccessfullyFinished": "Il signout è terminato in modo sicuro",
     "Status": "Stato",
-    "NoUserToDisplay": "Nessun utente da visualizzare"
+    "NoUserToDisplay": "Nessun utente da visualizzare",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "cartelle",
@@ -657,7 +686,8 @@
     "Used": "Usato",
     "Pipeline": "Cartelle della pipeline",
     "DialogDataFolder": "Cartelle dedicate alle pipeline che vengono create automaticamente quando si creano le pipeline in FastTrack.",
-    "DialogModelFolder": "È possibile servire e gestire i modelli."
+    "DialogModelFolder": "È possibile servire e gestire i modelli.",
+    "SearchByName": "Ricerca per nome"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memoria condivisa (GB)",
     "NoResourcePresetToDisplay": "Nessuna preimpostazione di risorse da visualizzare",
-    "Deleted": "La preimpostazione della risorsa è stata eliminata con successo."
+    "Deleted": "La preimpostazione della risorsa è stata eliminata con successo.",
+    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria"
   },
   "usersettings": {
     "General": "Generale",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Seleziona un'opzione.",
     "RegistrySuccessfullyModified": "Registro modificato con successo.",
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
-    "ModifyRegistry": "Modificare il registro"
+    "ModifyRegistry": "Modificare il registro",
+    "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",
@@ -991,14 +1023,27 @@
     "IOWriteDesc": "La quantità di dati scritti dalla sessione di calcolo. (La quantità di dati scritti da dispositivi montati esternamente, come le cartelle dati, non è inclusa)."
   },
   "language": {
-    "English": "inglese",
-    "Korean": "coreano",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "linguaggio",
     "OSDefault": "Sistema operativo predefinito",
-    "Russian": "Russo",
-    "French": "Francese",
-    "Mongolian": "Mongolo",
-    "Indonesian": "Indonesiano"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Registra nuove immagini dal repository",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Errore di aggiornamento",
     "APIEndpointIsEmpty": "L'endpoint API è vuoto. Specifica l'endpoint dell'API Backend.AI per la registrazione.",
-    "LoginSucceededManagerNotResponding": "Accesso riuscito ma il gestore non risponde."
+    "LoginSucceededManagerNotResponding": "Accesso riuscito ma il gestore non risponde.",
+    "NetworkConnectionFailed": "Connessione di rete fallita. Controllare lo stato della rete.",
+    "LoginFailed": "Accesso non riuscito. Controllare le informazioni di accesso.",
+    "AuthenticationFailed": "Autenticazione fallita. Controllare le informazioni e lo stato del manager.",
+    "VirtualFolderAlreadyExist": "Esiste già una cartella virtuale con lo stesso nome. Eliminare la propria cartella o declinare l'invito.",
+    "TooManyLoginFailures": "Si sono verificati troppi errori di accesso in poco tempo. L'accesso è bloccato per un po'.",
+    "MaximumVfolderCreation": "Non è possibile creare altre vfolders a causa del criterio delle risorse.",
+    "CannotChangeVirtualFolderOption": "Non è possibile modificare le opzioni di una cartella v che non è di mia proprietà.",
+    "CannotSharePrivateAutomountFolder": "Impossibile condividere le vfolders automount in linea con il criterio.",
+    "FolderSharingNotAvailableToUser": "La condivisione delle cartelle non è disponibile per gli utenti richiesti.",
+    "ReachedResourceLimit": "È stato raggiunto il limite di risorse. Controllare le risorse e le sessioni.",
+    "UserHasNoGroup": "L'utente non ha un gruppo. Contattare l'amministratore per risolvere il problema.",
+    "InvalidSignupToken": "Token di iscrizione non valido",
+    "LoginInformationMismatch": "Le informazioni di accesso non corrispondono. Controllare le informazioni",
+    "ResourcePolicyAlreadyExist": "Esiste già un criterio di risorse con lo stesso nome.",
+    "ScalingGroupAlreadyExist": "Esiste già un gruppo di risorse con lo stesso nome.",
+    "UserNameAlreadyExist": "Il nome utente esiste già. Non può essere duplicato.",
+    "ResourceLimitExceed": "Il limite delle risorse è stato superato. Controllare le risorse libere.",
+    "ResourcePolicyStillReferenced": "Esistono coppie di chiavi che fanno riferimento a questa politica delle risorse.",
+    "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
+    "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
+    "WrongAPIServerAddress": "Indirizzo del server API errato."
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1288,7 +1354,7 @@
     "FormValidationFailed": "Convalida del modulo non riuscita",
     "StartNewServing": "Iniziare un nuovo servizio",
     "ServiceName": "Nome del servizio",
-    "ServiceNameRule": "Sono consentiti solo da 4 a 64 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
+    "ServiceNameRule": "Sono consentiti solo da 4 a 24 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
     "OpenToPublic": "Aperto al pubblico",
     "DesiredRoutingCount": "Conteggio dell'instradamento desiderato",
     "ServingRouteErrorModalTitle": "Errore del percorso di servizio",

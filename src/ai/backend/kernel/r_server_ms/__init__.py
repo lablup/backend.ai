@@ -48,11 +48,9 @@ class Runner(BaseRunner):
         resp.raise_for_status()
         log.debug("deleted session:", self.sess_id)
         revoke_url = URL(f"{self.endpoint}/login/refreshToken")
-        revoke_url = revoke_url.update_query(
-            {
-                "refreshToken": self.refresh_token,
-            }
-        )
+        revoke_url = revoke_url.update_query({
+            "refreshToken": self.refresh_token,
+        })
         resp = await self.http_sess.delete(revoke_url, headers=self.auth_hdrs)
         resp.raise_for_status()
         await self.http_sess.close()

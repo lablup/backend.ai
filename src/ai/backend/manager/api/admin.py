@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import inspect
 import logging
-import re
+import traceback
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
@@ -10,9 +9,10 @@ import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphql.error import GraphQLError, format_error  # pants: no-infer-dep
+from graphene.validation import DisableIntrospection
+from graphql import parse, validate
+from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
-from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
@@ -29,8 +29,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-_rx_mutation_hdr = re.compile(r"^mutation(\s+\w+)?\s*(\(|{|@)", re.M)
 
 
 class GQLLoggingMiddleware:
@@ -52,7 +50,14 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     app_ctx: PrivateContext = request.app["admin.context"]
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
-
+    if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+        validate_errors = validate(
+            schema=app_ctx.gql_schema.graphql_schema,
+            document_ast=parse(params["query"]),
+            rules=(DisableIntrospection,),
+        )
+        if validate_errors:
+            return ExecutionResult(None, errors=validate_errors)
     gql_ctx = GraphQueryContext(
         schema=app_ctx.gql_schema,
         dataloader_manager=DataLoaderManager(),
@@ -72,9 +77,9 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
     )
-    result = app_ctx.gql_schema.execute(
+    result = await app_ctx.gql_schema.execute_async(
         params["query"],
-        app_ctx.gql_executor,
+        None,  # root
         variable_values=params["variables"],
         operation_name=params["operation_name"],
         context_value=gql_ctx,
@@ -83,37 +88,39 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             GQLMutationUnfrozenRequiredMiddleware(),
             GQLMutationPrivilegeCheckMiddleware(),
         ],
-        return_promise=True,
     )
-    if inspect.isawaitable(result):
-        result = await result
+
+    if result.errors:
+        for e in result.errors:
+            if isinstance(e, GraphQLError):
+                errmsg = e.formatted
+            else:
+                errmsg = {"message": str(e)}
+            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
-    return web.json_response(result.to_dict(), status=200)
+    return web.json_response(result.formatted, status=200)
 
 
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("query"): t.String,
-            t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-            tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-        }
-    )
+    t.Dict({
+        t.Key("query"): t.String,
+        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
+    })
 )
 async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     # FIXME: remove in v21.09
@@ -122,7 +129,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
         errors = []
         for e in result.errors:
             if isinstance(e, GraphQLError):
-                errmsg = format_error(e)
+                errmsg = e.formatted
                 errors.append(errmsg)
             else:
                 errmsg = {"message": str(e)}
@@ -134,18 +141,22 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
 
 @attrs.define(auto_attribs=True, slots=True, init=False)
 class PrivateContext:
-    gql_executor: AsyncioExecutor
     gql_schema: graphene.Schema
 
 
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
-    app_ctx.gql_executor = AsyncioExecutor()
     app_ctx.gql_schema = graphene.Schema(
         query=Queries,
         mutation=Mutations,
         auto_camelcase=False,
     )
+    root_ctx: RootContext = app["_root.context"]
+    if root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+        log.warning(
+            "GraphQL schema introspection is enabled. "
+            "It is strongly advised to disable this in production setups."
+        )
 
 
 async def shutdown(app: web.Application) -> None:
@@ -163,12 +174,3 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))
     return app, []
-
-
-if __name__ == "__main__":
-    # If executed as a main program, print all GraphQL schemas.
-    # (graphene transforms our object model into a textual representation)
-    # This is useful for writing documentation!
-    schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
-    print("======== GraphQL API Schema ========")
-    print(str(schema))

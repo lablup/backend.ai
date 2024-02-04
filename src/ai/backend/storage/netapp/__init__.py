@@ -261,12 +261,13 @@ class XCPFSOpModel(BaseFSOpModel):
                             entry_type = DirEntryType.FILE
                     symlink_target = ""
                     if entry_type == DirEntryType.SYMLINK:
-                        symlink_dst = Path(item_abspath).resolve()
                         try:
+                            symlink_dst = Path(item_abspath).resolve()
                             symlink_dst = symlink_dst.relative_to(target_path)
-                        except ValueError:
+                        except (ValueError, RuntimeError):
                             pass
-                        symlink_target = os.fsdecode(symlink_dst)
+                        else:
+                            symlink_target = os.fsdecode(symlink_dst)
                     await entry_queue.put(
                         DirEntry(
                             name=item_path.name,

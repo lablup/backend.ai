@@ -9,6 +9,13 @@ from tabulate import tabulate
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
+from ai.backend.cli.params import (
+    BoolExprType,
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+    OptionalType,
+)
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
@@ -17,11 +24,6 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .extensions import pass_ctx_obj
-from .params import (
-    ByteSizeParamCheckType,
-    ByteSizeParamType,
-    CommaSeparatedKVListParamType,
-)
 from .pretty import (
     ProgressViewer,
     print_done,
@@ -78,7 +80,6 @@ def list_allowed_types():
 @click.option(
     "--unmanaged",
     "host_path",
-    type=bool,
     is_flag=True,
     help=(
         "Treats HOST as a mount point of unmanaged virtual folder. "
@@ -124,7 +125,6 @@ def list_allowed_types():
 @click.option(
     "--cloneable",
     "--allow-clone",
-    type=bool,
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
@@ -166,7 +166,9 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @vfolder.command()
 @click.argument("name", type=str)
 def delete(name):
-    """Delete the given virtual folder. This operation is irreversible!
+    """Delete the given virtual folder.
+    This operation can be retracted by
+    calling `recover()`.
 
     \b
     NAME: Name of a virtual folder.
@@ -175,6 +177,38 @@ def delete(name):
         try:
             session.VFolder(name).delete()
             print_done("Deleted.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def purge(name):
+    """Purge the given virtual folder. This operation is irreversible!
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).purge()
+            print_done("Purged.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def recover(name):
+    """Recover the given virtual folder from deleted status.
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).recover()
+            print_done("Recovered.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -220,6 +254,7 @@ def info(name):
             print("- Number of files: {0}".format(result["numFiles"]))
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
+            print("- Status:", result["status"])
             print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
             print("- Group ID: {0}".format(result["group"]))
             print("- User ID: {0}".format(result["user"]))
@@ -811,7 +846,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
 )
 @click.option(
     "--set-cloneable",
-    type=bool,
+    type=OptionalType(BoolExprType),
     metavar="BOOLEXPR",
     help=(
         "A boolean-interpretable string whether a virtual folder can be cloned. "

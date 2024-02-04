@@ -88,11 +88,13 @@ class Agent(BaseFunction):
         agent_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($agent_id: String!) {
                 agent(agent_id: $agent_id) {$fields}
             }
-        """)
+        """
+        )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"agent_id": agent_id}
         data = await api_session.get().Admin._query(query, variables)

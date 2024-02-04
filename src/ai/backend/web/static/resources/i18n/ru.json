@@ -60,7 +60,8 @@
       "Tasks": "Задачи",
       "YouMushChangeYourPassword": "В целях безопасности рекомендуется периодически менять пароль. Поскольку с момента последней смены пароля прошло определенное время, для продолжения использования сервиса необходимо его сменить.",
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
-      "PleaseConfirmYourPassword": "Пожалуйста, подтвердите свой пароль"
+      "PleaseConfirmYourPassword": "Пожалуйста, подтвердите свой пароль",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Скачать приложение Backend.AI Web UI",
     "IPUEnabled": "IPU NPU Включено",
     "ATOMEnabled": "ATOM NPU Включено",
-    "WarboyEnabled": "Warboy NPU Enabled"
+    "WarboyEnabled": "Warboy NPU Enabled",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,27 @@
       "PreOpenPortPanelTitle": "Предварительно открытые порты для настройки (опционально)",
       "PreOpenPortRange": "Предварительно открытые порты доступны только в диапазоне от 1024 до 65535.",
       "MinMemory": "Минимальный объем памяти для выбранной в данный момент среды выполнения составляет {{size}}iB.",
-      "ModelStorage": "Модельное хранилище"
+      "ModelStorage": "Модельное хранилище",
+      "PreOpenPortRangeGuide": "Введите несколько значений, разделенных запятой (,) или пробелом.",
+      "preopen": "предварительное открытие",
+      "Network": "Сеть",
+      "Enable": "Давать возможность",
+      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
+      "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
+      "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
+      "NumberOfContainer": "Количество контейнеров",
+      "EnterEnvironmentVariable": "Введите имя переменной",
+      "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
+      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -296,7 +318,9 @@
       "SessionNameRequired": "Имя сессии является обязательным",
       "EnterValidSessionName": "Введите действительное имя сессии",
       "SessionNameAlreadyExist": "Имя сессии уже существует",
-      "SluggedStrings": "Строки с засечками (>3 символов)"
+      "SluggedStrings": "Строки с засечками (>3 символов)",
+      "SessionNameTooLong64": "Введите не более 64 символов.",
+      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 4 букв, цифр, «.», «_» и «-»."
     },
     "AlreadyTerminatingSession": "Уже завершаю сессию.",
     "NoSessionToDisplay": "Нет сеансов для отображения",
@@ -341,7 +365,12 @@
     "ConnectionNotice": "Уведомление",
     "Readless": "Читать далее",
     "Readmore": "Читать далее...",
-    "SessionType": "SessionType"
+    "SessionType": "SessionType",
+    "ExpiresAfter": "Оставшееся время",
+    "CPU": "CPU",
+    "MEM": "Память",
+    "GPU": "GPU",
+    "GPU(MEM)": "Графический процессор (память)"
   },
   "button": {
     "Cancel": "Отмена",
@@ -362,7 +391,6 @@
     "DeleteAll": "Удалить все",
     "Update": "Обновлять",
     "Delete": "Удалить",
-    "Dismiss": "Увольнять",
     "DismissAndProceed": "Закрыть и продолжить",
     "Close": "Закрывать",
     "Confirm": "Подтверждать",
@@ -415,7 +443,9 @@
     "Control": "Контроль",
     "NewPassword": "Новый пароль",
     "Enabled": "Включено",
-    "StorageProxies": "Хранилища данных"
+    "StorageProxies": "Хранилища данных",
+    "None": "Нет",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -492,7 +522,8 @@
     "AdminCanOnlyRemoveTotp": "Возможно только отключение 2FA для других пользователей.",
     "KeySeccessfullyDeleted": "Пара ключей удалена без последствий.",
     "SignoutSeccessfullyFinished": "Выход из системы завершен",
-    "ModifyUserDetail": "Изменение сведений о пользователе"
+    "ModifyUserDetail": "Изменение сведений о пользователе",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Папки",
@@ -657,7 +688,8 @@
     "HostDetails": "Отображает информацию о квотах для выбранного узла хранения.",
     "Used": "Используется",
     "Pipeline": "Трубопроводные папки",
-    "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack."
+    "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack.",
+    "SearchByName": "Поиск по имени"
   },
   "dialog": {
     "warning": {
@@ -748,7 +780,8 @@
     "RAM": "RAM (ГБ)",
     "SharedMemory": "Общая память (ГБ)",
     "Deleted": "Предварительная настройка ресурса успешно удалена.",
-    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов"
+    "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов",
+    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти"
   },
   "usersettings": {
     "General": "Общий",
@@ -884,7 +917,8 @@
     "PleaseSelectOption": "Пожалуйста, выберите один вариант.",
     "RegistrySuccessfullyModified": "Реестр успешно модифицирован.",
     "ModifyRegistry": "Изменение реестра",
-    "NoRegistryToDisplay": "Отсутствие отображаемых реестров"
+    "NoRegistryToDisplay": "Отсутствие отображаемых реестров",
+    "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",
@@ -991,14 +1025,27 @@
     "UsageHistoryNote": "История использования, представленная здесь, основана на завершенных вычислительных сессиях. Кроме того, история использования за одну неделю может не отображаться для пользователей, чья учетная запись создается не более чем на неделю."
   },
   "language": {
-    "English": "английский",
-    "Korean": "Корейский",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Язык",
     "OSDefault": "ОС по умолчанию",
     "Russian": "русский",
-    "French": "Французский",
-    "Mongolian": "Монголия",
-    "Indonesian": "Индонезия"
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
@@ -1257,7 +1304,28 @@
   "error": {
     "UpdateError": "Ошибка обновления",
     "APIEndpointIsEmpty": "Конечная точка API пуста. Для регистрации укажите конечную точку API Backend.AI.",
-    "LoginSucceededManagerNotResponding": "Вход выполнен успешно, но менеджер не отвечает."
+    "LoginSucceededManagerNotResponding": "Вход выполнен успешно, но менеджер не отвечает.",
+    "NetworkConnectionFailed": "Не удалось установить сетевое соединение. Проверьте состояние сети.",
+    "LoginFailed": "Не удалось войти в систему. Проверьте информацию для входа в систему.",
+    "AuthenticationFailed": "Не удалось выполнить аутентификацию. Проверьте информацию и состояние менеджера.",
+    "VirtualFolderAlreadyExist": "Виртуальная папка с таким же именем уже существует. Удалите собственную папку или отклоните приглашение.",
+    "TooManyLoginFailures": "За короткое время произошло слишком много сбоев при входе в систему. Вход в систему на некоторое время заблокирован.",
+    "MaximumVfolderCreation": "Создание дополнительных vfolders невозможно из-за политики ресурсов",
+    "CannotChangeVirtualFolderOption": "Нельзя изменить параметры папки vfolder, которая не принадлежит мне.",
+    "CannotSharePrivateAutomountFolder": "Невозможно предоставить общий доступ к automount vfolders в соответствии с политикой.",
+    "FolderSharingNotAvailableToUser": "Общий доступ к папкам недоступен для запрашиваемого пользователя (пользователей).",
+    "ReachedResourceLimit": "Достигнут лимит ресурсов. Проверьте ресурсы и сеансы.",
+    "UserHasNoGroup": "У пользователя нет группы. Обратитесь к администратору для устранения проблемы.",
+    "InvalidSignupToken": "Неверный токен регистрации",
+    "LoginInformationMismatch": "Несоответствие информации о входе в систему. Проверьте свои данные",
+    "ResourcePolicyAlreadyExist": "Политика ресурса с таким же именем уже существует.",
+    "ScalingGroupAlreadyExist": "Группа ресурсов с таким же именем уже существует.",
+    "UserNameAlreadyExist": "Имя пользователя уже существует. Оно не может быть продублировано.",
+    "ResourceLimitExceed": "Превышен лимит ресурсов. Проверьте свободные ресурсы.",
+    "ResourcePolicyStillReferenced": "Существуют пары ключей, которые ссылаются на данную ресурсную политику.",
+    "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
+    "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
+    "WrongAPIServerAddress": "Неверный адрес сервера API."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1363,7 +1431,7 @@
     "TokenExpiredDateHelp": "По умолчанию время истечения срока действия токена составляет 24 часа.",
     "TokenExpiredDateError": "Время истечения срока действия токена должно быть после текущего времени",
     "FormValidationFailed": "Не удалось выполнить валидацию формы",
-    "ServiceNameRule": "Допускается только от 4 до 64 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
+    "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
     "Image": "Изображение"
   },

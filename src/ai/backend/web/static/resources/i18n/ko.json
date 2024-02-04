@@ -60,7 +60,8 @@
       "YouMushChangeYourPassword": "보안을 위해 비밀번호를 주기적으로 변경하는 것이 좋습니다. 비밀번호를 변경한 지 일정 시간이 지났으므로, 서비스를 계속 이용하려면 비밀번호를 변경해야 합니다.",
       "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요.",
       "Notifications": "알림",
-      "Tasks": "작업"
+      "Tasks": "작업",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI 앱 다운로드",
     "IPUEnabled": "IPU NPU 사용중",
     "ATOMEnabled": "ATOM NPU 사용중",
-    "WarboyEnabled": "Warboy NPU 사용중"
+    "WarboyEnabled": "Warboy NPU 사용중",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -124,6 +126,7 @@
       "InteractiveMode": "Interactive",
       "BatchModeConfig": "Batch 모드 설정",
       "ScheduleTime": "시작 시간 설정 (옵션)",
+      "ScheduleTimeSimple": "시작 시간 설정",
       "StartUpCommand": "세션 시작시 실행할 명령",
       "SessionStartTime": "세션 시작 시간: ",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
@@ -135,12 +138,14 @@
       "Base": "기본환경",
       "Requirements": "요구사항",
       "SessionNameOptional": "세션 이름 (옵션)",
+      "SessionName": "세션 이름",
       "Environments": "실행 환경",
       "Start": "시작",
       "FolderToMount": "마운트할 폴더",
       "FolderToMountList": "마운트할 폴더",
       "MountedFolders": "마운트된 폴더",
       "ResourceAllocation": "자원 할당",
+      "ResourceAllocationPerContainer": "컨테이너당 리소스 할당",
       "NoSuitablePreset": "해당되는 프리셋 없음",
       "CustomAllocation": "사용자 설정 자원 할당",
       "Core": "코어",
@@ -208,6 +213,7 @@
       "GPUSlot": "슬롯",
       "FolderAlias": "경로 & 대체이름",
       "FolderAliasOverlapping": "대체 이름이 이미 존재하는 다른 이름과 겹칩니다.",
+      "FolderAliasInvalid": "영문 대소문자, 숫자, 밑줄(_), 슬래시(/), 대시(-)만 입력 가능합니다.",
       "DescFolderAlias": "<p>이 입력을 채우면 폴더 이름이 마운트될 때 별칭으로 변경됩니다.</p><p>절대 경로는 '/'에 마운트되고, / 또는 공백으로 시작하지 않으면 /home/work의 하위 경로에 속하게 됩니다.</p><p>시스템 폴더들과 같은 별칭을 사용하지 마십시오.</p><p>아래의 '마운트된 폴더'에서 최종 경로를 확인하십시오.</p><p>이 창을 다시 보고 싶으면 '경로 & 대체이름' 옆의 아이콘을 누르세요.</p>",
       "OpenMPOptimization": "OpenMP/OpenBLAS 최적화",
       "DescOpenMPOptimization": "<p>이 값은 nthreads-var 내부 컨트롤 변수의 초기 값을 설정하여 병렬 영역에 사용할 스레드 수를 설정합니다.</p><p>Backend.AI는 이 값을 CPU 코어수와 같게 설정하며, 일반적인 고성능 컴퓨팅 워크로드를 가속하는 효과가 있습니다. 그러나 일부 멀티스레드 워크로드의 경우 OpenMP를 사용하는 여러 프로세스가 동시에 사용되어 비정상적으로 많은 스레드를 생성하여 상당한 성능 저하가 발생합니다. 이러한 경우 이 값을 1 또는 2로 조정하시기 바랍니다.</p>",
@@ -230,7 +236,22 @@
       "PreOpenPortConfigurationDone": "사전 개방 포트값이 설정되었습니다.",
       "PreOpenPortPanelTitle": "추가될 사전 개방 포트값 (옵션)",
       "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다.",
-      "MinMemory": "현재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다."
+      "PreOpenPortRangeGuide": "여러 값을 콤마(,) 또는 스페이스로 구분하여 입력할 수 있습니다.",
+      "PreOpenPortMaxCountLimit": "사전 개방 포트는 최대 {{count}}개까지 설정할 수 있습니다.",
+      "MinMemory": "현재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다.",
+      "Enable": "활성화",
+      "Network": "네트워크",
+      "preopen": "사전 개방 포트",
+      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
+      "Template": "세션 템플릿",
+      "TemplateAndHistory": "템플릿 및 최근기록",
+      "ResetFormConfirm": "입력한 사항을 모두 초기화하시겠습니까?",
+      "StartTimeMustBeInTheFuture": "시작 시간은 현재 시간 이후여야 합니다.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "NumberOfContainer": "컨테이너 개수",
+      "EnterEnvironmentVariable": "변수 이름 입력해주세요.",
+      "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
+      "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -257,7 +278,7 @@
     "AllowedClientIps": "허용된 클라이언트 IP",
     "CommaSeparated": "콤마로 구분",
     "TryPreferredPort": "선호 포트",
-    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
+    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH 키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
     "ConnectionInformation": "연결 정보",
     "VNCconnection": "VNC 연결",
     "CheckAgainDialog": "이 선택은 취소할 수 없습니다. 정말 진행하시겠습니까?",
@@ -298,7 +319,9 @@
       "SessionNameRequired": "세션 이름을 입력해주세요",
       "SluggedStrings": "최소 4자 이상의 고유문자열로 입력해주세요",
       "EnterValidSessionName": "올바른 세션 이름을 입력해주세요",
-      "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다"
+      "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다",
+      "SessionNameTooLong64": "64자 이하로 입력해주세요.",
+      "PleaseFollowSessionNameRule": "최소 4자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요."
     },
     "AlreadyTerminatingSession": "이미 종료중인 세션입니다",
     "CommitSession": "세션을 이미지로 커밋하기",
@@ -341,7 +364,12 @@
     "ConnectionNotice": "주의",
     "Readmore": "더 알아보기...",
     "Readless": "내용 접기",
-    "SessionType": "세션 타입"
+    "SessionType": "세션 타입",
+    "ExpiresAfter": "남은 시간",
+    "CPU": "CPU",
+    "MEM": "메모리",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU(메모리)"
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -385,7 +413,7 @@
     "ExpiredDate": "토큰 만료 시각",
     "TokenExpiredDateHelp": "토큰 만료 시각 기본 값은 24시간 뒤입니다.",
     "TokenExpiredDateError": "토큰 만료 시간은 현재 시간 이후여야 합니다.",
-    "ServiceNameRule": "4~64자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
+    "ServiceNameRule": "4~24자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
     "FormValidationFailed": "양식 유효성 검사 실패",
     "resources": "자원",
     "Image": "이미지"
@@ -409,7 +437,6 @@
     "DeleteAll": "모두 삭제",
     "Update": "업데이트",
     "Delete": "삭제",
-    "Dismiss": "해제",
     "DismissAndProceed": "무시하고 진행",
     "Close": "닫기",
     "Confirm": "확인",
@@ -496,7 +523,9 @@
     "Control": "제어",
     "NewPassword": "새 비밀번호",
     "Enabled": "활성화됨",
-    "StorageProxies": "스토리지"
+    "StorageProxies": "스토리지",
+    "None": "없음",
+    "Image": "이미지"
   },
   "credential": {
     "Permission": "권한",
@@ -573,7 +602,8 @@
     "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
     "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
     "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
-    "ModifyUserDetail": "사용자 상세 정보 수정"
+    "ModifyUserDetail": "사용자 상세 정보 수정",
+    "EnableSudoSession": "sudo 세션 허용"
   },
   "data": {
     "Folders": "폴더",
@@ -610,6 +640,7 @@
     "StorageStatus": "저장소 상태",
     "Created": "생성됨",
     "Invited": "초대 받음",
+    "SearchByName": "이름으로 검색",
     "folders": {
       "Location": "위치",
       "Status": "상태",
@@ -822,6 +853,7 @@
     "NoPresetName": "자원 프리셋의 이름을 입력하십시오",
     "NoResourcePresetToDisplay": "자원 프리셋 정보가 없습니다.",
     "MemoryShouldBeLargerThanSHMEM": "메모리는 공유메모리보다 커야 합니다",
+    "SHMEMShouldBeSmallerThanMemory": "공유메모리는 메모리보다 작아야 합니다",
     "Created": "자원 프리셋이 생성되었습니다",
     "Updated": "자원 프리셋에 수정되었습니다",
     "MinimumCPUUnit": "CPU 최소 단위: 1 코어",
@@ -965,7 +997,8 @@
     "RescanFailed": "리스캔 작업이 실패하였습니다.",
     "NoRegistryToDisplay": "레지스트리 정보가 없습니다.",
     "RegistrySuccessfullyModified": "레지스트리가 성공적으로 수정되었습니다.",
-    "PleaseSelectOption": "옵션을 선택하세요"
+    "PleaseSelectOption": "옵션을 선택하세요",
+    "ConfirmNoUserName": "사용자 및 비밀번호가 지정되지 않았습니다. 저장하시겠습니까?"
   },
   "resourceGroup": {
     "ResourceGroups": "자원 그룹",
@@ -1076,10 +1109,23 @@
     "Korean": "한국어",
     "Language": "언어",
     "OSDefault": "운영체제 언어",
-    "Russian": "러시아어",
-    "French": "프랑스어",
-    "Mongolian": "몽골어",
-    "Indonesian": "인도네시아어"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "새 계산환경 이미지를 저장소로부터 등록",
@@ -1338,7 +1384,28 @@
   "error": {
     "UpdateError": "업데이트 에러",
     "APIEndpointIsEmpty": "API 엔드포인트가 비어있습니다. 회원 가입하시려면 Backend.AI API 엔드포인트를 입력해주세요.",
-    "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다."
+    "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다.",
+    "UserHasNoGroup": "사용자가 어떤 그룹에도 속해있지 않습니다. 관리자에게 문의하세요.",
+    "WrongAPIServerAddress": "잘못된 API 서버 주소",
+    "LoginFailed": "로그인 실패. 로그인 정보를 확인하세요.",
+    "VirtualFolderAlreadyExist": "같은 이름의 폴더가 이미 존재합니다. 폴더를 삭제하거나 초대를 거절하세요.",
+    "CannotChangeVirtualFolderOption": "폴더 소유자가 아닌 경우 폴더 옵션을 변경할 수 없습니다.",
+    "MaximumVfolderCreation": "자원 정책에 따라 더 이상의 폴더를 만들 수 없습니다.",
+    "LoginInformationMismatch": "로그인 실패. 로그인 정보를 확인하세요.",
+    "ReachedResourceLimit": "자원 제한에 도달했습니다. 자원 할당량을 확인하세요.",
+    "AuthenticationFailed": "API 인증 실패. 사용자 정보나 Manager 상태를 확인하세요.",
+    "NetworkConnectionFailed": "네트워크 연결 실패. 네트워크 상태를 확인하세요.",
+    "TooManyLoginFailures": "너무 많은 로그인 시도.  시간이 지난 후에 다시 시도해보세요.",
+    "ResourcePolicyAlreadyExist": "같은 이름의 자원 정책이 이미 있습니다.",
+    "ScalingGroupAlreadyExist": "같은 이름의 자원 그룹이 이미 있습니다.",
+    "ResourceLimitExceed": "자원 제한을 초과했습니다. 가용 자원량을 확인하세요.",
+    "SmallerResourceThenImageRequires": "요청한 자원이 이미지가 요구하는 자원보다 적습니다. 자원을 보다 크게 해서 시도해보세요.",
+    "UserNameAlreadyExist": "이미 사용하고 있는 사용자명입니다.",
+    "ResourcePolicyStillReferenced": "이 자원 정책을 사용하고 있는 자격 증명이 있습니다.",
+    "InvalidSignupToken": "잘못된 가입 토큰입니다",
+    "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
+    "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
+    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",

@@ -26,6 +26,8 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
 
+PASSWORD_PLACEHOLDER: Final = "*****"
+
 _RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 RESERVED_VFOLDERS = [
@@ -75,3 +77,6 @@ class LockID(enum.IntEnum):
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
+
+DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME: Final = "default"
+DEFAULT_KEYPAIR_RATE_LIMIT: Final = 10000

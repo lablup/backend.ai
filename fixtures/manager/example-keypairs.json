@@ -7,20 +7,23 @@
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
             "allowed_docker_registries": [
-                "cr.backend.ai"
+                "cr.backend.ai",
+                "index.docker.io"
             ]
         }
     ],
     "user_resource_policies": [
         {
             "name": "default",
-            "max_vfolder_size": -1
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
         }
     ],
     "project_resource_policies": [
         {
             "name": "default",
-            "max_vfolder_size": -1
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
         }
     ],
     "groups": [
@@ -32,7 +35,19 @@
             "domain_name": "default",
             "resource_policy": "default",
             "total_resource_slots": {},
-            "allowed_vfolder_hosts": {}
+            "allowed_vfolder_hosts": {},
+            "type": "general"
+        },
+        {
+            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "name": "model-store",
+            "description": "model store project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "model-store"
         }
     ],
     "scaling_groups": [
@@ -144,6 +159,26 @@
         {
             "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],
     "keypair_resource_policies": [
@@ -154,8 +189,6 @@
             "max_session_lifetime": 0,
             "max_concurrent_sessions": 5,
             "max_containers_per_session": 1,
-            "max_vfolder_count": 10,
-            "max_vfolder_size": 0,
             "idle_timeout": 3600,
             "allowed_vfolder_hosts": {
                 "local:volume1": [

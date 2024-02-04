@@ -60,7 +60,8 @@
       "Serving": "Phục vụ",
       "PasswordChangePlace": "Nhấp vào biểu tượng hình người ở thanh trên cùng và chuyển đến menu \"Tài khoản của tôi\".",
       "Notifications": "Thông báo",
-      "Tasks": "Nhiệm vụ"
+      "Tasks": "Nhiệm vụ",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Bạn hiện đang ngoại tuyến",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
@@ -108,7 +109,8 @@
     "IPUEnabled": "Đã bật NPU IPU",
     "ATOMEnabled": "Đã bật NPU ATOM",
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
-    "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI"
+    "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,24 @@
       "PreOpenPortPanelTitle": "Mở trước các cổng để đặt (tùy chọn)",
       "PortsTitleWithRange": "Giá trị cổng (trong khoảng 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mọi cổng mở trước chưa được lưu sẽ biến mất.",
-      "StartModelServing": "Bắt đầu phân phối mẫu"
+      "StartModelServing": "Bắt đầu phân phối mẫu",
+      "PreOpenPortRangeGuide": "Nhập nhiều giá trị được phân tách bằng dấu phẩy (,) hoặc dấu cách.",
+      "preopen": "mở trước",
+      "Network": "Mạng",
+      "Enable": "Cho phép",
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
+      "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Phân bổ tài nguyên trên mỗi vùng chứa",
+      "NumberOfContainer": "Số lượng thùng chứa",
+      "EnterEnvironmentVariable": "Nhập tên biến",
+      "EnvironmentVariableNamePatternError": "Tên biến phải bắt đầu bằng một chữ cái hoặc dấu gạch dưới và chỉ có thể chứa các chữ cái, số và dấu gạch dưới.",
+      "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -286,7 +305,9 @@
       "EnterValidSessionName": "Nhập tên phiên hợp lệ",
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
-      "SessionNameAlreadyExist": "Tên phiên đã tồn tại"
+      "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
+      "SessionNameTooLong64": "Vui lòng nhập 64 ký tự trở xuống.",
+      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 4 chữ cái, số, '.', '_' và '-'."
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -341,7 +362,12 @@
     "DescCommitSession": "Bạn sắp cam kết vùng chứa tương ứng với phiên bên dưới:",
     "NoSessionToDisplay": "Không có phiên nào để hiển thị",
     "StatusInfo": "Thông tin trạng thái",
-    "System": "Tải phiên lên"
+    "System": "Tải phiên lên",
+    "ExpiresAfter": "Thời gian còn lại",
+    "CPU": "CPU",
+    "MEM": "Ký ức",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (bộ nhớ)"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -362,7 +388,6 @@
     "DeleteAll": "Xóa hết",
     "Update": "Cập nhật",
     "Delete": "Xóa bỏ",
-    "Dismiss": "Bỏ qua",
     "DismissAndProceed": "Loại bỏ và tiếp tục",
     "Close": "Đóng",
     "Confirm": "Xác nhận",
@@ -415,7 +440,9 @@
     "Control": "Điều khiển",
     "NewPassword": "mật khẩu mới",
     "Enabled": "Đã bật",
-    "StorageProxies": "Kho lưu trữ"
+    "StorageProxies": "Kho lưu trữ",
+    "None": "Không có",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -492,7 +519,8 @@
     "KeypairDetail": "Chi tiết bàn phím",
     "SignoutSeccessfullyFinished": "Đăng xuất đã hoàn tất thành công",
     "Status": "Trạng thái",
-    "NoUserToDisplay": "Không có người dùng để hiển thị"
+    "NoUserToDisplay": "Không có người dùng để hiển thị",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Thư mục",
@@ -657,7 +685,8 @@
     },
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
-    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình."
+    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình.",
+    "SearchByName": "Tìm kiếm theo tên"
   },
   "dialog": {
     "warning": {
@@ -748,7 +777,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
-    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công."
+    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Chung",
@@ -884,7 +914,8 @@
     "PleaseSelectOption": "Làm ơn chọn một giải pháp.",
     "RegistrySuccessfullyModified": "Đã sửa đổi sổ đăng ký thành công.",
     "NoRegistryToDisplay": "Không có đăng ký để hiển thị",
-    "ModifyRegistry": "Sửa đổi sổ đăng ký"
+    "ModifyRegistry": "Sửa đổi sổ đăng ký",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
@@ -991,14 +1022,27 @@
     "IOWriteDesc": "Lượng dữ liệu được ghi từ phiên điện toán. \n(Không bao gồm lượng dữ liệu ghi từ các thiết bị gắn bên ngoài như thư mục dữ liệu.)"
   },
   "language": {
-    "English": "Tiếng Anh",
-    "Korean": "Hàn Quốc",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Ngôn ngữ",
     "OSDefault": "Hệ điều hành mặc định",
-    "Russian": "tiếng Nga",
-    "French": "người Pháp",
-    "Mongolian": "tiếng Mông Cổ",
-    "Indonesian": "tiếng Indonesia"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Đăng ký hình ảnh mới từ kho",
@@ -1257,7 +1301,28 @@
   "error": {
     "UpdateError": "Cập nhật lỗi",
     "APIEndpointIsEmpty": "Điểm cuối API trống. Vui lòng chỉ định điểm cuối API Backend.AI để đăng ký.",
-    "LoginSucceededManagerNotResponding": "Đăng nhập thành công nhưng người quản lý không phản hồi."
+    "LoginSucceededManagerNotResponding": "Đăng nhập thành công nhưng người quản lý không phản hồi.",
+    "APINotSupported": "API không được hỗ trợ. \nYêu cầu phiên bản mới nhất của trình quản lý Backend.AI.",
+    "AuthenticationFailed": "Quá trình xác thực đã thất bại. \nKiểm tra thông tin và trạng thái người quản lý.",
+    "CannotChangeVirtualFolderOption": "Bạn không thể thay đổi các tùy chọn của vfolder không thuộc quyền sở hữu của tôi.",
+    "CannotSharePrivateAutomountFolder": "Không thể chia sẻ các thư mục vfolder tự động theo chính sách.",
+    "FolderSharingNotAvailableToUser": "Chia sẻ thư mục không có sẵn cho (những) người dùng được yêu cầu.",
+    "InvalidSignupToken": "Mã thông báo đăng ký không hợp lệ",
+    "LoginFailed": "Đăng nhập thất bại. \nKiểm tra thông tin đăng nhập.",
+    "LoginInformationMismatch": "Thông tin đăng nhập không khớp. \nKiểm tra thông tin của bạn",
+    "MaximumVfolderCreation": "Bạn không thể tạo thêm vfolder do chính sách tài nguyên",
+    "NetworkConnectionFailed": "Kết nối mạng không thành công. \nKiểm tra trạng thái mạng.",
+    "ReachedResourceLimit": "Đã đạt đến giới hạn tài nguyên của bạn. \nKiểm tra tài nguyên và phiên.",
+    "ResourceLimitExceed": "Vượt quá giới hạn tài nguyên. \nKiểm tra tài nguyên miễn phí của bạn.",
+    "ResourcePolicyAlreadyExist": "Chính sách tài nguyên có cùng tên đã tồn tại.",
+    "ResourcePolicyStillReferenced": "Tồn tại các cặp khóa tham chiếu chính sách tài nguyên này.",
+    "ScalingGroupAlreadyExist": "Một nhóm tài nguyên có cùng tên đã tồn tại.",
+    "SmallerResourceThenImageRequires": "Yêu cầu tài nguyên của bạn nhỏ hơn mức tối thiểu mà hình ảnh yêu cầu. \nHãy thử nhiều tài nguyên hơn.",
+    "TooManyLoginFailures": "Đã có quá nhiều lần đăng nhập thất bại trong một thời gian ngắn. \nĐăng nhập bị chặn trong một thời gian.",
+    "UserHasNoGroup": "Người dùng không có nhóm. \nHãy liên hệ với quản trị viên để sửa nó.",
+    "UserNameAlreadyExist": "Tên này đã có người dùng. \nNó không thể bị trùng lặp.",
+    "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
+    "WrongAPIServerAddress": "Địa chỉ máy chủ API sai."
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1328,7 +1393,7 @@
     "FormValidationFailed": "Xác thực biểu mẫu không thành công",
     "StartNewServing": "Bắt đầu phân phát mới",
     "ServiceName": "Tên dịch vụ",
-    "ServiceNameRule": "Chỉ cho phép 4 đến 64 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
+    "ServiceNameRule": "Chỉ cho phép 4 đến 24 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
     "OpenToPublic": "Mở cửa cho công chúng",
     "DesiredRoutingCount": "Số lượng định tuyến mong muốn",
     "ServingRouteErrorModalTitle": "Lỗi tuyến đường phục vụ",
