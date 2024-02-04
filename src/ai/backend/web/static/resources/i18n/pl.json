@@ -60,7 +60,8 @@
       "Serving": "Obsługa",
       "PasswordChangePlace": "Kliknij ikonę osoby na górnym pasku i przejdź do menu \"Moje konto\".",
       "Notifications": "Powiadomienia",
-      "Tasks": "Zadania"
+      "Tasks": "Zadania",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Jesteś teraz offline",
     "YouAreOnline": "Jesteś teraz online",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
-    "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI"
+    "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,27 @@
       "PreOpenPortPanelTitle": "Wstępnie otwarte porty do ustawienia (opcjonalnie)",
       "PortsTitleWithRange": "Wartość portu (między 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Wszystkie niezapisane wcześniej otwarte porty zostaną usunięte.",
-      "StartModelServing": "Rozpoczęcie obsługi modelu"
+      "StartModelServing": "Rozpoczęcie obsługi modelu",
+      "PreOpenPortRangeGuide": "Wprowadź wiele wartości oddzielonych przecinkiem (,) lub spacją.",
+      "preopen": "wstępnie otwarte",
+      "Network": "Sieć",
+      "Enable": "Włączać",
+      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
+      "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
+      "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Alokacja zasobów na kontener",
+      "NumberOfContainer": "Liczba pojemników",
+      "EnterEnvironmentVariable": "Wprowadź nazwę zmiennej",
+      "EnvironmentVariableNamePatternError": "Nazwa zmiennej musi zaczynać się od litery lub podkreślenia i może zawierać tylko litery, cyfry i podkreślenia.",
+      "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -286,7 +308,9 @@
       "EnterValidSessionName": "Wprowadź prawidłową nazwę sesji",
       "SessionNameRequired": "Nazwa sesji jest wymagana",
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
-      "SessionNameAlreadyExist": "Nazwa sesji już istnieje"
+      "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
+      "SessionNameTooLong64": "Wprowadź maksymalnie 64 znaki.",
+      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 4 liter, cyfr, „.”, „_” i „-”."
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -341,7 +365,12 @@
     "DescCommitSession": "Za chwilę zatwierdzisz kontener odpowiadający poniższej sesji:",
     "NoSessionToDisplay": "Brak sesji do wyświetlenia",
     "StatusInfo": "Informacje o stanie",
-    "System": "Sesje przesyłania"
+    "System": "Sesje przesyłania",
+    "ExpiresAfter": "Pozostały czas",
+    "CPU": "CPU",
+    "MEM": "Pamięć",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (pamięć)"
   },
   "button": {
     "Cancel": "Anuluj",
@@ -362,7 +391,6 @@
     "DeleteAll": "Usuń wszystko",
     "Update": "Aktualizacja",
     "Delete": "Kasować",
-    "Dismiss": "Oddalić",
     "DismissAndProceed": "Odrzuć i kontynuuj",
     "Close": "Blisko",
     "Confirm": "Potwierdzać",
@@ -415,7 +443,9 @@
     "Control": "Kontrola",
     "NewPassword": "nowe hasło",
     "Enabled": "Włączone",
-    "StorageProxies": "Magazyny"
+    "StorageProxies": "Magazyny",
+    "None": "Brak",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -492,7 +522,8 @@
     "KeypairDetail": "Szczegóły pary kluczy",
     "SignoutSeccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
     "Status": "Status",
-    "NoUserToDisplay": "Brak użytkowników do wyświetlenia"
+    "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -657,7 +688,8 @@
     "Used": "Używany",
     "Pipeline": "Foldery rurociągów",
     "DialogDataFolder": "Dedykowane potokom foldery, które są automatycznie tworzone podczas tworzenia potoków w FastTrack.",
-    "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi."
+    "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi.",
+    "SearchByName": "Szukaj według nazwy"
   },
   "dialog": {
     "warning": {
@@ -748,7 +780,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Pamięć współdzielona (GB)",
     "NoResourcePresetToDisplay": "Brak ustawień wstępnych zasobów do wyświetlenia",
-    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte."
+    "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte.",
+    "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć"
   },
   "usersettings": {
     "General": "Generał",
@@ -884,7 +917,8 @@
     "PleaseSelectOption": "Proszę wybrać jedną opcję.",
     "RegistrySuccessfullyModified": "Rejestr został pomyślnie zmodyfikowany.",
     "NoRegistryToDisplay": "Brak rejestrów do wyświetlenia",
-    "ModifyRegistry": "Modyfikacja rejestru"
+    "ModifyRegistry": "Modyfikacja rejestru",
+    "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",
@@ -991,14 +1025,27 @@
     "IOWriteDesc": "Ilość danych zapisanych z sesji obliczeniowej. (Ilość zapisu danych z urządzeń zamontowanych zewnętrznie, takich jak foldery danych, nie jest uwzględniana)."
   },
   "language": {
-    "English": "język angielski",
-    "Korean": "koreański",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Język",
     "OSDefault": "Domyślny system operacyjny",
-    "Russian": "Rosyjski",
-    "French": "Francuski",
-    "Mongolian": "Mongolski",
-    "Indonesian": "Indonezyjski"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Zarejestruj nowe obrazy z repozytorium",
@@ -1257,7 +1304,28 @@
   "error": {
     "UpdateError": "Błąd aktualizacji",
     "APIEndpointIsEmpty": "Punkt końcowy interfejsu API jest pusty. Aby się zarejestrować, określ punkt końcowy interfejsu API Backend.AI.",
-    "LoginSucceededManagerNotResponding": "Logowanie powiodło się, ale menedżer nie odpowiada."
+    "LoginSucceededManagerNotResponding": "Logowanie powiodło się, ale menedżer nie odpowiada.",
+    "NetworkConnectionFailed": "Połączenie sieciowe nie powiodło się. Sprawdź stan sieci.",
+    "LoginFailed": "Logowanie nie powiodło się. Sprawdź dane logowania.",
+    "AuthenticationFailed": "Uwierzytelnianie nie powiodło się. Sprawdź informacje i status menedżera.",
+    "VirtualFolderAlreadyExist": "Istnieje już folder wirtualny o tej samej nazwie. Usuń własny folder lub odrzuć zaproszenie.",
+    "TooManyLoginFailures": "Wystąpiło zbyt wiele błędów logowania w krótkim czasie. Logowanie jest przez pewien czas zablokowane.",
+    "MaximumVfolderCreation": "Nie można utworzyć więcej folderów wirtualnych ze względu na zasady dotyczące zasobów",
+    "CannotChangeVirtualFolderOption": "Nie można zmienić opcji folderu v, który nie jest moją własnością.",
+    "CannotSharePrivateAutomountFolder": "Nie można udostępniać folderów vfolder automount zgodnie z zasadami.",
+    "FolderSharingNotAvailableToUser": "Udostępnianie folderów nie jest dostępne dla żądanych użytkowników.",
+    "ReachedResourceLimit": "Osiągnięto limit zasobów. Sprawdź zasoby i sesje.",
+    "UserHasNoGroup": "Użytkownik nie ma grupy. Skontaktuj się z administratorem, aby to naprawić.",
+    "InvalidSignupToken": "Nieprawidłowy token rejestracji",
+    "LoginInformationMismatch": "Niezgodność danych logowania. Sprawdź swoje dane",
+    "ResourcePolicyAlreadyExist": "Polityka zasobów o tej samej nazwie już istnieje.",
+    "ScalingGroupAlreadyExist": "Grupa zasobów o tej samej nazwie już istnieje.",
+    "UserNameAlreadyExist": "Nazwa użytkownika już istnieje. Nie można jej zduplikować.",
+    "ResourceLimitExceed": "Przekroczono limit zasobów. Sprawdź wolne zasoby.",
+    "ResourcePolicyStillReferenced": "Istnieją pary kluczy, które odwołują się do tej polityki zasobów.",
+    "SmallerResourceThenImageRequires": "Żądanie zasobów jest mniejsze niż minimum wymagane przez obraz. Spróbuj użyć więcej zasobów.",
+    "APINotSupported": "Interfejs API nie jest obsługiwany. Wymaga najnowszej wersji menedżera Backend.AI.",
+    "WrongAPIServerAddress": "Nieprawidłowy adres serwera API."
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",
@@ -1288,7 +1356,7 @@
     "FormValidationFailed": "Walidacja formularza nie powiodła się",
     "StartNewServing": "Rozpocznij nową porcję",
     "ServiceName": "Nazwa usługi",
-    "ServiceNameRule": "Dozwolone są tylko 4 do 64 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
+    "ServiceNameRule": "Dozwolone są tylko 4 do 24 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
     "OpenToPublic": "Otwarte dla publiczności",
     "DesiredRoutingCount": "Pożądana liczba tras",
     "ServingRouteErrorModalTitle": "Błąd trasy serwowania",

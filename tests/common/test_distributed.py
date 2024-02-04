@@ -274,6 +274,7 @@ async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
     r = RedisConnectionInfo(
         Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
         sentinel=None,
+        name="test",
         service_name=None,
         redis_helper_config=config.redis_helper_default_config,
     )

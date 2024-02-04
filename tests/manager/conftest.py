@@ -156,51 +156,46 @@ def local_config(
     postgres_addr = postgres_container[1]
 
     # Establish a self-contained config.
-    cfg = LocalConfig(
-        {
-            **etcd_config_iv.check(
-                {
-                    "etcd": {
-                        "namespace": test_id,
-                        "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-                    },
-                }
-            ),
-            "redis": redis_config_iv.check(
-                {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                }
-            ),
-            "db": {
-                "addr": postgres_addr,
-                "name": test_db,
-                "user": "postgres",
-                "password": "develove",
-                "pool-size": 8,
-                "max-overflow": 64,
+    cfg = LocalConfig({
+        **etcd_config_iv.check({
+            "etcd": {
+                "namespace": test_id,
+                "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
             },
-            "manager": {
-                "id": f"i-{test_id}",
-                "num-proc": 1,
-                "distributed-lock": "filelock",
-                "ipc-base-path": ipc_base_path,
-                "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
-                "allowed-plugins": set(),
-                "disabled-plugins": set(),
+        }),
+        "redis": redis_config_iv.check({
+            "addr": {
+                "host": redis_addr.host,
+                "port": redis_addr.port,
             },
-            "debug": {
-                "enabled": False,
-                "log-events": False,
-                "log-scheduler-ticks": False,
-                "periodic-sync-stats": False,
-            },
-            "logging": logging_config,
-        }
-    )
+            "redis_helper_config": config.redis_helper_default_config,
+        }),
+        "db": {
+            "addr": postgres_addr,
+            "name": test_db,
+            "user": "postgres",
+            "password": "develove",
+            "pool-size": 8,
+            "pool-recycle": -1,
+            "max-overflow": 64,
+        },
+        "manager": {
+            "id": f"i-{test_id}",
+            "num-proc": 1,
+            "distributed-lock": "filelock",
+            "ipc-base-path": ipc_base_path,
+            "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+            "allowed-plugins": set(),
+            "disabled-plugins": set(),
+        },
+        "debug": {
+            "enabled": False,
+            "log-events": False,
+            "log-scheduler-ticks": False,
+            "periodic-sync-stats": False,
+        },
+        "logging": logging_config,
+    })
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()
@@ -234,8 +229,10 @@ def etcd_fixture(
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
             "volumes": {
@@ -355,7 +352,8 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent("""
+    alembic_config_template = textwrap.dedent(
+        """
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -381,12 +379,15 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """).strip()
+    """
+    ).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
@@ -727,13 +728,11 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
 
     async def create_kernel(image="lua:5.3-alpine", tag=None):
         url = "/v3/kernel/"
-        req_bytes = json.dumps(
-            {
-                "image": image,
-                "tag": tag,
-                "clientSessionToken": sess_id,
-            }
-        ).encode()
+        req_bytes = json.dumps({
+            "image": image,
+            "tag": tag,
+            "clientSessionToken": sess_id,
+        }).encode()
         headers = get_headers("POST", url, req_bytes)
         response = await client.post(url, data=req_bytes, headers=headers)
         return await response.json()
@@ -785,6 +784,7 @@ async def registry_ctx(mocker):
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
     mock_redis_image = MagicMock()
+    mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
@@ -798,6 +798,7 @@ async def registry_ctx(mocker):
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
         redis_image=mock_redis_image,
+        redis_stream=mock_redis_stream,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
@@ -847,11 +848,13 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
-        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        user_resource_policy = UserResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+        )
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_size=-1
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
         )
         db_sess.add(project_resource_policy)
 

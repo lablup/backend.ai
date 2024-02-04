@@ -1,13 +1,15 @@
 import sys
 import uuid
+from typing import Sequence
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.group import _default_detail_fields, _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.cli.params import BoolExprType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 
+from ...func.group import _default_detail_fields, _default_list_fields
+from ...session import Session
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
@@ -89,23 +91,26 @@ def list(ctx: CLIContext, domain_name) -> None:
 @click.option("-i", "--inactive", is_flag=True, help="New group will be inactive.")
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts",
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
     type=str,
     default="{}",
     help=(
-        "Allowed virtual folder hosts. It must be JSON string (e.g:"
-        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
 def add(
     ctx: CLIContext,
-    domain_name,
-    name,
-    description,
-    inactive,
-    total_resource_slots,
-    allowed_vfolder_hosts,
-):
+    domain_name: str,
+    name: str,
+    description: str,
+    inactive: bool,
+    total_resource_slots: str,  # JSON string
+    vfolder_host_perms: str,  # JSON string
+) -> None:
     """
     Add new group. A group must belong to a domain, so DOMAIN_NAME should be provided.
 
@@ -121,7 +126,7 @@ def add(
                 description=description,
                 is_active=not inactive,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                allowed_vfolder_hosts=vfolder_host_perms,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -146,21 +151,53 @@ def add(
 @group.command()
 @pass_ctx_obj
 @click.argument("gid", type=str, metavar="GROUP_ID")
-@click.option("-n", "--name", type=str, help="New name of the group")
-@click.option("-d", "--description", type=str, help="Description of the group")
-@click.option("--is-active", type=bool, help="Set group inactive.")
-@click.option("--total-resource-slots", type=str, help="Update total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts",
-    type=str,
+    "-n",
+    "--name",
+    type=OptionalType(str),
+    default=undefined,
+    help="New name of the group",
+)
+@click.option(
+    "-d",
+    "--description",
+    type=OptionalType(str),
+    default=undefined,
+    help="Description of the group",
+)
+@click.option(
+    "--is-active",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Set group inactive.",
+)
+@click.option(
+    "--total-resource-slots",
+    type=OptionalType(str),
+    default=undefined,
+    help="Update total resource slots.",
+)
+@click.option(
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=OptionalType(str),
+    default=undefined,
     help=(
-        "Allowed virtual folder hosts. It must be JSON string (e.g:"
-        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
 def update(
-    ctx: CLIContext, gid, name, description, is_active, total_resource_slots, allowed_vfolder_hosts
-):
+    ctx: CLIContext,
+    gid: str | Undefined,
+    name: str | Undefined,
+    description: str | Undefined,
+    is_active: bool | Undefined,
+    total_resource_slots: str | Undefined,  # JSON string
+    vfolder_host_perms: str | Undefined,  # JSON string
+) -> None:
     """
     Update an existing group. Domain name is not necessary since group ID is unique.
 
@@ -174,7 +211,7 @@ def update(
                 description=description,
                 is_active=is_active,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                allowed_vfolder_hosts=vfolder_host_perms,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -201,7 +238,7 @@ def update(
 @group.command()
 @pass_ctx_obj
 @click.argument("gid", type=str, metavar="GROUP_ID")
-def delete(ctx: CLIContext, gid):
+def delete(ctx: CLIContext, gid: str) -> None:
     """
     Inactivates the existing group. Does not actually delete it for safety.
 
@@ -235,7 +272,7 @@ def delete(ctx: CLIContext, gid):
 @group.command()
 @pass_ctx_obj
 @click.argument("gid", type=str, metavar="GROUP_ID")
-def purge(ctx: CLIContext, gid):
+def purge(ctx: CLIContext, gid: str) -> None:
     """
     Delete the existing group. This action cannot be undone.
 
@@ -273,7 +310,7 @@ def purge(ctx: CLIContext, gid):
 @pass_ctx_obj
 @click.argument("gid", type=str, metavar="GROUP_ID")
 @click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
-def add_users(ctx: CLIContext, gid, user_uuids):
+def add_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
     """
     Add users to a group.
 
@@ -310,7 +347,7 @@ def add_users(ctx: CLIContext, gid, user_uuids):
 @pass_ctx_obj
 @click.argument("gid", type=str, metavar="GROUP_ID")
 @click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
-def remove_users(ctx: CLIContext, gid, user_uuids):
+def remove_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
     """
     Remove users from a group.
 

@@ -58,6 +58,7 @@ async def test_stream_fanout_cluster(
         s.master_for(service_name="mymaster"),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=s,
+        name="test",
         service_name="mymaster",
     )
 

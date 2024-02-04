@@ -60,7 +60,8 @@
       "Serving": "Servis",
       "PasswordChangePlace": "Üst çubuktaki kişi simgesine tıklayın ve \"Hesabım\" menüsüne gidin.",
       "Notifications": "Bildirimler",
-      "Tasks": "Görevler"
+      "Tasks": "Görevler",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Etkin",
     "ATOMEnabled": "ATOM NPU Etkin",
     "WarboyEnabled": "Warboy NPU Etkinleştirildi",
-    "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin"
+    "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Ayarlanacak ön açık bağlantı noktaları (isteğe bağlı)",
       "PortsTitleWithRange": "Port değeri (1024 ~ 65535 arasında)",
       "PrePortConfigWillDisappear": "Kaydedilmemiş tüm önceden açık portlar kaybolacaktır.",
-      "StartModelServing": "Model Servisini Başlat"
+      "StartModelServing": "Model Servisini Başlat",
+      "PreOpenPortRangeGuide": "Virgülle (,) veya boşlukla ayırarak birden fazla değer girin.",
+      "preopen": "önceden açılmak",
+      "Network": "Ağ",
+      "Enable": "Olanak vermek",
+      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir.",
+      "PreOpenPortMaxCountLimit": "En fazla {{sayı}} ön açık bağlantı noktası ayarlayabilirsiniz.",
+      "StartTimeMustBeInTheFuture": "Başlangıç zamanı geçerli saatten sonra olmalıdır.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Konteyner Başına Kaynak Tahsisi",
+      "NumberOfContainer": "Konteyner sayısı",
+      "EnterEnvironmentVariable": "Değişken adını girin",
+      "EnvironmentVariableNamePatternError": "Değişken adı bir harf veya alt çizgi ile başlamalıdır ve yalnızca harfler, sayılar ve alt çizgiler içerebilir.",
+      "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -286,7 +306,9 @@
       "EnterValidSessionName": "Geçerli oturum adını girin",
       "SessionNameRequired": "Oturum adı gereklidir",
       "SluggedStrings": "Kesikli dizeler (>3 karakter)",
-      "SessionNameAlreadyExist": "Oturum adı zaten mevcut"
+      "SessionNameAlreadyExist": "Oturum adı zaten mevcut",
+      "SessionNameTooLong64": "Lütfen 64 veya daha az karakter girin.",
+      "PleaseFollowSessionNameRule": "Lütfen en az 4 harf, rakam, '.', '_' ve '-' kombinasyonunu girin."
     },
     "Interactive": "İnteraktif",
     "Batch": "Toplu İş",
@@ -341,7 +363,12 @@
     "DescCommitSession": "Aşağıdaki oturuma karşılık gelen konteyneri işlemek üzeresiniz:",
     "NoSessionToDisplay": "Görüntülenecek oturum yok",
     "StatusInfo": "Durum Bilgisi",
-    "System": "Oturumları Yükle"
+    "System": "Oturumları Yükle",
+    "ExpiresAfter": "Kalan süre",
+    "CPU": "CPU",
+    "MEM": "Hafıza",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (bellek)"
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -362,7 +389,6 @@
     "DeleteAll": "Hepsini sil",
     "Update": "Güncelleme",
     "Delete": "Sil",
-    "Dismiss": "Reddet",
     "DismissAndProceed": "Kapat ve Devam Et",
     "Close": "Kapat",
     "Confirm": "Onaylamak",
@@ -415,7 +441,9 @@
     "Control": "Kontrol",
     "NewPassword": "Yeni Şifre",
     "Enabled": "Etkin",
-    "StorageProxies": "Depolar"
+    "StorageProxies": "Depolar",
+    "None": "Hiçbiri",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "izin",
@@ -492,7 +520,8 @@
     "KeypairDetail": "Anahtar Çifti Detayı",
     "SignoutSeccessfullyFinished": "Çıkış işlemi başarıyla tamamlandı",
     "Status": "Durum",
-    "NoUserToDisplay": "Görüntülenecek Kullanıcı Yok"
+    "NoUserToDisplay": "Görüntülenecek Kullanıcı Yok",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "klasörler",
@@ -657,7 +686,8 @@
     "Used": "Kullanılmış",
     "Pipeline": "Boru Hattı Klasörleri",
     "DialogDataFolder": "FastTrack'te boru hatları oluşturulurken otomatik olarak oluşturulan boru hattına özel klasörler.",
-    "DialogModelFolder": "Modellere hizmet verebilir ve yönetebilirsiniz."
+    "DialogModelFolder": "Modellere hizmet verebilir ve yönetebilirsiniz.",
+    "SearchByName": "Ada göre ara"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Paylaşılan bellek (GB)",
     "NoResourcePresetToDisplay": "Görüntülenecek Kaynak Ön Ayarı yok",
-    "Deleted": "Kaynak ön ayarı başarıyla silindi."
+    "Deleted": "Kaynak ön ayarı başarıyla silindi.",
+    "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır"
   },
   "usersettings": {
     "General": "Genel",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Lütfen bir seçeneği seçin.",
     "RegistrySuccessfullyModified": "Kayıt defteri başarıyla değiştirildi.",
     "NoRegistryToDisplay": "Görüntülenecek Kayıt Yok",
-    "ModifyRegistry": "Kayıt Defterini Değiştir"
+    "ModifyRegistry": "Kayıt Defterini Değiştir",
+    "ConfirmNoUserName": "Kullanıcı ve şifre belirtilmemiş, kaydetmek ister misiniz?"
   },
   "resourceGroup": {
     "ResourceGroups": "Kaynak Grupları",
@@ -991,14 +1023,27 @@
     "IOWriteDesc": "Hesaplama oturumundan yazılan veri miktarı. (Veri klasörleri gibi harici olarak bağlanan aygıtlardan yazılan veri miktarı dahil değildir)."
   },
   "language": {
-    "English": "ingilizce",
-    "Korean": "Koreli",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Dil",
     "OSDefault": "İşletim Sistemi Varsayılanı",
-    "Russian": "Rusça",
-    "French": "Fransızca",
-    "Mongolian": "Moğolca",
-    "Indonesian": "Endonezce"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Depodan yeni görüntüler kaydet",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Güncelleme hatası",
     "APIEndpointIsEmpty": "API Uç Noktası boş. Lütfen kaydolmak için Backend.AI API uç noktasını belirtin.",
-    "LoginSucceededManagerNotResponding": "Giriş başarılı ancak yönetici yanıt vermiyor."
+    "LoginSucceededManagerNotResponding": "Giriş başarılı ancak yönetici yanıt vermiyor.",
+    "NetworkConnectionFailed": "Ağ bağlantısı başarısız oldu. Ağ durumunu kontrol edin.",
+    "LoginFailed": "Giriş başarısız oldu. Giriş bilgilerini kontrol edin.",
+    "AuthenticationFailed": "Kimlik doğrulama başarısız oldu. Bilgileri ve yönetici durumunu kontrol edin.",
+    "VirtualFolderAlreadyExist": "Aynı ada sahip bir sanal klasör zaten mevcut. Kendi klasörünüzü silin veya daveti reddedin.",
+    "TooManyLoginFailures": "Kısa süre içinde çok fazla oturum açma hatası oldu. Giriş bir süreliğine engellendi.",
+    "MaximumVfolderCreation": "Kaynak ilkesi nedeniyle daha fazla vfolder oluşturamazsınız",
+    "CannotChangeVirtualFolderOption": "Bana ait olmayan bir vfolder'ın seçeneklerini değiştiremezsiniz.",
+    "CannotSharePrivateAutomountFolder": "İlkeye uygun olarak automount vfolders paylaşılamıyor.",
+    "FolderSharingNotAvailableToUser": "Klasör paylaşımı istenen kullanıcı(lar) için mevcut değil.",
+    "ReachedResourceLimit": "Kaynak sınırınıza ulaştınız. Kaynakları ve oturumları kontrol edin.",
+    "UserHasNoGroup": "Kullanıcının grubu yok. Düzeltmek için lütfen yöneticiyle iletişime geçin.",
+    "InvalidSignupToken": "Geçersiz kayıt belirteci",
+    "LoginInformationMismatch": "Giriş bilgileri uyuşmazlığı. Bilgilerinizi kontrol edin",
+    "ResourcePolicyAlreadyExist": "Aynı ada sahip bir kaynak ilkesi zaten mevcut.",
+    "ScalingGroupAlreadyExist": "Aynı ada sahip bir kaynak grubu zaten mevcut.",
+    "UserNameAlreadyExist": "Kullanıcı adı zaten mevcut. Çoğaltılamaz.",
+    "ResourceLimitExceed": "Kaynak sınırı aşıldı. Ücretsiz kaynaklarınızı kontrol edin.",
+    "ResourcePolicyStillReferenced": "Bu kaynak ilkesine referans veren anahtar çiftleri vardır.",
+    "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
+    "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
+    "WrongAPIServerAddress": "Yanlış API sunucu adresi."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1288,7 +1354,7 @@
     "FormValidationFailed": "Form doğrulama başarısız oldu",
     "StartNewServing": "Yeni servis başlatın",
     "ServiceName": "Hizmet Adı",
-    "ServiceNameRule": "Yalnızca alfanümerik, alt çizgi (_), kısa çizgi (-) ve nokta (.) karakterlerinden oluşan 4 ila 64 karaktere izin verin ve alfanümerik bir karakterle bitmelidir.",
+    "ServiceNameRule": "Yalnızca alfanümerik, alt çizgi (_), kısa çizgi (-) ve nokta (.) karakterlerinden oluşan 4 ila 24 karaktere izin verin ve alfanümerik bir karakterle bitmelidir.",
     "OpenToPublic": "Halka Açık",
     "DesiredRoutingCount": "İstenen Yönlendirme Sayısı",
     "ServingRouteErrorModalTitle": "Hizmet Veren Rota Hatası",

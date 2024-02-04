@@ -8,6 +8,7 @@ import sys
 import uuid
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import IO, List, Literal, Optional, Sequence
 
@@ -18,12 +19,12 @@ from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from faker import Faker
-from graphlib import TopologicalSorter
 from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import CommaSeparatedListType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run
@@ -32,9 +33,7 @@ from ...func.session import ComputeSession
 from ...output.fields import session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
-from ...types import Undefined, undefined
 from .. import events
-from ..params import CommaSeparatedListType, OptionalType
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
 from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
@@ -167,8 +166,8 @@ def _create_cmd(docs: str = None):
 
         ######
         envs = prepare_env_arg(env)
-        resources = prepare_resource_arg(resources)
-        resource_opts = prepare_resource_arg(resource_opts)
+        parsed_resources = prepare_resource_arg(resources)
+        parsed_resource_opts = prepare_resource_arg(resource_opts)
         mount, mount_map = prepare_mount_arg(mount)
 
         preopen_ports = preopen
@@ -191,8 +190,8 @@ def _create_cmd(docs: str = None):
                     mount_map=mount_map,
                     envs=envs,
                     startup_command=startup_command,
-                    resources=resources,
-                    resource_opts=resource_opts,
+                    resources=parsed_resources,
+                    resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
                     group_name=group,
@@ -249,8 +248,9 @@ def _create_cmd(docs: str = None):
                     )
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled."
-                        .format(compute_session.id)
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            compute_session.id
+                        )
                     )
 
     if docs is not None:
@@ -392,10 +392,10 @@ def _create_from_template_cmd(docs: str = None):
             name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
-        resources = (
+        parsed_resources = (
             prepare_resource_arg(resources) if len(resources) > 0 or no_resource else undefined
         )
-        resource_opts = (
+        parsed_resource_opts = (
             prepare_resource_arg(resource_opts)
             if len(resource_opts) > 0 or no_resource
             else undefined
@@ -421,8 +421,8 @@ def _create_from_template_cmd(docs: str = None):
                     mount_map=prepared_mount_map,
                     envs=envs,
                     startup_command=startup_command,
-                    resources=resources,
-                    resource_opts=resource_opts,
+                    resources=parsed_resources,
+                    resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
                     group_name=group,
@@ -457,8 +457,9 @@ def _create_from_template_cmd(docs: str = None):
                     print_info("Session ID {0} is still on the job queue.".format(name))
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled."
-                        .format(name)
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            name
+                        )
                     )
 
     if docs is not None:
@@ -544,7 +545,14 @@ session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 def _restart_cmd(docs: str = None):
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
-    def restart(session_refs):
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    def restart(session_refs, owner):
         """
         Restart the compute session.
 
@@ -559,7 +567,7 @@ def _restart_cmd(docs: str = None):
             has_failure = False
             for session_ref in session_refs:
                 try:
-                    compute_session = session.ComputeSession(session_ref)
+                    compute_session = session.ComputeSession(session_ref, owner)
                     compute_session.restart()
                 except BackendAPIError as e:
                     print_error(e)
@@ -1026,18 +1034,16 @@ session.command()(_events_cmd())
 
 
 def _fetch_session_names():
-    status = ",".join(
-        [
-            "PENDING",
-            "SCHEDULED",
-            "PREPARING",
-            "RUNNING",
-            "RUNNING_DEGRADED",
-            "RESTARTING",
-            "TERMINATING",
-            "ERROR",
-        ]
-    )
+    status = ",".join([
+        "PENDING",
+        "SCHEDULED",
+        "PREPARING",
+        "RUNNING",
+        "RUNNING_DEGRADED",
+        "RESTARTING",
+        "TERMINATING",
+        "ERROR",
+    ])
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],

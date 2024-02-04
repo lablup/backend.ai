@@ -60,7 +60,8 @@
       "Tasks": "Даалгаврууд",
       "YouMushChangeYourPassword": "Аюулгүй байдлын үүднээс нууц үгээ үе үе өөрчлөхийг зөвлөж байна. \nТа нууц үгээ хамгийн сүүлд сольсноос хойш тодорхой хугацаа өнгөрсөн тул үйлчилгээгээ үргэлжлүүлэн ашиглахын тулд үүнийг өөрчлөх шаардлагатай.",
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
-      "PleaseConfirmYourPassword": "Нууц үгээ баталгаажуулна уу"
+      "PleaseConfirmYourPassword": "Нууц үгээ баталгаажуулна уу",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Та одоо офлайн байна",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI програмыг татаж аваарай",
     "IPUEnabled": "IPU NPU идэвхжүүлсэн",
     "ATOMEnabled": "ATOM NPU-г идэвхжүүлсэн",
-    "WarboyEnabled": "Warboy NPU идэвхжүүлсэн"
+    "WarboyEnabled": "Warboy NPU идэвхжүүлсэн",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Тохируулахын тулд портуудыг урьдчилан нээх (заавал биш)",
       "PreOpenPortRange": "Урьдчилан нээх портуудыг зөвхөн 1024-ээс 65535 хүртэл ашиглах боломжтой.",
       "MinMemory": "Одоогоор сонгогдсон ажиллах орчны орчны хамгийн бага санах ойн багтаамж нь {{size}}iB байна.",
-      "ModelStorage": "Загвар хадгалах"
+      "ModelStorage": "Загвар хадгалах",
+      "PreOpenPortRangeGuide": "Таслал (,) эсвэл хоосон зайгаар тусгаарласан олон утгыг оруулна уу.",
+      "preopen": "урьдчилан нээх",
+      "Network": "Сүлжээ",
+      "Enable": "Идэвхжүүлэх",
+      "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө.",
+      "StartTimeMustBeInTheFuture": "Эхлэх цаг нь одоогийн цагаас хойш байх ёстой.",
+      "PreOpenPortMaxCountLimit": "__NOT_TRANSLATED__",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Нэг контейнерт нөөцийн хуваарилалт",
+      "NumberOfContainer": "Савны тоо",
+      "EnterEnvironmentVariable": "Хувьсагчийн нэрийг оруулна уу",
+      "EnvironmentVariableNamePatternError": "Хувьсагчийн нэр үсэг эсвэл доогуур зураасаар эхлэх ёстой бөгөөд зөвхөн үсэг, тоо, доогуур зураас агуулсан байж болно.",
+      "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -296,7 +316,9 @@
       "SessionNameRequired": "Сеансын нэрийг оруулах шаардлагатай",
       "EnterValidSessionName": "Хүчинтэй сессийн нэрийг оруулна уу",
       "SessionNameAlreadyExist": "Сешн нэр аль хэдийн байна",
-      "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)"
+      "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)",
+      "SessionNameTooLong64": "64 ба түүнээс бага тэмдэгт оруулна уу.",
+      "PleaseFollowSessionNameRule": "Дор хаяж 4 үсэг, тоо, '.', '_', '-' гэсэн хослолыг оруулна уу."
     },
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "NoSessionToDisplay": "Харуулах сесс алга",
@@ -341,7 +363,12 @@
     "ConnectionNotice": "Анхаар",
     "Readless": "Бага унш",
     "Readmore": "Цааш унших...",
-    "SessionType": "SessionType"
+    "SessionType": "SessionType",
+    "ExpiresAfter": "Үлдсэн хугацаа",
+    "CPU": "CPU",
+    "MEM": "Санах ой",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (санах ой)"
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -362,7 +389,6 @@
     "DeleteAll": "Бүгдийг нь устгах",
     "Update": "Шинэчлэх",
     "Delete": "Устгах",
-    "Dismiss": "Ажлаас халах",
     "DismissAndProceed": "Ажлаас халах, үргэлжлүүлэх",
     "Close": "Хаах",
     "Confirm": "Баталгаажуулах",
@@ -415,7 +441,9 @@
     "Control": "Хяналт",
     "NewPassword": "Шинэ нууц үг",
     "Enabled": "Идэвхжсэн",
-    "StorageProxies": "Хадгалах сан"
+    "StorageProxies": "Хадгалах сан",
+    "None": "Байхгүй",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -492,7 +520,8 @@
     "AdminCanOnlyRemoveTotp": "Зөвхөн бусад хэрэглэгчдийн 2FA-г идэвхгүй болгох боломжтой.",
     "KeySeccessfullyDeleted": "KeyPair амжилттай устгагдсан.",
     "SignoutSeccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
-    "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх"
+    "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Фолдерууд",
@@ -657,7 +686,8 @@
     "HostDetails": "Сонгосон хадгалах сангийн хостын квотын мэдээллийг харуулна.",
     "Used": "Ашигласан",
     "Pipeline": "Дамжуулах хоолойн хавтас",
-    "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд."
+    "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд.",
+    "SearchByName": "Нэрээр нь хайх"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Хуваалцсан санах ой (GB)",
     "Deleted": "Нөөцийн урьдчилсан тохируулгыг амжилттай устгалаа.",
-    "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй"
+    "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Ерөнхий",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Нэг сонголтыг сонгоно уу.",
     "RegistrySuccessfullyModified": "Бүртгэл амжилттай өөрчлөгдсөн.",
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
-    "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй"
+    "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -991,14 +1023,27 @@
     "UsageHistoryNote": "Энд үзүүлсэн ашиглалтын түүх нь дуусгавар болсон тооцооллын сешнүүдэд тулгуурласан болно. \nМөн долоо хоногоос илүүгүй хугацаанд бүртгэл үүсгэсэн хэрэглэгчдэд нэг долоо хоногийн ашиглалтын түүхийг харуулахгүй байж болно."
   },
   "language": {
-    "English": "Англи",
-    "Korean": "Солонгос",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Хэл",
     "OSDefault": "Үйлдлийн системийн дагуу",
-    "Russian": "Орос",
-    "French": "Франц",
+    "Russian": "русский",
+    "French": "Français",
     "Mongolian": "Монгол",
-    "Indonesian": "Индонез"
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Шинэчлэлтийн алдаа",
     "APIEndpointIsEmpty": "API Төгсгөлийн цэг (endpoint) хоосон байна. Бүртгүүлэхдээ Backend.AI API төгсгөлийн цэгийг зааж өгнө үү.",
-    "LoginSucceededManagerNotResponding": "Нэвтрэлт амжилттай болсон боловч менежер хариу өгөхгүй байна."
+    "LoginSucceededManagerNotResponding": "Нэвтрэлт амжилттай болсон боловч менежер хариу өгөхгүй байна.",
+    "APINotSupported": "API дэмждэггүй. \nBackend.AI менежерийн хамгийн сүүлийн хувилбарыг шаарддаг.",
+    "AuthenticationFailed": "Баталгаажуулалт амжилтгүй боллоо. \nМэдээлэл болон менежерийн статусыг шалгана уу.",
+    "CannotChangeVirtualFolderOption": "Та миний эзэмшдэггүй vfolder-ийн сонголтыг өөрчлөх боломжгүй.",
+    "CannotSharePrivateAutomountFolder": "Бодлогын дагуу автоматаар холбох vfolders хуваалцах боломжгүй.",
+    "FolderSharingNotAvailableToUser": "Хүссэн хэрэглэгчдэд хавтас хуваалцах боломжгүй.",
+    "InvalidSignupToken": "Буруу бүртгүүлэх токен",
+    "LoginFailed": "Нэвтэрч чадсангүй. \nНэвтрэх мэдээллийг шалгана уу.",
+    "LoginInformationMismatch": "Нэвтрэх мэдээлэл таарахгүй байна. \nМэдээллээ шалгана уу",
+    "MaximumVfolderCreation": "Нөөцийн бодлогын улмаас та илүү олон v хавтас үүсгэх боломжгүй",
+    "NetworkConnectionFailed": "Сүлжээний холболт амжилтгүй боллоо. \nСүлжээний статусыг шалгана уу.",
+    "ReachedResourceLimit": "Таны нөөцийн хязгаарт хүрсэн. \nНөөц болон сессүүдийг шалгана уу.",
+    "ResourcePolicyAlreadyExist": "Ижил нэртэй нөөцийн бодлого аль хэдийн байна.",
+    "ResourcePolicyStillReferenced": "Энэ нөөцийн бодлогыг лавлах түлхүүр хосууд байдаг.",
+    "ScalingGroupAlreadyExist": "Ижил нэртэй нөөцийн бүлэг аль хэдийн байна.",
+    "SmallerResourceThenImageRequires": "Таны нөөцийн хүсэлт зурагт шаардагдах доод хэмжээнээс бага байна. \nИлүү их нөөцийг туршиж үзээрэй.",
+    "TooManyLoginFailures": "Богино хугацаанд нэвтэрч ороход маш олон алдаа гарсан. \nНэвтрэхийг хэсэг хугацаанд хаасан.",
+    "UserHasNoGroup": "Хэрэглэгч бүлэггүй байна. \nҮүнийг засахын тулд админтай холбогдоно уу.",
+    "UserNameAlreadyExist": "Хэрэглэгчийн нэр аль хэдийн байна. \nҮүнийг хуулбарлах боломжгүй.",
+    "VirtualFolderAlreadyExist": "Ижил нэртэй виртуал хавтас аль хэдийн байна. \nӨөрийн фолдерыг устгах эсвэл урилгаас татгалзаарай.",
+    "WrongAPIServerAddress": "API серверийн хаяг буруу байна.",
+    "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу."
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",
@@ -1363,7 +1429,7 @@
     "TokenExpiredDateHelp": "Өгөгдмөл токен дуусах хугацаа нь 24 цагийн дараа байна.",
     "TokenExpiredDateError": "Токен дуусах хугацаа нь одоогийн цагаас хойш байх ёстой",
     "FormValidationFailed": "Маягтын баталгаажуулалт амжилтгүй боллоо",
-    "ServiceNameRule": "Зөвхөн 4-64 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
+    "ServiceNameRule": "Зөвхөн 4-24 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
     "resources": "Нөөц",
     "Image": "Зураг"
   },

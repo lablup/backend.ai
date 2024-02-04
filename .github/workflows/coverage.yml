@@ -12,7 +12,7 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
+    runs-on: [ubuntu-latest-8-cores]
     steps:
     - uses: actions/checkout@v4
       with:
@@ -20,7 +20,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -33,7 +33,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip

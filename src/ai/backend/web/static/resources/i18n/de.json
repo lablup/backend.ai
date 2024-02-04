@@ -60,7 +60,8 @@
       "Serving": "Bedienung von",
       "PasswordChangePlace": "Klicken Sie auf das Personensymbol in der oberen Leiste und rufen Sie das Menü \"Mein Konto\" auf.",
       "Notifications": "Benachrichtigungen",
-      "Tasks": "Aufgaben"
+      "Tasks": "Aufgaben",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Aktiviert",
     "ATOMEnabled": "ATOM NPU Aktiviert",
     "WarboyEnabled": "Warboy NPU Aktiviert",
-    "DownloadWebUIApp": "Backend.AI Web UI App herunterladen"
+    "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PreOpenPortPanelTitle": "Vorgeöffnete Ports einstellen (optional)",
       "PortsTitleWithRange": "Port-Wert (zwischen 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Alle nicht gespeicherten, bereits geöffneten Ports werden gelöscht.",
-      "StartModelServing": "Start Model Serving"
+      "StartModelServing": "Start Model Serving",
+      "PreOpenPortRangeGuide": "Geben Sie mehrere Werte ein, getrennt durch ein Komma (,) oder ein Leerzeichen.",
+      "preopen": "Voreröffnet",
+      "Network": "Netzwerk",
+      "Enable": "Aktivieren",
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
+      "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Ressourcenzuweisung pro Container",
+      "NumberOfContainer": "Nummer des Behälters",
+      "EnterEnvironmentVariable": "Variablenname eingeben",
+      "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+      "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -286,7 +306,9 @@
       "EnterValidSessionName": "Gültigen Sitzungsnamen eingeben",
       "SessionNameRequired": "Sitzungsname ist erforderlich",
       "SluggedStrings": "Geschliffene Zeichenfolgen (>3 Zeichen)",
-      "SessionNameAlreadyExist": "Sitzungsname existiert bereits"
+      "SessionNameAlreadyExist": "Sitzungsname existiert bereits",
+      "SessionNameTooLong64": "Bitte geben Sie maximal 64 Zeichen ein.",
+      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein."
     },
     "Interactive": "Interaktiv",
     "Batch": "Stapel",
@@ -341,7 +363,12 @@
     "DescCommitSession": "Sie sind im Begriff, einen Container zu übertragen, der der folgenden Sitzung entspricht:",
     "NoSessionToDisplay": "Keine Sitzungen zum Anzeigen",
     "StatusInfo": "Status-Infos",
-    "System": "Upload-Sitzungen"
+    "System": "Upload-Sitzungen",
+    "ExpiresAfter": "Verbleibende Zeit",
+    "CPU": "CPU",
+    "MEM": "Speicher",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (Speicher)"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -362,7 +389,6 @@
     "DeleteAll": "Alles löschen",
     "Update": "Aktualisieren",
     "Delete": "Löschen",
-    "Dismiss": "Entlassen",
     "DismissAndProceed": "Ablehnen und fortfahren",
     "Close": "Schließen",
     "Confirm": "Bestätigen",
@@ -415,7 +441,9 @@
     "Control": "Steuerung",
     "NewPassword": "Neues Kennwort",
     "Enabled": "aktiviert",
-    "StorageProxies": "Speicher"
+    "StorageProxies": "Speicher",
+    "None": "Keine",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -492,7 +520,8 @@
     "KeypairDetail": "Schlüsselpaar Detail",
     "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
-    "NoUserToDisplay": "Keine Benutzer zum Anzeigen"
+    "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Ordner",
@@ -657,7 +686,8 @@
     "Used": "Gebraucht",
     "Pipeline": "Pipeline-Ordner",
     "DialogDataFolder": "Pipeline-spezifische Ordner, die bei der Erstellung von Pipelines in FastTrack automatisch erstellt werden.",
-    "DialogModelFolder": "Sie können Modelle bedienen und verwalten."
+    "DialogModelFolder": "Sie können Modelle bedienen und verwalten.",
+    "SearchByName": "Suche mit Name"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "Arbeitsspeicher (GB)",
     "SharedMemory": "Gemeinsamer Speicher (GB)",
     "NoResourcePresetToDisplay": "Keine Ressourcenvoreinstellungen anzeigen",
-    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht."
+    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht.",
+    "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher"
   },
   "usersettings": {
     "General": "Allgemeines",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "Bitte wählen Sie eine Option.",
     "RegistrySuccessfullyModified": "Registry erfolgreich geändert.",
     "NoRegistryToDisplay": "Keine Registrierungen anzeigen",
-    "ModifyRegistry": "Registry ändern"
+    "ModifyRegistry": "Registry ändern",
+    "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -991,14 +1023,27 @@
     "IOWriteDesc": "Die Menge der von der Computersitzung geschriebenen Daten. (Die Datenmenge, die von extern angeschlossenen Geräten wie Datenordnern geschrieben wird, ist nicht enthalten)."
   },
   "language": {
-    "English": "Englisch",
-    "Korean": "Koreanisch",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Sprache",
     "OSDefault": "Betriebssystemstandard",
-    "Russian": "Russisch",
-    "French": "Französisch",
-    "Mongolian": "Mongolei",
-    "Indonesian": "Indonesisch"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Neue Bilder aus dem Repository registrieren",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "Aktualisierungsfehler",
     "APIEndpointIsEmpty": "API-Endpunkt ist leer. Bitte geben Sie den Backend.AI API-Endpunkt für die Anmeldung an.",
-    "LoginSucceededManagerNotResponding": "Anmeldung erfolgreich, aber Manager antwortet nicht."
+    "LoginSucceededManagerNotResponding": "Anmeldung erfolgreich, aber Manager antwortet nicht.",
+    "NetworkConnectionFailed": "Netzwerkverbindung fehlgeschlagen. Überprüfen Sie den Netzwerkstatus.",
+    "LoginFailed": "Anmeldung fehlgeschlagen. Überprüfen Sie die Anmeldeinformationen.",
+    "AuthenticationFailed": "Authentifizierung fehlgeschlagen. Prüfen Sie die Informationen und den Status des Managers.",
+    "VirtualFolderAlreadyExist": "Es existiert bereits ein virtueller Ordner mit demselben Namen. Löschen Sie Ihren eigenen Ordner oder lehnen Sie die Einladung ab.",
+    "TooManyLoginFailures": "Es gab zu viele Login-Fehler in kurzer Zeit. Die Anmeldung ist eine Zeit lang blockiert.",
+    "MaximumVfolderCreation": "Sie können aufgrund von Ressourcenrichtlinien keine weiteren vOrdner erstellen",
+    "CannotChangeVirtualFolderOption": "Sie können die Optionen eines vOrdners, der mir nicht gehört, nicht ändern.",
+    "CannotSharePrivateAutomountFolder": "Die Freigabe von automatisch eingehängten vOrdnern gemäß der Richtlinie ist nicht möglich.",
+    "FolderSharingNotAvailableToUser": "Die gemeinsame Nutzung von Ordnern ist für den/die gewünschten Benutzer nicht verfügbar.",
+    "ReachedResourceLimit": "Sie haben Ihr Ressourcenlimit erreicht. Überprüfen Sie Ressourcen und Sitzungen.",
+    "UserHasNoGroup": "Der Benutzer hat keine Gruppe. Bitte kontaktieren Sie den Administrator, um das Problem zu beheben.",
+    "InvalidSignupToken": "Ungültiges Anmelde-Token",
+    "LoginInformationMismatch": "Die Anmeldeinformationen stimmen nicht überein. Prüfen Sie Ihre Informationen",
+    "ResourcePolicyAlreadyExist": "Es existiert bereits eine Ressourcenrichtlinie mit demselben Namen.",
+    "ScalingGroupAlreadyExist": "Eine Ressourcengruppe mit demselben Namen existiert bereits.",
+    "UserNameAlreadyExist": "Der Benutzername existiert bereits. Er kann nicht dupliziert werden.",
+    "ResourceLimitExceed": "Ressourcenlimit überschritten. Überprüfen Sie Ihre freien Ressourcen.",
+    "ResourcePolicyStillReferenced": "Es gibt Schlüsselpaare, die auf diese Ressourcenpolitik verweisen.",
+    "SmallerResourceThenImageRequires": "Ihre Ressourcenanforderung ist kleiner als das für das Bild erforderliche Minimum. Versuchen Sie es mit mehr Ressourcen.",
+    "APINotSupported": "API wird nicht unterstützt. Erfordert die neueste Version des Backend.AI-Managers.",
+    "WrongAPIServerAddress": "Falsche API-Serveradresse."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
@@ -1288,7 +1354,7 @@
     "FormValidationFailed": "Formularüberprüfung fehlgeschlagen",
     "StartNewServing": "Neue Portion starten",
     "ServiceName": "Dienst Name",
-    "ServiceNameRule": "Erlaubt sind nur 4 bis 64 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
+    "ServiceNameRule": "Erlaubt sind nur 4 bis 24 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
     "OpenToPublic": "Offen für die Öffentlichkeit",
     "DesiredRoutingCount": "Gewünschte Routinganzahl",
     "ServingRouteErrorModalTitle": "Serving Route Fehler",

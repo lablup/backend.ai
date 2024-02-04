@@ -245,12 +245,9 @@ class InlineRoutingFormatter(OutputFormatter):
         count_by_status: defaultdict[int, int] = defaultdict(int)
         for route in value:
             count_by_status[route["status"]] += 1
-        return ", ".join(
-            [
-                f"{key} {value}"
-                for key, value in sorted(count_by_status.items(), key=lambda kv: kv[0])
-            ]
-        )
+        return ", ".join([
+            f"{key} {value}" for key, value in sorted(count_by_status.items(), key=lambda kv: kv[0])
+        ])
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value

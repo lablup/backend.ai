@@ -60,7 +60,8 @@
       "Serving": "服务",
       "PasswordChangePlace": "点击顶部栏上的个人图标，进入 \"我的账户 \"菜单。",
       "Notifications": "通知",
-      "Tasks": "任务"
+      "Tasks": "任务",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "您现在离线",
     "YouAreOnline": "您现在在线",
@@ -108,7 +109,8 @@
     "IPUEnabled": "启用 IPU NPU",
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
-    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序"
+    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -230,7 +232,25 @@
       "PortsTitleWithRange": "端口值（1024 ~ 65535 之间）",
       "PrePortConfigWillDisappear": "任何未保存的预打开端口都将消失。",
       "StartModelServing": "开始模型服务",
-      "ModelStorage": "模型存储"
+      "ModelStorage": "模型存储",
+      "PreOpenPortRangeGuide": "您可以输入多个值，以逗号（,）或空格分隔。",
+      "preopen": "预开放端口",
+      "Network": "网络",
+      "Enable": "启用",
+      "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
+      "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
+      "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "每个集装箱的资源分配",
+      "NumberOfContainer": "集装箱数量",
+      "EnterEnvironmentVariable": "输入变量名称",
+      "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
+      "EnvironmentVariableDuplicateName": "已经存在的变量名。"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -286,7 +306,9 @@
       "EnterValidSessionName": "输入有效的会话名称",
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
-      "SessionNameAlreadyExist": "会话名称已存在"
+      "SessionNameAlreadyExist": "会话名称已存在",
+      "SessionNameTooLong64": "请输入不超过 64 个字符。",
+      "PleaseFollowSessionNameRule": "请输入至少 4 个字母、数字、“.”、“_”和“-”的组合字符。"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -341,7 +363,12 @@
     "DescCommitSession": "您即将提交与下面会话相对应的容器：",
     "NoSessionToDisplay": "没有会话显示",
     "StatusInfo": "状态信息",
-    "System": "上传会话"
+    "System": "上传会话",
+    "ExpiresAfter": "剩余时间",
+    "CPU": "中央处理器",
+    "MEM": "内存",
+    "GPU": "GPU",
+    "GPU(MEM)": "图形处理器（内存）"
   },
   "button": {
     "Cancel": "取消",
@@ -362,7 +389,6 @@
     "DeleteAll": "删除所有",
     "Update": "更新",
     "Delete": "删除",
-    "Dismiss": "解雇",
     "DismissAndProceed": "解雇并继续",
     "Close": "关闭",
     "Confirm": "确认",
@@ -415,7 +441,9 @@
     "Control": "控制",
     "NewPassword": "新密码",
     "Enabled": "启用",
-    "StorageProxies": "存储"
+    "StorageProxies": "存储",
+    "None": "无",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "允许",
@@ -492,7 +520,8 @@
     "KeypairDetail": "配对密钥详情",
     "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
-    "NoUserToDisplay": "无用户显示"
+    "NoUserToDisplay": "无用户显示",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "文件夹",
@@ -657,7 +686,8 @@
     },
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
-    "DialogModelFolder": "您可以服务和管理模型。"
+    "DialogModelFolder": "您可以服务和管理模型。",
+    "SearchByName": "按名称搜索"
   },
   "dialog": {
     "warning": {
@@ -748,7 +778,8 @@
     "RAM": "内存 (GB)",
     "SharedMemory": "共享内存 (GB)",
     "NoResourcePresetToDisplay": "无资源预置显示",
-    "Deleted": "资源预置已成功删除。"
+    "Deleted": "资源预置已成功删除。",
+    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存"
   },
   "usersettings": {
     "General": "一般的",
@@ -884,7 +915,8 @@
     "PleaseSelectOption": "请选择一个选项。",
     "RegistrySuccessfullyModified": "注册表已成功修改。",
     "NoRegistryToDisplay": "无注册表显示",
-    "ModifyRegistry": "修改注册表"
+    "ModifyRegistry": "修改注册表",
+    "ConfirmNoUserName": "未指定用户和密码，要保存吗？"
   },
   "resourceGroup": {
     "ResourceGroups": "资源组",
@@ -991,14 +1023,27 @@
     "IOWriteDesc": "从计算会话写入的数据量。(不包括从外部安装的设备（如数据文件夹）写入的数据量）。"
   },
   "language": {
-    "English": "英语",
-    "Korean": "韩国人",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "语",
     "OSDefault": "操作系统默认值",
-    "Russian": "俄罗斯",
-    "French": "法语",
-    "Mongolian": "蒙古语",
-    "Indonesian": "印尼语"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "从存储库注册新图像",
@@ -1257,7 +1302,28 @@
   "error": {
     "UpdateError": "更新错误",
     "APIEndpointIsEmpty": "API 端点为空。请指定 Backend.AI API 端点进行注册。",
-    "LoginSucceededManagerNotResponding": "登录成功，但经理没有响应。"
+    "LoginSucceededManagerNotResponding": "登录成功，但经理没有响应。",
+    "NetworkConnectionFailed": "网络连接失败。检查网络状态。",
+    "LoginFailed": "登录失败。检查登录信息。",
+    "AuthenticationFailed": "验证失败。检查信息和管理器状态。",
+    "VirtualFolderAlreadyExist": "已存在同名的虚拟文件夹。删除自己的文件夹或拒绝邀请。",
+    "TooManyLoginFailures": "短时间内登录失败次数过多。登录被暂时阻止。",
+    "MaximumVfolderCreation": "由于资源政策原因，无法创建更多 v 文件夹",
+    "CannotChangeVirtualFolderOption": "您不能更改不属于自己的 v 文件夹的选项。",
+    "CannotSharePrivateAutomountFolder": "无法按照策略共享自动挂载 v 文件夹。",
+    "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹。",
+    "ReachedResourceLimit": "已达到资源限制。检查资源和会话。",
+    "UserHasNoGroup": "用户没有组。请联系管理员修复。",
+    "InvalidSignupToken": "无效注册令牌",
+    "LoginInformationMismatch": "登录信息不匹配。检查您的信息",
+    "ResourcePolicyAlreadyExist": "已存在同名的资源策略。",
+    "ScalingGroupAlreadyExist": "已存在同名资源组。",
+    "UserNameAlreadyExist": "用户名已存在。不能重复。",
+    "ResourceLimitExceed": "超出资源限制。检查您的免费资源。",
+    "ResourcePolicyStillReferenced": "存在引用该资源策略的密钥对。",
+    "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
+    "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
+    "WrongAPIServerAddress": "错误的 API 服务器地址。"
   },
   "maxLength": {
     "64chars": "（最多 64 个字符）",
@@ -1328,7 +1394,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 64 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",

@@ -34,7 +34,8 @@ from kubernetes_asyncio import config as kube_config
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.common.events import EventProducer
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -101,6 +102,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         agent_sockpath: Path,
@@ -113,6 +115,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
             local_config,
             computers,
@@ -326,38 +329,34 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             self.config_maps.append(cm)
 
-        await self.process_volumes(
-            [
-                KubernetesConfigMapVolume(
-                    name=f"kernel-{self.kernel_id}-ssh-keypair",
-                    configMap={
-                        "name": "ssh-keypair-hash",
-                    },
-                ),
-            ]
-        )
-        await self.process_mounts(
-            [
-                Mount(
-                    MountTypes.K8S_GENERIC,
-                    Path("public"),
-                    Path("/home/config/ssh/id_cluster.pub"),
-                    permission=MountPermission.READ_ONLY,
-                    opts={
-                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                    },
-                ),
-                Mount(
-                    MountTypes.K8S_GENERIC,
-                    Path("private"),
-                    Path("/home/config/ssh/id_cluster.pub"),
-                    permission=MountPermission.READ_ONLY,
-                    opts={
-                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                    },
-                ),
-            ]
-        )
+        await self.process_volumes([
+            KubernetesConfigMapVolume(
+                name=f"kernel-{self.kernel_id}-ssh-keypair",
+                configMap={
+                    "name": "ssh-keypair-hash",
+                },
+            ),
+        ])
+        await self.process_mounts([
+            Mount(
+                MountTypes.K8S_GENERIC,
+                Path("public"),
+                Path("/home/config/ssh/id_cluster.pub"),
+                permission=MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                },
+            ),
+            Mount(
+                MountTypes.K8S_GENERIC,
+                Path("private"),
+                Path("/home/config/ssh/id_cluster.pub"),
+                permission=MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                },
+            ),
+        ])
 
     async def process_mounts(self, mounts: Sequence[Mount]):
         for i, mount in zip(range(len(mounts)), mounts):
@@ -382,7 +381,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     ),
                 )
             else:
-                log.warn(
+                log.warning(
                     "Mount {}:{} -> Mount type {} it not supported on K8s Agent. Skipping mount",
                     mount.source,
                     mount.target,
@@ -439,17 +438,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     "name": f"kernel-{self.kernel_id}-hostPath-{idx}",
                 },
             )
-            await self.process_volumes(
-                [
-                    KubernetesHostPathVolume(
-                        name=f"kernel-{self.kernel_id}-hostPath-{idx}",
-                        hostPath={
-                            "path": vfolder.host_path.as_posix(),
-                            "type": "Directory",
-                        },
-                    ),
-                ]
-            )
+            await self.process_volumes([
+                KubernetesHostPathVolume(
+                    name=f"kernel-{self.kernel_id}-hostPath-{idx}",
+                    hostPath={
+                        "path": vfolder.host_path.as_posix(),
+                        "type": "Directory",
+                    },
+                ),
+            ])
             resource_spec.mounts.append(mount)
 
     async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
@@ -579,36 +576,32 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 ssh_config_map = ConfigMap(self.kernel_id, f"kernel-{self.kernel_id}-ssh-config")
                 ssh_config_map.put("authorized_keys", pubkey)
                 ssh_config_map.put("id_container", privkey)
-                await self.process_volumes(
-                    [
-                        KubernetesConfigMapVolume(
-                            name="ssh-config",
-                            configMap={
-                                "name": f"kernel-{self.kernel_id}-ssh-config",
-                            },
-                        ),
-                    ]
-                )
-                await self.process_mounts(
-                    [
-                        Mount(
-                            MountTypes.K8S_GENERIC,
-                            Path("authorized_keys"),
-                            Path("/home/work/.ssh/authorized_keys"),
-                            opts={
-                                "name": "ssh-config",
-                            },
-                        ),
-                        Mount(
-                            MountTypes.K8S_GENERIC,
-                            Path("id_container"),
-                            Path("/home/work/.ssh/id_container"),
-                            opts={
-                                "name": "ssh-config",
-                            },
-                        ),
-                    ]
-                )
+                await self.process_volumes([
+                    KubernetesConfigMapVolume(
+                        name="ssh-config",
+                        configMap={
+                            "name": f"kernel-{self.kernel_id}-ssh-config",
+                        },
+                    ),
+                ])
+                await self.process_mounts([
+                    Mount(
+                        MountTypes.K8S_GENERIC,
+                        Path("authorized_keys"),
+                        Path("/home/work/.ssh/authorized_keys"),
+                        opts={
+                            "name": "ssh-config",
+                        },
+                    ),
+                    Mount(
+                        MountTypes.K8S_GENERIC,
+                        Path("id_container"),
+                        Path("/home/work/.ssh/id_container"),
+                        opts={
+                            "name": "ssh-config",
+                        },
+                    ),
+                ])
 
         # higher priority dotfiles are stored last to support overwriting
         for dotfile in self.internal_data.get("dotfiles", []):
@@ -725,37 +718,31 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             raise
 
         node_ports = expose_service_api_response.spec.ports
-        arguments.append(
-            (
-                None,
-                functools.partial(
-                    core_api.delete_namespaced_service, expose_service.name, "backend-ai"
-                ),
-            )
-        )
+        arguments.append((
+            None,
+            functools.partial(
+                core_api.delete_namespaced_service, expose_service.name, "backend-ai"
+            ),
+        ))
         for cm in self.config_maps:
-            arguments.append(
-                (
-                    functools.partial(
-                        core_api.create_namespaced_config_map,
-                        "backend-ai",
-                        body=cm.to_dict(),
-                    ),
-                    functools.partial(core_api.delete_namespaced_config_map, cm.name, "backend-ai"),
-                )
-            )
-
-        arguments.append(
-            (
+            arguments.append((
                 functools.partial(
-                    apps_api.create_namespaced_deployment,
+                    core_api.create_namespaced_config_map,
                     "backend-ai",
-                    body=deployment,
-                    pretty="pretty-example",
+                    body=cm.to_dict(),
                 ),
-                None,
-            )
-        )
+                functools.partial(core_api.delete_namespaced_config_map, cm.name, "backend-ai"),
+            ))
+
+        arguments.append((
+            functools.partial(
+                apps_api.create_namespaced_deployment,
+                "backend-ai",
+                body=deployment,
+                pretty="pretty-example",
+            ),
+            None,
+        ))
 
         await rollup(arguments)
 
@@ -845,15 +832,13 @@ class KubernetesAgent(
 
         namespaces = await core_api.list_namespace()
         if len(list(filter(lambda ns: ns.metadata.name == "backend-ai", namespaces.items))) == 0:
-            await core_api.create_namespace(
-                {
-                    "apiVersion": "v1",
-                    "kind": "Namespace",
-                    "metadata": {
-                        "name": "backend-ai",
-                    },
-                }
-            )
+            await core_api.create_namespace({
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {
+                    "name": "backend-ai",
+                },
+            })
 
         pv = await core_api.list_persistent_volume(
             label_selector="backend.ai/backend-ai-scratch-volume"
@@ -1025,6 +1010,7 @@ class KubernetesAgent(
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
             self.local_config,
             self.agent_sockpath,

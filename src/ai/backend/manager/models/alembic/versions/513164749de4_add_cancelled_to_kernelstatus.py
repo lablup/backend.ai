@@ -5,6 +5,7 @@ Revises: 405aa2c39458
 Create Date: 2019-09-20 11:13:39.157834
 
 """
+
 import textwrap
 
 import sqlalchemy as sa
@@ -55,12 +56,14 @@ def upgrade():
     conn.execute(text("DROP INDEX IF EXISTS ix_kernels_unique_sess_token;"))
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;"))
     kernelstatus_new.create(conn)
-    query = textwrap.dedent("""
+    query = textwrap.dedent(
+        """
     ALTER TABLE kernels
         ALTER COLUMN "status" DROP DEFAULT,
         ALTER COLUMN "status" TYPE kernelstatus USING "status"::text::kernelstatus,
         ALTER COLUMN "status" SET DEFAULT 'PENDING'::kernelstatus;
-    """)
+    """
+    )
     conn.execute(text(query))
     query = "DROP TYPE kernelstatus_old;"
     conn.execute(text(query))
@@ -78,7 +81,10 @@ def downgrade():
     conn = op.get_bind()
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;"))
     kernelstatus_old.create(conn)
-    conn.execute(text(textwrap.dedent("""\
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
             ALTER TABLE kernels
                 ALTER COLUMN "status" DROP DEFAULT,
                 ALTER COLUMN "status" TYPE kernelstatus USING (
@@ -88,7 +94,10 @@ def downgrade():
                     END
                 )::kernelstatus,
                 ALTER COLUMN "status" SET DEFAULT 'PREPARING'::kernelstatus;
-            """)))
+            """
+            )
+        )
+    )
     conn.execute(text("DROP TYPE kernelstatus_new;"))
     op.create_index(
         "ix_kernels_unique_sess_token",

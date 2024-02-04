@@ -38,7 +38,7 @@ as a reference implementation of API clients.
   - `storage/`: Storage proxy
   - `storage/api`: Storage proxy's manager-facing and client-facing APIs
   - `web/`: Web UI server
-    - `static/`: A git subtree of [lablup/backend.ai-app](https://github.com/lablup/backend.ai-app) tracking its main branch
+    - `static/`: Backend.AI WebUI release artifacts
   - `plugin/`: Plugin subsystem
   - `test/`: Integration test suite
   - `testutils/`: Shared utilities used by unit tests
@@ -173,10 +173,10 @@ and basic administration tasks.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
-**Synchronizing the backend.ai-app repository as a subtree:**
+**Synchronizing the static Backend.AI WebUI version:**
 ```console
 $ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
-$ git subtree pull --squash --prefix=src/ai/backend/web/static webui-package main
+$ scripts/download-webui-release.sh <target version to download>
 ```
 
 ### Kernels
@@ -270,7 +270,7 @@ Python Version Compatibility
 
 | Backend.AI Core Version | Compatible Python Version |
 |:-----------------------:|:-------------------------:|
-| 23.03.x                 | 3.11.x                    |
+| 23.03.x / 23.09.x       | 3.11.x                    |
 | 22.03.x / 22.09.x       | 3.10.x                    |
 | 21.03.x / 21.09.x       | 3.8.x                     |
 

@@ -26,6 +26,7 @@ from .base import (
     EnumValueType,
     ForeignKeyIDColumn,
     IDColumn,
+    InferenceSessionError,
     Item,
     PaginatedList,
     ResourceSlotColumn,
@@ -117,7 +118,7 @@ class EndpointRow(Base):
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    url = sa.Column("url", sa.String(length=1024), unique=True)
+    url = sa.Column("url", sa.String(length=1024))
     resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     cluster_mode = sa.Column(
         "cluster_mode",
@@ -146,6 +147,12 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    created_user_row = relationship(
+        "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
+    )
+    session_owner_row = relationship(
+        "UserRow", back_populates="owned_endpoints", foreign_keys="EndpointRow.session_owner"
+    )
 
     def __init__(
         self,
@@ -203,6 +210,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_tokens=False,
         load_image=False,
+        load_created_user=False,
+        load_session_owner=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -214,6 +223,10 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -236,6 +249,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_image=False,
         load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
     ) -> List["EndpointRow"]:
         query = (
@@ -249,6 +264,10 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -354,17 +373,6 @@ class EndpointTokenRow(Base):
         return row
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
-        src = graphene.String(required=True)
-        name = graphene.String(required=True)
-        repr = graphene.String(required=True)
-
-    session_id = graphene.UUID(required=True)
-
-    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
-
-
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -378,8 +386,16 @@ class Endpoint(graphene.ObjectType):
     url = graphene.String()
     model = graphene.UUID()
     model_mount_destiation = graphene.String()
-    created_user = graphene.UUID()
-    session_owner = graphene.UUID()
+    created_user = graphene.UUID(
+        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+    )
+    created_user_email = graphene.String(description="Added at 23.09.8")
+    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner = graphene.UUID(
+        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+    )
+    session_owner_email = graphene.String(description="Added at 23.09.8")
+    session_owner_id = graphene.UUID(description="Added at 23.09.8")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -420,7 +436,11 @@ class Endpoint(graphene.ObjectType):
             model=row.model,
             model_mount_destiation=row.model_mount_destiation,
             created_user=row.created_user,
+            created_user_id=row.created_user,
+            created_user_email=row.created_user_row.email,
             session_owner=row.session_owner,
+            session_owner_id=row.session_owner,
+            session_owner_email=row.session_owner_row.email,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,
@@ -452,9 +472,10 @@ class Endpoint(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(EndpointRow)
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -486,11 +507,14 @@ class Endpoint(graphene.ObjectType):
             .offset(offset)
             .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
+            .options(selectinload(EndpointRow.created_user_row))
+            .options(selectinload(EndpointRow.session_owner_row))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -522,9 +546,15 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
-                session, project=project, domain=domain_name, user_uuid=user_uuid, load_image=True
+                session,
+                project=project,
+                domain=domain_name,
+                user_uuid=user_uuid,
+                load_image=True,
+                load_created_user=True,
+                load_session_owner=True,
             )
-        return [await Endpoint.from_row(ctx, row) for row in rows]
+            return [await Endpoint.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -549,10 +579,12 @@ class Endpoint(graphene.ObjectType):
                     project=project,
                     load_image=True,
                     load_routes=True,
+                    load_created_user=True,
+                    load_session_owner=True,
                 )
+                return await Endpoint.from_row(ctx, row)
         except NoResultFound:
             raise EndpointNotFound
-        return await Endpoint.from_row(ctx, row)
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
@@ -569,39 +601,27 @@ class Endpoint(graphene.ObjectType):
         return "PROVISIONING"
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
-        from .session import SessionRow
-
-        ctx = info.context
-        async with ctx.db.begin_readonly_session() as db_sess:
-            error_routes = [
-                r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name
-            ]
-            query = sa.select(SessionRow).where(
-                SessionRow.id.in_([r.session for r in error_routes])
-            )
-            result = await db_sess.execute(query)
-            error_sessions = result.scalars().all()
-
-            errors_by_session = []
-            for sess in error_sessions:
-                if "error" not in sess.status_data:
-                    continue
-                if sess.status_data["error"]["name"] == "MultiAgentError":
-                    errors = sess.status_data["error"]["collection"]
-                else:
-                    errors = [sess.status_data["error"]]
-                errors_by_session.append(
-                    InferenceSessionError(
-                        session_id=sess.id,
-                        errors=[
-                            InferenceSessionError.InferenceSessionErrorInfo(
-                                src=e["src"], name=e["name"], repr=e["repr"]
-                            )
-                            for e in errors
-                        ],
-                    )
+        error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
+        errors = []
+        for route in error_routes:
+            match route.error_data["type"]:
+                case "session_cancelled":
+                    session_id = route.error_data["session_id"]
+                case _:
+                    session_id = None
+            errors.append(
+                InferenceSessionError(
+                    session_id=session_id,
+                    errors=[
+                        InferenceSessionError.InferenceSessionErrorInfo(
+                            src=e["src"], name=e["name"], repr=e["repr"]
+                        )
+                        for e in route.error_data["errors"]
+                    ],
                 )
-            return errors_by_session
+            )
+
+        return errors
 
 
 class EndpointList(graphene.ObjectType):
