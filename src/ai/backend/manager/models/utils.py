@@ -189,6 +189,7 @@ async def connect_database(
         url,
         connect_args=pgsql_connect_opts,
         pool_size=local_config["db"]["pool-size"],
+        pool_recycle=local_config["db"]["pool-recycle"],
         max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,

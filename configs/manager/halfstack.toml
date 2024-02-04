@@ -11,6 +11,7 @@ addr = { host = "localhost", port = 8100 }
 name = "backend"
 user = "postgres"
 password = "develove"
+pool-recycle = 50
 
 
 [manager]
