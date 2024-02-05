@@ -715,9 +715,7 @@ class SchedulerDispatcher(aobject):
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
         if requested_architectures is None:
-            raise GenericBadRequest(
-                "Requested session has no architecture information"
-            )
+            raise GenericBadRequest("Requested session has no architecture information")
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
@@ -725,11 +723,7 @@ class SchedulerDispatcher(aobject):
 
         try:
             if candidate_agents is None:
-                raise InstanceNotAvailable(
-                    extra_msg=(
-                        "No agents are registered with the manager"
-                    )
-                )
+                raise InstanceNotAvailable(extra_msg=("No agents are registered with the manager"))
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -1036,9 +1030,7 @@ class SchedulerDispatcher(aobject):
                         ]
                         if candidate_agents is None:
                             raise InstanceNotAvailable(
-                                extra_msg=(
-                                    "No agents are registered with the manager"
-                                )
+                                extra_msg=("No agents are registered with the manager")
                             )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
