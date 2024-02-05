@@ -1618,9 +1618,9 @@ async def purge_vfolders(
     *,
     storage_manager: StorageSessionManager,
     db: ExtendedAsyncSAEngine,
-    reporter: ProgressReporter,
+    reporter: ProgressReporter | None = None,
 ) -> None:
-    async def _task(reporter: ProgressReporter):
+    async def _task(reporter: ProgressReporter | None):
         row_deletion_infos: list[VFolderDeletionInfo] = []
         failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
         for vfolder_info in requested_vfolders:
@@ -1652,7 +1652,8 @@ async def purge_vfolders(
             else:
                 row_deletion_infos.append(vfolder_info)
                 progress_msg = f"Purge successs (id: {folder_id})"
-            await reporter.update(1, message=progress_msg)
+            if reporter is not None:
+                await reporter.update(1, message=progress_msg)
         if row_deletion_infos:
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
@@ -1664,6 +1665,9 @@ async def purge_vfolders(
 
             await execute_with_retry(_delete_row)
             log.debug("Successfully remove vfolder {}", [str(x) for x in vfolder_ids])
+
+    if reporter is not None:
+        reporter.total_progress = len(requested_vfolders)
 
     async with aiotools.TaskGroup() as tg:
         tg.create_task(_task(reporter))
