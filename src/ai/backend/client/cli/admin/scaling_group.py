@@ -100,7 +100,7 @@ def list(ctx: CLIContext) -> None:
     default="{}",
     help="""
         Set scheduler options as a JSON string.
-        For 'allowed_session_types', if the key does not exist, the values 'interactive' and 'batch' are set.
+        If the 'allowed_session_types' key is not specified, the policy defaults to accept both 'interactive' and 'batch'.
         """,
 )
 @click.option(
@@ -212,7 +212,7 @@ def add(
     default=undefined,
     help="""
         Set scheduler options as a JSON string.
-        For 'allowed_session_types', if the key does not exist, the values 'interactive' and 'batch' are set.
+        If the 'allowed_session_types' key is not specified, the policy defaults to accept both 'interactive' and 'batch'.
         """,
 )
 @click.option(
