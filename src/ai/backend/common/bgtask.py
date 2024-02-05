@@ -38,7 +38,7 @@ from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-TaskResult = Literal["bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed"]
+TaskStatus = Literal["bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed"]
 BgtaskEvents: TypeAlias = (
     BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
 )
@@ -168,7 +168,7 @@ class BackgroundTaskManager:
                         "total_progress": task_info["total"],
                         "message": task_info["msg"],
                     }
-                    await resp.send(json.dumps(body), event=f"bgtask_{task_info['status']}")
+                    await resp.send(json.dumps(body), event="bgtask_" + task_info["status"])
                 finally:
                     await resp.send("{}", event="server_close")
             return resp
@@ -252,7 +252,7 @@ class BackgroundTaskManager:
         task_name: str | None,
         **kwargs,
     ) -> None:
-        task_result: TaskResult = "bgtask_started"
+        task_result: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
