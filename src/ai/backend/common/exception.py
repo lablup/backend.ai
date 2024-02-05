@@ -58,16 +58,14 @@ class InvalidImageTag(ValueError):
     ```
     """
 
-    def __init__(self, tag: str, value: str | None = None) -> None:
-        super(InvalidImageTag, self).__init__(tag, value)
+    def __init__(self, tag: str, full_name: str | None = None) -> None:
+        super().__init__(tag, full_name)
         self._tag = tag
-        self._value = value
+        self._full_name = full_name
 
     def __str__(self) -> str:
-        if self._value is not None:
-            return (
-                f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._value}"
-            )
+        if self._full_name is not None:
+            return f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._full_name}"
         else:
             return f"Invalid or duplicate image name tag: {self._tag}"
 
