@@ -714,12 +714,22 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
+        if requested_architectures is None:
+            raise GenericBadRequest(
+                "Requested session has no architecture information"
+            )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
 
         try:
+            if candidate_agents is None:
+                raise InstanceNotAvailable(
+                    extra_msg=(
+                        "No agents are registered with the manager"
+                    )
+                )
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -997,7 +1007,7 @@ class SchedulerDispatcher(aobject):
                                     AgentRow.occupied_slots,
                                 ]).where(AgentRow.id == agent.id)
                             )
-                        ).fecthall()[0]
+                        ).fetchall()[0]
 
                         if result is None:
                             raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
@@ -1024,6 +1034,12 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
+                        if candidate_agents is None:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    "No agents are registered with the manager"
+                                )
+                            )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
