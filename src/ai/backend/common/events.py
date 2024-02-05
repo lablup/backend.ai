@@ -552,6 +552,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
     current_progress: float = attrs.field()
     total_progress: float = attrs.field()
     message: Optional[str] = attrs.field(default=None)
+    log_type: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -559,6 +560,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
             self.current_progress,
             self.total_progress,
             self.message,
+            self.log_type,
         )
 
     @classmethod
@@ -568,6 +570,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
             value[1],
             value[2],
             value[3],
+            value[4],
         )
 
 

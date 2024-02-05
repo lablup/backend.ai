@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask import LogType, ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -1626,6 +1626,7 @@ async def purge_vfolders(
         for vfolder_info in requested_vfolders:
             folder_id, host_name = vfolder_info
             proxy_name, volume_name = storage_manager.split_host(host_name)
+            log_type = LogType.INFO
             try:
                 async with storage_manager.request(
                     proxy_name,
@@ -1645,15 +1646,17 @@ async def purge_vfolders(
                     err_str = repr(e)
                     failed_deletion.append((vfolder_info, err_str))
                     progress_msg = f"Purge fail due to error, (id: {folder_id}, status: {e.status}, e: {err_str})"
+                    log_type = LogType.ERROR
             except Exception as e:
                 err_str = repr(e)
                 failed_deletion.append((vfolder_info, err_str))
                 progress_msg = f"Purge fail due to error, (id: {folder_id}, e: {err_str})"
+                log_type = LogType.ERROR
             else:
                 row_deletion_infos.append(vfolder_info)
                 progress_msg = f"Purge successs (id: {folder_id})"
             if reporter is not None:
-                await reporter.update(1, message=progress_msg)
+                await reporter.update(1, message=progress_msg, log_type=log_type)
         if row_deletion_infos:
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 

@@ -7,6 +7,7 @@ import time
 import uuid
 import weakref
 from collections import defaultdict
+from enum import StrEnum, auto
 from typing import (
     Awaitable,
     Callable,
@@ -46,6 +47,13 @@ BgtaskEvents: TypeAlias = (
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 
+class LogType(StrEnum):
+    INFO = auto()
+    WARNING = auto()
+    ERROR = auto()
+    DEBUG = auto()
+
+
 class ProgressReporter:
     event_producer: Final[EventProducer]
     task_id: Final[uuid.UUID]
@@ -68,6 +76,7 @@ class ProgressReporter:
         self,
         increment: Union[int, float] = 0,
         message: str | None = None,
+        log_type: LogType = LogType.INFO,
     ) -> None:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
@@ -84,6 +93,7 @@ class ProgressReporter:
                     "current": str(current),
                     "total": str(total),
                     "msg": message or "",
+                    "log_type": str(log_type),
                     "last_update": str(time.time()),
                 },
             )
@@ -167,6 +177,7 @@ class BackgroundTaskManager:
                         "current_progress": task_info["current"],
                         "total_progress": task_info["total"],
                         "message": task_info["msg"],
+                        "log_type": task_info.get("log_type", str(LogType.INFO)),
                     }
                     await resp.send(json.dumps(body), event="bgtask_" + task_info["status"])
                 finally:
@@ -191,17 +202,24 @@ class BackgroundTaskManager:
                                 "task_id": str(task_id),
                                 "message": event.message,
                             }
-                            if isinstance(event, BgtaskUpdatedEvent):
-                                body["current_progress"] = event.current_progress
-                                body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
-                            if (
-                                isinstance(event, BgtaskDoneEvent)
-                                or isinstance(event, BgtaskFailedEvent)
-                                or isinstance(event, BgtaskCancelledEvent)
-                            ):
-                                await resp.send("{}", event="server_close")
-                                break
+                            match event:
+                                case BgtaskUpdatedEvent(
+                                    name=name,
+                                    current_progress=progress,
+                                    total_progress=total_progress,
+                                    log_type=log_type,
+                                ):
+                                    body["current_progress"] = progress
+                                    body["total_progress"] = total_progress
+                                    body["log_type"] = log_type
+                                    await resp.send(json.dumps(body), event=name, retry=5)
+                                case (
+                                    BgtaskDoneEvent()
+                                    | BgtaskFailedEvent()
+                                    | BgtaskCancelledEvent()
+                                ):
+                                    await resp.send("{}", event="server_close")
+                                    break
                         finally:
                             my_queue.task_done()
                 finally:
@@ -264,16 +282,19 @@ class BackgroundTaskManager:
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
             BgtaskDoneEvent
         )
+        log_type = LogType.INFO
         try:
             message = await func(reporter, **kwargs) or ""
             task_status = "bgtask_done"
         except asyncio.CancelledError:
             task_status = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
+            log_type = LogType.WARNING
         except Exception as e:
             task_status = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
+            log_type = LogType.ERROR
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
         finally:
             redis_producer = self.event_producer.redis_client
@@ -287,6 +308,7 @@ class BackgroundTaskManager:
                         "status": task_status.removeprefix("bgtask_"),
                         "msg": message,
                         "last_update": str(time.time()),
+                        "log_type": str(log_type),
                     },
                 )
                 await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
