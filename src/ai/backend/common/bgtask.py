@@ -165,7 +165,7 @@ class BackgroundTaskManager:
                         "total_progress": task_info["total"],
                         "message": task_info["msg"],
                     }
-                    await resp.send(json.dumps(body), event=f"task_{task_info['status']}")
+                    await resp.send(json.dumps(body), event=f"bgtask_{task_info['status']}")
                 finally:
                     await resp.send("{}", event="server_close")
             return resp
