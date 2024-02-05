@@ -252,7 +252,7 @@ class BackgroundTaskManager:
         task_name: str | None,
         **kwargs,
     ) -> None:
-        task_result: TaskStatus = "bgtask_started"
+        task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
@@ -260,12 +260,12 @@ class BackgroundTaskManager:
         )
         try:
             message = await func(reporter, **kwargs) or ""
-            task_result = "bgtask_done"
+            task_status = "bgtask_done"
         except asyncio.CancelledError:
-            task_result = "bgtask_cancelled"
+            task_status = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
         except Exception as e:
-            task_result = "bgtask_failed"
+            task_status = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
@@ -278,7 +278,7 @@ class BackgroundTaskManager:
                 await pipe.hset(
                     tracker_key,
                     mapping={
-                        "status": task_result.removeprefix("bgtask_"),
+                        "status": task_status.removeprefix("bgtask_"),
                         "msg": message,
                         "last_update": str(time.time()),
                     },
@@ -293,7 +293,7 @@ class BackgroundTaskManager:
                     message=message,
                 ),
             )
-            log.info("Task {} ({}): {}", task_id, task_name or "", task_result)
+            log.info("Task {} ({}): {}", task_id, task_name or "", task_status)
 
     async def shutdown(self) -> None:
         join_tasks = []
