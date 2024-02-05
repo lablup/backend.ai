@@ -216,6 +216,7 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         name: str | None = None,
+        total_progress: int = 0,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -230,7 +231,7 @@ class BackgroundTaskManager:
                 mapping={
                     "status": "started",
                     "current": "0",
-                    "total": "0",
+                    "total": total_progress,
                     "msg": "",
                     "started_at": now,
                     "last_update": now,
@@ -241,7 +242,9 @@ class BackgroundTaskManager:
 
         await redis_helper.execute(redis_producer, _pipe_builder)
 
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
+        task = asyncio.create_task(
+            self._wrapper_task(func, task_id, name, total_progress, **kwargs)
+        )
         self.ongoing_tasks.add(task)
         return task_id
 
@@ -250,10 +253,13 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: str | None,
+        task_total_progress: int = 0,
         **kwargs,
     ) -> None:
         task_status: TaskStatus = "bgtask_started"
-        reporter = ProgressReporter(self.event_producer, task_id)
+        reporter = ProgressReporter(
+            self.event_producer, task_id, total_progress=task_total_progress
+        )
         message = ""
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
             BgtaskDoneEvent

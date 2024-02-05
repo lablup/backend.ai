@@ -1666,9 +1666,6 @@ async def purge_vfolders(
             await execute_with_retry(_delete_row)
             log.debug("Successfully remove vfolder {}", [str(x) for x in vfolder_ids])
 
-    if reporter is not None:
-        reporter.total_progress = len(requested_vfolders)
-
     async with aiotools.TaskGroup() as tg:
         tg.create_task(_task(reporter))
 
@@ -1709,7 +1706,9 @@ class PurgeVFolder(graphene.Mutation):
                 reporter=reporter,
             )
 
-        task_id = await graph_ctx.background_task_manager.start(_purge_task)
+        task_id = await graph_ctx.background_task_manager.start(
+            _purge_task, total_progress=len(vfolder_infos)
+        )
         return PurgeVFolder(ok=True, msg="", task_id=task_id)
 
 
