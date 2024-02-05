@@ -438,6 +438,13 @@ class AgentRegistry:
                         "Alias name cannot be set to an existing folder name: " + str(alias_name)
                     )
 
+        if _resources := config["resources"]:
+            available_resource_slots = await self.shared_config.get_resource_slots()
+            try:
+                ResourceSlot.from_user_input(_resources, available_resource_slots)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
+
         # Resolve the image reference.
         try:
             async with self.db.begin_readonly_session() as session:
@@ -995,6 +1002,7 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
+            "use_host_network": use_host_network,
         }
 
         kernel_shared_data = {
