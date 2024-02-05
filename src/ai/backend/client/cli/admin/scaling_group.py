@@ -98,7 +98,10 @@ def list(ctx: CLIContext) -> None:
     "--scheduler-opts",
     type=JSONParamType(),
     default="{}",
-    help="Set scheduler options as a JSON string.",
+    help="""
+        Set scheduler options as a JSON string.
+        For 'allowed_session_types', if the key does not exist, the values 'interactive' and 'batch' are set.
+        """,
 )
 @click.option(
     "--use-host-network",
@@ -207,7 +210,10 @@ def add(
     "--scheduler-opts",
     type=OptionalType(JSONParamType),
     default=undefined,
-    help="Set scheduler options as a JSON string.",
+    help="""
+        Set scheduler options as a JSON string.
+        For 'allowed_session_types', if the key does not exist, the values 'interactive' and 'batch' are set.
+        """,
 )
 @click.option(
     "--use-host-network",
