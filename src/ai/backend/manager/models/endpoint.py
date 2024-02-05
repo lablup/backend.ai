@@ -384,8 +384,9 @@ class Endpoint(graphene.ObjectType):
 
     endpoint_id = graphene.UUID()
     image = graphene.String()
-    architecture = graphene.String()
+    image_id = graphene.UUID(description="Added at 23.09.9")
     image_row = Image
+    architecture = graphene.String()
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
@@ -435,6 +436,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             image=row.image_row.name,
+            image_id=row.image_row.id,
             architecture=row.image_row.architecture,
             domain=row.domain,
             project=row.project,
@@ -595,7 +597,7 @@ class Endpoint(graphene.ObjectType):
             raise EndpointNotFound
 
     async def resolve_image_row(self, info: graphene.ResolveInfo) -> Image:
-        query = sa.select(ImageRow).where(ImageRow.id == self.image)
+        query = sa.select(ImageRow).where(ImageRow.id == self.image_id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
             raw_result = await db_session.scalar(query)
