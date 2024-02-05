@@ -597,7 +597,11 @@ class Endpoint(graphene.ObjectType):
             raise EndpointNotFound
 
     async def resolve_image_row(self, info: graphene.ResolveInfo) -> Image:
-        query = sa.select(ImageRow).where(ImageRow.id == self.image_id)
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id == self.image_id)
+            .options(selectinload(ImageRow.aliases))
+        )
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
             raw_result = await db_session.scalar(query)
