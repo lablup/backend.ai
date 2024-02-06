@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from pprint import pformat, pprint
-import json
 
 import click
 import sqlalchemy as sa
@@ -196,7 +195,7 @@ async def dealias(cli_ctx, alias):
 
 
 async def validate_image_alias(cli_ctx, alias: str) -> dict[str, str]:
-    async with(
+    async with (
         connect_database(cli_ctx.local_config) as db,
         db.begin_session() as session,
     ):
@@ -213,14 +212,15 @@ async def validate_image_alias(cli_ctx, alias: str) -> dict[str, str]:
 
 
 async def validate_image_canonical(cli_ctx, canonical: str, architecture: str) -> dict[str, str]:
-    async with(
+    async with (
         connect_database(cli_ctx.local_config) as db,
         db.begin_session() as session,
     ):
         try:
             image_row = await session.scalar(
-                sa.select(ImageRow).where((ImageRow.name == canonical)
-                                          & (ImageRow.architecture == architecture))
+                sa.select(ImageRow).where(
+                    (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
+                )
             )
             if image_row is None:
                 raise UnknownImageReference(f"{canonical}:{architecture}")

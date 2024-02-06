@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import sys
 import asyncio
 import logging
+import sys
 
 import click
 
@@ -129,6 +129,7 @@ def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
             print(*value) if isinstance(value, list) else print(value)
     except Exception:
         sys.exit(ExitCode.FAILURE)
+
 
 @cli.command()
 @click.argument("canonical")
