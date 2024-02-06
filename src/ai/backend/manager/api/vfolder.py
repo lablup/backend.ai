@@ -2414,7 +2414,6 @@ async def restore(request: web.Request) -> web.Response:
     """
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
-    resource_policy = request["keypair"]["resource_policy"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2452,15 +2451,6 @@ async def restore(request: web.Request) -> web.Response:
             )
         elif len(restore_targets) == 0:
             raise InvalidAPIParameters("No such vfolder.")
-
-        # Check resource policy's max_vfolder_count
-        if resource_policy["max_vfolder_count"] > 0:
-            query = sa.select([sa.func.count()]).where(
-                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
-            )
-            result = await conn.scalar(query)
-            if result + len(restore_targets) > resource_policy["max_vfolder_count"]:
-                raise InvalidAPIParameters("You cannot create (or restore) more vfolders.")
 
         # query_accesible_vfolders returns list
         entry = restore_targets[0]
