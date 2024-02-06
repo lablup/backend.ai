@@ -95,7 +95,7 @@ __all__: Sequence[str] = (
     "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
-    "initiate_vfolder_purge",
+    "initiate_vfolder_deletion",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
@@ -148,7 +148,7 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
-class VFolderOperationStatus(str, enum.Enum):
+class VFolderOperationStatus(enum.StrEnum):
     """
     Introduce virtual folder current status for storage-proxy operations.
     """
@@ -158,12 +158,14 @@ class VFolderOperationStatus(str, enum.Enum):
     CLONING = "cloning"
     MOUNTED = "mounted"
     ERROR = "error"
-    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
-    DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
-    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
+
+    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_ERROR = "delete-error"
 
 
-class VFolderAccessStatus(str, enum.Enum):
+class VFolderAccessStatus(enum.StrEnum):
     """
     Introduce virtual folder desired status for storage-proxy operations.
     Not added to db scheme  and determined only by current vfolder status.
@@ -172,14 +174,16 @@ class VFolderAccessStatus(str, enum.Enum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     RECOVERABLE = "recoverable"
-    DELETABLE = "deletable"
-    PURGABLE = "purgable"
+    TRASHABLE = "trashable"  # Able to move to `trash bin`
+    DELETABLE = "deletable"  # Able to delete vfolder in storage proxy
+    PURGABLE = "purgable"  # Able to delete vfolder row in DB
 
 
 DEAD_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_PENDING,
     VFolderOperationStatus.DELETE_ONGOING,
     VFolderOperationStatus.DELETE_COMPLETE,
-    VFolderOperationStatus.PURGE_ONGOING,
+    VFolderOperationStatus.DELETE_ERROR,
 )
 
 
@@ -252,6 +256,7 @@ vfolders = sa.Table(
     #   "delete-ongoing": "2022-10-25T10:22:30"
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
+    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -978,7 +983,7 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
-async def initiate_vfolder_purge(
+async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
@@ -992,7 +997,7 @@ async def initiate_vfolder_purge(
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
     row_deletion_infos: list[VFolderDeletionInfo] = []
@@ -1025,15 +1030,17 @@ async def initiate_vfolder_purge(
         if row_deletion_infos:
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
-            async def _delete_row() -> None:
-                async with db_engine.begin_session() as db_session:
-                    await db_session.execute(
-                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
-                    )
-
-            await execute_with_retry(_delete_row)
+            await update_vfolder_status(
+                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+            )
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
+            await update_vfolder_status(
+                db_engine,
+                [vfid.vfolder_id for vfid, _ in failed_deletion],
+                VFolderOperationStatus.DELETE_ERROR,
+                do_log=False,
+            )
             extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
             raise VFolderOperationFailed(extra_data=extra_data)
 
