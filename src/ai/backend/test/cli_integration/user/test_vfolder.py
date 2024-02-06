@@ -1,5 +1,6 @@
 import json
 from contextlib import closing
+from io import TextIOWrapper
 
 from ...utils.cli import EOF, ClientRunnerFunc
 
@@ -69,6 +70,27 @@ def test_rename_vfolder(run_user: ClientRunnerFunc):
 
     test_folder3 = get_folder_from_list(folder_list, "test_folder3")
     assert bool(test_folder3), "Test folder 3 doesn't exist!"
+
+
+def test_upload_file(run_user: ClientRunnerFunc, make_txt_file: TextIOWrapper):
+    """
+    Test for uploading a file to the vfolder.
+    !! Make sure you execute this test after test_create_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    VFOLDER_NAME = "test_folder2"
+    FILE_NAME = make_txt_file.name
+
+    # Upload the file to vfolder
+    with closing(run_user(["vfolder", "upload", VFOLDER_NAME, FILE_NAME])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "File failed to upload."
+
+    # Check if the file has been successfully uploaded
+    with closing(run_user(["vfolder", "ls", VFOLDER_NAME])) as p:
+        p.expect(EOF)
+        assert "test.txt" in p.before.decode(), "File not uploaded successfully."
 
 
 def test_delete_vfolder(run_user: ClientRunnerFunc):

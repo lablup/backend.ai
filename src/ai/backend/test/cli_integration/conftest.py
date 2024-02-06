@@ -5,6 +5,7 @@ import re
 import secrets
 from collections import namedtuple
 from contextlib import closing
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Callable, Iterator, Sequence, Tuple
 
@@ -138,6 +139,16 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
 def keypair_resource_policy() -> str:
     fake = Faker()
     return fake.unique.word()
+
+
+@pytest.fixture
+def make_txt_file() -> TextIOWrapper:
+    FILE_NAME = "test.txt"
+    f = open(FILE_NAME, "w")
+    yield f
+
+    f.close()
+    os.remove(FILE_NAME)
 
 
 run_user = make_run_fixture("user_file")
