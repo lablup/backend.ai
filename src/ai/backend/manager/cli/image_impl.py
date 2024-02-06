@@ -194,7 +194,7 @@ async def dealias(cli_ctx, alias):
         await session.delete(alias_row)
 
 
-async def validate_image_alias(cli_ctx, alias: str) -> dict[str, str]:
+async def validate_image_alias(cli_ctx, alias: str):
     async with (
         connect_database(cli_ctx.local_config) as db,
         db.begin_session() as session,
@@ -211,7 +211,7 @@ async def validate_image_alias(cli_ctx, alias: str) -> dict[str, str]:
             log.exception("An error occurred.")
 
 
-async def validate_image_canonical(cli_ctx, canonical: str, architecture: str) -> dict[str, str]:
+async def validate_image_canonical(cli_ctx, canonical: str, architecture: str):
     async with (
         connect_database(cli_ctx.local_config) as db,
         db.begin_session() as session,
