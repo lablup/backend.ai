@@ -822,17 +822,20 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
+    now = datetime.now(tzutc())
+
     async def _update() -> None:
         async with engine.begin_session() as db_session:
             query = (
                 sa.update(vfolders)
                 .values(
                     status=update_status,
+                    status_changed=now,
                     status_history=sql_json_merge(
                         vfolders.c.status_history,
                         (),
                         {
-                            update_status.name: datetime.now(tzutc()).isoformat(),
+                            update_status.name: now.isoformat(),
                         },
                     ),
                 )
