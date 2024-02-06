@@ -570,7 +570,6 @@ class SharedConfig(AbstractConfig):
         etcd_password: Optional[str],
         namespace: str,
     ) -> None:
-        # WARNING: importing etcd3/grpc must be done after forks.
         super().__init__()
         credentials = None
         if etcd_user:

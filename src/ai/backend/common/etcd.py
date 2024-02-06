@@ -137,7 +137,7 @@ class AsyncEtcd:
         }).check(scope_prefix_map)
 
         if credentials is not None:
-            self._connect_options = ConnectOptions().with_username(
+            self._connect_options = ConnectOptions().with_user(
                 credentials["user"], credentials["password"]
             )
         else:
@@ -236,11 +236,11 @@ class AsyncEtcd:
 
         _flatten(key, cast(NestedStrKeyedDict, dict_obj))
 
-        async with self.etcd.connect() as communicator:
-            actions = []
-            for k, v in flattened_dict.items():
-                actions.append(TxnOp.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v)))
+        actions = []
+        for k, v in flattened_dict.items():
+            actions.append(TxnOp.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v)))
 
+        async with self.etcd.connect() as communicator:
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def put_dict(
@@ -255,7 +255,7 @@ class AsyncEtcd:
         Since the given dict must be a flattened one, its keys must be quoted as needed by the caller.
         For new codes, ``put_prefix()`` is recommended.
 
-        :param dict_obj: Flattened key-value pairs to put.
+        :param flattened_dict_obj: Flattened key-value pairs to put.
         :param scope: The config scope for putting the values.
         :param scope_prefix_map: The scope map used to mangle the prefix for the config scope.
         :return:
@@ -379,6 +379,8 @@ class AsyncEtcd:
                 mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
                 values = await communicator.get_prefix(mangled_key_prefix)
                 pair_sets.append([(self._demangle_key(k), v) for k, v in values.items()])
+
+        pair_sets = [sorted(pairs, key=lambda x: x[0]) for pairs in pair_sets]
 
         configs = [
             make_dict_from_pairs(f"{_slash(scope_prefix)}{key_prefix}", pairs, "/")

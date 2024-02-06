@@ -43,7 +43,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py-test==0.2.5b1",
+//     "etcd-client-py-test==0.2.17b1",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
@@ -936,36 +936,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "33a8b6d9136fa7427160edb92d2e50f2035f04e9d63a2d1027349053e12626aa",
-              "url": "https://files.pythonhosted.org/packages/0e/78/d505b8c71139d234e34df1c4a18d0567287494ce63f690337aa2af23219c/boto3-1.34.34-py3-none-any.whl"
+              "hash": "53897701ab4f307fbcfdade673eae809dfc5eabb6102053c84907aa27de66e53",
+              "url": "https://files.pythonhosted.org/packages/d3/05/81fa81be2c97e43d85c2fc55fcdc67403ed88fd9c7a2844220dadf5e6ada/boto3-1.34.35-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b2f321e20966f021ec800b7f2c01287a3dd04fc5965acdfbaa9c505a24ca45d1",
-              "url": "https://files.pythonhosted.org/packages/50/a0/f332de5bc770ddbcbddc244a9ced5476ac2d105a14fbd867c62f702a73ee/boto3-1.34.34.tar.gz"
+              "hash": "4052031f9ac18924e94be7c30a5f0af5843a4752b8c8cb9034cd978be252b61b",
+              "url": "https://files.pythonhosted.org/packages/e2/35/82942e7156c8841c907f64b761eddb994d23f5b5bc17af73e30395d2f16d/boto3-1.34.35.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.35.0,>=1.34.34",
+            "botocore<1.35.0,>=1.34.35",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.11.0,>=0.10.0"
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.34"
+          "version": "1.34.35"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cd060b0d88ebb2b893f1411c1db7f2ba66cc18e52dcc57ad029564ef5fec437b",
-              "url": "https://files.pythonhosted.org/packages/6e/71/b81be726c424784858e9b9ccada167dbb19364f37744d9d780c2f79f9e6e/botocore-1.34.34-py3-none-any.whl"
+              "hash": "b67b8c865973202dc655a493317ae14b33d115e49ed6960874eb05d950167b37",
+              "url": "https://files.pythonhosted.org/packages/8d/28/3352b6a205ca2e3e0a2f1bb0b3418807862d1717c923782dd58712d16149/botocore-1.34.35-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "54093dc97372bb7683f5c61a279aa8240408abf3b2cc494ae82a9a90c1b784b5",
-              "url": "https://files.pythonhosted.org/packages/18/58/b38387dda6dae1db663c716f7184a728941367d039830a073a30c3a28d3c/botocore-1.34.34.tar.gz"
+              "hash": "8a2b53ab772584a5f7e2fe1e4a59028b0602cfef8e39d622db7c6b670e4b1ee6",
+              "url": "https://files.pythonhosted.org/packages/4a/54/00c8d6dd02768c79425fdb57213fd735eaea63efa57b351ad5f6d1fda2bc/botocore-1.34.35.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -977,7 +977,7 @@
             "urllib3<2.1,>=1.25.4; python_version >= \"3.10\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.34"
+          "version": "1.34.35"
         },
         {
           "artifacts": [
@@ -1440,19 +1440,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d00912a16f5c32b4d95315d1dd778e7933d597647989debc5815ca418331428a",
-              "url": "https://files.pythonhosted.org/packages/74/e0/b0fd2c00168f103fd69802ff9735ac6131023154a11c67fe2ab28f073a66/etcd_client_py_test-0.2.5b1-cp311-cp311-manylinux_2_34_x86_64.whl"
+              "hash": "0929d36362fcea4df6ef79c0f30c9a378388339e663550c997918bcab2602158",
+              "url": "https://files.pythonhosted.org/packages/03/58/e2aec35df8dd666daa72e5c8025a794cfd5e2ad498c534506d1b573bd195/etcd_client_py_test-0.2.17b1-cp311-cp311-manylinux_2_34_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6617a32cf6a204b136107e69a75a1cea3e887469a2cb9a8fce70942f1841b4c0",
-              "url": "https://files.pythonhosted.org/packages/c5/2b/ee9a0219e76381dbc2e9a54517fe5fdf6f5348343eeb6355dd45890b16e3/etcd_client_py_test-0.2.5b1.tar.gz"
+              "hash": "220e4a1e307b06f905b3ea9de40445d29c688936b9c1f9b5ae364f1a69d8cc63",
+              "url": "https://files.pythonhosted.org/packages/5d/92/fafc3e7ea6cde6716c13a5bd07fa8d144b906f182b749e5b51eb874fcf99/etcd_client_py_test-0.2.17b1.tar.gz"
             }
           ],
           "project_name": "etcd-client-py-test",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.2.5b1"
+          "version": "0.2.17b1"
         },
         {
           "artifacts": [
@@ -4632,7 +4632,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py-test==0.2.5b1",
+    "etcd-client-py-test==0.2.17b1",
     "faker~=13.12.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
