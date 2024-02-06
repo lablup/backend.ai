@@ -183,7 +183,7 @@ class Domain(BaseFunction):
     @classmethod
     async def delete(cls, name: str):
         """
-        Inactivates an existing domain.
+        Deletes an existing domain.
         """
         query = textwrap.dedent(
             """\
@@ -202,7 +202,7 @@ class Domain(BaseFunction):
     @classmethod
     async def purge(cls, name: str):
         """
-        Deletes an existing domain.
+        Purges an existing domain.
         """
         query = textwrap.dedent(
             """\
