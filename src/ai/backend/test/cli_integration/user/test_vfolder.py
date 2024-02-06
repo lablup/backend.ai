@@ -91,18 +91,40 @@ def test_upload_file(run_user: ClientRunnerFunc, make_txt_file: TextIOWrapper):
     # Check if the file has been successfully uploaded
     with closing(run_user(["vfolder", "ls", VFOLDER_NAME])) as p:
         p.expect(EOF)
-        assert "test.txt" in p.before.decode(), "File was not uploaded successfully."
+        assert FILE_NAME in p.before.decode(), "File was not uploaded successfully."
 
 
-def test_download_file(run_user: ClientRunnerFunc):
+def test_rename_file(run_user: ClientRunnerFunc):
     """
-    Test for downloading a file from the vfolder.
+    Test for renaming a file from the vfolder.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file !!
     Otherwise, it will raise an error.
     """
 
     VFOLDER_NAME = "test_folder2"
-    FILE_NAME = "test.txt"
+    OLD_FILE_NAME = "test.txt"
+    NEW_FILE_NAME = "new.txt"
+
+    with closing(
+        run_user(["vfolder", "rename_file", VFOLDER_NAME, OLD_FILE_NAME, NEW_FILE_NAME])
+    ) as p:
+        p.expect(EOF)
+        assert "Renamed." in p.before.decode(), "File rename failed."
+
+    with closing(run_user(["vfolder", "ls", VFOLDER_NAME])) as p:
+        p.expect(EOF)
+        assert NEW_FILE_NAME in p.before.decode(), "File was not renamed successfully."
+
+
+def test_download_file(run_user: ClientRunnerFunc):
+    """
+    Test for downloading a file from the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file !!
+    Otherwise, it will raise an error.
+    """
+
+    VFOLDER_NAME = "test_folder2"
+    FILE_NAME = "new.txt"
 
     # Download the file from vfolder
     with closing(run_user(["vfolder", "download", VFOLDER_NAME, FILE_NAME])) as p:
