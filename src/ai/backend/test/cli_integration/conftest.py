@@ -7,7 +7,7 @@ from collections import namedtuple
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Iterator, Sequence, Tuple
+from typing import Callable, Iterator, Sequence, Tuple, Generator
 
 import pexpect
 import pytest
@@ -142,7 +142,7 @@ def keypair_resource_policy() -> str:
 
 
 @pytest.fixture
-def make_txt_file() -> TextIOWrapper:
+def make_txt_file() -> Generator[TextIOWrapper, None, None]:
     FILE_NAME = "test.txt"
     f = open(FILE_NAME, "w")
     yield f
