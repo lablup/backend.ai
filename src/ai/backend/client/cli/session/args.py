@@ -84,6 +84,7 @@ START_OPTION = [
     click.option(
         "--scaling-group",
         "--sgroup",
+        metavar="SCALING_GROUP",
         type=str,
         default=None,
         help=(

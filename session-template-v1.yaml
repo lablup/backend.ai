@@ -1,0 +1,21 @@
+---
+template:
+  api_version: '6'
+  kind: taskTemplate
+  metadata:
+    name: mount-template-v1
+  spec:
+    sessionType: batch
+    kernel:
+      # image: python:3.11-ubuntu22.04
+      image: cr.backend.ai/multiarch/python:3.10-ubuntu20.04
+      architecture: aarch64  # default: x86_64
+      environ:
+        MYCONFIG: XXX
+    scaling_group: default
+    mounts:
+      vf-0: /home/work/target
+    resources:
+      cpu: '1'
+      mem: 1g
+# TaskID: 45731b54432c43b49da1891846113d1d
