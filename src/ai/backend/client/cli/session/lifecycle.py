@@ -350,7 +350,7 @@ def _create_from_template_cmd(docs: str = None):
         name: str | Undefined,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
-        type_: Literal["batch", "interactive"] | Undefined,  # click_start_option
+        type: Literal["batch", "interactive"] | Undefined,  # click_start_option
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
@@ -409,7 +409,7 @@ def _create_from_template_cmd(docs: str = None):
                     template_id,
                     image=image,
                     name=name,
-                    type_=type_,
+                    type_=type,
                     starts_at=starts_at,
                     enqueue_only=enqueue_only,
                     max_wait=max_wait,
