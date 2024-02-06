@@ -158,24 +158,6 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
         await self._set_quota_by_project(project_id, qspath, options)
 
-        # Set quota grace period to 0
-        try:
-            await run([
-                b"sudo",
-                b"lfs",
-                b"setquota",
-                b"-t",
-                b"-p",
-                str(project_id),
-                b"-b",  # byte usage grace period
-                b"0",
-                b"-i",  # inode usage grace period
-                b"0",
-                str(qspath),
-            ])
-        except CalledProcessError as e:
-            raise RuntimeError(f"'lfs setquota -t -p {project_id}' command failed: {e.stderr}")
-
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         """
         $ lfs quota -p <projectId> <fs_mount_point>
