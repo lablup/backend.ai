@@ -382,6 +382,9 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             await volume.delete_vfolder(params["vfid"])
+            import asyncio
+
+            await asyncio.sleep(15)
             return web.Response(status=204)
 
 

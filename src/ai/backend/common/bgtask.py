@@ -7,7 +7,6 @@ import time
 import uuid
 import weakref
 from collections import defaultdict
-from enum import StrEnum, auto
 from typing import (
     Awaitable,
     Callable,
@@ -26,6 +25,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 from . import redis_helper
+from .defs import BackgroundTaskLogType as LogType
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -45,13 +45,6 @@ BgtaskEvents: TypeAlias = (
 )
 
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
-
-
-class LogType(StrEnum):
-    INFO = auto()
-    WARNING = auto()
-    ERROR = auto()
-    DEBUG = auto()
 
 
 class ProgressReporter:
@@ -107,6 +100,7 @@ class ProgressReporter:
                 message=message,
                 current_progress=current,
                 total_progress=total,
+                log_type=log_type,
             ),
         )
 
@@ -211,7 +205,7 @@ class BackgroundTaskManager:
                                 ):
                                     body["current_progress"] = progress
                                     body["total_progress"] = total_progress
-                                    body["log_type"] = log_type
+                                    body["log_type"] = str(log_type)
                                     await resp.send(json.dumps(body), event=name, retry=5)
                                 case (
                                     BgtaskDoneEvent()

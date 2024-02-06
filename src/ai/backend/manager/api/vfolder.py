@@ -2342,7 +2342,8 @@ async def purge(request: web.Request) -> web.Response:
         root_ctx.storage_manager,
         root_ctx.background_task_manager,
     )
-    return web.json_response({"task_id": task_id}, status=200)
+    print(f"{task_id = }")
+    return web.json_response({"task_id": str(task_id) if task_id is not None else None}, status=200)
 
 
 @auth_required
