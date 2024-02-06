@@ -20,6 +20,14 @@ PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"
 PROJECT_ID_FILE_NAME: Final = "project_id"
 
 
+def _byte_to_kilobyte(byte: int) -> int:
+    return byte // 1024
+
+
+def _kilobyte_to_byte(kilobyte: int) -> int:
+    return kilobyte * 1024
+
+
 class EXAScalerQuotaModel(BaseQuotaModel):
     def __init__(self, mount_path: Path, local_config: Mapping[str, Any], etcd: AsyncEtcd) -> None:
         self.local_config = local_config
@@ -40,7 +48,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
         def _write():
             with open(pid_file_path, "w") as f:
-                f.write(pid)
+                f.write(str(pid))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)
 
@@ -54,7 +62,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return val
 
     async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
-        quota_limit = options.limit_bytes // 1024  # default unit for quota is KB
+        quota_limit = _byte_to_kilobyte(options.limit_bytes)  # default unit for DDN quota is KB
         try:
             await run([
                 b"sudo",
@@ -98,7 +106,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     # words[1] is soft_limit
                     if hard_limit == 0:
                         return None
-                    return QuotaUsage(used_bytes=used_bytes, limit_bytes=hard_limit)
+                    return QuotaUsage(
+                        used_bytes=_kilobyte_to_byte(used_bytes), limit_bytes=hard_limit
+                    )
                 if Path(words[0]) == qspath:
                     next_line_is_quota = True
                     continue
