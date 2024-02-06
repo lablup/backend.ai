@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pprint import pformat, pprint
+import json
 
 import click
 import sqlalchemy as sa
@@ -9,7 +10,7 @@ from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -192,3 +193,40 @@ async def dealias(cli_ctx, alias):
             log.exception("Alias not found.")
             return
         await session.delete(alias_row)
+
+
+async def validate_image_alias(cli_ctx, alias: str) -> dict[str, str]:
+    async with(
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_session() as session,
+    ):
+        try:
+            image_row = await ImageRow.from_alias(session, alias)
+            if image_row is None:
+                raise UnknownImageReference
+
+            return validate_image_labels(image_row.labels)
+        except UnknownImageReference:
+            log.error(f"No images were found with alias: {alias}")
+        except Exception:
+            log.exception("An error occurred.")
+
+
+async def validate_image_canonical(cli_ctx, canonical: str, architecture: str) -> dict[str, str]:
+    async with(
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_session() as session,
+    ):
+        try:
+            image_row = await session.scalar(
+                sa.select(ImageRow).where((ImageRow.name == canonical)
+                                          & (ImageRow.architecture == architecture))
+            )
+            if image_row is None:
+                raise UnknownImageReference(f"{canonical}:{architecture}")
+
+            return validate_image_labels(image_row.labels)
+        except UnknownImageReference as e:
+            log.error(f"{e}")
+        except Exception:
+            log.exception("An error occurred.")
