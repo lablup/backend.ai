@@ -133,7 +133,6 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             main_pid = await self._read_main_project_id()
             project_id = main_pid + 1
             await self._write_project_id(project_id, pid_path)
-            await self._write_project_id(project_id, self.mount_path / PROJECT_ID_FILE_NAME)
         else:
             quota_usage = await self._get_quota_by_project(project_id, qspath)
             if quota_usage is not None:
