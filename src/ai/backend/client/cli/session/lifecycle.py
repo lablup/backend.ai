@@ -274,7 +274,14 @@ def _create_from_template_cmd(docs: str = None):
         help="Set the owner of the target session explicitly.",
     )
     # job scheduling options
-    @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
+    @click.option(
+        "-i",
+        "--image",
+        metavar="IMAGE",
+        type=OptionalType(str),
+        default=undefined,
+        help="Set compute_session image to run.",
+    )
     @click.option(
         "-c",
         "--startup-command",
@@ -282,16 +289,6 @@ def _create_from_template_cmd(docs: str = None):
         type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
-    )
-    @click.option(
-        "--depends",
-        metavar="SESSION_ID",
-        type=str,
-        multiple=True,
-        help=(
-            "Set the list of session ID or names that the newly created session depends on. "
-            "The session will get scheduled after all of them successfully finish."
-        ),
     )
     @click.option(
         "--depends",
@@ -347,28 +344,28 @@ def _create_from_template_cmd(docs: str = None):
     def create_from_template(
         # base args
         template_id: str,
-        name: str | Undefined,  # click_start_option
+        name: str | None,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
-        type: Literal["batch", "interactive"] | Undefined,  # click_start_option
+        type: Literal["batch", "interactive"],  # click_start_option
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         enqueue_only: bool,  # click_start_option
-        max_wait: int | Undefined,  # click_start_option
+        max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,  # click_start_option
+        callback_url: str | None,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | Undefined,  # click_start_option
+        tag: str | None,  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: str | Undefined,  # click_start_option
+        scaling_group: str | None,  # click_start_option
         resources: Sequence[str],  # click_start_option
-        cluster_size: int | Undefined,  # click_start_option
-        resource_opts: Sequence[str],  # click_start_option
+        cluster_size: int | Undefined,
+        resource_opts: Sequence[str],
         # resource grouping
         domain: str | None,  # click_start_option
         group: str | None,  # click_start_option
@@ -386,7 +383,7 @@ def _create_from_template_cmd(docs: str = None):
         \b
         TEMPLATE_ID: The template ID to create a session from.
         """
-        if name is undefined:
+        if name is None:
             name = f"pysdk-{secrets.token_hex(5)}"
         else:
             name = name

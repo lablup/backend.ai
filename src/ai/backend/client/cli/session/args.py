@@ -8,6 +8,8 @@ START_OPTION = [
         "--name",
         "--client-token",
         metavar="NAME",
+        type=str,
+        default=None,
         help="Specify a human-readable session name. If not set, a random hex string is used.",
     ),
     # job scheduling options
