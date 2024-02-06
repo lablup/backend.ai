@@ -411,6 +411,8 @@ jobs:
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
