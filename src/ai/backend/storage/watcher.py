@@ -133,7 +133,6 @@ class MountTask(AbstractTask):
     name = "mount"
 
     mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
 
     fs_location: str = attrs.field()
     fs_type: str = attrs.field(default="nfs")
@@ -145,6 +144,8 @@ class MountTask(AbstractTask):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str = attrs.field(default="/etc/fstab")
     mount_prefix: str | None = attrs.field(default=None)
+
+    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         return await _mount(
@@ -163,7 +164,6 @@ class MountTask(AbstractTask):
     ) -> MountTask:
         return MountTask(
             str(mount_path),
-            event.quota_scope_id,
             event.fs_location,
             event.fs_type,
             event.cmd_options,
@@ -171,12 +171,12 @@ class MountTask(AbstractTask):
             event.edit_fstab,
             event.fstab_path,
             mount_prefix,
+            event.quota_scope_id,
         )
 
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
-            str(self.quota_scope_id),
             self.fs_location,
             self.fs_type,
             self.cmd_options,
@@ -184,20 +184,21 @@ class MountTask(AbstractTask):
             self.edit_fstab,
             self.fstab_path,
             self.mount_prefix,
+            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> MountTask:
         return MountTask(
             values[0],
-            QuotaScopeID.parse(values[1]),
+            values[1],
             values[2],
             values[3],
             values[4],
             values[5],
             values[6],
             values[7],
-            values[8],
+            QuotaScopeID.parse(values[8]) if values[8] is not None else None,
         )
 
 
@@ -206,7 +207,6 @@ class UmountTask(AbstractTask):
     name = "umount"
 
     mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
     scaling_group: str | None = attrs.field(default=None)
 
     # if `edit_fstab` is False, `fstab_path` is ignored
@@ -215,6 +215,8 @@ class UmountTask(AbstractTask):
     fstab_path: str | None = attrs.field(default=None)
     mount_prefix: str | None = attrs.field(default=None)
     timeout: float | None = attrs.field(default=None)
+
+    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         did_umount = await _umount(
@@ -238,35 +240,35 @@ class UmountTask(AbstractTask):
     ) -> UmountTask:
         return UmountTask(
             str(mount_path),
-            event.quota_scope_id,
             event.scaling_group,
             event.edit_fstab,
             event.fstab_path,
             mount_prefix,
             timeout,
+            event.quota_scope_id,
         )
 
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
-            str(self.quota_scope_id),
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
             self.mount_prefix,
             self.timeout,
+            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> UmountTask:
         return UmountTask(
             values[0],
-            QuotaScopeID.parse(values[1]),
+            values[1],
             values[2],
             values[3],
             values[4],
             values[5],
-            values[6],
+            QuotaScopeID.parse(values[6]) if values[6] is not None else None,
         )
 
 

@@ -3,7 +3,18 @@ from __future__ import annotations
 import asyncio
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Final, Generic, Mapping, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Coroutine,
+    Final,
+    Generic,
+    Mapping,
+    Protocol,
+    TypeVar,
+    cast,
+)
 
 from async_timeout import timeout
 
@@ -21,6 +32,11 @@ if TYPE_CHECKING:
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 60
 DEFAULT_POLLING_INTERVAL: Final = 30
+
+
+class ErrorHandler(Protocol):
+    def __call__(self, path: str, reason: str) -> Coroutine[None, None, None]:
+        pass
 
 
 async def _run_cmd(cmd: list[str]) -> ProcResult:
@@ -162,16 +178,17 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
 
     async def poll_check_mount(
         self,
-        mount_path: str,
+        mount_paths: list[str],
         mount_prefix: str | None = None,
         *,
         interval: float = DEFAULT_POLLING_INTERVAL,
-        error_handler: Coroutine,
+        error_handler: ErrorHandler,
         return_when_error: bool = False,
     ) -> None:
         while True:
-            if not (await self.check_mount(mount_path, mount_prefix)):
-                await error_handler
-                if return_when_error:
-                    return
+            for path in mount_paths:
+                if not (await self.check_mount(path, mount_prefix)):
+                    await error_handler(path, reason="unknown")
+                    if return_when_error:
+                        return
             await asyncio.sleep(interval)

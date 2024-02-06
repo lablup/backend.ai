@@ -2390,23 +2390,28 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
-        log.debug("Storage proxy is in the same node. Skip the volume task.")
-        await context.event_producer.produce_event(
-            VolumeMounted(
-                str(context.id),
-                VolumeMountableNodeType.AGENT,
-                "",
-                event.quota_scope_id,
-            )
-        )
-        return
-    mount_prefix = await context.etcd.get("volumes/_mount")
+    # This should be removed after agent-watcher is fully implemented
+    mount_prefix = await context.etcd.get("volumes/_mount") or "/"
     volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
     if volume_mount_prefix is None:
         volume_mount_prefix = "./"
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
+
+    mountpoint = Path(mount_prefix) / real_path
+    if mountpoint.is_mount():
+        log.debug("Volume is already mounted. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                "already-mounted",
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                str(real_path),
+                "",
+                event.quota_scope_id,
+            )
+        )
+        return
     try:
         await mount(
             str(real_path),
@@ -2421,11 +2426,12 @@ async def handle_volume_mount(
         err_msg = str(e)
     await context.event_producer.produce_event(
         VolumeMounted(
+            "mount-event",
             str(context.id),
             VolumeMountableNodeType.AGENT,
             str(real_path),
-            event.quota_scope_id,
             err_msg,
+            event.quota_scope_id,
         )
     )
 
@@ -2435,22 +2441,27 @@ async def handle_volume_umount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
-        log.debug("Storage proxy is in the same node. Skip the volume task.")
+    # This should be removed after agent-watcher is fully implemented
+    mount_prefix = await context.etcd.get("volumes/_mount") or "/"
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
+    volume_mount_prefix = context.local_config["agent"]["mount-path"]
+    real_path = Path(volume_mount_prefix, event.dir_name)
+    err_msg: str | None = None
+
+    mountpoint = Path(mount_prefix) / real_path
+    if not mountpoint.is_mount():
+        log.debug("Volume is already umounted. Skip the volume task.")
         await context.event_producer.produce_event(
             VolumeUnmounted(
+                "already-umounted",
                 str(context.id),
                 VolumeMountableNodeType.AGENT,
+                str(real_path),
                 "",
                 event.quota_scope_id,
             )
         )
         return
-    mount_prefix = await context.etcd.get("volumes/_mount")
-    timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_prefix = context.local_config["agent"]["mount-path"]
-    real_path = Path(volume_mount_prefix, event.dir_name)
-    err_msg: str | None = None
     try:
         did_umount = await umount(
             str(real_path),
@@ -2465,10 +2476,11 @@ async def handle_volume_umount(
         log.warning(f"{real_path} does not exist. Skip umount")
     await context.event_producer.produce_event(
         VolumeUnmounted(
+            "umount-event",
             str(context.id),
             VolumeMountableNodeType.AGENT,
             str(real_path),
-            event.quota_scope_id,
             err_msg,
+            event.quota_scope_id,
         )
     )

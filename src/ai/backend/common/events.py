@@ -610,7 +610,6 @@ class DoVolumeMountEvent(AbstractEvent):
     # with their mount_path or mount_prefix.
     dir_name: str = attrs.field()
     volume_backend_name: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
 
     fs_location: str = attrs.field()
     fs_type: str = attrs.field(default="nfs")
@@ -622,17 +621,19 @@ class DoVolumeMountEvent(AbstractEvent):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str = attrs.field(default="/etc/fstab")
 
+    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
+
     def serialize(self) -> tuple:
         return (
             self.dir_name,
             self.volume_backend_name,
-            str(self.quota_scope_id),
             self.fs_location,
             self.fs_type,
             self.cmd_options,
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
+            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
@@ -640,13 +641,13 @@ class DoVolumeMountEvent(AbstractEvent):
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
-            quota_scope_id=QuotaScopeID.parse(value[2]),
-            fs_location=value[3],
-            fs_type=value[4],
-            cmd_options=value[5],
-            scaling_group=value[6],
-            edit_fstab=value[7],
-            fstab_path=value[8],
+            fs_location=value[2],
+            fs_type=value[3],
+            cmd_options=value[4],
+            scaling_group=value[5],
+            edit_fstab=value[6],
+            fstab_path=value[7],
+            quota_scope_id=QuotaScopeID.parse(value[8]) if value[8] is not None else None,
         )
 
 
@@ -658,7 +659,6 @@ class DoVolumeUnmountEvent(AbstractEvent):
     # with their mount_path or mount_prefix.
     dir_name: str = attrs.field()
     volume_backend_name: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
     scaling_group: str | None = attrs.field(default=None)
 
     # if `edit_fstab` is False, `fstab_path` is ignored
@@ -666,14 +666,16 @@ class DoVolumeUnmountEvent(AbstractEvent):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str | None = attrs.field(default=None)
 
+    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
+
     def serialize(self) -> tuple:
         return (
             self.dir_name,
             self.volume_backend_name,
-            str(self.quota_scope_id),
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
+            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
@@ -681,46 +683,57 @@ class DoVolumeUnmountEvent(AbstractEvent):
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
-            quota_scope_id=QuotaScopeID.parse(value[2]),
-            scaling_group=value[3],
-            edit_fstab=value[4],
-            fstab_path=value[5],
+            scaling_group=value[2],
+            edit_fstab=value[3],
+            fstab_path=value[4],
+            quota_scope_id=QuotaScopeID.parse(value[5]) if value[5] is not None else None,
         )
 
 
+class MonitoringAlarmEvent(AbstractEvent, metaclass=abc.ABCMeta):
+    name = "monitoring_alarm"
+
+
+@attrs.define(slots=True)
+class MonitoringAlarmEventArgs:
+    reason: str = attrs.field()
+
+
 @attrs.define(auto_attribs=True, slots=True)
-class VolumeMountEventArgs(AbstractEvent):
+class VolumeMountEventArgs(MonitoringAlarmEventArgs):
     node_id: str = attrs.field()
     node_type: VolumeMountableNodeType = attrs.field()
     mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
     err_msg: str | None = attrs.field(default=None)
+    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
+            self.reason,
             self.node_id,
             str(self.node_type),
             self.mount_path,
-            str(self.quota_scope_id),
             self.err_msg,
+            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
             value[0],
-            VolumeMountableNodeType(value[1]),
-            value[2],
-            QuotaScopeID.parse(value[3]),
+            value[1],
+            VolumeMountableNodeType(value[2]),
+            value[3],
             value[4],
+            QuotaScopeID.parse(value[5]) if value[5] is not None else None,
         )
 
 
-class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
+class VolumeMounted(VolumeMountEventArgs, MonitoringAlarmEvent):
     name = "volume_mounted"
 
 
-class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
+class VolumeUnmounted(VolumeMountEventArgs, MonitoringAlarmEvent):
     name = "volume_unmounted"
 
 
