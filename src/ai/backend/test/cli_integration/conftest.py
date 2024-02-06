@@ -7,7 +7,7 @@ from collections import namedtuple
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Iterator, Sequence, Tuple, Generator
+from typing import Callable, Generator, Iterator, Sequence, Tuple
 
 import pexpect
 import pytest

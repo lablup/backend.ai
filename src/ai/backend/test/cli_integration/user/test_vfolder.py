@@ -1,4 +1,5 @@
 import json
+import os
 from contextlib import closing
 from io import TextIOWrapper
 
@@ -85,12 +86,34 @@ def test_upload_file(run_user: ClientRunnerFunc, make_txt_file: TextIOWrapper):
     # Upload the file to vfolder
     with closing(run_user(["vfolder", "upload", VFOLDER_NAME, FILE_NAME])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "File failed to upload."
+        assert "Done." in p.before.decode(), "File upload failed."
 
     # Check if the file has been successfully uploaded
     with closing(run_user(["vfolder", "ls", VFOLDER_NAME])) as p:
         p.expect(EOF)
-        assert "test.txt" in p.before.decode(), "File not uploaded successfully."
+        assert "test.txt" in p.before.decode(), "File was not uploaded successfully."
+
+
+def test_download_file(run_user: ClientRunnerFunc):
+    """
+    Test for downloading a file from the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file !!
+    Otherwise, it will raise an error.
+    """
+
+    VFOLDER_NAME = "test_folder2"
+    FILE_NAME = "test.txt"
+
+    # Download the file from vfolder
+    with closing(run_user(["vfolder", "download", VFOLDER_NAME, FILE_NAME])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "File download failed."
+
+    # Check if the file has been successfully downloaded
+    assert os.path.isfile(FILE_NAME), "File was not downloaded successfully."
+
+    # remove the file for testing
+    os.remove(FILE_NAME)
 
 
 def test_delete_vfolder(run_user: ClientRunnerFunc):
