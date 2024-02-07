@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 from etcd_client import Client as EtcdClient
 from etcd_client import Communicator as EtcdCommunicator
-from etcd_client import ConnectOptions
+from etcd_client import EtcdLockOption
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.exceptions import LockError, LockNotOwnedError
@@ -126,7 +126,7 @@ class FileLock(AbstractDistributedLock):
         await self.acquire()
         return self
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info) -> Optional[bool]:
         self.release()
         return None
 
@@ -168,27 +168,27 @@ class EtcdLock(AbstractDistributedLock):
         self.etcd = etcd
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._etcd_client = None
 
     async def __aenter__(self) -> EtcdCommunicator:
-        conn_opt = ConnectOptions().with_timeout(self._timeout)
-        self._etcd_client = self.etcd.etcd.connect(conn_opt)
-        assert self._etcd_client is not None
+        self._etcd_client = self.etcd.etcd.with_lock(
+            EtcdLockOption(
+                lock_name=self.lock_name,
+                timeout=self._timeout,
+                ttl=int(self._lifetime) if self._lifetime is not None else None,
+            ),
+        )
 
-        communicator = await self._etcd_client.__aenter__()
-        if self._lifetime is not None:
-            await communicator.lease_grant(int(self._lifetime))
-
-        await communicator.lock(self.lock_name)
+        etcd_communicator = await self._etcd_client.__aenter__()
 
         if self._debug:
             log.debug("etcd lock acquired")
 
-        return communicator
+        return etcd_communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._etcd_client is not None
-        communicator = await self._etcd_client.__aenter__()
-        await communicator.unlock(self.lock_name)
+        await self._etcd_client.__aexit__(*exc_info)
 
         if self._debug:
             log.debug("etcd lock released")
