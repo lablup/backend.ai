@@ -57,7 +57,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     ACTIVE_USER_STATUSES,
-    DEAD_VFOLDER_STATUSES,
     AgentStatus,
     GroupRow,
     KernelStatus,
@@ -95,6 +94,7 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry
+from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -497,7 +497,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 sa.select([sa.func.count()])
                 .select_from(vfolders)
                 .where(
-                    (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+                    (vfolders.c.user == user_uuid)
+                    & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
                 )
             )
             result = await conn.scalar(query)
@@ -2663,7 +2664,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
             query = sa.select([sa.func.count()]).where(
-                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+                (vfolders.c.user == user_uuid)
+                & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
             )
             result = await conn.scalar(query)
             if result >= max_vfolder_count:

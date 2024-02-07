@@ -179,11 +179,19 @@ class VFolderAccessStatus(enum.StrEnum):
     PURGABLE = "purgable"  # Able to delete vfolder row in DB
 
 
-DEAD_VFOLDER_STATUSES = (
+SOFT_DELETED_VFOLDER_STATUSES = (
     VFolderOperationStatus.DELETE_PENDING,
     VFolderOperationStatus.DELETE_ONGOING,
+)
+
+HARD_DELETED_VFOLDER_STATUSES = (
     VFolderOperationStatus.DELETE_COMPLETE,
     VFolderOperationStatus.DELETE_ERROR,
+)
+
+DEAD_VFOLDER_STATUSES = (
+    *SOFT_DELETED_VFOLDER_STATUSES,
+    *HARD_DELETED_VFOLDER_STATUSES,
 )
 
 
