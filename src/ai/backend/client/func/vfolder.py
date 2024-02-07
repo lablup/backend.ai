@@ -244,8 +244,8 @@ class VFolder(BaseFunction):
             return {}
 
     @api_function
-    async def recover(self):
-        rqst = Request("POST", "/folders/{0}/recover".format(self.name))
+    async def restore(self):
+        rqst = Request("POST", "/folders/{0}/restore-from-trash-bin".format(self.name))
         async with rqst.fetch():
             return {}
 

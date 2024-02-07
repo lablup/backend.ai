@@ -200,15 +200,15 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def recover(name):
-    """Recover the given virtual folder from deleted status.
+def restore(name):
+    """Restore the given virtual folder from deleted status, from trash bin.
 
     NAME: Name of a virtual folder.
     """
     with Session() as session:
         try:
-            session.VFolder(name).recover()
-            print_done("Recovered.")
+            session.VFolder(name).restore()
+            print_done("Restored.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

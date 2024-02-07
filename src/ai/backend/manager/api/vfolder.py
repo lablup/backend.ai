@@ -3355,7 +3355,6 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/restore-from-trash-bin", restore))
     cors.add(add_route("POST", r"/{name}/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("POST", r"/{name}/purge", purge))
-    cors.add(add_route("POST", r"/{name}/recover", restore))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
