@@ -164,6 +164,32 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
         assert "Done." in p.before.decode(), "The parent directory is not created automatically."
 
 
+def test_mv_file(run_user: ClientRunnerFunc):
+    """
+    Test for downloading a file from the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file, 4. test_mkdir_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    VFOLDER_NAME = "test_folder2"
+    DIR_PATH = "tmp"
+    FILE_NAME = "new.txt"
+
+    with closing(
+        run_user(["vfolder", "mv", VFOLDER_NAME, FILE_NAME, f"{DIR_PATH}/{FILE_NAME}"])
+    ) as p:
+        p.expect(EOF)
+        assert "Moved." in p.before.decode(), "File move failed."
+
+    with closing(run_user(["vfolder", "ls", VFOLDER_NAME])) as p:
+        p.expect(EOF)
+        assert FILE_NAME not in p.before.decode(), "File was not moved successfully."
+
+    with closing(run_user(["vfolder", "ls", VFOLDER_NAME, DIR_PATH])) as p:
+        p.expect(EOF)
+        assert FILE_NAME in p.before.decode(), "File was not moved successfully."
+
+
 def test_delete_vfolder(run_user: ClientRunnerFunc):
     """
     Test delete vfolder function.
