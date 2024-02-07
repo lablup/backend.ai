@@ -34,6 +34,11 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+)
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -109,7 +114,7 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import check_api_params, get_user_scopes
+from .utils import check_api_params, get_user_scopes, pydantic_params_api_handler
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -118,6 +123,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
+
+
+class SuccessResponseModel(BaseModel):
+    success: bool = Field(default=True)
+    status: int = Field(default=200)
 
 
 async def ensure_vfolder_status(
@@ -2291,14 +2301,24 @@ async def delete_by_name(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class DeleteFromTrashRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to hard-delete, permanently remove from storage",
+    )
+
+
 @auth_required
-async def delete_from_trash_bin(request: web.Request) -> web.Response:
+@pydantic_params_api_handler(DeleteFromTrashRequestModel)
+async def delete_from_trash_bin(
+    request: web.Request, params: DeleteFromTrashRequestModel
+) -> SuccessResponseModel:
     """
     Delete `delete-pending` vfolders in storage proxy
     """
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2308,11 +2328,9 @@ async def delete_from_trash_bin(request: web.Request) -> web.Response:
         "VFOLDER.DELETE_FROM_TRASH_BIN (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
     )
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.DELETABLE, folder_id_or_name=request.match_info["name"]
-    )
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id_or_name=folder_id)
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -2320,18 +2338,18 @@ async def delete_from_trash_bin(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            extra_vf_conds=(vfolders.c.id == folder_id),
         )
         # FIXME: For now, deleting multiple VFolders at once will raise an error.
         # This behavior should be fixed in 24.03
         if len(entries) > 1:
             log.error(
-                "VFOLDER.DELETE_FROM_TRASH_BIN(folder name:{}, hosts:{}",
-                folder_name,
+                "VFOLDER.DELETE_FROM_TRASH_BIN(folder id:{}, hosts:{}",
+                folder_id,
                 [entry["host"] for entry in entries],
             )
             raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
+                extra_msg="Multiple folders with the same id.",
                 extra_data=None,
             )
         elif len(entries) == 0:
@@ -2347,17 +2365,25 @@ async def delete_from_trash_bin(request: web.Request) -> web.Response:
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
-    return web.Response(status=204)
+    return SuccessResponseModel(status=204)
+
+
+class PurgeRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to purge, permanently remove from DB",
+    )
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def purge(request: web.Request) -> web.Response:
+@pydantic_params_api_handler(PurgeRequestModel)
+async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessResponseModel:
     """
     Delete `delete-complete`d vfolder rows in DB
     """
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2367,16 +2393,14 @@ async def purge(request: web.Request) -> web.Response:
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
     )
     if request["user"]["role"] not in (
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
-    )
+    await ensure_vfolder_status(request, VFolderAccessStatus.PURGABLE, folder_id_or_name=folder_id)
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -2384,16 +2408,16 @@ async def purge(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            extra_vf_conds=(vfolders.c.id == folder_id),
         )
         if len(entries) > 1:
             log.error(
-                "VFOLDER.PURGE(folder name:{}, hosts:{}",
-                folder_name,
+                "VFOLDER.PURGE(folder id:{}, hosts:{}",
+                folder_id,
                 [entry["host"] for entry in entries],
             )
             raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
+                extra_msg="Multiple folders with the same id.",
                 extra_data=None,
             )
         elif len(entries) == 0:
@@ -2403,17 +2427,25 @@ async def purge(request: web.Request) -> web.Response:
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
-    return web.Response(status=204)
+    return SuccessResponseModel(status=204)
+
+
+class RestoreRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to restore",
+    )
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def restore(request: web.Request) -> web.Response:
+@pydantic_params_api_handler(RestoreRequestModel)
+async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessResponseModel:
     """
     Recover vfolder from trash bin, by changing status.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2423,10 +2455,12 @@ async def restore(request: web.Request) -> web.Response:
         "VFOLDER.RESTORE (email: {}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
     )
     await ensure_vfolder_status(
-        request, VFolderAccessStatus.RECOVERABLE, folder_id_or_name=request.match_info["name"]
+        request,
+        VFolderAccessStatus.RECOVERABLE,
+        folder_id_or_name=folder_id,
     )
     async with root_ctx.db.begin() as conn:
         restore_targets = await query_accessible_vfolders(
@@ -2435,14 +2469,14 @@ async def restore(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            extra_vf_conds=(vfolders.c.id == folder_id),
         )
         # FIXME: For now, multiple entries on restore vfolder will raise an error.
         if len(restore_targets) > 1:
             log.error(
-                "VFOLDER.RESTORE(email:{}, folder name:{}, hosts:{})",
+                "VFOLDER.RESTORE(email:{}, folder id:{}, hosts:{})",
                 request["user"]["email"],
-                folder_name,
+                folder_id,
                 [entry["host"] for entry in restore_targets],
             )
             raise TooManyVFoldersFound(
@@ -2461,7 +2495,7 @@ async def restore(request: web.Request) -> web.Response:
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
     await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
-    return web.Response(status=204)
+    return SuccessResponseModel(status=204)
 
 
 @auth_required
@@ -3352,8 +3386,6 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/all_hosts", list_all_hosts))  # legacy underbar
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
-    cors.add(add_route("POST", r"/{name}/restore-from-trash-bin", restore))
-    cors.add(add_route("POST", r"/{name}/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("POST", r"/{name}/purge", purge))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
@@ -3371,6 +3403,8 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/share", share))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
+    cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
+    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
