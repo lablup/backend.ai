@@ -166,7 +166,7 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
 
 def test_mv_file(run_user: ClientRunnerFunc):
     """
-    Test for downloading a file from the vfolder.
+    Test for moving a file within the vfolder.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file, 4. test_mkdir_vfolder !!
     Otherwise, it will raise an error.
     """
