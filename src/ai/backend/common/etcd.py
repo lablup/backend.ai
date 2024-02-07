@@ -16,7 +16,6 @@ import logging
 from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
-    AsyncIterator,
     Callable,
     Iterable,
     List,
@@ -48,7 +47,7 @@ from etcd_client import (
     GRpcStatusCode,
     GRpcStatusError,
     TxnOp,
-    WatchEvent,
+    Watch,
 )
 from etcd_client import (
     Txn as EtcdTransactionAction,
@@ -438,7 +437,7 @@ class AsyncEtcd:
             actions = []
             for k in keys:
                 actions.append(TxnOp.delete(self._mangle_key(f"{_slash(scope_prefix)}{k}")))
-            communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def delete_prefix(
         self,
@@ -454,7 +453,7 @@ class AsyncEtcd:
 
     async def _watch_impl(
         self,
-        iterator_factory: Callable[[EtcdCommunicator], AsyncIterator[WatchEvent]],
+        iterator_factory: Callable[[EtcdCommunicator], Watch],
         scope_prefix_len: int,
         once: bool,
         cleanup_event: Optional[CondVar] = None,
@@ -463,6 +462,7 @@ class AsyncEtcd:
         try:
             async with self.etcd.connect() as communicator:
                 iterator = iterator_factory(communicator)
+
                 async for ev in iterator:
                     if wait_timeout is not None:
                         try:
@@ -474,7 +474,7 @@ class AsyncEtcd:
                         return
         finally:
             if cleanup_event:
-                cleanup_event.notify_waiters()
+                await cleanup_event.notify_waiters()
 
     async def watch(
         self,

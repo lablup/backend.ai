@@ -175,7 +175,9 @@ class EtcdLock(AbstractDistributedLock):
         assert self._etcd_client is not None
 
         communicator = await self._etcd_client.__aenter__()
-        await communicator.lease_grant(self._lifetime)
+        if self._lifetime is not None:
+            await communicator.lease_grant(int(self._lifetime))
+
         await communicator.lock(self.lock_name)
 
         if self._debug:
