@@ -443,15 +443,15 @@ def cp(filenames):
     "--exist-ok",
     default=False,
     is_flag=True,
-    help="Skip an error caused by file not found",
+    help="Skip an error caused by file already existed",
 )
 def mkdir(name, path, parents, exist_ok):
     """Create an empty directory in the virtual folder.
 
     \b
     NAME: Name of a virtual folder.
-    PATH: The name or path of directory. Parent directories are created automatically
-          if they do not exist.
+    PATH: The name or path of directory.
+          If you want to automatically create parent directories when they do not exist, use -p option.
     """
     with Session() as session:
         try:
