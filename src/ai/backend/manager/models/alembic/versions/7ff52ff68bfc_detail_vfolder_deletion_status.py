@@ -26,28 +26,20 @@ BATCH_SIZE = 100
 
 ENUM_NAME = "vfolderoperationstatus"
 
-# New enum values
-delete_pending = "delete-pending"  # vfolder is in trash bin
-delete_ongoing = "delete-ongoing"  # vfolder is being deleted in storage
-delete_complete = "delete-complete"  # vfolder is deleted permanently, only DB row remains
-delete_error = "delete-error"
-
-# Legacy enum values
-legacy_delete_complete = "deleted-complete"
-purge_ongoing = "purge-ongoing"
-
-# Original enum values to downgrade from new enum values
-error = "error"
-
 
 class VFolderOperationStatus(enum.StrEnum):
-    DELETE_PENDING = delete_pending  # vfolder is in trash bin
-    DELETE_ONGOING = delete_ongoing  # vfolder is being deleted in storage
-    DELETE_COMPLETE = delete_complete  # vfolder is deleted permanently, only DB row remains
-    DELETE_ERROR = delete_error
-    LEGACY_DELETE_COMPLETE = legacy_delete_complete
-    PURGE_ONGOING = purge_ongoing
-    ERROR = error
+    # New enum values
+    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
+    DELETE_ERROR = "delete-error"
+
+    # Legacy enum values
+    LEGACY_DELETE_COMPLETE = "deleted-complete"
+    PURGE_ONGOING = "purge-ongoing"
+
+    # Original enum values
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
+    ERROR = "error"
 
 
 vfolders = sa.Table(
@@ -64,15 +56,15 @@ vfolders = sa.Table(
 )
 
 
-def add_enum(enum_val: str):
-    op.execute(f"ALTER TYPE {ENUM_NAME} ADD VALUE IF NOT EXISTS '{enum_val}'")
+def add_enum(enum_val: VFolderOperationStatus) -> None:
+    op.execute(f"ALTER TYPE {ENUM_NAME} ADD VALUE IF NOT EXISTS '{str(enum_val)}'")
 
 
-def delete_enum(enum_val: str):
+def delete_enum(enum_val: VFolderOperationStatus) -> None:
     op.execute(
         text(
             f"""DELETE FROM pg_enum
-        WHERE enumlabel = '{enum_val}'
+        WHERE enumlabel = '{str(enum_val)}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{ENUM_NAME}'
         )"""
@@ -81,14 +73,23 @@ def delete_enum(enum_val: str):
 
 
 def update_legacy_to_new(
-    conn, vfolder_t, legacy_enum: VFolderOperationStatus, new_enum: VFolderOperationStatus
-):
+    conn,
+    vfolder_t,
+    legacy_enum: VFolderOperationStatus,
+    new_enum: VFolderOperationStatus,
+    *,
+    legacy_enum_name: str | None = None,
+    new_enum_name: str | None = None,
+) -> None:
+    _legacy_enum_name = legacy_enum_name or legacy_enum.name
+    _new_enum_name = new_enum_name or new_enum.name
+
     while True:
         stmt = (
             sa.select([vfolder_t.c.id])
             .where(
                 (vfolder_t.c.status == legacy_enum)
-                | (vfolder_t.c.status_history.has_key(legacy_enum.name))
+                | (vfolder_t.c.status_history.has_key(_legacy_enum_name))
             )
             .limit(BATCH_SIZE)
         )
@@ -111,24 +112,24 @@ def update_legacy_to_new(
             sa.update(vfolder_t)
             .values({
                 "status_history": sa.func.jsonb_build_object(
-                    new_enum.name, vfolder_t.c.status_history.op("->>")(legacy_enum.name)
+                    _new_enum_name, vfolder_t.c.status_history.op("->>")(_legacy_enum_name)
                 )
-                + vfolder_t.c.status_history.op("-")(legacy_enum.name)
+                + vfolder_t.c.status_history.op("-")(_legacy_enum_name)
             })
             .where(
                 (vfolder_t.c.id.in_(vfolder_ids))
-                & (vfolder_t.c.status_history.has_key(legacy_enum.name))
+                & (vfolder_t.c.status_history.has_key(_legacy_enum_name))
             )
         )
         conn.execute(update_status_history)
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
 
-    add_enum(delete_pending)
-    add_enum(delete_complete)
-    add_enum(delete_error)
+    add_enum(VFolderOperationStatus.DELETE_PENDING)
+    add_enum(VFolderOperationStatus.DELETE_COMPLETE)
+    add_enum(VFolderOperationStatus.DELETE_ERROR)
     conn.commit()
 
     vfolders = sa.Table(
@@ -152,10 +153,11 @@ def upgrade():
         vfolders,
         VFolderOperationStatus.LEGACY_DELETE_COMPLETE,
         VFolderOperationStatus.DELETE_PENDING,
+        legacy_enum_name="DELETE_COMPLETE",
     )
 
-    delete_enum(legacy_delete_complete)
-    delete_enum(purge_ongoing)
+    delete_enum(VFolderOperationStatus.LEGACY_DELETE_COMPLETE)
+    delete_enum(VFolderOperationStatus.PURGE_ONGOING)
 
     op.add_column(
         "vfolders", sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True)
@@ -166,11 +168,11 @@ def upgrade():
     conn.commit()
 
 
-def downgrade():
+def downgrade() -> None:
     conn = op.get_bind()
 
-    add_enum(legacy_delete_complete)
-    add_enum(purge_ongoing)
+    add_enum(VFolderOperationStatus.LEGACY_DELETE_COMPLETE)
+    add_enum(VFolderOperationStatus.PURGE_ONGOING)
     conn.commit()
 
     vfolders = sa.Table(
@@ -200,11 +202,12 @@ def downgrade():
         vfolders,
         VFolderOperationStatus.DELETE_PENDING,
         VFolderOperationStatus.LEGACY_DELETE_COMPLETE,
+        new_enum_name="DELETE_COMPLETE",
     )
 
-    delete_enum(delete_pending)
-    delete_enum(delete_complete)
-    delete_enum(delete_error)
+    delete_enum(VFolderOperationStatus.DELETE_PENDING)
+    delete_enum(VFolderOperationStatus.DELETE_COMPLETE)
+    delete_enum(VFolderOperationStatus.DELETE_ERROR)
 
     op.drop_index(op.f("ix_vfolders_status_changed"), table_name="vfolders")
     op.drop_column("vfolders", "status_changed")
