@@ -138,6 +138,32 @@ def test_download_file(run_user: ClientRunnerFunc):
     os.remove(FILE_NAME)
 
 
+def test_mkdir_vfolder(run_user: ClientRunnerFunc):
+    """
+    Test for creating an empty directory in the vfolder.
+    !! Make sure you execute this test after test_create_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    VFOLDER_NAME = "test_folder2"
+    DIR_PATHS = ["tmp", "test/dir"]
+
+    # Create directory in the vfolder
+    with closing(run_user(["vfolder", "mkdir", VFOLDER_NAME, DIR_PATHS[0]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "Directory creation failed."
+
+    # Create already existing directory with exist-ok option
+    with closing(run_user(["vfolder", "mkdir", "-e", VFOLDER_NAME, DIR_PATHS[0]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "Exist-ok option does not work properly."
+
+    # Test whether the parent directory is created automatically
+    with closing(run_user(["vfolder", "mkdir", "-p", VFOLDER_NAME, DIR_PATHS[1]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "The parent directory is not created automatically."
+
+
 def test_delete_vfolder(run_user: ClientRunnerFunc):
     """
     Test delete vfolder function.
