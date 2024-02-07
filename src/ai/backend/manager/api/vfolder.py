@@ -2201,7 +2201,7 @@ async def _delete(
     await update_vfolder_status(
         root_ctx.db,
         (entry["id"],),
-        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_PENDING,
     )
 
 
@@ -2213,7 +2213,6 @@ async def _delete(
     }),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
 
     access_key = request["keypair"]["access_key"]
@@ -2229,6 +2228,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         access_key,
         folder_id,
     )
+    await ensure_vfolder_status(request, VFolderAccessStatus.TRASHABLE, params["id"])
     try:
         await _delete(
             root_ctx,
@@ -2253,7 +2253,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
 
     folder_name = request.match_info["name"]
@@ -2270,6 +2269,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
+    await ensure_vfolder_status(request, VFolderAccessStatus.TRASHABLE, request.match_info["name"])
     try:
         await _delete(
             root_ctx,
@@ -2311,7 +2311,7 @@ async def delete_from_trash_bin(request: web.Request) -> web.Response:
         folder_name,
     )
     await ensure_vfolder_status(
-        request, VFolderAccessStatus.TRASHABLE, folder_id_or_name=request.match_info["name"]
+        request, VFolderAccessStatus.DELETABLE, folder_id_or_name=request.match_info["name"]
     )
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
