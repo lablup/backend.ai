@@ -43,7 +43,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py-test==0.1.4",
+//     "etcd-client-py==0.2.0b1",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
@@ -1440,19 +1440,29 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e4f6e6d051a913f8dc63613363b9fbdc67f20a2f89fe005c9550642ebe2be4c5",
-              "url": "https://files.pythonhosted.org/packages/67/10/a6c122333b04f23782d3b61d8eb3fb389412478fcf5e000a905881083067/etcd_client_py_test-0.1.4-cp311-cp311-manylinux_2_34_x86_64.whl"
+              "hash": "551b04c0199273238e0f68e15f3893f9366fcf69001218c707324326585fde5a",
+              "url": "https://files.pythonhosted.org/packages/bf/98/70ed1fca59db116003fbd6e2aff9edb9fcaf072502607852b8d2edf72694/etcd_client_py-0.2.0b1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3ac2f4cac0037b16e50f4154e6b8a6fa9ade155bcb8d8f65baef8a4591f4d694",
-              "url": "https://files.pythonhosted.org/packages/18/b6/3990f200e28567e54ba07c0bffcfd4046aaa1eaaeb86804abae89f7825a9/etcd_client_py_test-0.1.4.tar.gz"
+              "hash": "1efaf5c1dabd297646450824bee3771d09dcbcf0f71b83f55d1a137dd79ea78d",
+              "url": "https://files.pythonhosted.org/packages/61/e4/8d6fcd1fc1a6e48b4fb45225fb863889346371e82aac1adcda5d3a20601b/etcd_client_py-0.2.0b1-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "31a670030c23cb7eb14fff7609fd552ec4e03031f908bcfcccf20cd1359e1ad9",
+              "url": "https://files.pythonhosted.org/packages/7d/03/57ec2dd3930d4b769264596d593dc1ad92e48303266af11bb4b6b41c6d45/etcd_client_py-0.2.0b1.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "356c90f23ea01c0f252874b9b2d68d7e308440bf68e2c0edf094833167f7bf91",
+              "url": "https://files.pythonhosted.org/packages/e1/f9/b2f168f801a137b098e1fa504b026160233bef96e62050ce35b53978d1b0/etcd_client_py-0.2.0b1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             }
           ],
-          "project_name": "etcd-client-py-test",
+          "project_name": "etcd-client-py",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.1.4"
+          "version": "0.2.0b1"
         },
         {
           "artifacts": [
@@ -2177,13 +2187,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a3a24428f6c96f27370d7fe61d2ac0be09017be5190d68d8658233171f1b6541",
-              "url": "https://files.pythonhosted.org/packages/1f/1a/16b0d2f66601ba3081f1d4177087c79fd1f11d17706ee01d373e4ba8e00d/linkify_it_py-2.0.2-py3-none-any.whl"
+              "hash": "6bcbc417b0ac14323382aef5c5192c0075bf8a9d6b41820a2b66371eac6b6d79",
+              "url": "https://files.pythonhosted.org/packages/04/1e/b832de447dee8b582cac175871d2f6c3d5077cc56d5575cadba1fd1cccfa/linkify_it_py-2.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "19f3060727842c254c808e99d465c80c49d2c7306788140987a1a7a29b0d6ad2",
-              "url": "https://files.pythonhosted.org/packages/8d/fd/73bb30ec2b3cd952fe139a79a40ce5f5fd0280dd2cc1de94c93ea6a714d2/linkify-it-py-2.0.2.tar.gz"
+              "hash": "68cda27e162e9215c17d786649d1da0021a451bdc436ef9e0fa0ba5234b9b048",
+              "url": "https://files.pythonhosted.org/packages/2a/ae/bb56c6828e4797ba5a4821eec7c43b8bf40f69cda4d4f5f8c8a2810ec96a/linkify-it-py-2.0.3.tar.gz"
             }
           ],
           "project_name": "linkify-it-py",
@@ -2204,7 +2214,7 @@
             "uc-micro-py"
           ],
           "requires_python": ">=3.7",
-          "version": "2.0.2"
+          "version": "2.0.3"
         },
         {
           "artifacts": [
@@ -4632,7 +4642,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py-test==0.1.4",
+    "etcd-client-py==0.2.0b1",
     "faker~=13.12.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
