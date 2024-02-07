@@ -106,7 +106,7 @@ def test_rename_file(run_user: ClientRunnerFunc):
     NEW_FILE_NAME = "new.txt"
 
     with closing(
-        run_user(["vfolder", "rename_file", VFOLDER_NAME, OLD_FILE_NAME, NEW_FILE_NAME])
+        run_user(["vfolder", "rename-file", VFOLDER_NAME, OLD_FILE_NAME, NEW_FILE_NAME])
     ) as p:
         p.expect(EOF)
         assert "Renamed." in p.before.decode(), "File rename failed."

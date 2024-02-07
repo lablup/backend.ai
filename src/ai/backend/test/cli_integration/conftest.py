@@ -144,10 +144,10 @@ def keypair_resource_policy() -> str:
 @pytest.fixture
 def make_txt_file() -> Generator[TextIOWrapper, None, None]:
     FILE_NAME = "test.txt"
-    f = open(FILE_NAME, "w")
+    with open(FILE_NAME, "w") as f:
+        f.write("This file is for testing.")
     yield f
 
-    f.close()
     os.remove(FILE_NAME)
 
 
