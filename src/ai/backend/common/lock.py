@@ -8,7 +8,9 @@ from io import IOBase
 from pathlib import Path
 from typing import Any, Optional
 
-from etcetra.client import EtcdCommunicator, EtcdConnectionManager
+from etcd_client import Client as EtcdClient
+from etcd_client import Communicator as EtcdCommunicator
+from etcd_client import ConnectOptions
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.exceptions import LockError, LockNotOwnedError
@@ -143,7 +145,7 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-    _con_mgr: Optional[EtcdConnectionManager]
+    _etcd_client: Optional[EtcdClient]
     _debug: bool
 
     lock_name: str
@@ -168,25 +170,28 @@ class EtcdLock(AbstractDistributedLock):
         self._debug = debug
 
     async def __aenter__(self) -> EtcdCommunicator:
-        self._con_mgr = self.etcd.etcd.with_lock(
-            self.lock_name,
-            timeout=self._timeout,
-            ttl=int(self._lifetime) if self._lifetime is not None else None,
-        )
-        assert (
-            self._con_mgr is not None
-        )  # FIXME: not required if with_lock() has an explicit return type.
-        communicator = await self._con_mgr.__aenter__()
+        conn_opt = ConnectOptions().with_timeout(self._timeout)
+        self._etcd_client = self.etcd.etcd.connect(conn_opt)
+        assert self._etcd_client is not None
+
+        communicator = await self._etcd_client.__aenter__()
+        await communicator.lease_grant(self._lifetime)
+        await communicator.lock(self.lock_name)
+
         if self._debug:
             log.debug("etcd lock acquired")
+
         return communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._con_mgr is not None
-        await self._con_mgr.__aexit__(*exc_info)
+        assert self._etcd_client is not None
+        communicator = await self._etcd_client.__aenter__()
+        await communicator.unlock(self.lock_name)
+
         if self._debug:
             log.debug("etcd lock released")
-        self._con_mgr = None
+
+        self._etcd_client = None
         return None
 
 
