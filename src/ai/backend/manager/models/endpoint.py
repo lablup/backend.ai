@@ -386,7 +386,7 @@ class Endpoint(graphene.ObjectType):
     image = graphene.String()
     image_id = graphene.UUID(description="Added at 23.09.9")
     image_row = graphene.Field(Image, description="Added at 23.09.9")
-    architecture = graphene.String()
+    architecture = graphene.String(description="Added at 23.09.9")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
