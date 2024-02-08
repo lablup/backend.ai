@@ -302,62 +302,56 @@ manager_local_config_iv = (
             t.Key("log-scheduler-ticks", default=False): t.ToBool,
             t.Key("periodic-sync-stats", default=False): t.ToBool,
         }).allow_extra("*"),
-        t.Key("raft", default=None): (
-            t.Dict({
-                # Cluster configurations
-                ## Set this to the max(node_ids) when joining RaftNodes to another cluster.
-                t.Key("restore-wal-from", default=None): t.Int | t.Null,
-                t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
-                # Initial peers
-                ## my peers
-                t.Key("myself"): t.List(
-                    t.Dict({
-                        t.Key("node-id"): t.Int,
-                        t.Key("host"): t.String,
-                        t.Key("port"): t.Int,
-                        t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(
-                            RaftNodeInitialRole
-                        ),
-                    })
-                ),
-                ## Other peers
-                t.Key("peers", default=[]): (
-                    t.List(
-                        t.Dict({
-                            t.Key("node-id"): t.Int,
-                            t.Key("host"): t.String,
-                            t.Key("port"): t.Int,
-                            t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(
-                                RaftNodeInitialRole
-                            ),
-                        })
-                    )
-                    | t.Null
-                ),
-                # Storage configurations
-                t.Key("log-dir"): t.String,
-                # Raft core configurations
-                # TODO: Decide proper default values for these configs.
-                t.Key("heartbeat-tick", default=None): t.Int | t.Null,
-                t.Key("election-tick", default=None): t.Int | t.Null,
-                t.Key("min-election-tick", default=None): t.Int | t.Null,
-                t.Key("max-election-tick", default=None): t.Int | t.Null,
-                t.Key("max-committed-size-per-ready", default=None): t.Int | t.Null,
-                t.Key("max-size-per-msg", default=None): t.Int | t.Null,
-                t.Key("max-inflight-msgs", default=None): t.Int | t.Null,
-                t.Key("check-quorum", default=None): t.ToBool | t.Null,
-                t.Key("batch-append", default=None): t.ToBool | t.Null,
-                t.Key("max-uncommitted-size", default=None): t.Int | t.Null,
-                t.Key("skip-bcast-commit", default=None): t.ToBool | t.Null,
-                t.Key("pre-vote", default=None): t.ToBool | t.Null,
-                t.Key("priority", default=None): t.Int | t.Null,
-            }).allow_extra("*")
-            | t.Null
-        ),
+        t.Key("raft", default=None): t.Null
+        | t.Dict({
+            # Storage configurations
+            t.Key("log-dir"): t.String,
+            # Raft core configurations
+            # TODO: Decide proper default values for these configs.
+            t.Key("heartbeat-tick", default=None): t.Int | t.Null,
+            t.Key("election-tick", default=None): t.Int | t.Null,
+            t.Key("min-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-committed-size-per-ready", default=None): t.Int | t.Null,
+            t.Key("max-size-per-msg", default=None): t.Int | t.Null,
+            t.Key("max-inflight-msgs", default=None): t.Int | t.Null,
+            t.Key("check-quorum", default=None): t.ToBool | t.Null,
+            t.Key("batch-append", default=None): t.ToBool | t.Null,
+            t.Key("max-uncommitted-size", default=None): t.Int | t.Null,
+            t.Key("skip-bcast-commit", default=None): t.ToBool | t.Null,
+            t.Key("pre-vote", default=None): t.ToBool | t.Null,
+            t.Key("priority", default=None): t.Int | t.Null,
+        }).allow_extra("*"),
     })
     .merge(config.etcd_config_iv)
     .allow_extra("*")
 )
+
+manager_raft_cluster_config_iv = t.Dict({
+    t.Key("restore-wal-from", default=None): t.Int | t.Null,
+    t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
+    t.Key("peers"): t.Dict({
+        t.Key("myself"): t.List(
+            t.Dict({
+                t.Key("node-id"): t.Int,
+                t.Key("host"): t.String,
+                t.Key("port"): t.Int,
+                t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+            })
+        ),
+        t.Key("other", default=[]): (
+            t.List(
+                t.Dict({
+                    t.Key("node-id"): t.Int,
+                    t.Key("host"): t.String,
+                    t.Key("port"): t.Int,
+                    t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+                })
+            )
+            | t.Null
+        ),
+    }),
+}).allow_extra("*")
 
 _config_defaults: Mapping[str, Any] = {
     "system": {
@@ -611,6 +605,31 @@ def load(
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the manager local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+    else:
+        return LocalConfig(cfg)
+
+
+def load_raft_cluster_config(
+    debug_enabled: bool = False,
+    raft_cluster_config_path: Optional[Path] = None,
+) -> Optional[LocalConfig]:
+    try:
+        raw_cfg, _ = config.read_from_file(raft_cluster_config_path, "raft-cluster-config")
+    except config.ConfigurationError:
+        return None
+
+    try:
+        cfg = config.check(raw_cfg, manager_raft_cluster_config_iv)
+        if debug_enabled:
+            print("== Raft cluster configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the raft cluster config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
