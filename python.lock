@@ -73,7 +73,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=24.0.1",
-//     "raftify==0.1.42",
+//     "raftify==0.1.43",
 //     "redis[hiredis]==4.5.5",
 //     "rich~=13.6",
 //     "setproctitle~=1.3.2",
@@ -3398,19 +3398,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ce3208bce423aa29eb7e328f1dcae653612866ccb2d5977306e833de186fce93",
-              "url": "https://files.pythonhosted.org/packages/bc/73/bde132e18ff1186d34044e53ab8fec92826f4cd2b64176b27e92594d2fc9/raftify-0.1.42-cp311-cp311-macosx_11_0_arm64.whl"
+              "hash": "3e55cb4eedde0b6c9a740560b6d01de7a810a7e28fba46c23f9a23fd02f146dd",
+              "url": "https://files.pythonhosted.org/packages/3f/0b/54a9a0068e6b0c64b7066cea9d4ba74db0ee48a54558b43618450a421e9c/raftify-0.1.43-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ab6e0238073b0bed73ee52edd53ee917d6c52ae0be4b62efbf4d4ee447d1b312",
-              "url": "https://files.pythonhosted.org/packages/69/d6/d157854fed70ac6acd350a88cedca59a27b7ee4ddb9b6c009c31a649d471/raftify-0.1.42.tar.gz"
+              "hash": "f3607539656460e58be755852100b57886103ea3b6ec3ca19e2bf269b23af175",
+              "url": "https://files.pythonhosted.org/packages/50/fa/f87a219d8592bc7519b97923957dc854e7532a48119a7084a56e9c9d673c/raftify-0.1.43.tar.gz"
             }
           ],
           "project_name": "raftify",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.1.42"
+          "version": "0.1.43"
         },
         {
           "artifacts": [
@@ -4672,7 +4672,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=24.0.1",
-    "raftify==0.1.42",
+    "raftify==0.1.43",
     "redis[hiredis]==4.5.5",
     "rich~=13.6",
     "setproctitle~=1.3.2",

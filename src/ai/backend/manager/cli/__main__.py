@@ -12,7 +12,7 @@ from typing import Any
 
 import click
 from more_itertools import chunked
-from raftify import Peers, RaftServiceClient, cli_main
+from raftify import InitialRole, Peer, Peers, RaftServiceClient, cli_main
 from setproctitle import setproctitle
 from tabulate import tabulate
 
@@ -338,8 +338,11 @@ async def inspect_node_status(cli_ctx: CLIContext) -> None:
 
     if raft_configs is not None:
         initial_peers = Peers({
-            int(entry["node-id"]): f"{entry['host']}:{entry['port']}"
-            for entry in raft_configs["peers"]
+            int(peer_config["node-id"]): Peer(
+                addr=f"{peer_config['host']}:{peer_config['port']}",
+                role=InitialRole.from_str(peer_config["role"]),
+            )
+            for peer_config in raft_configs["peers"]
         })
 
         peers: dict[str, Any] | None = None

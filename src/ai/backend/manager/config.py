@@ -217,7 +217,7 @@ from ai.backend.common.types import (
     SlotTypes,
     current_resource_slots,
 )
-from ai.backend.manager.types import RaftLogLovel
+from ai.backend.manager.types import RaftNodeInitialRole
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -305,10 +305,6 @@ manager_local_config_iv = (
         t.Key("raft", default=None): (
             t.Dict({
                 # Cluster configurations
-                ## Cluster's Leader node id
-                t.Key("cluster-leader-id", default=1): t.Int,
-                ## This would be useful when adding new RaftNodes to an existing cluster without restarting the server.
-                t.Key("bootstrap-done", default=False): t.ToBool,
                 ## Set this to the max(node_ids) when joining RaftNodes to another cluster.
                 t.Key("restore-wal-from", default=None): t.Int | t.Null,
                 t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
@@ -319,21 +315,27 @@ manager_local_config_iv = (
                         t.Key("node-id"): t.Int,
                         t.Key("host"): t.String,
                         t.Key("port"): t.Int,
+                        t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(
+                            RaftNodeInitialRole
+                        ),
                     })
                 ),
                 ## Other peers
-                t.Key("peers", default=[]): t.List(
-                    t.Dict({
-                        t.Key("node-id"): t.Int,
-                        t.Key("host"): t.String,
-                        t.Key("port"): t.Int,
-                    })
-                )
-                | t.Null,
+                t.Key("peers", default=[]): (
+                    t.List(
+                        t.Dict({
+                            t.Key("node-id"): t.Int,
+                            t.Key("host"): t.String,
+                            t.Key("port"): t.Int,
+                            t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(
+                                RaftNodeInitialRole
+                            ),
+                        })
+                    )
+                    | t.Null
+                ),
                 # Storage configurations
                 t.Key("log-dir"): t.String,
-                # Logging configurations
-                t.Key("log-level", default=RaftLogLovel.INFO): tx.Enum(RaftLogLovel),
                 # Raft core configurations
                 # TODO: Decide proper default values for these configs.
                 t.Key("heartbeat-tick", default=None): t.Int | t.Null,
