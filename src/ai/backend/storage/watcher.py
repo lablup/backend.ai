@@ -15,7 +15,6 @@ import zmq.asyncio
 from ai.backend.common import msgpack
 from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
 
@@ -143,9 +142,6 @@ class MountTask(AbstractTask):
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str = attrs.field(default="/etc/fstab")
-    mount_prefix: str | None = attrs.field(default=None)
-
-    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         return await _mount(
@@ -155,12 +151,14 @@ class MountTask(AbstractTask):
             self.cmd_options,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
         )
 
     @classmethod
     def from_event(
-        cls, event: DoVolumeMountEvent, *, mount_path: Path, mount_prefix: str | None = None
+        cls,
+        event: DoVolumeMountEvent,
+        *,
+        mount_path: Path,
     ) -> MountTask:
         return MountTask(
             str(mount_path),
@@ -170,8 +168,6 @@ class MountTask(AbstractTask):
             event.scaling_group,
             event.edit_fstab,
             event.fstab_path,
-            mount_prefix,
-            event.quota_scope_id,
         )
 
     def serialize(self) -> bytes:
@@ -183,8 +179,6 @@ class MountTask(AbstractTask):
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
-            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         ))
 
     @classmethod
@@ -197,8 +191,6 @@ class MountTask(AbstractTask):
             values[4],
             values[5],
             values[6],
-            values[7],
-            QuotaScopeID.parse(values[8]) if values[8] is not None else None,
         )
 
 
@@ -213,10 +205,7 @@ class UmountTask(AbstractTask):
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str | None = attrs.field(default=None)
-    mount_prefix: str | None = attrs.field(default=None)
     timeout: float | None = attrs.field(default=None)
-
-    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         did_umount = await _umount(
@@ -235,7 +224,6 @@ class UmountTask(AbstractTask):
         event: DoVolumeUnmountEvent,
         *,
         mount_path: Path,
-        mount_prefix: str | None = None,
         timeout: float | None = None,
     ) -> UmountTask:
         return UmountTask(
@@ -243,9 +231,7 @@ class UmountTask(AbstractTask):
             event.scaling_group,
             event.edit_fstab,
             event.fstab_path,
-            mount_prefix,
             timeout,
-            event.quota_scope_id,
         )
 
     def serialize(self) -> bytes:
@@ -254,9 +240,7 @@ class UmountTask(AbstractTask):
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
             self.timeout,
-            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         ))
 
     @classmethod
@@ -267,8 +251,6 @@ class UmountTask(AbstractTask):
             values[2],
             values[3],
             values[4],
-            values[5],
-            QuotaScopeID.parse(values[6]) if values[6] is not None else None,
         )
 
 

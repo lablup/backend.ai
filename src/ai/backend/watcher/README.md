@@ -4,7 +4,7 @@ A base interface of Backend.AI watcher. Watcher is a special process that runs w
 
 
 ## How to use
-First, you should implement the watcher as a Backend.AI Watcher plugin. There are two interfaces that you should extend.
+First, you should implement the watcher as a Backend.AI Watcher plugin. There are two interfaces that you should implement.
 - `ai.backend.watcher.base.BaseWatcher`
 - `ai.backend.watcher.base.BaseWatcherConfig`
 

@@ -52,9 +52,6 @@ agent-sock-port = 6007
 # This affects the per-sgroup configuration scope.
 scaling-group = "default"
 
-# Set the volume mount path for the agent node.
-# mount-path = "/vfroot"
-
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./agent.pid"             # env: BACKEND_PID_FILE

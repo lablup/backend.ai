@@ -9,7 +9,6 @@ import stat
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -2830,9 +2829,6 @@ async def list_mounts(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log.info("VFOLDER.LIST_MOUNTS(ak:{})", access_key)
-    mount_prefix = await root_ctx.shared_config.get_raw("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
 
     # NOTE: Changed in 20.09: the manager instances no longer have mountpoints.
     all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
@@ -2948,9 +2944,6 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})"
     log_args = (access_key, params["name"], params["fs_location"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.shared_config.get_raw("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
 
     # NOTE: Changed in 20.09: the manager instances no longer have mountpoints.
     resp: MutableMapping[str, Any] = {
@@ -3049,11 +3042,6 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
     log_args = (access_key, params["name"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.shared_config.get_raw("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    assert Path(mount_prefix) != mountpoint
 
     async with root_ctx.db.begin() as conn, conn.begin():
         # Prevent unmount if target host is mounted to running kernels.

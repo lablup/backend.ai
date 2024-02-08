@@ -41,6 +41,7 @@ from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
 from .vast import VASTVolume
 from .vfs import BaseVolume
+from .watcher import WatcherClient
 from .weka import WekaVolume
 from .xfs import XfsVolume
 
@@ -97,6 +98,7 @@ class RootContext:
     dsn: str | None
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
+    watcher: WatcherClient | None
 
     def __init__(
         self,
@@ -108,6 +110,7 @@ class RootContext:
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
+        watcher: WatcherClient | None,
         dsn: Optional[str] = None,
     ) -> None:
         self.pid = pid
@@ -118,6 +121,7 @@ class RootContext:
         self.dsn = dsn
         self.event_producer = event_producer
         self.event_dispatcher = event_dispatcher
+        self.watcher = watcher
         self.cors_options = {
             "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=False, expose_headers="*", allow_headers="*"

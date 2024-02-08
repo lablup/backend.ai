@@ -310,20 +310,16 @@ class Fstab:
 
 
 async def mount(
-    mount_path: str,
+    mountpoint: str,
     fs_location: str,
     fs_type: str = "nfs",
     cmd_options: str | None = None,
     edit_fstab: bool = False,
     fstab_path: str | None = None,
-    mount_prefix: str | None = None,
 ) -> None:
-    if mount_prefix is None:
-        mount_prefix = "/"
     if fstab_path is None:
         fstab_path = "/etc/fstab"
-    mountpoint = Path(mount_prefix) / mount_path
-    mountpoint.mkdir(exist_ok=True)
+    Path(mountpoint).mkdir(exist_ok=True)
     if cmd_options is not None:
         cmd = [
             "mount",
@@ -332,10 +328,10 @@ async def mount(
             "-o",
             cmd_options,
             fs_location,
-            str(mountpoint),
+            mountpoint,
         ]
     else:
-        cmd = ["mount", "-t", fs_type, fs_location, str(mountpoint)]
+        cmd = ["mount", "-t", fs_type, fs_location, mountpoint]
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
@@ -350,35 +346,31 @@ async def mount(
             fstab = Fstab(fp)
             await fstab.add(
                 fs_location,
-                str(mountpoint),
+                mountpoint,
                 fs_type,
                 cmd_options,
             )
 
 
 async def umount(
-    mount_path: str,
-    mount_prefix: str | None = None,
+    mountpoint: str,
     edit_fstab: bool = False,
     fstab_path: str | None = None,
     rmdir_if_empty: bool = False,
     *,
     timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
 ) -> bool:
-    if mount_prefix is None:
-        mount_prefix = "/"
     if fstab_path is None:
         fstab_path = "/etc/fstab"
-    mountpoint = Path(mount_prefix) / mount_path
-    assert Path(mount_prefix) != mountpoint
-    if not mountpoint.is_mount():
+    mountpoint_path = Path(mountpoint)
+    if not mountpoint_path.is_mount():
         return False
     try:
         with timeout(timeout_sec):
             proc = await asyncio.create_subprocess_exec(
                 *[
                     "umount",
-                    str(mountpoint),
+                    mountpoint,
                 ],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -396,11 +388,11 @@ async def umount(
         raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
     if rmdir_if_empty:
         try:
-            mountpoint.rmdir()  # delete directory if empty
+            mountpoint_path.rmdir()  # delete directory if empty
         except OSError:
             pass
     if edit_fstab:
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)
-            await fstab.remove_by_mountpoint(str(mountpoint))
+            await fstab.remove_by_mountpoint(mountpoint)
     return True

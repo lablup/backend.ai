@@ -41,7 +41,6 @@ from .types import (
     KernelId,
     LogSeverity,
     ModelServiceStatus,
-    QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
     VolumeMountableNodeType,
@@ -621,8 +620,6 @@ class DoVolumeMountEvent(AbstractEvent):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str = attrs.field(default="/etc/fstab")
 
-    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
-
     def serialize(self) -> tuple:
         return (
             self.dir_name,
@@ -633,7 +630,6 @@ class DoVolumeMountEvent(AbstractEvent):
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
@@ -647,7 +643,6 @@ class DoVolumeMountEvent(AbstractEvent):
             scaling_group=value[5],
             edit_fstab=value[6],
             fstab_path=value[7],
-            quota_scope_id=QuotaScopeID.parse(value[8]) if value[8] is not None else None,
         )
 
 
@@ -666,8 +661,6 @@ class DoVolumeUnmountEvent(AbstractEvent):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str | None = attrs.field(default=None)
 
-    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
-
     def serialize(self) -> tuple:
         return (
             self.dir_name,
@@ -675,7 +668,6 @@ class DoVolumeUnmountEvent(AbstractEvent):
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
@@ -686,7 +678,6 @@ class DoVolumeUnmountEvent(AbstractEvent):
             scaling_group=value[2],
             edit_fstab=value[3],
             fstab_path=value[4],
-            quota_scope_id=QuotaScopeID.parse(value[5]) if value[5] is not None else None,
         )
 
 
@@ -705,7 +696,6 @@ class VolumeMountEventArgs(MonitoringAlarmEventArgs):
     node_type: VolumeMountableNodeType = attrs.field()
     mount_path: str = attrs.field()
     err_msg: str | None = attrs.field(default=None)
-    quota_scope_id: QuotaScopeID | None = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -714,7 +704,6 @@ class VolumeMountEventArgs(MonitoringAlarmEventArgs):
             str(self.node_type),
             self.mount_path,
             self.err_msg,
-            str(self.quota_scope_id) if self.quota_scope_id is not None else None,
         )
 
     @classmethod
@@ -725,7 +714,6 @@ class VolumeMountEventArgs(MonitoringAlarmEventArgs):
             VolumeMountableNodeType(value[2]),
             value[3],
             value[4],
-            QuotaScopeID.parse(value[5]) if value[5] is not None else None,
         )
 
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -28,9 +29,18 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import MOUNT_MAP_KEY
+from ai.backend.common.events import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
+    VolumeMountableNodeType,
+    VolumeMounted,
+    VolumeUnmounted,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
@@ -1057,4 +1067,88 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
+    # passive events
+    evd = ctx.event_dispatcher
+    evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
+    evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
     return app
+
+
+async def handle_volume_mount(
+    context: RootContext,
+    source: AgentId,
+    event: DoVolumeMountEvent,
+) -> None:
+    if context.pidx != 0:
+        return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
+        return
+    err_msg: str | None = None
+    mount_path = Path(event.dir_name)
+    mount_task = MountTask.from_event(event, mount_path=mount_path)
+    resp = await context.watcher.request_task(mount_task)
+    if not resp.succeeded:
+        # Produce volume mounted event with error message.
+        # And skip chown.
+        err_msg = resp.body
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                "mount-fail",
+                str(context.node_id),
+                VolumeMountableNodeType.STORAGE_PROXY,
+                str(mount_path),
+                err_msg,
+            )
+        )
+        return
+
+    # change owner of mounted directory
+    chown_task = ChownTask(str(mount_path), os.getuid(), os.getgid())
+    resp = await context.watcher.request_task(chown_task)
+    if not resp.succeeded:
+        err_msg = resp.body
+    await context.etcd.put(f"{MOUNT_MAP_KEY}/{str(mount_path)}", event.fs_location)
+    await context.event_producer.produce_event(
+        VolumeMounted(
+            "mount-success",
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            str(mount_path),
+            err_msg,
+        )
+    )
+
+
+async def handle_volume_umount(
+    context: RootContext,
+    source: AgentId,
+    event: DoVolumeUnmountEvent,
+) -> None:
+    if context.pidx != 0:
+        return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
+        return
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
+    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    mount_path = Path(volume_mount_path, event.dir_name)
+    umount_task = UmountTask.from_event(
+        event,
+        mount_path=mount_path,
+        timeout=float(timeout) if timeout is not None else None,
+    )
+    resp = await context.watcher.request_task(umount_task)
+    err_msg = resp.body if not resp.succeeded else None
+    if resp.body:
+        log.warning(resp.body)
+    await context.etcd.delete(f"{MOUNT_MAP_KEY}/{str(mount_path)}")
+    await context.event_producer.produce_event(
+        VolumeUnmounted(
+            "umount-success",
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            str(mount_path),
+            err_msg,
+        )
+    )

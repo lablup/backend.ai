@@ -47,6 +47,17 @@ session-expire = "1d"
 # aiomonitor-webui-port = 49300
 
 
+# The socket fd path prefix to communicate with storage proxy watcher
+# The path should not have any permission issue with UID/GID
+# The full socket fd name will be like this. `/path/to/file/socket-<PIDx>`
+# watcher-insock-path-prefix = ""
+# watcher-outsock-path-prefix = ""
+
+
+# Watcher delegates root permission and do privileged tasks. This option enables the use of watcher.
+use-watcher = false
+
+
 [api.client]
 # Client-facing API
 service-addr = { host = "0.0.0.0", port = 6021 }

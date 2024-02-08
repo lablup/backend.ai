@@ -17,6 +17,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import MOUNT_MAP_KEY
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
@@ -135,13 +136,12 @@ async def handle_fstab_detail(request: web.Request) -> web.Response:
 async def handle_list_mounts(request: web.Request) -> web.Response:
     log.info("HANDLE_LIST_MOUNT")
     config = request.app["config_server"]
-    mount_prefix = await config.get("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
+    mount_map: dict[str, str] = await config.get_prefix(MOUNT_MAP_KEY)
     mounts = set()
-    for p in Path(mount_prefix).iterdir():
+    for path in mount_map.keys():
+        p = Path(path)
         if p.is_dir() and p.is_mount():
-            mounts.add(str(p))
+            mounts.add(path)
     return web.json_response(sorted(mounts))
 
 
@@ -149,10 +149,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     log.info("HANDLE_MOUNT")
     params = await request.json()
     config = request.app["config_server"]
-    mount_prefix = await config.get("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
+    mountpoint = Path(params["name"])
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -177,7 +174,8 @@ async def handle_mount(request: web.Request) -> web.Response:
     if err:
         log.error("Mount error: " + err)
         return web.Response(text=err, status=500)
-    log.info("Mounted " + params["name"] + " on " + mount_prefix)
+    await config.put(f"{MOUNT_MAP_KEY}/{str(mountpoint)}", params["fs_location"])
+    log.info(f"Mounted {str(mountpoint)}")
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
@@ -193,11 +191,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     log.info("HANDLE_UMOUNT")
     params = await request.json()
     config = request.app["config_server"]
-    mount_prefix = await config.get("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    assert Path(mount_prefix) != mountpoint
+    mountpoint = Path(params["name"])
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
@@ -214,7 +208,8 @@ async def handle_umount(request: web.Request) -> web.Response:
     if err:
         log.error("Unmount error: " + err)
         return web.Response(text=err, status=500)
-    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
+    await config.put(f"{MOUNT_MAP_KEY}/{str(mountpoint)}")
+    log.info(f"Unmounted {str(mountpoint)}")
     try:
         mountpoint.rmdir()  # delete directory if empty
     except OSError:

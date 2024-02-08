@@ -10,3 +10,5 @@ REDIS_STREAM_LOCK: Final = 5
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
+
+MOUNT_MAP_KEY: Final = "volumes/mounts"

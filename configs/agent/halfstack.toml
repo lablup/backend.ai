@@ -18,7 +18,6 @@ var-base-path = "./var/lib/backend.ai"
 # allow-compute-plugins = []
 # block-compute-plugins = []
 image-commit-path = "./tmp/backend.ai/commit/"
-mount-path = "./vfroot/local"
 
 
 [container]

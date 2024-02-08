@@ -106,12 +106,8 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         cmd_options: str | None = None,
         edit_fstab: bool = False,
         fstab_path: str | None = None,
-        mount_prefix: str | None = None,
     ) -> None:
-        if mount_prefix is None:
-            _mount_path = Path(mount_path)
-        else:
-            _mount_path = Path(mount_prefix, mount_path)
+        _mount_path = Path(mount_path)
 
         def already_done() -> bool:
             return _mount_path.is_mount()
@@ -129,23 +125,18 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
                 cmd_options,
                 edit_fstab,
                 fstab_path,
-                mount_prefix,
             )
 
     async def umount(
         self,
         mount_path: str,
-        mount_prefix: str | None = None,
         edit_fstab: bool = False,
         fstab_path: str | None = None,
         rmdir_if_empty: bool = False,
         *,
         timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
     ) -> bool:
-        if mount_prefix is None:
-            _mount_path = Path(mount_path)
-        else:
-            _mount_path = Path(mount_prefix, mount_path)
+        _mount_path = Path(mount_path)
 
         def already_done() -> bool:
             return not _mount_path.is_mount()
@@ -158,28 +149,15 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
                 return True
             return await _umount(
                 mount_path,
-                mount_prefix,
                 edit_fstab,
                 fstab_path,
                 rmdir_if_empty,
                 timeout_sec=timeout_sec,
             )
 
-    async def check_mount(
-        self,
-        mount_path: str,
-        mount_prefix: str | None = None,
-    ) -> bool:
-        if mount_prefix is None:
-            _mount_path = Path(mount_path)
-        else:
-            _mount_path = Path(mount_prefix, mount_path)
-        return _mount_path.is_mount()
-
     async def poll_check_mount(
         self,
         mount_paths: list[str],
-        mount_prefix: str | None = None,
         *,
         interval: float = DEFAULT_POLLING_INTERVAL,
         error_handler: ErrorHandler,
@@ -187,7 +165,7 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
     ) -> None:
         while True:
             for path in mount_paths:
-                if not (await self.check_mount(path, mount_prefix)):
+                if not Path(path).is_mount():
                     await error_handler(path, reason="unknown")
                     if return_when_error:
                         return
