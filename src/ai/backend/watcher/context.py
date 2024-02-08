@@ -8,10 +8,6 @@ from typing import (
 )
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import (
-    EventDispatcher,
-    EventProducer,
-)
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .defs import WatcherName
@@ -33,8 +29,6 @@ class RootContext:
     etcd: AsyncEtcd
     local_config: dict[str, Any]
     dsn: str | None
-    event_producer: EventProducer | None
-    event_dispatcher: EventDispatcher | None
     _watchers: dict[WatcherName, BaseWatcher]
     webapp_ctx: WatcherWebAppPluginContext | None
 
@@ -45,17 +39,12 @@ class RootContext:
         node_id: str,
         local_config: dict[str, Any],
         etcd: AsyncEtcd,
-        *,
-        event_producer: EventProducer | None = None,
-        event_dispatcher: EventDispatcher | None = None,
     ) -> None:
         self.pid = pid
         self.pidx = pidx
         self.node_id = node_id
         self.etcd = etcd
         self.local_config = local_config
-        self.event_producer = event_producer
-        self.event_dispatcher = event_dispatcher
         self._watchers = {}
         self.webapp_ctx = None
 

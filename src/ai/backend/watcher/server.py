@@ -16,13 +16,7 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common import config
-from ai.backend.common.config import redis_config_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import (
-    EventDispatcher,
-    EventProducer,
-)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -199,33 +193,12 @@ async def server_main(
             str(local_config["watcher"]["ssl-cert"]),
             str(local_config["watcher"]["ssl-privkey"]),
         )
-    redis_config = redis_config_iv.check(
-        await etcd.get_prefix("config/redis"),
-    )
-    event_producer, event_dispatcher = None, None
-    if local_config["watcher"]["event"]["connect-server"]:
-        if (consumer_group := local_config["watcher"]["event"]["consumer-group"]) is None:
-            raise RuntimeError("Should set valid `consumer-group` in local config file.")
-        event_producer = await EventProducer.new(
-            redis_config,
-            db=REDIS_STREAM_DB,
-            log_events=local_config["debug"]["log-events"],
-        )
-        event_dispatcher = await EventDispatcher.new(
-            redis_config,
-            db=REDIS_STREAM_DB,
-            log_events=local_config["debug"]["log-events"],
-            node_id=local_config["watcher"]["node-id"],
-            consumer_group=consumer_group,
-        )
     ctx = RootContext(
         pid=os.getpid(),
         node_id=local_config["watcher"]["node-id"],
         pidx=pidx,
         local_config=local_config,
         etcd=etcd,
-        event_producer=event_producer,
-        event_dispatcher=event_dispatcher,
     )
     app["ctx"] = ctx
     app.middlewares.append(auth_middleware)

@@ -7,11 +7,9 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Coroutine,
     Final,
     Generic,
     Mapping,
-    Protocol,
     TypeVar,
     cast,
 )
@@ -34,8 +32,9 @@ DEFAULT_FILE_IO_TIMEOUT: Final = 60
 DEFAULT_POLLING_INTERVAL: Final = 30
 
 
-class ErrorHandler(Protocol):
-    def __call__(self, path: str, reason: str) -> Coroutine[None, None, None]:
+class MountErrorHandler(metaclass=ABCMeta):
+    @abstractmethod
+    async def call(self, path: str, reason: str) -> None:
         pass
 
 
@@ -139,7 +138,9 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         _mount_path = Path(mount_path)
 
         def already_done() -> bool:
-            return not _mount_path.is_mount()
+            if not _mount_path.is_mount() and (not rmdir_if_empty or not _mount_path.is_dir()):
+                return True
+            return False
 
         if already_done():
             return True
@@ -160,13 +161,13 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         mount_paths: list[str],
         *,
         interval: float = DEFAULT_POLLING_INTERVAL,
-        error_handler: ErrorHandler,
+        error_handler: MountErrorHandler,
         return_when_error: bool = False,
     ) -> None:
         while True:
             for path in mount_paths:
                 if not Path(path).is_mount():
-                    await error_handler(path, reason="unknown")
+                    await error_handler.call(path, "unknown")
                     if return_when_error:
                         return
             await asyncio.sleep(interval)

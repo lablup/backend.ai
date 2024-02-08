@@ -27,10 +27,6 @@ watcher_config_iv = (
             t.Key("soft-reset-available", default=False): t.Bool,
             t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
             t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
-            t.Key("event"): t.Dict({
-                t.Key("connect-server", default=False): t.ToBool,
-                t.Key("consumer-group", default=None): t.Null | t.String,
-            }),
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
         t.Key("debug"): t.Dict({
