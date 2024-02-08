@@ -744,7 +744,7 @@ class ModifyEndpoint(graphene.Mutation):
         async def _post(conn, result) -> EndpointRow:
             endpoint = result.first()
             try:
-                async with graph_ctx.db.begin_readonly_session() as session:
+                async with AsyncSession(conn) as session:
                     row = await EndpointRow.get(
                         session,
                         endpoint_id=endpoint.id,
