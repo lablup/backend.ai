@@ -38,22 +38,24 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 heartbeat-tick = 3
 election-tick = 10
 log-dir = "./logs"
-log-level = "debug"
 
-[[raft.peers]]
+[[raft.myself]]
 host = "127.0.0.1"
 port = 60151
 node-id = 1
+role = "voter"
 
-[[raft.peers]]
+[[raft.myself]]
 host = "127.0.0.1"
 port = 60152
 node-id = 2
+role = "voter"
 
-[[raft.peers]]
+[[raft.myself]]
 host = "127.0.0.1"
 port = 60153
 node-id = 3
+role = "voter"
 
 [docker-registry]
 ssl-verify = false

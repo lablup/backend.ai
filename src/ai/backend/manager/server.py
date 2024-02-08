@@ -32,7 +32,9 @@ import aiotools
 import click
 from aiohttp import web
 from aiotools import process_index
-from raftify import ClusterJoinTicket, Config, Peers, Raft, RaftConfig
+from raftify import Config as RaftConfig
+from raftify import InitialRole, Peer, Peers, Raft
+from raftify import RaftConfig as RaftCoreConfig
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -669,11 +671,14 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
 
         initial_peers = Peers({
-            int(peer_config["node-id"]): f"{peer_config['host']}:{peer_config['port']}"
+            int(peer_config["node-id"]): Peer(
+                addr=f"{peer_config['host']}:{peer_config['port']}",
+                role=InitialRole.from_str(peer_config["role"]),
+            )
             for peer_config in all_peers
         })
 
-        raft_core_config = RaftConfig(
+        raft_core_config = RaftCoreConfig(
             heartbeat_tick=raft_configs["heartbeat-tick"],
             election_tick=raft_configs["election-tick"],
             min_election_tick=raft_configs["min-election-tick"],
@@ -689,77 +694,41 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             priority=raft_configs["priority"],
         )
 
-        raft_cfg = Config(
+        raft_cfg = RaftConfig(
             log_dir=raft_configs["log-dir"],
             save_compacted_logs=True,
             compacted_log_dir=raft_configs["log-dir"],
             restore_wal_from=raft_configs["restore-wal-from"],
             restore_wal_snapshot_from=raft_configs["restore-wal-snapshot-from"],
+            initial_peers=initial_peers,
             raft_config=raft_core_config,
         )
 
         node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
         node_id = node_id_offset + process_index.get() + 1
-        raft_addr = initial_peers.get(node_id)
-        leader_id = raft_configs["cluster-leader-id"]
-        leader_addr = initial_peers.get(leader_id)
 
-        if leader_addr is None:
-            raise Exception(f"Leader node {leader_id} not found in initial peers.")
+        raft_addr = initial_peers.get(node_id)
 
         store = HashStore()
 
-        leader_mark = "-leader" if node_id == leader_id else ""
-
         raft_logger = RaftLogger(
-            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}{leader_mark}"),  # type: ignore
+            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
         )
 
-        if node_id == leader_id:
-            root_ctx.raft_ctx.cluster = Raft.bootstrap_cluster(
-                node_id,
-                raft_addr,
-                store,  # type: ignore
-                raft_cfg,
-                raft_logger,  # type: ignore
-                initial_peers,
-            )
-            raft_cluster = root_ctx.raft_ctx.cluster
-            raft_cluster.run()  # type: ignore
-        else:
-            root_ctx.raft_ctx.cluster = Raft.new_follower(
-                node_id,
-                raft_addr,
-                store,  # type: ignore
-                raft_cfg,
-                raft_logger,  # type: ignore
-                initial_peers,
-            )
-            raft_cluster = root_ctx.raft_ctx.cluster
-            raft_cluster.run()  # type: ignore
+        root_ctx.raft_ctx.cluster = Raft.bootstrap(
+            node_id,
+            raft_addr,
+            store,  # type: ignore
+            raft_cfg,
+            raft_logger,  # type: ignore
+        )
+        raft_cluster = root_ctx.raft_ctx.cluster
+        raft_cluster.run()  # type: ignore
 
-            # Wait for the leader node's gRPC server ready
-            await asyncio.sleep(2)
-
-            if raft_configs["bootstrap-done"]:
-                await raft_cluster.join(
-                    ClusterJoinTicket(
-                        node_id,
-                        leader_id,
-                        leader_addr,
-                        initial_peers,
-                    )
-                )
-                await raft_cluster.get_raft_node().set_bootstrap_done()
-            else:
-                await raft_cluster.member_bootstrap_ready(leader_addr, node_id, raft_logger)  # type: ignore
-
-        # Only for testing
+        # Webserver only for raft testing
         asyncio.create_task(
             WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
         )
-
-        # assert root_ctx.raft_ctx.cluster.raft_node is not None, "RaftNode not initialized properly!"
     yield
 
 
