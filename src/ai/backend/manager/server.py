@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -76,7 +77,7 @@ from .api.types import (
     WebMiddleware,
     WebRequestHandler,
 )
-from .config import LocalConfig, SharedConfig, volume_config_iv
+from .config import LocalConfig, SharedConfig, load_raft_cluster_config, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
 from .models import SessionRow
@@ -662,13 +663,19 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 @actxmgr
 async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     register_custom_deserializer()
-    local_config = root_ctx.local_config
-    raft_configs = local_config.get("raft")
+    raft_configs = root_ctx.local_config.get("raft")
+    raft_cluster_configs = root_ctx.raft_cluster_config
 
     if raft_configs is not None:
-        other_peers = [{**peer, "myself": False} for peer in raft_configs["peers"]]
-        my_peers = [{**peer, "myself": True} for peer in raft_configs["myself"]]
+        assert raft_cluster_configs is not None
+
+        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
         all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
+        assert (
+            root_ctx.local_config["manager"]["num-proc"] >= len(my_peers)
+        ), "The number of raft peers (myself), should be greater than or equal to the number of processes"
 
         initial_peers = Peers({
             int(peer_config["node-id"]): Peer(
@@ -698,8 +705,8 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log_dir=raft_configs["log-dir"],
             save_compacted_logs=True,
             compacted_log_dir=raft_configs["log-dir"],
-            restore_wal_from=raft_configs["restore-wal-from"],
-            restore_wal_snapshot_from=raft_configs["restore-wal-snapshot-from"],
+            restore_wal_from=raft_cluster_configs["restore-wal-from"],
+            restore_wal_snapshot_from=raft_cluster_configs["restore-wal-snapshot-from"],
             initial_peers=initial_peers,
             raft_config=raft_core_config,
         )
@@ -835,6 +842,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 def build_root_app(
     pidx: int,
     local_config: LocalConfig,
+    raft_cluster_config: Optional[LocalConfig] = None,
     *,
     cleanup_contexts: Sequence[CleanupContext] = None,
     subapp_pkgs: Sequence[str] = None,
@@ -853,6 +861,13 @@ def build_root_app(
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
     root_ctx.local_config = local_config
+    root_ctx.raft_cluster_config = raft_cluster_config
+
+    if local_config.get("raft") is not None and raft_cluster_config is None:
+        raise FileNotFoundError(
+            "Raft configurations enabled but Raft cluster configuration file not found!"
+        )
+
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(
@@ -938,9 +953,8 @@ async def server_main(
     pidx: int,
     _args: List[Any],
 ) -> AsyncIterator[None]:
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], _args[1], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
-
     root_ctx.raft_ctx = RaftClusterContext()
 
     # Start aiomonitor.
@@ -1021,7 +1035,7 @@ async def server_main_logwrapper(
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
 
-    log_endpoint = _args[1]
+    log_endpoint = _args[2]
     logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
 
     try:
@@ -1042,6 +1056,13 @@ async def server_main_logwrapper(
     help="The config file path. (default: ./manager.toml and /etc/backend.ai/manager.toml)",
 )
 @click.option(
+    "--raft-cluster-config-path",
+    "--raft-cluster-config",
+    type=Path,
+    default=None,
+    help="The raft cluster config file path. (default: ./raft-cluster-config.toml and /etc/backend.ai/raft-cluster-config.toml)",
+)
+@click.option(
     "--debug",
     is_flag=True,
     help="This option will soon change to --log-level TEXT option.",
@@ -1057,12 +1078,14 @@ def main(
     ctx: click.Context,
     config_path: Path,
     log_level: LogSeverity,
+    raft_cluster_config_path: Path,
     debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.
     """
     cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
+    raft_cluster_cfg = load_raft_cluster_config(debug, raft_cluster_config_path)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
@@ -1087,7 +1110,7 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=cfg["manager"]["num-proc"],
-                        args=(cfg, log_endpoint),
+                        args=(cfg, raft_cluster_cfg, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:

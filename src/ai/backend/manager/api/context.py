@@ -60,6 +60,7 @@ class RootContext(BaseContext):
     redis_lock: RedisConnectionInfo
     shared_config: SharedConfig
     local_config: LocalConfig
+    raft_cluster_config: Optional[LocalConfig]
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext

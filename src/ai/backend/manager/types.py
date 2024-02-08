@@ -5,7 +5,6 @@ import uuid
 from typing import TYPE_CHECKING, Protocol
 
 import attr
-from raftify import InitialRole
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 if TYPE_CHECKING:
@@ -45,9 +44,9 @@ class DistributedLockFactory(Protocol):
 
 
 class RaftNodeInitialRole(str, enum.Enum):
-    LEADER = InitialRole.LEADER
-    VOTER = InitialRole.VOTER
-    LEARNER = InitialRole.LEARNER
+    LEADER = "leader"
+    VOTER = "voter"
+    LEARNER = "learner"
 
 
 class RaftLogLovel(str, enum.Enum):
