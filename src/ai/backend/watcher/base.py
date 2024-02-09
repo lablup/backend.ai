@@ -105,19 +105,27 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         cmd_options: str | None = None,
         edit_fstab: bool = False,
         fstab_path: str | None = None,
-    ) -> None:
+    ) -> bool:
+        """
+        Run mount command through `ai.backend.common.utils.mount()` API
+        with `ai.backend.common.lock.FileLock`.
+
+        Return True if mount is successful.
+        Return False if the given path is already mounted.
+        Raise `ai.backend.common.exception.VolumeMountFailed` if any error occurs during mount.
+        """
         _mount_path = Path(mount_path)
 
         def already_done() -> bool:
             return _mount_path.is_mount()
 
         if already_done():
-            return
+            return False
         lock_path = FileLock.get_dir_lock_path(_mount_path)
         async with FileLock(lock_path, remove_when_unlock=True):
             if already_done():
-                return
-            return await _mount(
+                return False
+            await _mount(
                 mount_path,
                 fs_location,
                 fs_type,
@@ -125,6 +133,7 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
                 edit_fstab,
                 fstab_path,
             )
+            return True
 
     async def umount(
         self,
@@ -135,19 +144,29 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         *,
         timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
     ) -> bool:
+        """
+        Run umount command through `ai.backend.common.utils.umount()` API
+        with `ai.backend.common.lock.FileLock`.
+
+        Return True if umount is successful.
+        Return False if the given path is already umounted.
+        Raise `ai.backend.common.exception.VolumeMountFailed` if any error occurs during umount.
+        """
         _mount_path = Path(mount_path)
 
         def already_done() -> bool:
-            if not _mount_path.is_mount() and (not rmdir_if_empty or not _mount_path.is_dir()):
-                return True
-            return False
+            if _mount_path.is_mount():
+                return False
+            if rmdir_if_empty and _mount_path.is_dir():
+                return False
+            return True
 
         if already_done():
-            return True
+            return False
         lock_path = FileLock.get_dir_lock_path(_mount_path)
         async with FileLock(lock_path, remove_when_unlock=True):
             if already_done():
-                return True
+                return False
             return await _umount(
                 mount_path,
                 edit_fstab,
