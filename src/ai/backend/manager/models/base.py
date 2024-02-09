@@ -112,6 +112,11 @@ def zero_if_none(val):
     return 0 if val is None else val
 
 
+class FixtureOpModes(enum.StrEnum):
+    INSERT = "insert"
+    UPDATE = "update"
+
+
 class EnumType(TypeDecorator, SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
@@ -1070,27 +1075,84 @@ def set_if_set(
 
 async def populate_fixture(
     engine: SAEngine,
-    fixture_data: Mapping[str, Sequence[Dict[str, Any]]],
-    *,
-    ignore_unique_violation: bool = False,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
+        if table_name.startswith("__"):
+            # skip reserved names like "__mode"
+            continue
+        assert not isinstance(rows, str)
         table: sa.Table = getattr(models, table_name)
         assert isinstance(table, sa.Table)
+        if not rows:
+            return
+        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
         async with engine.begin() as conn:
+            # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, EnumType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls[row[col.name]]
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls[row[col.name]]
                 elif isinstance(col.type, EnumValueType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls(row[col.name])
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls(row[col.name])
                 elif isinstance(
                     col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
                 ):
                     for row in rows:
-                        row[col.name] = col.type._schema.from_json(row[col.name])
-            await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+                        if col.name in row:
+                            row[col.name] = col.type._schema.from_json(row[col.name])
+
+            match op_mode:
+                case FixtureOpModes.INSERT:
+                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
+                    await conn.execute(stmt)
+                case FixtureOpModes.UPDATE:
+                    stmt = sa.update(table)
+                    pkcols = []
+                    for pkidx, pkcol in enumerate(table.primary_key):
+                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        pkcols.append(pkcol)
+                    update_data = []
+                    # Extract the data column names from the FIRST row
+                    # (Therefore a fixture dataset for a single table in the udpate mode should
+                    # have consistent set of attributes!)
+                    try:
+                        datacols: list[sa.Column] = [
+                            getattr(table.columns, name)
+                            for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
+                        ]
+                    except AttributeError as e:
+                        raise ValueError(
+                            f"fixture for table {table_name!r} has an invalid column name: "
+                            f"{e.args[0]!r}"
+                        )
+                    stmt = stmt.values({
+                        datacol.name: sa.bindparam(datacol.name) for datacol in datacols
+                    })
+                    for row in rows:
+                        update_row = {}
+                        for pkidx, pkcol in enumerate(pkcols):
+                            try:
+                                update_row[f"_pk_{pkidx}"] = row[pkcol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing primary key column for update"
+                                    f"query: {pkcol.name!r}"
+                                )
+                        for datacol in datacols:
+                            try:
+                                update_row[datacol.name] = row[datacol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing data column for update"
+                                    f"query: {datacol.name!r}"
+                                )
+                        update_data.append(update_row)
+                    await conn.execute(stmt, update_data)
 
 
 class InferenceSessionError(graphene.ObjectType):
