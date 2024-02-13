@@ -245,6 +245,7 @@ manager_local_config_iv = (
             t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
+            t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
         t.Key("manager"): t.Dict({
             t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
