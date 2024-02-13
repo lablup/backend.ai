@@ -184,6 +184,7 @@ session_fields = FieldSet([
     FieldSpec("scaling_group"),
     FieldSpec("service_ports", formatter=nested_dict_formatter),
     FieldSpec("mounts"),
+    FieldSpec("vfolder_mounts"),
     FieldSpec("occupying_slots", formatter=resource_slot_formatter),
     FieldSpec(
         "containers",
@@ -265,7 +266,6 @@ vfolder_fields = FieldSet([
     FieldSpec("status"),
     FieldSpec("unmanaged_path"),
     FieldSpec("usage_mode"),
-    FieldSpec("status"),
     FieldSpec("permission"),
     FieldSpec("ownership_type"),
     FieldSpec("max_files"),
