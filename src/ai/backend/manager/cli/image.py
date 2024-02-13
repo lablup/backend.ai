@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+from typing import Optional
 
 import click
 
-from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import MinMaxRange
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -122,29 +121,25 @@ def dealias(cli_ctx, alias) -> None:
 @click.pass_obj
 def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
     """Validate a local/remote image's labels and platform tag formats by image alias."""
-    try:
-        result = asyncio.run(validate_image_alias_impl(cli_ctx, alias))
-        for key, value in result.items():
-            print(f"{key[11:]:<20}: ", end="")
-            print(*value) if isinstance(value, list) else print(value)
-    except Exception:
-        sys.exit(ExitCode.FAILURE)
+    asyncio.run(validate_image_alias_impl(cli_ctx, alias))
 
 
 @cli.command()
 @click.argument("canonical")
-@click.argument("architecture")
+@click.option(
+    "--architecture",
+    "--arch",
+    "-a",
+    type=str,
+    help="Default is the architecture of the current client.",
+)
 @click.pass_obj
-def validate_image_canonical(cli_ctx: CLIContext, canonical: str, architecture: str) -> None:
+def validate_image_canonical(
+    cli_ctx: CLIContext, canonical: str, architecture: Optional[str] = None
+) -> None:
     """
     Validate a local/remote image's labels and platform tag formats by image canonical.
 
-    Write in the format registry/name:tag architecture
+    Write in the format registry/name:tag
     """
-    try:
-        result = asyncio.run(validate_image_canonical_impl(cli_ctx, canonical, architecture))
-        for key, value in result.items():
-            print(f"{key[11:]:<20}: ", end="")
-            print(*value) if isinstance(value, list) else print(value)
-    except Exception:
-        sys.exit(ExitCode.FAILURE)
+    asyncio.run(validate_image_canonical_impl(cli_ctx, canonical, architecture))
