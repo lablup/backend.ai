@@ -1264,16 +1264,9 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         match storage_resp.status:
             case 200 | 207:
                 return web.json_response(storage_reply, status=storage_resp.status)
-            case 500:
-                raise InternalServerError(extra_data=storage_reply)
+            # 422 will be wrapped as VFolderOperationFailed by storage_manager
             case _:
-                # Need to check the storage-proxy log in this case.
-                raise InternalServerError(
-                    extra_msg=(
-                        f"Unexpected response from storage proxy: "
-                        f"{storage_resp.reason} (status: {storage_resp.status})"
-                    )
-                )
+                raise RuntimeError("should not reach here")
 
 
 @auth_required
