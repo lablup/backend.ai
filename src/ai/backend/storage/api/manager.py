@@ -18,7 +18,6 @@ from typing import (
     Awaitable,
     Callable,
     Iterator,
-    List,
     NotRequired,
     TypedDict,
     cast,
@@ -145,7 +144,7 @@ def handle_external_errors() -> Iterator[None]:
 
 
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: RootContext, volume_name: str) -> List[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> list[str]:
         async with ctx.get_volume(volume_name) as volume:
             return [*await volume.get_capabilities()]
 

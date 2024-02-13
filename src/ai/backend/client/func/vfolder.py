@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Union
+from typing import Mapping, Optional, Sequence, TypeAlias, TypeVar, Union
 
 import aiohttp
 import janus
@@ -40,6 +42,9 @@ _default_list_fields = (
     vfolder_fields["ownership_type"],
     vfolder_fields["status"],
 )
+
+T = TypeVar("T")
+list_: TypeAlias = list[T]
 
 
 class ResponseFailed(Exception):
@@ -283,7 +288,7 @@ class VFolder(BaseFunction):
         if_range: str | None = None
         file_unit = "bytes"
         file_mode = "wb"
-        file_req_hdrs: Dict[str, str] = {}
+        file_req_hdrs: dict[str, str] = {}
         try:
             async for session_attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
@@ -468,8 +473,8 @@ class VFolder(BaseFunction):
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
-        dir_list: List[Path] = []
-        file_list: List[Path] = []
+        dir_list: list[Path] = []
+        file_list: list[Path] = []
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         for path in source:
             if path.is_file():
@@ -506,7 +511,7 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: str | Path | List[str | Path],
+        path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
@@ -522,7 +527,7 @@ class VFolder(BaseFunction):
     @api_function
     async def mkdir(
         self,
-        path: str | Path | List[str | Path],
+        path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
     ) -> str:
