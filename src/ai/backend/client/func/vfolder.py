@@ -523,7 +523,8 @@ class VFolder(BaseFunction):
             "exist_ok": exist_ok,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            reply = await resp.json()
+            return reply["results"]
 
     @api_function
     async def mkdir(
