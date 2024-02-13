@@ -457,11 +457,19 @@ def mkdir(name, paths, parents, exist_ok):
     """
     with Session() as session:
         try:
-            result = json.loads(
-                session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
-            )
+            results = session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
+            if results["success"]:
+                print("Successfully created:")
+                print(tabulate(map(lambda item: [item["item"]], results["success"])))
+            if results["failed"]:
+                print("Failed to create:")
+                print(
+                    tabulate(
+                        map(lambda item: [item["item"], item["msg"]], results["success"]),
+                        headers=["Item", "Error"],
+                    )
+                )
             print_done("Done.")
-            print(tabulate(result, headers="keys"))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

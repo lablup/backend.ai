@@ -768,7 +768,7 @@ async def mkdir(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True)
-                    | t.List(tx.PurePath(relative_only=True)),
+                    | t.List(tx.PurePath(relative_only=True), max_length=50),
                     t.Key("parents", default=True): t.ToBool,
                     t.Key("exist_ok", default=False): t.ToBool,
                 },
@@ -815,7 +815,7 @@ async def mkdir(request: web.Request) -> web.Response:
             "failed": failed_results,
         }
         if all(failed_cases):
-            status_code = 500
+            status_code = 422
         elif any(failed_cases):
             status_code = 207
         else:

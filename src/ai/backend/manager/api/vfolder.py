@@ -1234,6 +1234,8 @@ async def update_vfolder_options(
     })
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    if isinstance(params["path"], list) and len(params["path"]) > 50:
+        raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]

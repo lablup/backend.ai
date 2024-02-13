@@ -192,7 +192,10 @@ class StorageSessionManager:
                         extra_data=None,
                     )
                 except VFolderOperationFailed as e:
-                    raise InvalidAPIParameters(e.extra_msg, e.extra_data)
+                    if client_resp.status // 100 == 5:
+                        raise InvalidAPIParameters(e.extra_msg, e.extra_data)
+                    # Raise as-is for semantic failures, not server errors.
+                    raise
             yield proxy_info.client_api_url, client_resp
 
 
