@@ -26,6 +26,11 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
 # pool-size = 8
 
+# The connections for lock lifetime
+# Distribution locks wait for `lock-conn-timeout` seconds and lock context should finish within this time.
+# Default is 0, which means infinite
+# lock-conn-timeout = 30
+
 # This setting causes the pool to recycle connections after the given number of seconds has passed.
 # Default is -1, which means infinite. 
 # https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
