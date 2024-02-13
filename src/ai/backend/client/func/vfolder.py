@@ -21,6 +21,7 @@ from yarl import URL
 
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.common.types import ResultSet
 
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
@@ -514,7 +515,7 @@ class VFolder(BaseFunction):
         path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ) -> str:
+    ) -> ResultSet:
         rqst = Request("POST", "/folders/{}/mkdir".format(self.name))
         rqst.set_json({
             "path": path,
@@ -522,7 +523,7 @@ class VFolder(BaseFunction):
             "exist_ok": exist_ok,
         })
         async with rqst.fetch() as resp:
-            return await resp.text()
+            return await resp.json()
 
     @api_function
     async def mkdir(
@@ -530,7 +531,7 @@ class VFolder(BaseFunction):
         path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ) -> str:
+    ) -> ResultSet:
         return await self._mkdir(path, parents, exist_ok)
 
     @api_function

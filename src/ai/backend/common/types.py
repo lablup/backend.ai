@@ -299,6 +299,16 @@ class CommitStatus(str, enum.Enum):
     ONGOING = "ongoing"
 
 
+class ItemResult(TypedDict):
+    msg: Optional[str]
+    item: Optional[str]
+
+
+class ResultSet(TypedDict):
+    success: list[ItemResult]
+    failed: list[ItemResult]
+
+
 class AbuseReportValue(str, enum.Enum):
     DETECTED = "detected"
     CLEANING = "cleaning"

@@ -1259,16 +1259,19 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         },
     ) as (_, storage_resp):
         storage_reply = await storage_resp.json()
-        resp_code = storage_resp.status
-        resp = {
-            "failure_tasks": storage_reply["failure_tasks"],
-            "success_tasks": storage_reply["success_tasks"],
-        }
-
-    return web.json_response(
-        resp,
-        status=resp_code,
-    )
+        match storage_resp.status:
+            case 200 | 207:
+                return web.json_response(storage_reply, status=storage_resp.status)
+            case 500:
+                raise InternalServerError(extra_data=storage_reply)
+            case _:
+                # Need to check the storage-proxy log in this case.
+                raise InternalServerError(
+                    extra_msg=(
+                        f"Unexpected response from storage proxy: "
+                        f"{storage_resp.reason} (status: {storage_resp.status})"
+                    )
+                )
 
 
 @auth_required

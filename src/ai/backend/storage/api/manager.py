@@ -37,7 +37,7 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
@@ -782,46 +782,46 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok = params["exist_ok"]
         relpath = params["relpath"]
         relpaths = relpath if isinstance(relpath, list) else [relpath]
-        failure_tasks: list[str] = []
-        success_tasks: list[str] = []
+        failed_results: list[ItemResult] = []
+        success_results: list[ItemResult] = []
 
         async with ctx.get_volume(params["volume"]) as volume:
             mkdir_tasks = [
                 volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok) for rpath in relpaths
             ]
             result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
-            exception_flags = [isinstance(res, BaseException) for res in result_group]
+            failed_cases = [isinstance(res, BaseException) for res in result_group]
 
-            # if result group is all false throw error.
-            if all(exception_flags):
-                raise web.HTTPInternalServerError(
-                    body=json.dumps(
-                        {
-                            "msg": f'{repr(result_group[0])} occurred while creating directory "{relpaths[0]}"',
-                            "errno": getattr(result_group[0], "errno", None),
-                        },
-                    ),
-                    content_type="application/json",
+        for relpath, result_or_exception in zip(relpaths, result_group):
+            if isinstance(result_or_exception, BaseException):
+                log.error(
+                    "Failed to create the directory {!r} in vol:{}/vfid:{}:",
+                    relpath,
+                    volume,
+                    vfid,
+                    exc_info=result_or_exception,
                 )
-
-            for relpath, result_or_exception in zip(relpaths, result_group):
-                if isinstance(result_or_exception, BaseException):
-                    log.error(
-                        "{}",
-                        repr(result_or_exception),
-                        exc_info=result_or_exception,
-                    )
-                    failure_tasks.append(str(relpath))
-                else:
-                    success_tasks.append(str(relpath))
-
-            status_code = 207 if any(exception_flags) else 200
-
+                failed_results.append({
+                    "msg": repr(result_or_exception),
+                    "item": str(relpath),
+                })
+            else:
+                success_results.append({
+                    "msg": None,
+                    "item": str(relpath),
+                })
+        results: ResultSet = {
+            "success": success_results,
+            "failed": failed_results,
+        }
+        if all(failed_cases):
+            status_code = 500
+        elif any(failed_cases):
+            status_code = 207
+        else:
+            status_code = 200
         return web.json_response(
-            {
-                "failure_tasks": failure_tasks,
-                "success_tasks": success_tasks,
-            },
+            {"results": results},
             status=status_code,
         )
 
