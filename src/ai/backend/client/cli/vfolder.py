@@ -443,15 +443,15 @@ def cp(filenames):
     "--exist-ok",
     default=False,
     is_flag=True,
-    help="Skip an error caused by file not found",
+    help="Skip an error caused by file already existed",
 )
 def mkdir(name, paths, parents, exist_ok):
     """Create an empty directory in the virtual folder.
 
     \b
     NAME: Name of a virtual folder.
-    PATH: name or path of directories to create. Parent directories are created automatically
-          if they do not exist.
+    PATHS: name or path of directories to create.
+          If you want to automatically create parent directories when they do not exist, use -p option.
 
     Example: backend.ai vfolder mkdir my_vfolder "dir1" "dir2" "dir3"
     """
