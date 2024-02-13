@@ -22,3 +22,4 @@ class Logger:
 
     def fatal(self, message):
         self.logger.error(message)
+        assert False, "Fatal error occurred: " + message

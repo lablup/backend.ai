@@ -77,11 +77,15 @@
 =======
 //     "pyzmq~=24.0.1",
 <<<<<<< HEAD
+<<<<<<< HEAD
 //     "raftify==0.1.42",
 >>>>>>> a7ae2ac8 (Introduce raftify and RaftContext)
 =======
 //     "raftify==0.1.43",
 >>>>>>> 4fcd15f2 (Reflect new API of raftify)
+=======
+//     "raftify==0.1.45",
+>>>>>>> fa4423ad (Update raftify)
 //     "redis[hiredis]==4.5.5",
 //     "rich~=13.6",
 //     "setproctitle~=1.3.2",
@@ -3387,19 +3391,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3e55cb4eedde0b6c9a740560b6d01de7a810a7e28fba46c23f9a23fd02f146dd",
-              "url": "https://files.pythonhosted.org/packages/3f/0b/54a9a0068e6b0c64b7066cea9d4ba74db0ee48a54558b43618450a421e9c/raftify-0.1.43-cp311-cp311-macosx_11_0_arm64.whl"
+              "hash": "4bc907d1258d738476f49d0a3f81d98a5f5b77c86bdfadcc4fa85cbf888558c8",
+              "url": "https://files.pythonhosted.org/packages/73/ea/5d39b23a88a90b804f6441cc6e04bca71b2054e46126ada75bfc0342d9c3/raftify-0.1.45-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f3607539656460e58be755852100b57886103ea3b6ec3ca19e2bf269b23af175",
-              "url": "https://files.pythonhosted.org/packages/50/fa/f87a219d8592bc7519b97923957dc854e7532a48119a7084a56e9c9d673c/raftify-0.1.43.tar.gz"
+              "hash": "1d845200960b43962ffe9f9c3e6d4668982f5980680fd492cffe3beef5ea4f2e",
+              "url": "https://files.pythonhosted.org/packages/d7/6c/3c8508b92b4eeb0c0829a4285bd5af682489b424496f633454e2a64b2dab/raftify-0.1.45.tar.gz"
             }
           ],
           "project_name": "raftify",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.1.43"
+          "version": "0.1.45"
         },
         {
           "artifacts": [
@@ -4670,11 +4674,15 @@
 =======
     "pyzmq~=24.0.1",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "raftify==0.1.42",
 >>>>>>> a7ae2ac8 (Introduce raftify and RaftContext)
 =======
     "raftify==0.1.43",
 >>>>>>> 4fcd15f2 (Reflect new API of raftify)
+=======
+    "raftify==0.1.45",
+>>>>>>> fa4423ad (Update raftify)
     "redis[hiredis]==4.5.5",
     "rich~=13.6",
     "setproctitle~=1.3.2",
