@@ -543,7 +543,7 @@ Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'
 Resolve the error message 'Pants is not abailable for your platform', When installing Backend.AI with pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When installing Backend.AI, you may find the following error message that 'Pants is not abailable for your platform'
+When installing Backend.AI, you may find the following error message that 'Pants is not available for your platform'.
 
 .. code-block:: text
 
