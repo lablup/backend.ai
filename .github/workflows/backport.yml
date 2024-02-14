@@ -10,25 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 병합된 pr의 commit인지 확인
+      - name: Extract pr_number from commit message
         run: |
           latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
           echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
           commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
           echo "commit_message=$commit_message" >> $GITHUB_OUTPUT
           pr_number=$(echo $commit_message | grep -oP "\(#\d+\)$" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
-      - name: 최신릴리즈버전 가져오기
+      - name: Check if this is a merged pr commit
+        run: |
+          if [[ -z "$pr_number" ]]; then
+            echo "This is not a merged pr commit."
+            exit 0
+          fi
+      - name: Get latest release
         run: |
           latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
           echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
-      - name: pr에서 target milestone 가져오기
+      - name: Get target milestone
         run: |
           tartget_milestone=$(gh pr view $pr_number --json milestone.title --jq .milestone.title)
       - uses: actions/checkout@v4
-      - name: milestone 리스트 가져오기
+      - name: Get milestone list
         run: |
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
-      - name: milstone 리스트에서 Backlog 제거
+      - name: Remove Backlog from milestone list
         run: |
           milestones=($milestones)
           for i in "${!milestones[@]}"; do
@@ -36,10 +42,10 @@ jobs:
               unset 'milestones[$i]'
             fi
           done
-      - name: milestone 리스트 정렬
+      - name: Sort milestone list
         run: |
           sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort))
-      - name: target milestone까지 범위 설정
+      - name: Get target milestones
         run: |
           for i in "${!sort_milestones[@]}"; do
             echo "$i: ${sort_milestones[$i]}"
@@ -59,10 +65,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ matrix.milestone }}
-      - name: cherry-pick
+      - name: Cherry-pick
         run: |
           git cherry-pick ${{ needs.backport-target-branch.outputs.latest_commit }}
-      - name: backport pr 생성
+      - name: Create Bakport PR
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -76,3 +82,5 @@ jobs:
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ github.actor }}
+      - name: Enable auto-merge
+        run: gh pr merge ${{ needs.backport-target-branch.outputs.pr_number }} --auto
