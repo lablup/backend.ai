@@ -2216,14 +2216,17 @@ async def _delete(
     )
 
 
+class DeleteRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to soft-delete, to go to trash bin",
+    )
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("id"): tx.UUID,
-    }),
-)
-async def delete_by_id(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(DeleteRequestModel)
+async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> SuccessResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
 
     access_key = request["keypair"]["access_key"]
@@ -2232,14 +2235,14 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    folder_id = params["id"]
+    folder_id = params.vfolder_id
     log.info(
         "VFOLDER.DELETE_BY_ID (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
         folder_id,
     )
-    await ensure_vfolder_status(request, VFolderAccessStatus.SOFT_DELETABLE, params["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.SOFT_DELETABLE, folder_id)
     try:
         await _delete(
             root_ctx,
@@ -2258,7 +2261,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             e.extra_data,
         )
         raise
-    return web.Response(status=204)
+    return SuccessResponseModel(status=204)
 
 
 @auth_required
