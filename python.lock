@@ -43,7 +43,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py-test==0.2.33b1",
+//     "etcd-client-py==0.2.3",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
@@ -936,36 +936,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1e38a4ea4bb8bc66fbb858abb411820709fda5d6c5604c2da0f696653d49c684",
-              "url": "https://files.pythonhosted.org/packages/3f/a5/8888db36d5c33f081d5ca9f076e618d28de4b6e666c0d47c71c3862c9b10/boto3-1.34.36-py3-none-any.whl"
+              "hash": "ae1a974c728c076a49392a695102124f650f45361c654bb7c0bef1bb644c52d5",
+              "url": "https://files.pythonhosted.org/packages/bc/6c/53daaa366940957c4a10760bd96a79ce0b746a904d42c2ffdda572d1f785/boto3-1.34.41-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7ec36deb7ccc9c4943510692303cf93883ef61dc2c79f8bd4d75ee42209559d3",
-              "url": "https://files.pythonhosted.org/packages/ff/68/ee8f915d3495909ed1a2505fba5f78ecdf500b8be805eba84021755f361f/boto3-1.34.36.tar.gz"
+              "hash": "9fd66f22a4cdd63165a7a19186fff9b6e3d742e83498ea3f3231bab6ae4bf0f3",
+              "url": "https://files.pythonhosted.org/packages/99/4b/9f7a58aa0515856bad38ca9a6340485f70961a5ddd5f5660b9ee6021666a/boto3-1.34.41.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.35.0,>=1.34.36",
+            "botocore<1.35.0,>=1.34.41",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.11.0,>=0.10.0"
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.36"
+          "version": "1.34.41"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3f39ae0165f1a27f621fc91a46fb59f87e819671fad106c230dadcc724892f70",
-              "url": "https://files.pythonhosted.org/packages/36/c1/7b26967500a23818131b8a184b5c56b70ac48e5ab7595a2f0bbe1db89fb6/botocore-1.34.36-py3-none-any.whl"
+              "hash": "9b5827332da766da487e5a5b14b36e02528be9f2e899f909577afb7001eb441d",
+              "url": "https://files.pythonhosted.org/packages/ce/8e/f96d93e59a59dd9b8b41735e67a0529585ebb8da6f4e3c6169779c6c9552/botocore-1.34.41-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "89c3dc15b6ffae146029df636d51b9952740051204c444ec765286b081c917bc",
-              "url": "https://files.pythonhosted.org/packages/d7/ab/22149fd894184aeb1f40d958d6616c642e9e4ab811f77573d6367ff7b6fb/botocore-1.34.36.tar.gz"
+              "hash": "3a6943c75a0d292ab6e008bce58ee6503776969479f991f5ad03a5d877af29ae",
+              "url": "https://files.pythonhosted.org/packages/7f/bf/fb0d863155fb42fc52df560fd021ab65672c2b564551847cc3eee889592f/botocore-1.34.41.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -977,7 +977,7 @@
             "urllib3<2.1,>=1.25.4; python_version >= \"3.10\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.36"
+          "version": "1.34.41"
         },
         {
           "artifacts": [
@@ -1440,19 +1440,29 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5e8a46aaa25a59dc6d419439e35bc4a4db5cb855ef685445570e58efdeb6aa6c",
-              "url": "https://files.pythonhosted.org/packages/ed/ea/19cdce87eb3837c08113dd980d5ca6269c0a5da436153745ec7d4d3cd500/etcd_client_py_test-0.2.33b1-cp311-cp311-manylinux_2_34_x86_64.whl"
+              "hash": "3ca6018c5833c848fbb79c7eefeed9002f47d3314966435d69db2107e8f8c3ff",
+              "url": "https://files.pythonhosted.org/packages/86/85/d0edf98489d3acd738d3cb4fef579c39184d242c3d7747d0655a907765b1/etcd_client_py-0.2.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "60def2fe75b25d74f5eaf43a58cb0bdfa32f07009fc705932eb511c792435169",
-              "url": "https://files.pythonhosted.org/packages/8b/3b/d336a1e88deca0bb23649f3599dcc9677b5c7d20c84ab966085872fe9f9f/etcd_client_py_test-0.2.33b1.tar.gz"
+              "hash": "e792b6b99afb9e07cd77d6957931ad2663be4c719462a8f73e2ed8e422c28f71",
+              "url": "https://files.pythonhosted.org/packages/92/ac/15c896a7e995414b7b7fc38b826ad65a6d8ce37088dd4248a8a39b4153f0/etcd_client_py-0.2.3-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "4fe84f79932eedc196e49255c38e3040be8680f5b7c8d8bed9536e50005aef37",
+              "url": "https://files.pythonhosted.org/packages/e2/2d/a04cd180c842fc7d4e953f753e9aa9bc8f533291cfade73e201f982a8197/etcd_client_py-0.2.3.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "5a61bc85ef7b4a42dd112395ee21ec0d62303bb8692d80db06a237bab93e283e",
+              "url": "https://files.pythonhosted.org/packages/e9/9e/5b1410451e2095b8531b221e09edf576976c97ebdd920f18ce4df9533e5d/etcd_client_py-0.2.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             }
           ],
-          "project_name": "etcd-client-py-test",
+          "project_name": "etcd-client-py",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.2.33b1"
+          "version": "0.2.3"
         },
         {
           "artifacts": [
@@ -3629,13 +3639,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "385eb4edd9c9d5c17540511303e39a147ce2fc04bc55289c322b9e5904fe2c05",
-              "url": "https://files.pythonhosted.org/packages/55/3a/5121b58b578a598b269537e09a316ad2a94fdd561a2c6eb75cd68578cc6b/setuptools-69.0.3-py3-none-any.whl"
+              "hash": "c054629b81b946d63a9c6e732bc8b2513a7c3ea645f11d0139a2191d735c60c6",
+              "url": "https://files.pythonhosted.org/packages/bb/0a/203797141ec9727344c7649f6d5f6cf71b89a6c28f8f55d4f18de7a1d352/setuptools-69.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "be1af57fc409f93647f2e8e4573a142ed38724b8cdd389706a867bb4efcf1e78",
-              "url": "https://files.pythonhosted.org/packages/fc/c9/b146ca195403e0182a374e0ea4dbc69136bad3cd55bc293df496d625d0f7/setuptools-69.0.3.tar.gz"
+              "hash": "850894c4195f09c4ed30dba56213bf7c3f21d86ed6bdaafb5df5972593bfc401",
+              "url": "https://files.pythonhosted.org/packages/c9/3d/74c56f1c9efd7353807f8f5fa22adccdba99dc72f34311c30a69627a0fad/setuptools-69.1.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3657,14 +3667,14 @@
             "packaging>=23.1; extra == \"testing-integration\"",
             "pip>=19.1; extra == \"testing\"",
             "pygments-github-lexers==0.0.5; extra == \"docs\"",
-            "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-enabler; extra == \"testing-integration\"",
             "pytest-enabler>=2.2; extra == \"testing\"",
+            "pytest-home>=0.5; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-perf; sys_platform != \"cygwin\" and extra == \"testing\"",
-            "pytest-ruff; sys_platform != \"cygwin\" and extra == \"testing\"",
+            "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"testing\"",
             "pytest-timeout; extra == \"testing\"",
             "pytest-xdist; extra == \"testing\"",
             "pytest-xdist; extra == \"testing-integration\"",
@@ -3687,7 +3697,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.8",
-          "version": "69.0.3"
+          "version": "69.1.0"
         },
         {
           "artifacts": [
@@ -3861,13 +3871,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a9d2f225584afb28a6c05b7f7d06d41b54cd02822020f11711d788e5098161db",
-              "url": "https://files.pythonhosted.org/packages/6a/17/7d1231c242cf2749abb91e26c0010776033f749347c5cbe8c046a452d0bb/textual-0.48.2-py3-none-any.whl"
+              "hash": "11bd87fe6c543358122c43db2e9dfc5940900ef9b8975502ab7043792928638b",
+              "url": "https://files.pythonhosted.org/packages/4c/af/d1e772e33d127bd399044269c5e6bd5b79cb2172fc2b786a02636c74606c/textual-0.50.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e092dffa5311f3381cb5f51d56c506143f5c1ee3b1c67f57bb1929cfa73fee07",
-              "url": "https://files.pythonhosted.org/packages/a8/c4/b19c89d2ad42c0be92aa773bb86bc4e028f30166edd032c49f148c0bc652/textual-0.48.2.tar.gz"
+              "hash": "415bef44b2dfa702d17ebb08637c0141eb54767cfbeafe60d07e62104183b56a",
+              "url": "https://files.pythonhosted.org/packages/73/9d/865d5d60512c2483d4d207e46b6b106749a63bb7bad0fdc8ecf2909bb59f/textual-0.50.1.tar.gz"
             }
           ],
           "project_name": "textual",
@@ -3879,7 +3889,7 @@
             "typing-extensions<5.0.0,>=4.4.0"
           ],
           "requires_python": "<4.0,>=3.8",
-          "version": "0.48.2"
+          "version": "0.50.1"
         },
         {
           "artifacts": [
@@ -3974,13 +3984,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386",
-              "url": "https://files.pythonhosted.org/packages/00/e5/f12a80907d0884e6dff9c16d0c0114d81b8cd07dc3ae54c5e962cc83037e/tqdm-4.66.1-py3-none-any.whl"
+              "hash": "1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9",
+              "url": "https://files.pythonhosted.org/packages/2a/14/e75e52d521442e2fcc9f1df3c5e456aead034203d4797867980de558ab34/tqdm-4.66.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7",
-              "url": "https://files.pythonhosted.org/packages/62/06/d5604a70d160f6a6ca5fd2ba25597c24abd5c5ca5f437263d177ac242308/tqdm-4.66.1.tar.gz"
+              "hash": "6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531",
+              "url": "https://files.pythonhosted.org/packages/ea/85/3ce0f9f7d3f596e7ea57f4e5ce8c18cb44e4a9daa58ddb46ee0d13d6bff8/tqdm-4.66.2.tar.gz"
             }
           ],
           "project_name": "tqdm",
@@ -3995,7 +4005,7 @@
             "slack-sdk; extra == \"slack\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.66.1"
+          "version": "4.66.2"
         },
         {
           "artifacts": [
@@ -4334,13 +4344,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8c9110c309db9d9e87302e2f4ad2c3152770930d88ab385cd544e7a7e75f3de0",
-              "url": "https://files.pythonhosted.org/packages/d1/1c/5aeb94aa980da111e4fd0c0fbe5ad95ed5bf9bd957f8e2a6178b85ff4da8/uc_micro_py-1.0.2-py3-none-any.whl"
+              "hash": "db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5",
+              "url": "https://files.pythonhosted.org/packages/37/87/1f677586e8ac487e29672e4b17455758fce261de06a0d086167bb760361a/uc_micro_py-1.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "30ae2ac9c49f39ac6dce743bd187fcd2b574b16ca095fa74cd9396795c954c54",
-              "url": "https://files.pythonhosted.org/packages/75/db/241444fe6df6970a4c18d227193cad77fab7cec55d98e296099147de017f/uc-micro-py-1.0.2.tar.gz"
+              "hash": "d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a",
+              "url": "https://files.pythonhosted.org/packages/91/7a/146a99696aee0609e3712f2b44c6274566bc368dfe8375191278045186b8/uc-micro-py-1.0.3.tar.gz"
             }
           ],
           "project_name": "uc-micro-py",
@@ -4350,7 +4360,7 @@
             "pytest; extra == \"test\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.0.2"
+          "version": "1.0.3"
         },
         {
           "artifacts": [
@@ -4632,7 +4642,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py-test==0.2.33b1",
+    "etcd-client-py==0.2.3",
     "faker~=13.12.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
