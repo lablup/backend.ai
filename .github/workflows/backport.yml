@@ -76,6 +76,7 @@ jobs:
             ${{ needs.backport-target-branch.outputs.commit_message }}
             Backported-from: main($latest_release)
             Backported-to: ${{ matrix.milestone }}
+            Backport-of: ${{ needs.backport-target-branch.outputs.pr_number }}
           title: "${{ needs.backport-target-branch.outputs.commit_message }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
