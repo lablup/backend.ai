@@ -169,12 +169,12 @@ async def ensure_vfolder_status(
                 VFolderOperationStatus.READY,
                 VFolderOperationStatus.MOUNTED,
             }
-        case VFolderAccessStatus.TRASHABLE:
-            # if TRASHABLE access status is requested, only READY operation status is accepted.
+        case VFolderAccessStatus.SOFT_DELETABLE:
+            # if SOFT_DELETABLE access status is requested, only READY operation status is accepted.
             available_vf_statuses = {
                 VFolderOperationStatus.READY,
             }
-        case VFolderAccessStatus.DELETABLE:
+        case VFolderAccessStatus.HARD_DELETABLE:
             # if DELETABLE access status is requested, READY and DELETE_PENDING operation status is accepted.
             available_vf_statuses = {
                 VFolderOperationStatus.READY,
@@ -2239,7 +2239,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         access_key,
         folder_id,
     )
-    await ensure_vfolder_status(request, VFolderAccessStatus.TRASHABLE, params["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.SOFT_DELETABLE, params["id"])
     try:
         await _delete(
             root_ctx,
@@ -2280,7 +2280,9 @@ async def delete_by_name(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
-    await ensure_vfolder_status(request, VFolderAccessStatus.TRASHABLE, request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.SOFT_DELETABLE, request.match_info["name"]
+    )
     try:
         await _delete(
             root_ctx,
@@ -2331,7 +2333,9 @@ async def delete_from_trash_bin(
         access_key,
         folder_id,
     )
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id_or_name=folder_id)
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.HARD_DELETABLE, folder_id_or_name=folder_id
+    )
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,

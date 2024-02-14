@@ -174,9 +174,9 @@ class VFolderAccessStatus(enum.StrEnum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     RECOVERABLE = "recoverable"
-    TRASHABLE = "trashable"  # Able to move to `trash bin`
-    DELETABLE = "deletable"  # Able to delete vfolder in storage proxy
-    PURGABLE = "purgable"  # Able to delete vfolder row in DB
+    SOFT_DELETABLE = "soft-deletable"  # Able to move to `trash bin`
+    HARD_DELETABLE = "hard-deletable"  # Able to delete vfolder in storage proxy
+    PURGABLE = "purgable"  # Able to delete vfolder row in DB. The real data of vfolder should be deleted already.
 
 
 SOFT_DELETED_VFOLDER_STATUSES = (
