@@ -152,7 +152,7 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
-    image_row = relationship("ImageRow", back_populates="endpoints")
+    image_object = relationship("ImageRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -228,7 +228,7 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_row))
+            query = query.options(selectinload(EndpointRow.image_object))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -269,7 +269,7 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_row))
+            query = query.options(selectinload(EndpointRow.image_object))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -439,9 +439,9 @@ class Endpoint(graphene.ObjectType):
     ) -> "Endpoint":
         return cls(
             endpoint_id=row.id,
-            image=row.image_row.name,
-            image_id=row.image_row.id,
-            architecture=row.image_row.architecture,
+            # image="", # deprecated, row.image_object.name,
+            image_object=row.image_object,
+            architecture=row.image_object.architecture,
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -519,7 +519,7 @@ class Endpoint(graphene.ObjectType):
             sa.select(EndpointRow)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_row))
+            .options(selectinload(EndpointRow.image_object))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -600,10 +600,10 @@ class Endpoint(graphene.ObjectType):
         except NoResultFound:
             raise EndpointNotFound
 
-    async def resolve_image_row(self, info: graphene.ResolveInfo) -> Image:
+    async def resolve_image_object(self, info: graphene.ResolveInfo) -> Image:
         query = (
             sa.select(ImageRow)
-            .where(ImageRow.id == self.image_id)
+            .where(ImageRow.id == self.image_object.id)
             .options(selectinload(ImageRow.aliases))
         )
         graph_ctx: GraphQueryContext = info.context
@@ -742,8 +742,8 @@ class ModifyEndpoint(graphene.Mutation):
                         image_name,
                         registry,
                     )
-                image_row = await ImageRow.resolve(db_session, [image_ref])
-                data["image"] = image_row.id
+                image_object = await ImageRow.resolve(db_session, [image_ref])
+                data["image"] = image_object.id
 
         update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
 
