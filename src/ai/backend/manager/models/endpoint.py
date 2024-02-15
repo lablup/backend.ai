@@ -462,7 +462,18 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
+            routings=[
+                Routing(
+                    routing_id=r.id,
+                    endpoint=row.url,
+                    session=r.session,
+                    status=r.session,
+                    traffic_ratio=r.traffic_ratio,
+                    created_at=r.created_at,
+                    error_data=r.error_data,
+                )
+                for r in row.routings
+            ],
             lifecycle_stage=row.lifecycle_stage.name,
         )
 
