@@ -199,53 +199,61 @@ async def dealias(cli_ctx, alias):
 async def validate_image_alias(cli_ctx, alias: str) -> None:
     async with (
         connect_database(cli_ctx.local_config) as db,
-        db.begin_session() as session,
+        db.begin_readonly_session() as session,
     ):
         try:
             image_row = await ImageRow.from_alias(session, alias)
-            if image_row is None:
-                raise UnknownImageReference
-
             for key, value in validate_image_labels(image_row.labels).items():
-                if key[:11] == "ai.backend.":
-                    print(f"{key[11:]:<30}: ", end="")
-                else:
-                    print(f"{key:<30}: ", end="")
-                print(*value) if isinstance(value, list) else print(value)
+                print(f"{key:<40}: ", end="")
+                if isinstance(value, list):
+                    value = f'[{", ".join(value)}]'
+                print(value)
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. (e: {str(e)})")
 
 
 async def validate_image_canonical(
-    cli_ctx, canonical: str, architecture: Optional[str] = None
+    cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
     async with (
         connect_database(cli_ctx.local_config) as db,
-        db.begin_session() as session,
+        db.begin_readonly_session() as session,
     ):
         try:
-            # Default arch is current arch
-            if architecture is None:
-                architecture = CURRENT_ARCH
-            image_row = await session.scalar(
-                sa.select(ImageRow).where(
-                    (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
+            if current or architecture is not None:
+                if current:
+                    architecture = architecture or CURRENT_ARCH
+                image_row = await session.scalar(
+                    sa.select(ImageRow).where(
+                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
+                    )
                 )
-            )
-            if image_row is None:
-                raise UnknownImageReference(f"{canonical}/{architecture}")
-
-            for key, value in validate_image_labels(image_row.labels).items():
-                if key[:11] == "ai.backend.":
-                    print(f"{key[11:]:<30}: ", end="")
-                else:
-                    print(f"{key:<30}: ", end="")
-                print(*value) if isinstance(value, list) else print(value)
+                if image_row is None:
+                    raise UnknownImageReference(f"{canonical}/{architecture}")
+                for key, value in validate_image_labels(image_row.labels).items():
+                    print(f"{key:<40}: ", end="")
+                    if isinstance(value, list):
+                        value = f'{", ".join(value)}'
+                    print(value)
+            else:
+                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                image_rows = rows.fetchall()
+                if not image_rows:
+                    raise UnknownImageReference(f"{canonical}")
+                for i, image_row in enumerate(image_rows):
+                    if i > 0:
+                        print("-" * 50)
+                    print(f"{'architecture':<40}: {image_row.architecture}")
+                    for key, value in validate_image_labels(image_row.labels).items():
+                        print(f"{key:<40}: ", end="")
+                        if isinstance(value, list):
+                            value = f'{", ".join(value)}'
+                        print(value)
 
         except UnknownImageReference as e:
             log.error(f"{e}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. (e: {str(e)})")

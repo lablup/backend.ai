@@ -127,19 +127,27 @@ def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
 @cli.command()
 @click.argument("canonical")
 @click.option(
-    "--architecture",
     "--arch",
     "-a",
     type=str,
-    help="Default is the architecture of the current client.",
+    help="Specify architecture, Can't use with --current option",
+)
+@click.option(
+    "--current",
+    "-c",
+    is_flag=True,
+    default=False,
+    help="Use default architecture as the current client's architecture",
 )
 @click.pass_obj
 def validate_image_canonical(
-    cli_ctx: CLIContext, canonical: str, architecture: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, arch: Optional[str] = None
 ) -> None:
     """
     Validate a local/remote image's labels and platform tag formats by image canonical.
 
     Write in the format registry/name:tag
     """
-    asyncio.run(validate_image_canonical_impl(cli_ctx, canonical, architecture))
+    if arch and current:
+        raise click.UsageError("Cannot use both --architecture and --current together")
+    asyncio.run(validate_image_canonical_impl(cli_ctx, canonical, current, arch))
