@@ -166,9 +166,9 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @vfolder.command()
 @click.argument("name", type=str)
 def delete(name):
-    """Delete the given virtual folder.
+    """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
     This operation can be retracted by
-    calling `recover()`.
+    calling `restore()`.
 
     \b
     NAME: Name of a virtual folder.
@@ -200,9 +200,25 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
+def delete_trash(name):
+    """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
+    This operation is irreversible!
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).delete_trash()
+            print_done("Delete completed.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
 def recover(name):
-    """Restore the given virtual folder from deleted status.
-    Deprecated since 24.03.1; use `restore`
+    """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
 
     NAME: Name of a virtual folder.
     """

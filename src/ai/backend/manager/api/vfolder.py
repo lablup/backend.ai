@@ -114,7 +114,12 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import check_api_params, get_user_scopes, pydantic_params_api_handler
+from .utils import (
+    check_api_params,
+    get_user_scopes,
+    pydantic_params_api_handler,
+    pydantic_response_api_handler,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -2309,6 +2314,56 @@ async def delete_by_name(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class CompactVFolderInfoModel(BaseModel):
+    id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
+    name: str = Field(description="Name of the vfolder.")
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_response_api_handler
+async def get_vfolder_id(request: web.Request) -> CompactVFolderInfoModel:
+    root_ctx: RootContext = request.app["_root.context"]
+
+    folder_name = request.match_info["name"]
+    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
+    user_role = request["user"]["role"]
+    user_uuid = request["user"]["uuid"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+
+    log.info(
+        "VFOLDER.GET_ID (email:{}, ak:{}, vf:{})",
+        request["user"]["email"],
+        access_key,
+        folder_name,
+    )
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        entries = await query_accessible_vfolders(
+            db_session.bind,
+            user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name),
+        )
+        if len(entries) > 1:
+            log.error(
+                "VFOLDER.GET_ID(folder name:{}, hosts:{}",
+                folder_name,
+                [entry["host"] for entry in entries],
+            )
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters(f"No such vfolder (name: {folder_name})")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+    return CompactVFolderInfoModel(id=entry["id"], name=folder_name)
+
+
 class DeleteFromTrashRequestModel(BaseModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
@@ -3391,13 +3446,13 @@ def create_app(default_cors_options):
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
     cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
+    cors.add(add_route("GET", r"/{name}/id", get_vfolder_id))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
     cors.add(add_route("GET", r"/_/all_hosts", list_all_hosts))  # legacy underbar
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
-    cors.add(add_route("POST", r"/{name}/purge", purge))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
@@ -3414,6 +3469,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/share", share))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
+    cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
     cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
