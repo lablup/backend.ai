@@ -35,7 +35,7 @@ from .base import (
     set_if_set,
     simple_db_mutate_returning_item,
 )
-from .image import Image, ImageRefType, ImageRow
+from .image import ImageNode, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
 from .user import UserRole
 
@@ -384,8 +384,7 @@ class Endpoint(graphene.ObjectType):
 
     endpoint_id = graphene.UUID()
     image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
-    image_object = graphene.Field(Image, description="Added at 23.09.9")
-    architecture = graphene.String(description="Added at 23.09.9")
+    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
@@ -435,8 +434,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=row.image_row,
-            architecture=row.image_row.architecture,
+            image_object=ImageNode.from_row(row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -594,17 +592,6 @@ class Endpoint(graphene.ObjectType):
                 return await Endpoint.from_row(ctx, row)
         except NoResultFound:
             raise EndpointNotFound
-
-    async def resolve_image_object(self, info: graphene.ResolveInfo) -> Image:
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id == self.image_object.id)
-            .options(selectinload(ImageRow.aliases))
-        )
-        graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            raw_result = await db_session.scalar(query)
-            return await Image.from_row(graph_ctx, raw_result)
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
