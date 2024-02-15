@@ -513,7 +513,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
         #     params["quota"] = max_vfolder_size
 
         # Prevent creation of vfolder with duplicated name on all hosts.
-        extra_vf_conds = [vfolders.c.name == params["name"]]
+        extra_vf_conds = [
+            (vfolders.c.name == params["name"]),
+            (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
+        ]
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
