@@ -681,7 +681,6 @@ class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    id = graphene.UUID()
     name = graphene.String()
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -729,7 +728,7 @@ class ImageNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> ImageNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
         graph_ctx: GraphQueryContext = info.context
 
         _, image_id = AsyncNode.resolve_global_id(info, id)
