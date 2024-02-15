@@ -17,6 +17,7 @@ from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
+from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
@@ -24,7 +25,6 @@ from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
 from ...session import AsyncSession
-from ..params import CommaSeparatedListType, RangeExprOptionType
 from ..pretty import (
     format_info,
     print_done,
@@ -227,9 +227,9 @@ def format_stats(stats):
 def prepare_resource_arg(resources: Sequence[str]) -> Mapping[str, str]:
     if resources:
         parsed = {k: v for k, v in map(lambda s: s.split("=", 1), resources)}
-        if parsed["mem"] and not parsed["mem"][-1].isalpha():
+        if (mem_arg := parsed.get("mem")) is not None and not mem_arg[-1].isalpha():
             # The default suffix is "m" (mega) if not specified.
-            parsed["mem"] += "m"
+            parsed["mem"] = f"{mem_arg}m"
     else:
         parsed = {}  # use the defaults configured in the server
     return parsed

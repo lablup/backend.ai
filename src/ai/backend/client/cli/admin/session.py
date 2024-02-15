@@ -34,22 +34,20 @@ def _list_cmd(name: str = "list", docs: str = None):
         "-s",
         "--status",
         default=None,
-        type=click.Choice(
-            [
-                "PENDING",
-                "SCHEDULED",
-                "PULLING",
-                "PREPARING",
-                "RUNNING",
-                "RESTARTING",
-                "RUNNING_DEGRADED",
-                "TERMINATING",
-                "TERMINATED",
-                "ERROR",
-                "CANCELLED",
-                "ALL",  # special case
-            ]
-        ),
+        type=click.Choice([
+            "PENDING",
+            "SCHEDULED",
+            "PULLING",
+            "PREPARING",
+            "RUNNING",
+            "RESTARTING",
+            "RUNNING_DEGRADED",
+            "TERMINATING",
+            "TERMINATED",
+            "ERROR",
+            "CANCELLED",
+            "ALL",  # special case
+        ]),
         help="Filter by the given status",
     )
     @click.option(
@@ -124,82 +122,70 @@ def _list_cmd(name: str = "list", docs: str = None):
             elif format is not None:
                 options = format.split(",")
                 for opt in options:
-                    if opt not in session_fields:
+                    if opt not in session_fields or opt == "containers":
                         ctx.output.print_fail(f"There is no such format option: {opt}")
                         sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
             else:
                 if session.api_version[0] >= 6:
                     fields.append(session_fields["session_id"])
-                fields.extend(
-                    [
-                        session_fields["group_name"],
-                        session_fields["main_kernel_id"],
-                        session_fields["image"],
-                        session_fields["type"],
-                        session_fields["status"],
-                        session_fields["status_info"],
-                        session_fields["status_changed"],
-                        session_fields["result"],
-                    ]
-                )
+                fields.extend([
+                    session_fields["group_name"],
+                    session_fields["main_kernel_id"],
+                    session_fields["image"],
+                    session_fields["type"],
+                    session_fields["status"],
+                    session_fields["status_info"],
+                    session_fields["status_changed"],
+                    session_fields["result"],
+                ])
                 if detail:
-                    fields.extend(
-                        [
-                            session_fields["tag"],
-                            session_fields["created_at"],
-                            session_fields["occupying_slots"],
-                        ]
-                    )
+                    fields.extend([
+                        session_fields["tag"],
+                        session_fields["created_at"],
+                        session_fields["occupying_slots"],
+                    ])
 
         no_match_name = None
         if status is None:
-            status = ",".join(
-                [
-                    "PENDING",
-                    "SCHEDULED",
-                    "PULLING",
-                    "PREPARING",
-                    "RUNNING",
-                    "RUNNING_DEGRADED",
-                    "TERMINATING",
-                    "ERROR",
-                ]
-            )
+            status = ",".join([
+                "PENDING",
+                "SCHEDULED",
+                "PULLING",
+                "PREPARING",
+                "RUNNING",
+                "RUNNING_DEGRADED",
+                "TERMINATING",
+                "ERROR",
+            ])
             no_match_name = "active"
         if running:
-            status = ",".join(
-                [
-                    "PREPARING",
-                    "RUNNING",
-                    "RUNNING_DEGRADED",
-                ]
-            )
+            status = ",".join([
+                "PREPARING",
+                "RUNNING",
+                "RUNNING_DEGRADED",
+            ])
             no_match_name = "running"
         if dead:
-            status = ",".join(
-                [
-                    "CANCELLED",
-                    "TERMINATED",
-                ]
-            )
+            status = ",".join([
+                "CANCELLED",
+                "TERMINATED",
+            ])
             no_match_name = "dead"
         if status == "ALL" or all:
-            status = ",".join(
-                [
-                    "PENDING",
-                    "SCHEDULED",
-                    "PULLING",
-                    "PREPARING",
-                    "RUNNING",
-                    "RESTARTING",
-                    "RUNNING_DEGRADED",
-                    "TERMINATING",
-                    "TERMINATED",
-                    "ERROR",
-                    "CANCELLED",
-                ]
-            )
+            status = ",".join([
+                "PENDING",
+                "SCHEDULED",
+                "PULLING",
+                "PREPARING",
+                "RUNNING",
+                "RESTARTING",
+                "RUNNING_DEGRADED",
+                "TERMINATING",
+                "TERMINATED",
+                "ERROR",
+                "CANCELLED",
+            ])
             no_match_name = "in any status"
         if no_match_name is None:
             no_match_name = status.lower()
@@ -253,19 +239,17 @@ def _info_cmd(docs: str = None):
             if session_.api_version[0] >= 6:
                 fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
-            fields.extend(
-                [
-                    session_fields["image"],
-                    session_fields["tag"],
-                    session_fields["created_at"],
-                    session_fields["terminated_at"],
-                    session_fields["status"],
-                    session_fields["status_info"],
-                    session_fields["status_data"],
-                    session_fields["occupying_slots"],
-                    session_fields["idle_checks"],
-                ]
-            )
+            fields.extend([
+                session_fields["image"],
+                session_fields["tag"],
+                session_fields["created_at"],
+                session_fields["terminated_at"],
+                session_fields["status"],
+                session_fields["status_info"],
+                session_fields["status_data"],
+                session_fields["occupying_slots"],
+                session_fields["idle_checks"],
+            ])
             if session_.api_version[0] >= 6:
                 fields.append(session_fields["containers"])
             else:

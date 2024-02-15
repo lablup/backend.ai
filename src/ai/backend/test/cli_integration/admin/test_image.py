@@ -4,17 +4,17 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_alias_image(run: ClientRunnerFunc):
+def test_alias_image(run_admin: ClientRunnerFunc):
     pass
 
 
-def test_dealias_image(run: ClientRunnerFunc):
+def test_dealias_image(run_admin: ClientRunnerFunc):
     pass
 
 
-def test_list_image(run: ClientRunnerFunc):
+def test_list_image(run_admin: ClientRunnerFunc):
     print("[ List image ]")
-    with closing(run(["--output=json", "admin", "image", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "image", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)

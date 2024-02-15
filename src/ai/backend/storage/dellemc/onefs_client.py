@@ -116,12 +116,10 @@ class OneFSClient:
     async def get_cluster_metadata(self) -> List[Dict[str, Any]]:
         try:
             cluster_metadata = []
-            cluster_metadata.append(
-                {
-                    "config": await self.get_cluster_config(),
-                    "interface": await self.get_cluster_interface(),
-                }
-            )
+            cluster_metadata.append({
+                "config": await self.get_cluster_config(),
+                "interface": await self.get_cluster_interface(),
+            })
             return cluster_metadata
         except Exception as e:
             raise (e)
@@ -146,12 +144,10 @@ class OneFSClient:
             lnns = await self.get_list_lnn()
             node_metadata = []
             for lnn in lnns:
-                node_metadata.append(
-                    {
-                        "hardware": await self.get_node_hardware_info_by_lnn(lnn),
-                        "status": await self.get_node_status_by_lnn(lnn),
-                    }
-                )
+                node_metadata.append({
+                    "hardware": await self.get_node_hardware_info_by_lnn(lnn),
+                    "status": await self.get_node_status_by_lnn(lnn),
+                })
             return node_metadata
         except Exception as e:
             raise (e)

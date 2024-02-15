@@ -7,3 +7,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "saturday"
+      timezone: "Asia/Seoul"
+    labels:
+      - "skip:changelog"
+      - "area:infrastructure"

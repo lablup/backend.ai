@@ -245,7 +245,12 @@
       "SessionName": "__NOT_TRANSLATED__",
       "ResetFormConfirm": "__NOT_TRANSLATED__",
       "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Atribuição de recursos por contentor",
+      "NumberOfContainer": "Número de contentores",
+      "EnterEnvironmentVariable": "Introduzir o nome da variável",
+      "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
+      "EnvironmentVariableDuplicateName": "Um nome de variável que já existe."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",

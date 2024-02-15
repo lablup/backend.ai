@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -65,7 +66,10 @@ from ai.backend.manager.models import (
     users,
     vfolders,
 )
-from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
+from ai.backend.manager.models.base import (
+    pgsql_connect_opts,
+    populate_fixture,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -78,6 +82,8 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 here = Path(__file__).parent
+
+log = logging.getLogger("tests.manager.conftest")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -156,51 +162,47 @@ def local_config(
     postgres_addr = postgres_container[1]
 
     # Establish a self-contained config.
-    cfg = LocalConfig(
-        {
-            **etcd_config_iv.check(
-                {
-                    "etcd": {
-                        "namespace": test_id,
-                        "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-                    },
-                }
-            ),
-            "redis": redis_config_iv.check(
-                {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                }
-            ),
-            "db": {
-                "addr": postgres_addr,
-                "name": test_db,
-                "user": "postgres",
-                "password": "develove",
-                "pool-size": 8,
-                "max-overflow": 64,
+    cfg = LocalConfig({
+        **etcd_config_iv.check({
+            "etcd": {
+                "namespace": test_id,
+                "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
             },
-            "manager": {
-                "id": f"i-{test_id}",
-                "num-proc": 1,
-                "distributed-lock": "filelock",
-                "ipc-base-path": ipc_base_path,
-                "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
-                "allowed-plugins": set(),
-                "disabled-plugins": set(),
+        }),
+        "redis": redis_config_iv.check({
+            "addr": {
+                "host": redis_addr.host,
+                "port": redis_addr.port,
             },
-            "debug": {
-                "enabled": False,
-                "log-events": False,
-                "log-scheduler-ticks": False,
-                "periodic-sync-stats": False,
-            },
-            "logging": logging_config,
-        }
-    )
+            "redis_helper_config": config.redis_helper_default_config,
+        }),
+        "db": {
+            "addr": postgres_addr,
+            "name": test_db,
+            "user": "postgres",
+            "password": "develove",
+            "pool-size": 8,
+            "pool-recycle": -1,
+            "max-overflow": 64,
+            "lock-conn-timeout": 0,
+        },
+        "manager": {
+            "id": f"i-{test_id}",
+            "num-proc": 1,
+            "distributed-lock": "filelock",
+            "ipc-base-path": ipc_base_path,
+            "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+            "allowed-plugins": set(),
+            "disabled-plugins": set(),
+        },
+        "debug": {
+            "enabled": False,
+            "log-events": False,
+            "log-scheduler-ticks": False,
+            "periodic-sync-stats": False,
+        },
+        "logging": logging_config,
+    })
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()
@@ -357,7 +359,8 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent("""
+    alembic_config_template = textwrap.dedent(
+        """
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -383,7 +386,8 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """).strip()
+    """
+    ).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
@@ -423,19 +427,13 @@ def database_fixture(local_config, test_db, database):
     db_pass = local_config["db"]["password"]
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
-    fixtures = {}
-    # NOTE: The fixtures must be loaded in the order that they are present.
-    #       Normal dicts on Python 3.6 or later guarantees the update ordering.
-    fixtures.update(
-        json.loads(
-            (Path(__file__).parent / "fixtures" / "example-keypairs.json").read_text(),
-        )
-    )
-    fixtures.update(
-        json.loads(
-            (Path(__file__).parent / "fixtures" / "example-resource-presets.json").read_text(),
-        )
-    )
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+    fixture_paths = [
+        build_root / "fixtures" / "manager" / "example-users.json",
+        build_root / "fixtures" / "manager" / "example-keypairs.json",
+        build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
+        build_root / "fixtures" / "manager" / "example-resource-presets.json",
+    ]
 
     async def init_fixture():
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
@@ -443,7 +441,14 @@ def database_fixture(local_config, test_db, database):
             connect_args=pgsql_connect_opts,
         )
         try:
-            await populate_fixture(engine, fixtures)
+            for fixture_path in fixture_paths:
+                with open(fixture_path, "rb") as f:
+                    data = json.load(f)
+                try:
+                    await populate_fixture(engine, data)
+                except ValueError:
+                    log.error("Failed to populate fixtures from %s", fixture_path)
+                    raise
         finally:
             await engine.dispose()
 
@@ -731,13 +736,11 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
 
     async def create_kernel(image="lua:5.3-alpine", tag=None):
         url = "/v3/kernel/"
-        req_bytes = json.dumps(
-            {
-                "image": image,
-                "tag": tag,
-                "clientSessionToken": sess_id,
-            }
-        ).encode()
+        req_bytes = json.dumps({
+            "image": image,
+            "tag": tag,
+            "clientSessionToken": sess_id,
+        }).encode()
         headers = get_headers("POST", url, req_bytes)
         response = await client.post(url, data=req_bytes, headers=headers)
         return await response.json()

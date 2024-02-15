@@ -104,7 +104,7 @@ class NodeMeasurement:
 
     # 2-tuple of Decimals mean raw values for (usage, available)
     # Percent values are calculated from them.
-    key: str
+    key: MetricKey
     type: MetricTypes
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
@@ -119,7 +119,7 @@ class ContainerMeasurement:
     Collection of per-container statistics for a specific metric.
     """
 
-    key: str
+    key: MetricKey
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
@@ -133,7 +133,7 @@ class ProcessMeasurement:
     Collection of per-process statistics for a specific metric.
     """
 
-    key: str
+    key: MetricKey
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
@@ -429,18 +429,19 @@ class StatContext:
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_kernel_ids: Set[KernelId] = set()
             for result in results:
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     log.error(
                         "collect_container_stat(): gather_container_measures() error",
                         exc_info=result,
                     )
                     continue
                 for ctnr_measure in result:
+                    assert isinstance(ctnr_measure, ContainerMeasurement)
                     metric_key = ctnr_measure.key
                     # update per-container metric
                     for cid, measure in ctnr_measure.per_container.items():
                         try:
-                            kernel_id = kernel_id_map[cid]
+                            kernel_id = kernel_id_map[ContainerId(cid)]
                         except KeyError:
                             continue
                         updated_kernel_ids.add(kernel_id)
