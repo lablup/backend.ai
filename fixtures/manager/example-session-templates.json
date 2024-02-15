@@ -37,7 +37,7 @@
     "id": "59062449-4f57-4434-975d-add2a593438c",
     "is_active": true,
     "domain_name": "default",
-    "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+    "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
     "user_uuid": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
     "type": "TASK",
     "name": "python_aarch64",

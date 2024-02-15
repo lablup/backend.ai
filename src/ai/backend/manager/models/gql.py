@@ -691,7 +691,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # filters
         domain_name=graphene.String(),
-        group_id=graphene.String(),
+        group_id=graphene.String(),  # legacy
         access_key=graphene.String(),
         project=graphene.UUID(),
     )
