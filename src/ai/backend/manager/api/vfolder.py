@@ -159,9 +159,9 @@ async def ensure_vfolder_status(
                 VFolderOperationStatus.READY,
                 VFolderOperationStatus.PERFORMING,
                 VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETE_PENDING,
-                VFolderOperationStatus.DELETE_ERROR,
                 VFolderOperationStatus.MOUNTED,
+                VFolderOperationStatus.ERROR,
+                VFolderOperationStatus.DELETE_PENDING,
             }
         case VFolderAccessStatus.UPDATABLE:
             # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
@@ -175,9 +175,8 @@ async def ensure_vfolder_status(
                 VFolderOperationStatus.READY,
             }
         case VFolderAccessStatus.HARD_DELETABLE:
-            # if DELETABLE access status is requested, READY and DELETE_PENDING operation status is accepted.
+            # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
             available_vf_statuses = {
-                VFolderOperationStatus.READY,
                 VFolderOperationStatus.DELETE_PENDING,
             }
         case VFolderAccessStatus.RECOVERABLE:
