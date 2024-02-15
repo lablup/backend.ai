@@ -2228,7 +2228,7 @@ class DeleteRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(DeleteRequestModel)
-async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> SuccessResponseModel:
+async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
     access_key = request["keypair"]["access_key"]
@@ -2263,7 +2263,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> Succ
             e.extra_data,
         )
         raise
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 @auth_required
