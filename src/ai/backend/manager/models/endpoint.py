@@ -151,7 +151,7 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
-    image_object = relationship("ImageRow", back_populates="endpoints")
+    image_row = relationship("ImageRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -227,7 +227,7 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_object))
+            query = query.options(selectinload(EndpointRow.image_row))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -268,7 +268,7 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_object))
+            query = query.options(selectinload(EndpointRow.image_row))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -435,8 +435,8 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=row.image_object,
-            architecture=row.image_object.architecture,
+            image_object=row.image_row,
+            architecture=row.image_row.architecture,
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -514,7 +514,7 @@ class Endpoint(graphene.ObjectType):
             sa.select(EndpointRow)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_object))
+            .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
