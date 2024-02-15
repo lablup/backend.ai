@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.17.0"
+pants_version = "2.19.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -42,6 +42,7 @@ root_patterns = [
 
 [test]
 extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
+attempts_default = 3
 
 [python]
 enable_resolves = true

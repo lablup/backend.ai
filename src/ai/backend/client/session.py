@@ -409,7 +409,7 @@ class Session(BaseSession):
         self._worker_thread.start()
 
         async def _create_aiohttp_session() -> aiohttp.ClientSession:
-            ssl: SSLContextType = None
+            ssl: SSLContextType = True
             if self._config.skip_sslcert_validation:
                 ssl = False
             connector = aiohttp.TCPConnector(ssl=ssl)
@@ -480,7 +480,7 @@ class AsyncSession(BaseSession):
         proxy_mode: bool = False,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        ssl: SSLContextType = None
+        ssl: SSLContextType = True
         if self._config.skip_sslcert_validation:
             ssl = False
         connector = aiohttp.TCPConnector(ssl=ssl)
