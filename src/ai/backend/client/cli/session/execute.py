@@ -413,6 +413,7 @@ def run(
     resource_opts,  # click_start_option
     architecture,
     domain,  # click_start_option
+    project,  # click_start_option
     group,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
@@ -427,6 +428,13 @@ def run(
            runtime or programming language.
     FILES: The code file(s). Can be added multiple times.
     """
+    if group:
+        print_warn("`--group` option is deprecated. Use `--project` option instead.")
+        if not project:
+            project = group
+        else:
+            print_fail("Cannot use `--project` and `--group` options simultaneously.")
+            sys.exit(ExitCode.FAILURE)
     if quiet:
         vprint_info = vprint_wait = vprint_done = _noop
     else:
@@ -526,7 +534,7 @@ def run(
                 envs=envs,
                 resources=resources,
                 domain_name=domain,
-                group_name=group,
+                project_name=project,
                 scaling_group=scaling_group,
                 tag=tag,
                 architecture=architecture,
@@ -543,8 +551,8 @@ def run(
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
+                    "[{0}] Session {1} is ready (domain={2}, project={3}).".format(
+                        idx, compute_session.name, compute_session.domain, compute_session.project
                     )
                 )
             else:
@@ -631,7 +639,7 @@ def run(
                 resources=resources,
                 resource_opts=resource_opts,
                 domain_name=domain,
-                group_name=group,
+                project_name=project,
                 scaling_group=scaling_group,
                 bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
                 tag=tag,
@@ -651,8 +659,8 @@ def run(
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
+                    "[{0}] Session {1} is ready (domain={2}, project={3}).".format(
+                        idx, compute_session.name, compute_session.domain, compute_session.project
                     )
                 )
             else:

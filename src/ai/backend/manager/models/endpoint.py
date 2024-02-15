@@ -92,10 +92,10 @@ class EndpointRow(Base):
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project = sa.Column(
-        "project",
+    project_id = sa.Column(
+        "project_id",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("projects.id", ondelete="RESTRICT"),
         nullable=False,
     )
     resource_group = sa.Column(
@@ -294,7 +294,7 @@ class EndpointTokenRow(Base):
     project = sa.Column(
         "project",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="CASCADE"),
+        sa.ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
     )
     created_at = sa.Column(

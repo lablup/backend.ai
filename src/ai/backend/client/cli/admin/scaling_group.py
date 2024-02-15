@@ -22,11 +22,11 @@ def scaling_group() -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
-@click.argument("group", type=str, metavar="GROUP_NAME")
-def get_available(ctx: CLIContext, group: str) -> None:
+@click.argument("project", type=str, metavar="GROUP_NAME")
+def get_available(ctx: CLIContext, project: str) -> None:
     with Session() as session:
         try:
-            items = session.ScalingGroup.list_available(group)
+            items = session.ScalingGroup.list_available(project)
             ctx.output.print_list(items, [scaling_group_fields["name"]])
         except Exception as e:
             ctx.output.print_error(e)

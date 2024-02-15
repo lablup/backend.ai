@@ -39,7 +39,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .group import resolve_group_name_or_id, resolve_groups
+from .project import resolve_project_name_or_id, resolve_projects
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ __all__: Sequence[str] = (
     "ScalingGroupOpts",
     "ScalingGroupRow",
     "sgroups_for_domains",
-    "sgroups_for_groups",
+    "sgroups_for_projects",
     "sgroups_for_keypairs",
     # functions
     "query_allowed_sgroups",
@@ -60,10 +60,10 @@ __all__: Sequence[str] = (
     "ModifyScalingGroup",
     "DeleteScalingGroup",
     "AssociateScalingGroupWithDomain",
-    "AssociateScalingGroupWithUserGroup",
+    "AssociateScalingGroupWithUserProject",
     "AssociateScalingGroupWithKeyPair",
     "DisassociateScalingGroupWithDomain",
-    "DisassociateScalingGroupWithUserGroup",
+    "DisassociateScalingGroupWithUserProject",
     "DisassociateScalingGroupWithKeyPair",
 )
 
@@ -137,7 +137,7 @@ scaling_groups = sa.Table(
 
 
 # When scheduling, we take the union of allowed scaling groups for
-# each domain, group, and keypair.
+# each domain, project, and keypair.
 
 
 sgroups_for_domains = sa.Table(
@@ -160,8 +160,8 @@ sgroups_for_domains = sa.Table(
 )
 
 
-sgroups_for_groups = sa.Table(
-    "sgroups_for_groups",
+sgroups_for_projects = sa.Table(
+    "sgroups_for_projects",
     mapper_registry.metadata,
     IDColumn(),
     sa.Column(
@@ -171,12 +171,12 @@ sgroups_for_groups = sa.Table(
         nullable=False,
     ),
     sa.Column(
-        "group",
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        "project",
+        sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+    sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
 )
 
 
@@ -209,9 +209,9 @@ class ScalingGroupRow(Base):
         secondary=sgroups_for_domains,
         back_populates="scaling_groups",
     )
-    groups = relationship(
-        "GroupRow",
-        secondary=sgroups_for_groups,
+    projects = relationship(
+        "ProjectRow",
+        secondary=sgroups_for_projects,
         back_populates="scaling_groups",
     )
     keypairs = relationship(
@@ -225,7 +225,7 @@ class ScalingGroupRow(Base):
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID,
+    project: uuid.UUID,
     access_key: str,
 ) -> Sequence[Row]: ...
 
@@ -234,7 +234,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Iterable[uuid.UUID],
+    project: Iterable[uuid.UUID],
     access_key: str,
 ) -> Sequence[Row]: ...
 
@@ -243,7 +243,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: str,
+    project: str,
     access_key: str,
 ) -> Sequence[Row]: ...
 
@@ -252,7 +252,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Iterable[str],
+    project: Iterable[str],
     access_key: str,
 ) -> Sequence[Row]: ...
 
@@ -260,36 +260,36 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
+    project: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
     query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    group_ids: Iterable[uuid.UUID] = []
-    match group:
+    project_ids: Iterable[uuid.UUID] = []
+    match project:
         case uuid.UUID() | str():
-            if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
-                group_ids = [group_id]
+            if project_id := await resolve_project_name_or_id(db_conn, domain_name, project):
+                project_ids = [project_id]
             else:
-                group_ids = []
+                project_ids = []
         case list() | tuple() | set():
-            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
-    from_group: Set[str]
-    if not group_ids:
-        from_group = set()  # empty
+            project_ids = await resolve_projects(db_conn, domain_name, cast(Iterable, project))
+    from_project: Set[str]
+    if not project_ids:
+        from_project = set()  # empty
     else:
-        group_cond = sgroups_for_groups.c.group.in_(group_ids)
-        query = sa.select([sgroups_for_groups]).where(group_cond)
+        project_cond = sgroups_for_projects.c.project.in_(project_ids)
+        query = sa.select([sgroups_for_projects]).where(project_cond)
         result = await db_conn.execute(query)
-        from_group = {row["scaling_group"] for row in result}
+        from_project = {row["scaling_group"] for row in result}
 
     query = sa.select([sgroups_for_keypairs]).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
     from_keypair = {row["scaling_group"] for row in result}
 
-    sgroups = from_domain | from_group | from_keypair
+    sgroups = from_domain | from_project | from_keypair
     query = (
         sa.select([scaling_groups])
         .where(
@@ -381,20 +381,22 @@ class ScalingGroup(graphene.ObjectType):
             ]
 
     @classmethod
-    async def load_by_group(
+    async def load_by_project(
         cls,
         ctx: GraphQueryContext,
-        group: uuid.UUID,
+        project: uuid.UUID,
         *,
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
-            sgroups_for_groups,
-            scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
+            sgroups_for_projects,
+            scaling_groups.c.name == sgroups_for_projects.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_groups.c.group == group)
+            sa.select([scaling_groups])
+            .select_from(j)
+            .where(sgroups_for_projects.c.project == project)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -433,20 +435,20 @@ class ScalingGroup(graphene.ObjectType):
             ]
 
     @classmethod
-    async def batch_load_by_group(
+    async def batch_load_by_project(
         cls,
         ctx: GraphQueryContext,
-        group_ids: Sequence[uuid.UUID],
+        project_ids: Sequence[uuid.UUID],
     ) -> Sequence[Sequence[ScalingGroup | None]]:
         j = sa.join(
             scaling_groups,
-            sgroups_for_groups,
-            scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
+            sgroups_for_projects,
+            scaling_groups.c.name == sgroups_for_projects.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups, sgroups_for_groups.c.group])
+            sa.select([scaling_groups, sgroups_for_projects.c.project])
             .select_from(j)
-            .where(sgroups_for_groups.c.group.in_(group_ids))
+            .where(sgroups_for_projects.c.project.in_(project_ids))
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -454,8 +456,8 @@ class ScalingGroup(graphene.ObjectType):
                 conn,
                 query,
                 cls,
-                group_ids,
-                lambda row: row["group"],
+                project_ids,
+                lambda row: row["project"],
             )
 
     @classmethod
@@ -672,12 +674,12 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
-class AssociateScalingGroupWithUserGroup(graphene.Mutation):
+class AssociateScalingGroupWithUserProject(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scaling_group = graphene.String(required=True)
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -688,21 +690,21 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scaling_group: str,
-        user_group: uuid.UUID,
-    ) -> AssociateScalingGroupWithUserGroup:
-        insert_query = sa.insert(sgroups_for_groups).values({
+        project: uuid.UUID,
+    ) -> AssociateScalingGroupWithUserProject:
+        insert_query = sa.insert(sgroups_for_projects).values({
             "scaling_group": scaling_group,
-            "group": user_group,
+            "project": project,
         })
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
-class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
+class DisassociateScalingGroupWithUserProject(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scaling_group = graphene.String(required=True)
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -713,20 +715,20 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scaling_group: str,
-        user_group: uuid.UUID,
-    ) -> DisassociateScalingGroupWithUserGroup:
-        delete_query = sa.delete(sgroups_for_groups).where(
-            (sgroups_for_groups.c.scaling_group == scaling_group)
-            & (sgroups_for_groups.c.group == user_group),
+        project: uuid.UUID,
+    ) -> DisassociateScalingGroupWithUserProject:
+        delete_query = sa.delete(sgroups_for_projects).where(
+            (sgroups_for_projects.c.scaling_group == scaling_group)
+            & (sgroups_for_projects.c.project == project),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
-class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
+class DisassociateAllScalingGroupsWithProject(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -736,9 +738,11 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        user_group: uuid.UUID,
-    ) -> DisassociateAllScalingGroupsWithGroup:
-        delete_query = sa.delete(sgroups_for_groups).where(sgroups_for_groups.c.group == user_group)
+        project: uuid.UUID,
+    ) -> DisassociateAllScalingGroupsWithProject:
+        delete_query = sa.delete(sgroups_for_projects).where(
+            sgroups_for_projects.c.project == project
+        )
         return await simple_db_mutate(cls, info.context, delete_query)
 
 

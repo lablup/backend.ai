@@ -188,7 +188,8 @@ class APIConfig:
         "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",
         "hash_type": "sha256",
         "domain": "default",
-        "group": "default",
+        "group": "default",  # legacy
+        "project": "default",
         "storage_proxy_address_map": {},
         "connection_timeout": "10.0",
         "read_timeout": "0",
@@ -199,7 +200,8 @@ class APIConfig:
     """
 
     _endpoints: List[URL]
-    _group: str
+    _group: str  # legacy
+    _project: str
     _hash_type: str
     _skip_sslcert_validation: bool
     _version: str
@@ -210,7 +212,8 @@ class APIConfig:
         endpoint: Union[URL, str] = None,
         endpoint_type: str = None,
         domain: str = None,
-        group: str = None,
+        group: str = None,  # legacy
+        project: Optional[str] = None,
         storage_proxy_address_map: Mapping[str, str] = None,
         version: str = None,
         user_agent: str = None,
@@ -241,6 +244,11 @@ class APIConfig:
         )
         self._group = (
             group if group is not None else get_env("GROUP", self.DEFAULTS["group"], clean=str)
+        )  # legacy
+        self._project = (
+            project
+            if project is not None
+            else get_env("PROJECT", self.DEFAULTS["project"], clean=str)
         )
         self._storage_proxy_address_map = (
             storage_proxy_address_map
@@ -326,9 +334,14 @@ class APIConfig:
         return self._domain
 
     @property
-    def group(self) -> str:
+    def group(self) -> str:  # legacy
         """The configured group."""
         return self._group
+
+    @property
+    def project(self) -> str:
+        """The configured project."""
+        return self._project
 
     @property
     def storage_proxy_address_map(self) -> Mapping[str, str]:

@@ -66,30 +66,29 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 __all__: Sequence[str] = (
-    "groups",
-    "GroupRow",
-    "association_groups_users",
-    "AssocGroupUserRow",
-    "resolve_group_name_or_id",
-    "Group",
-    "GroupInput",
-    "ModifyGroupInput",
-    "CreateGroup",
-    "ModifyGroup",
-    "DeleteGroup",
-    "GroupDotfile",
+    "projects",
+    "association_projects_users",
+    "resolve_project_name_or_id",
+    "Project",
+    "ProjectRow",
+    "ProjectInput",
+    "ModifyProjectInput",
+    "CreateProject",
+    "ModifyProject",
+    "DeleteProject",
+    "ProjectDotfile",
     "ProjectType",
     "MAXIMUM_DOTFILE_SIZE",
-    "query_group_dotfiles",
-    "query_group_domain",
+    "query_project_dotfiles",
+    "query_project_domain",
     "verify_dotfile_name",
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
-association_groups_users = sa.Table(
-    "association_groups_users",
+association_projects_users = sa.Table(
+    "association_projects_users",
     mapper_registry.metadata,
     IDColumn(),
     sa.Column(
@@ -99,19 +98,19 @@ association_groups_users = sa.Table(
         nullable=False,
     ),
     sa.Column(
-        "group_id",
+        "project_id",
         GUID,
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
+    sa.UniqueConstraint("user_id", "project_id", name="uq_association_user_id_project_id"),
 )
 
 
-class AssocGroupUserRow(Base):
-    __table__ = association_groups_users
-    user = relationship("UserRow", back_populates="groups")
-    group = relationship("GroupRow", back_populates="users")
+class AssocProjectUserRow(Base):
+    __table__ = association_projects_users
+    user = relationship("UserRow", back_populates="projects")
+    project = relationship("ProjectRow", back_populates="users")
 
 
 class ProjectType(enum.StrEnum):
@@ -119,8 +118,8 @@ class ProjectType(enum.StrEnum):
     MODEL_STORE = "model-store"
 
 
-groups = sa.Table(
-    "groups",
+projects = sa.Table(
+    "projects",
     mapper_registry.metadata,
     IDColumn("id"),
     sa.Column("name", sa.String(length=64), nullable=False),
@@ -166,50 +165,50 @@ groups = sa.Table(
         nullable=False,
         default=ProjectType.GENERAL,
     ),
-    sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+    sa.UniqueConstraint("name", "domain_name", name="uq_projects_name_domain_name"),
 )
 
 
-class GroupRow(Base):
-    __table__ = groups
-    sessions = relationship("SessionRow", back_populates="group")
-    domain = relationship("DomainRow", back_populates="groups")
+class ProjectRow(Base):
+    __table__ = projects
+    sessions = relationship("SessionRow", back_populates="project")
+    domain = relationship("DomainRow", back_populates="projects")
     scaling_groups = relationship(
-        "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
+        "ScalingGroupRow", secondary="sgroups_for_projects", back_populates="projects"
     )
-    users = relationship("AssocGroupUserRow", back_populates="group")
+    users = relationship("AssocProjectUserRow", back_populates="project")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
 
 
-def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
+def _build_project_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
     query = (
-        sa.select([groups.c.id])
-        .select_from(groups)
+        sa.select([projects.c.id])
+        .select_from(projects)
         .where(
-            cond & (groups.c.domain_name == domain_name),
+            cond & (projects.c.domain_name == domain_name),
         )
     )
     return query
 
 
-async def resolve_group_name_or_id(
+async def resolve_project_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: Union[str, uuid.UUID],
 ) -> Optional[uuid.UUID]:
     match value:
         case uuid.UUID():
-            cond = groups.c.id == value
+            cond = projects.c.id == value
         case str():
-            cond = groups.c.name == value
+            cond = projects.c.name == value
         case _:
-            raise TypeError("unexpected type for group_name_or_id")
-    query = _build_group_query(cond, domain_name)
+            raise TypeError("unexpected type for project_name_or_id")
+    query = _build_project_query(cond, domain_name)
     return await db_conn.scalar(query)
 
 
 @overload
-async def resolve_groups(
+async def resolve_projects(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
@@ -217,14 +216,14 @@ async def resolve_groups(
 
 
 @overload
-async def resolve_groups(
+async def resolve_projects(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
 ) -> Iterable[uuid.UUID]: ...
 
 
-async def resolve_groups(
+async def resolve_projects(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID] | Iterable[str],
@@ -232,13 +231,13 @@ async def resolve_groups(
     listed_val = [*values]
     match listed_val:
         case [uuid.UUID(), *_]:
-            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+            query = _build_project_query((projects.c.id.in_(listed_val)), domain_name)
         case [str(), *_]:
-            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
+            query = _build_project_query((projects.c.name.in_(listed_val)), domain_name)
         case []:
             return []
         case _:
-            raise TypeError("unexpected type for group_name_or_id")
+            raise TypeError("unexpected type for project_name_or_id")
 
     rows = (await db_conn.execute(query)).fetchall()
     return_val = [row["id"] for row in rows]
@@ -246,7 +245,7 @@ async def resolve_groups(
     return return_val
 
 
-class Group(graphene.ObjectType):
+class Project(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
     description = graphene.String()
@@ -263,7 +262,7 @@ class Group(graphene.ObjectType):
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Optional[Group]:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Optional[Project]:
         if row is None:
             return None
         return cls(
@@ -298,12 +297,12 @@ class Group(graphene.ObjectType):
         domain_name: str = None,
         is_active: bool = None,
         type: list[ProjectType] = [ProjectType.GENERAL],
-    ) -> Sequence[Group]:
-        query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
+    ) -> Sequence[Project]:
+        query = sa.select([projects]).select_from(projects).where(projects.c.type.in_(type))
         if domain_name is not None:
-            query = query.where(groups.c.domain_name == domain_name)
+            query = query.where(projects.c.domain_name == domain_name)
         if is_active is not None:
-            query = query.where(groups.c.is_active == is_active)
+            query = query.where(projects.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -315,20 +314,20 @@ class Group(graphene.ObjectType):
     async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
-        group_ids: Sequence[uuid.UUID],
+        project_ids: Sequence[uuid.UUID],
         *,
         domain_name: str = None,
-    ) -> Sequence[Group | None]:
-        query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
+    ) -> Sequence[Project | None]:
+        query = sa.select([projects]).select_from(projects).where(projects.c.id.in_(project_ids))
         if domain_name is not None:
-            query = query.where(groups.c.domain_name == domain_name)
+            query = query.where(projects.c.domain_name == domain_name)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_result(
                 graph_ctx,
                 conn,
                 query,
                 cls,
-                group_ids,
+                project_ids,
                 lambda row: row["id"],
             )
 
@@ -336,20 +335,22 @@ class Group(graphene.ObjectType):
     async def batch_load_by_name(
         cls,
         graph_ctx: GraphQueryContext,
-        group_names: Sequence[str],
+        project_names: Sequence[str],
         *,
         domain_name: str = None,
-    ) -> Sequence[Sequence[Group | None]]:
-        query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
+    ) -> Sequence[Sequence[Project | None]]:
+        query = (
+            sa.select([projects]).select_from(projects).where(projects.c.name.in_(project_names))
+        )
         if domain_name is not None:
-            query = query.where(groups.c.domain_name == domain_name)
+            query = query.where(projects.c.domain_name == domain_name)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
                 conn,
                 query,
                 cls,
-                group_names,
+                project_names,
                 lambda row: row["name"],
             )
 
@@ -359,16 +360,16 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         type: list[ProjectType] = [ProjectType.GENERAL],
-    ) -> Sequence[Sequence[Group | None]]:
+    ) -> Sequence[Sequence[Project | None]]:
         j = sa.join(
-            groups,
-            association_groups_users,
-            groups.c.id == association_groups_users.c.group_id,
+            projects,
+            association_projects_users,
+            projects.c.id == association_projects_users.c.project_id,
         )
         query = (
-            sa.select([groups, association_groups_users.c.user_id])
+            sa.select([projects, association_projects_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
+            .where(association_projects_users.c.user_id.in_(user_ids) & (projects.c.type.in_(type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -381,18 +382,20 @@ class Group(graphene.ObjectType):
             )
 
     @classmethod
-    async def get_groups_for_user(
+    async def get_projects_for_user(
         cls,
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
-    ) -> Sequence[Group]:
+    ) -> Sequence[Project]:
         j = sa.join(
-            groups,
-            association_groups_users,
-            groups.c.id == association_groups_users.c.group_id,
+            projects,
+            association_projects_users,
+            projects.c.id == association_projects_users.c.project_id,
         )
         query = (
-            sa.select([groups]).select_from(j).where(association_groups_users.c.user_id == user_id)
+            sa.select([projects])
+            .select_from(j)
+            .where(association_projects_users.c.user_id == user_id)
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return [
@@ -402,7 +405,7 @@ class Group(graphene.ObjectType):
             ]
 
 
-class GroupInput(graphene.InputObjectType):
+class ProjectInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
@@ -419,7 +422,7 @@ class GroupInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False, default_value="default")
 
 
-class ModifyGroupInput(graphene.InputObjectType):
+class ModifyProjectInput(graphene.InputObjectType):
     name = graphene.String(required=False)
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
@@ -432,16 +435,16 @@ class ModifyGroupInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False)
 
 
-class CreateGroup(graphene.Mutation):
+class CreateProject(graphene.Mutation):
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         name = graphene.String(required=True)
-        props = GroupInput(required=True)
+        props = ProjectInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    group = graphene.Field(lambda: Group, required=False)
+    project = graphene.Field(lambda: Project, required=False)
 
     @classmethod
     @privileged_mutation(
@@ -453,8 +456,8 @@ class CreateGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         name: str,
-        props: GroupInput,
-    ) -> CreateGroup:
+        props: ProjectInput,
+    ) -> CreateProject:
         if _rx_slug.search(name) is None:
             raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
@@ -475,20 +478,20 @@ class CreateGroup(graphene.Mutation):
             clean_func=lambda v: ResourceSlot.from_user_input(v, None),
         )
         set_if_set(props, data, "allowed_vfolder_hosts")
-        insert_query = sa.insert(groups).values(data)
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
+        insert_query = sa.insert(projects).values(data)
+        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Project)
 
 
-class ModifyGroup(graphene.Mutation):
+class ModifyProject(graphene.Mutation):
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
-        props = ModifyGroupInput(required=True)
+        props = ModifyProjectInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    group = graphene.Field(lambda: Group, required=False)
+    project = graphene.Field(lambda: Project, required=False)
 
     @classmethod
     @privileged_mutation(
@@ -501,7 +504,7 @@ class ModifyGroup(graphene.Mutation):
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
         props: ModifyUserInput,
-    ) -> ModifyGroup:
+    ) -> ModifyProject:
         graph_ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
         set_if_set(props, data, "name")
@@ -525,48 +528,51 @@ class ModifyGroup(graphene.Mutation):
         if not props.user_uuids:
             props.user_update_mode = None
         if not data and props.user_update_mode is None:
-            return cls(ok=False, msg="nothing to update", group=None)
+            return cls(ok=False, msg="nothing to update", project=None)
 
-        async def _do_mutate() -> ModifyGroup:
+        async def _do_mutate() -> ModifyProject:
             async with graph_ctx.db.begin() as conn:
-                # TODO: refactor user addition/removal in groups as separate mutations
+                # TODO: refactor user addition/removal in projects as separate mutations
                 #       (to apply since 21.09)
                 if props.user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
+                    values = [{"user_id": uuid, "project_id": gid} for uuid in props.user_uuids]
                     await conn.execute(
-                        sa.insert(association_groups_users).values(values),
+                        sa.insert(association_projects_users).values(values),
                     )
                 elif props.user_update_mode == "remove":
                     await conn.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(props.user_uuids))
-                            & (association_groups_users.c.group_id == gid),
+                        sa.delete(association_projects_users).where(
+                            (association_projects_users.c.user_id.in_(props.user_uuids))
+                            & (association_projects_users.c.project_id == gid),
                         ),
                     )
                 if data:
                     result = await conn.execute(
-                        sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
+                        sa.update(projects)
+                        .values(data)
+                        .where(projects.c.id == gid)
+                        .returning(projects),
                     )
                     if result.rowcount > 0:
-                        o = Group.from_row(graph_ctx, result.first())
-                        return cls(ok=True, msg="success", group=o)
-                    return cls(ok=False, msg="no such group", group=None)
-                else:  # updated association_groups_users table
-                    return cls(ok=True, msg="success", group=None)
+                        o = Project.from_row(graph_ctx, result.first())
+                        return cls(ok=True, msg="success", project=o)
+                    return cls(ok=False, msg="no such project", project=None)
+                else:  # updated association_projects_users table
+                    return cls(ok=True, msg="success", project=None)
 
         try:
             return await execute_with_retry(_do_mutate)
         except sa.exc.IntegrityError as e:
-            return cls(ok=False, msg=f"integrity error: {e}", group=None)
+            return cls(ok=False, msg=f"integrity error: {e}", project=None)
         except (asyncio.CancelledError, asyncio.TimeoutError):
             raise
         except Exception as e:
-            return cls(ok=False, msg=f"unexpected error: {e}", group=None)
+            return cls(ok=False, msg=f"unexpected error: {e}", project=None)
 
 
-class DeleteGroup(graphene.Mutation):
+class DeleteProject(graphene.Mutation):
     """
-    Instead of deleting the group, just mark it as inactive.
+    Instead of deleting the project, just mark it as inactive.
     """
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -582,26 +588,26 @@ class DeleteGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
+    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteProject:
         ctx: GraphQueryContext = info.context
         update_query = (
-            sa.update(groups)
+            sa.update(projects)
             .values(
                 is_active=False,
                 integration_id=None,
             )
-            .where(groups.c.id == gid)
+            .where(projects.c.id == gid)
         )
         return await simple_db_mutate(cls, ctx, update_query)
 
 
-class PurgeGroup(graphene.Mutation):
+class PurgeProject(graphene.Mutation):
     """
-    Completely deletes a group from DB.
+    Completely deletes a project from DB.
 
-    Group's vfolders and their data will also be lost
-    as well as the kernels run from the group.
-    There is no migration of the ownership for group folders.
+    Project's vfolders and their data will also be lost
+    as well as the kernels run from the project.
+    There is no migration of the ownership for project folders.
     """
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -617,38 +623,38 @@ class PurgeGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
+    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeProject:
         graph_ctx: GraphQueryContext = info.context
 
         async def _pre_func(conn: SAConnection) -> None:
-            if await cls.group_vfolder_mounted_to_active_kernels(conn, gid):
+            if await cls.project_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
+                    "Some of virtual folders that belong to this project "
                     "are currently mounted to active sessions. "
                     "Terminate them first to proceed removal.",
                 )
-            if await cls.group_has_active_kernels(conn, gid):
+            if await cls.project_has_active_kernels(conn, gid):
                 raise RuntimeError(
-                    "Group has some active session. Terminate them first to proceed removal.",
+                    "Project has some active session. Terminate them first to proceed removal.",
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
 
-        delete_query = sa.delete(groups).where(groups.c.id == gid)
+        delete_query = sa.delete(projects).where(projects.c.id == gid)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
 
     @classmethod
     async def delete_vfolders(
         cls,
         engine: ExtendedAsyncSAEngine,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
         """
-        Delete group's all virtual folders as well as their physical data.
+        Delete project's all virtual folders as well as their physical data.
 
         :param conn: DB connection
-        :param group_id: group's UUID to delete virtual folders
+        :param project_id: project's UUID to delete virtual folders
 
         :return: number of deleted rows
         """
@@ -657,12 +663,12 @@ class PurgeGroup(graphene.Mutation):
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
             .select_from(vfolders)
-            .where(vfolders.c.group == group_id)
+            .where(vfolders.c.group == project_id)
         )
         async with engine.begin_session() as db_conn:
             result = await db_conn.execute(query)
             target_vfs = result.fetchall()
-            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
+            delete_query = sa.delete(vfolders).where(vfolders.c.project_id == project_id)
             result = await db_conn.execute(delete_query)
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
@@ -678,56 +684,58 @@ class PurgeGroup(graphene.Mutation):
             raise
         deleted_count = len(target_vfs)
         if deleted_count > 0:
-            log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
+            log.info("deleted {0} project's virtual folders ({1})", deleted_count, project_id)
         return deleted_count
 
     @classmethod
     async def delete_kernels(
         cls,
         db_conn: SAConnection,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> int:
         """
-        Delete all kernels run from the target groups.
+        Delete all kernels run from the target projects.
 
         :param conn: DB connection
-        :param group_id: group's UUID to delete kernels
+        :param project_id: project's UUID to delete kernels
 
         :return: number of deleted rows
         """
         from . import kernels
 
-        query = sa.delete(kernels).where(kernels.c.group_id == group_id)
+        query = sa.delete(kernels).where(kernels.c.project_id == project_id)
         result = await db_conn.execute(query)
         if result.rowcount > 0:
-            log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
+            log.info("deleted {0} project's kernels ({1})", result.rowcount, project_id)
         return result.rowcount
 
     @classmethod
-    async def group_vfolder_mounted_to_active_kernels(
+    async def project_vfolder_mounted_to_active_kernels(
         cls,
         db_conn: SAConnection,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> bool:
         """
-        Check if no active kernel is using the group's virtual folders.
+        Check if no active kernel is using the project's virtual folders.
 
         :param conn: DB connection
-        :param group_id: group's ID
+        :param project_id: project's ID
 
         :return: True if a virtual folder is mounted to active kernels.
         """
         from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
 
-        query = sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.group == group_id)
+        query = (
+            sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.group == project_id)
+        )
         result = await db_conn.execute(query)
         rows = result.fetchall()
-        group_vfolder_ids = [row["id"] for row in rows]
+        project_vfolder_ids = [row["id"] for row in rows]
         query = (
             sa.select([kernels.c.mounts])
             .select_from(kernels)
             .where(
-                (kernels.c.group_id == group_id)
+                (kernels.c.project_id == project_id)
                 & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
             )
         )
@@ -735,25 +743,25 @@ class PurgeGroup(graphene.Mutation):
             for _mount in row["mounts"]:
                 try:
                     vfolder_id = uuid.UUID(_mount[2])
-                    if vfolder_id in group_vfolder_ids:
+                    if vfolder_id in project_vfolder_ids:
                         return True
                 except Exception:
                     pass
         return False
 
     @classmethod
-    async def group_has_active_kernels(
+    async def project_has_active_kernels(
         cls,
         db_conn: SAConnection,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> bool:
         """
-        Check if the group does not have active kernels.
+        Check if the project does not have active kernels.
 
         :param conn: DB connection
-        :param group_id: group's UUID
+        :param project_id: project's UUID
 
-        :return: True if the group has some active kernels.
+        :return: True if the project has some active kernels.
         """
         from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 
@@ -761,7 +769,7 @@ class PurgeGroup(graphene.Mutation):
             sa.select([sa.func.count()])
             .select_from(kernels)
             .where(
-                (kernels.c.group_id == group_id)
+                (kernels.c.project_id == project_id)
                 & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
             )
         )
@@ -769,7 +777,7 @@ class PurgeGroup(graphene.Mutation):
         return True if active_kernel_count > 0 else False
 
 
-class GroupNode(graphene.ObjectType):
+class ProjectNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -792,7 +800,7 @@ class GroupNode(graphene.ObjectType):
     )
 
     @classmethod
-    def from_row(cls, row: GroupRow) -> GroupNode:
+    def from_row(cls, row: ProjectRow) -> ProjectNode:
         return cls(
             id=row.id,
             name=row.name,
@@ -848,10 +856,12 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        j = sa.join(UserRow, AssocGroupUserRow)
-        user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
+        j = sa.join(UserRow, AssocProjectUserRow)
+        user_query = query.select_from(j).where(AssocProjectUserRow.project_id == self.id)
         cnt_query = (
-            sa.select(sa.func.count()).select_from(j).where(AssocGroupUserRow.group_id == self.id)
+            sa.select(sa.func.count())
+            .select_from(j)
+            .where(AssocProjectUserRow.project_id == self.id)
         )
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
@@ -863,13 +873,13 @@ class GroupNode(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> ProjectNode:
         graph_ctx: GraphQueryContext = info.context
-        _, group_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
+        _, project_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(ProjectRow).where(ProjectRow.id == project_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_row = (await db_session.scalars(query)).first()
-            return cls.from_row(group_row)
+            project_row = (await db_session.scalars(query)).first()
+            return cls.from_row(project_row)
 
     @classmethod
     async def get_connection(
@@ -892,8 +902,8 @@ class GroupNode(graphene.ObjectType):
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            GroupRow,
-            GroupRow.id,
+            ProjectRow,
+            ProjectRow.id,
             filter_expr,
             order_expr,
             offset,
@@ -902,33 +912,35 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
+        cnt_query = sa.select(sa.func.count()).select_from(ProjectRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(row) for row in group_rows]
+            project_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(row) for row in project_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class GroupConnection(Connection):
+class ProjectConnection(Connection):
     class Meta:
-        node = GroupNode
+        node = ProjectNode
 
 
-class GroupDotfile(TypedDict):
+class ProjectDotfile(TypedDict):
     data: str
     path: str
     perm: str
 
 
-async def query_group_dotfiles(
+async def query_project_dotfiles(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
-) -> tuple[list[GroupDotfile], int]:
-    query = sa.select([groups.c.dotfiles]).select_from(groups).where(groups.c.id == group_id)
+    project_id: Union[GUID, uuid.UUID],
+) -> tuple[list[ProjectDotfile], int]:
+    query = (
+        sa.select([projects.c.dotfiles]).select_from(projects).where(projects.c.id == project_id)
+    )
     packed_dotfile = await db_conn.scalar(query)
     if packed_dotfile is None:
         return [], MAXIMUM_DOTFILE_SIZE
@@ -936,11 +948,13 @@ async def query_group_dotfiles(
     return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
 
 
-async def query_group_domain(
+async def query_project_domain(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
+    project_id: Union[GUID, uuid.UUID],
 ) -> str:
-    query = sa.select([groups.c.domain_name]).select_from(groups).where(groups.c.id == group_id)
+    query = (
+        sa.select([projects.c.domain_name]).select_from(projects).where(projects.c.id == project_id)
+    )
     domain = await db_conn.scalar(query)
     return domain
 

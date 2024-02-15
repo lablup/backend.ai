@@ -12,7 +12,7 @@ from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..pretty import print_info
+from ..pretty import print_fail, print_info, print_warn
 from ..types import CLIContext
 from . import admin
 
@@ -43,7 +43,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["status_info"],
         user_fields["created_at"],
         user_fields["domain_name"],
-        user_fields["groups"],
+        user_fields["projects"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
         user_fields["main_access_key"],
@@ -67,17 +67,24 @@ def info(ctx: CLIContext, email: str) -> None:
     help="Filter users in a specific state (active, inactive, deleted, before-verification).",
 )
 @click.option(
+    "-j",
+    "--project",
+    type=str,
+    default=None,
+    help="""
+    Filter by project ID.
+
+    \b
+    EXAMPLE
+        --project "$(backend.ai admin project list | grep 'example-project-name' | awk '{print $1}')"
+    """,
+)
+@click.option(
     "-g",
     "--group",
     type=str,
     default=None,
-    help="""
-    Filter by group ID.
-
-    \b
-    EXAMPLE
-        --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
-    """,
+    help="Filter by project ID. This option is deprecated, use `--project` option instead.",
 )
 @click.option(
     "--filter",
@@ -129,7 +136,7 @@ def info(ctx: CLIContext, email: str) -> None:
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
+def list(ctx: CLIContext, status, project, group, filter_, order, offset, limit) -> None:
     """
     List users.
     (admin privilege required)
@@ -145,16 +152,24 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["status_info"],
         user_fields["created_at"],
         user_fields["domain_name"],
-        user_fields["groups"],
+        user_fields["projects"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
         user_fields["main_access_key"],
     ]
+    if group:
+        print_warn("`--group` option is deprecated. Use `--project` option instead.")
+        if not project:
+            project = group
+        else:
+            print_fail("Cannot use `--project` and `--group` options simultaneously.")
+            sys.exit(ExitCode.FAILURE)
+
     try:
         with Session() as session:
             fetch_func = lambda pg_offset, pg_size: session.User.paginated_list(
                 status,
-                group,
+                project,
                 fields=fields,
                 page_offset=pg_offset,
                 page_size=pg_size,

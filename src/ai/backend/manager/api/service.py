@@ -49,7 +49,6 @@ from ..models import (
     RoutingRow,
     UserRow,
     query_accessible_vfolders,
-    resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
@@ -278,8 +277,10 @@ class NewServiceRequestModel(BaseModel):
         description="Image architecture",
         default=DEFAULT_IMAGE_ARCH,
     )
-    group: str = Field(
-        validation_alias=AliasChoices("group", "groupName", "group_name"),
+    project: str = Field(
+        validation_alias=AliasChoices(
+            "project", "projectName", "project_name", "group", "groupName", "group_name"
+        ),
         description="Name of project to spawn session",
         default="default",
     )
@@ -345,7 +346,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
             SessionTypes.INFERENCE,
             owner_access_key,
             params.domain,
-            params.group,
+            params.project,
         )
 
         query = (
@@ -365,7 +366,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
 
         params.config.scaling_group = checked_scaling_group
 
-        owner_uuid, group_id, resource_policy = await query_userinfo(
+        owner_uuid, project_id, resource_policy = await query_userinfo(
             request, params.model_dump(), conn
         )
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -477,7 +478,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
         params.architecture,
         UserScope(
             domain_name=params.domain,
-            group_id=group_id,
+            project_id=project_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),
@@ -505,11 +506,6 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
         if service_with_duplicate_name is not None:
             raise InvalidAPIParameters("Cannot create multiple services with same name")
 
-        project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params.domain, params.group
-        )
-        if project_id is None:
-            raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
             params.service_name,
             request["user"]["uuid"],

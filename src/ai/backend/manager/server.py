@@ -168,7 +168,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".image",
     ".userconfig",
     ".domainconfig",
-    ".groupconfig",
+    ".projectconfig",
     ".logs",
 ]
 

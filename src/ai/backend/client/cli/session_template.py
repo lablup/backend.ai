@@ -7,7 +7,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..session import Session
-from .pretty import print_error, print_info, print_warn
+from .pretty import print_error, print_fail, print_info, print_warn
 
 
 @main.group(aliases=["sesstpl"])
@@ -35,13 +35,24 @@ def session_template():
     ),
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP_NAME",
+    "-j",
+    "--project",
+    metavar="PROJECT_NAME",
     default=None,
     help=(
-        "Group name where the session is spawned. "
-        "User should be a member of the group to execute the code."
+        "Project name where the session is spawned. "
+        "User should be a member of the project to execute the code."
+    ),
+)
+@click.option(
+    "-g",
+    "--group",
+    metavar="PROJECT_NAME",
+    default=None,
+    help=(
+        "Project name where the session is spawned. "
+        "User should be a member of the project to execute the code. "
+        "This option is deprecated, use `--project` option instead."
     ),
 )
 @click.option(
@@ -52,11 +63,18 @@ def session_template():
     metavar="ACCESS_KEY",
     help="Set the owner of the target session explicitly.",
 )
-def create(template_path, domain, group, owner_access_key):
+def create(template_path, domain, project, group, owner_access_key):
     """
     Store task template to Backend.AI Manager and return template ID.
     Template can be used when creating new session.
     """
+    if group:
+        print_warn("`--group` option is deprecated. Use `--project` option instead.")
+        if not project:
+            project = group
+        else:
+            print_fail("Cannot use `--project` and `--group` options simultaneously.")
+            sys.exit(ExitCode.FAILURE)
 
     if template_path:
         with open(template_path, "r") as fr:
@@ -69,7 +87,7 @@ def create(template_path, domain, group, owner_access_key):
         try:
             # TODO: Make user select template type when cluster template is implemented
             template = session.SessionTemplate.create(
-                body, domain_name=domain, group_name=group, owner_access_key=owner_access_key
+                body, domain_name=domain, project_name=project, owner_access_key=owner_access_key
             )
             print_info(f"Task template {template.template_id} created and ready")
         except Exception as e:
@@ -126,7 +144,7 @@ def list(list_all):
         ("Owner", "is_owner"),
         ("Type", "type"),
         ("User", "user"),
-        ("Group", "group"),
+        ("Project", "project"),
     ]
     with Session() as session:
         try:

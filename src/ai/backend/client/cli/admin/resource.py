@@ -74,19 +74,19 @@ def recalculate_usage() -> None:
 
 @resource.command()
 @click.argument("month", metavar="MONTH")
-@click.argument("groups", metavar="GROUP_IDS", nargs=-1)
-def usage_per_month(month: str, groups: Sequence[str]) -> None:
+@click.argument("projects", metavar="PROJECT_IDS", nargs=-1)
+def usage_per_month(month: str, projects: Sequence[str]) -> None:
     """
-    Get session usage stats of target groups for specific month.
+    Get session usage stats of target projects for specific month.
 
     \b
     MONTH: Target month to get usage (yyyymm).
-    GROUP_IDS: IDs of target groups to get usage (UUID).
+    PROJECT_IDS: IDs of target projects to get usage (UUID).
     """
     with Session() as session:
-        ret = session.Resource.usage_per_month(month, list(groups))
+        ret = session.Resource.usage_per_month(month, list(projects))
         for item in ret:
-            print("Group:", item["g_name"] + " (" + item["g_id"] + ")")
+            print("Project:", item["g_name"] + " (" + item["g_id"] + ")")
             print("  Domain:", item["domain_name"])
             print(
                 "  Total Allocated:",
@@ -135,14 +135,14 @@ def usage_per_month(month: str, groups: Sequence[str]) -> None:
 
 
 @resource.command()
-@click.argument("group")
+@click.argument("proejct")
 @click.argument("start_date")
 @click.argument("end_date")
-def usage_per_period(group: str, start_date: str, end_date: str) -> None:
+def usage_per_period(project: str, start_date: str, end_date: str) -> None:
     with Session() as session:
-        item = session.Resource.usage_per_period(group, start_date, end_date)
+        item = session.Resource.usage_per_period(project, start_date, end_date)
         if "g_id" in item:
-            print("Group:", item["g_name"] + " (" + item["g_id"] + ")")
+            print("Project:", item["g_name"] + " (" + item["g_id"] + ")")
             print("  Domain:", item["domain_name"])
             print(
                 "  Total Allocated:",

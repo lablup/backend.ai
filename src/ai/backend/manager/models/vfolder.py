@@ -64,9 +64,9 @@ from .gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
-from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .project import ProjectRow, ProjectType
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -96,7 +96,7 @@ __all__: Sequence[str] = (
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
     "initiate_vfolder_purge",
-    "get_allowed_vfolder_hosts_by_group",
+    "get_allowed_vfolder_hosts_by_project",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
@@ -115,7 +115,7 @@ class VFolderOwnershipType(str, enum.Enum):
     """
 
     USER = "user"
-    GROUP = "group"
+    PROJECT = "project"
 
 
 class VFolderPermission(str, enum.Enum):
@@ -235,7 +235,9 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column(
+        "project_id", GUID, sa.ForeignKey("projects.id"), nullable=True
+    ),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -254,12 +256,13 @@ vfolders = sa.Table(
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
+        "(ownership_type = 'project' AND \"project_id\" IS NOT NULL)",
+        name="ownership_type_match_with_user_or_project",
     ),
     sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
+        '("user" IS NULL AND "project_id" IS NOT NULL) OR ("user" IS NOT NULL AND "project_id"'
+        " IS NULL)",
+        name="either_one_of_user_or_project",
     ),
 )
 
@@ -357,10 +360,10 @@ async def query_accessible_vfolders(
     extra_vf_conds=None,
     extra_invited_vf_conds=None,
     extra_vf_user_conds=None,
-    extra_vf_group_conds=None,
+    extra_vf_project_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-    from ai.backend.manager.models import groups, users
+    from ai.backend.manager.models import association_projects_users as apus
+    from ai.backend.manager.models import projects, users
 
     if allowed_vfolder_types is None:
         allowed_vfolder_types = ["user"]  # legacy default
@@ -377,7 +380,7 @@ async def query_accessible_vfolders(
         vfolders.c.max_size,
         vfolders.c.ownership_type,
         vfolders.c.user,
-        vfolders.c.group,
+        vfolders.c.project_id,
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
@@ -412,10 +415,14 @@ async def query_accessible_vfolders(
                 "max_files": row.vfolders_max_files,
                 "ownership_type": row.vfolders_ownership_type,
                 "user": str(row.vfolders_user) if row.vfolders_user else None,
-                "group": str(row.vfolders_group) if row.vfolders_group else None,
+                "group": str(row.vfolders_project_id)
+                if row.vfolders_project_id
+                else None,  # legacy
+                "project_id": str(row.vfolders_project_id) if row.vfolders_project_id else None,
                 "creator": row.vfolders_creator,
                 "user_email": row.users_email if "users_email" in row_keys else None,
-                "group_name": row.groups_name if "groups_name" in row_keys else None,
+                "group_name": row.projects_name if "projects_name" in row_keys else None,  # legacy
+                "project_name": row.projects_name if "projects_name" in row_keys else None,
                 "is_owner": _is_owner,
                 "permission": _perm,
                 "unmanaged_path": row.vfolders_unmanaged_path,
@@ -463,37 +470,37 @@ async def query_accessible_vfolders(
             query = query.where(extra_invited_vf_conds)
         await _append_entries(query, _is_owner=False)
 
-    if "group" in allowed_vfolder_types:
-        # Scan group vfolders.
+    if "project" in allowed_vfolder_types:
+        # Scan project vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.domain_name == domain_name)
             )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.id for g in grps]
+            project_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            j = sa.join(apus, users, apus.c.user_id == users.c.uuid)
+            query = sa.select([apus.c.project_id]).select_from(j).where(apus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.group_id for g in grps]
-        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+            project_ids = [g.project_id for g in grps]
+        j = vfolders.join(projects, vfolders.c.project_id == projects.c.id)
         query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
+            vfolders_selectors + [vfolders.c.permission, projects.c.name], use_labels=True
         ).select_from(j)
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
-            query = query.where(vfolders.c.group.in_(group_ids))
-        if extra_vf_group_conds is not None:
-            query = query.where(extra_vf_group_conds)
+            query = query.where(vfolders.c.project_id.in_(project_ids))
+        if extra_vf_project_conds is not None:
+            query = query.where(extra_vf_project_conds)
         is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
         await _append_entries(query, is_owner)
 
-        # Override permissions, if exists, for group vfolders.
+        # Override permissions, if exists, for project vfolders.
         j = sa.join(
             vfolders,
             vfolder_permissions,
@@ -503,7 +510,7 @@ async def query_accessible_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+                (vfolders.c.project.in_(project_ids)) & (vfolder_permissions.c.user == user_uuid),
             )
         )
         if extra_vf_conds is not None:
@@ -515,27 +522,27 @@ async def query_accessible_vfolders(
         for entry in entries:
             if (
                 entry["id"] in overriding_permissions
-                and entry["ownership_type"] == VFolderOwnershipType.GROUP
+                and entry["ownership_type"] == VFolderOwnershipType.PROJECT
             ):
                 entry["permission"] = overriding_permissions[entry["id"]]
 
     return entries
 
 
-async def get_allowed_vfolder_hosts_by_group(
+async def get_allowed_vfolder_hosts_by_project(
     conn: SAConnection,
     resource_policy,
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    project_id: Optional[uuid.UUID] = None,
     domain_admin: bool = False,
 ) -> VFolderHostPermissionMap:
     """
-    Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
+    Union `allowed_vfolder_hosts` from domain, project, and keypair_resource_policy.
 
-    If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
-    If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
+    If `project_id` is not None, `allowed_vfolder_hosts` from the project is also merged.
+    If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain projects.
     """
-    from . import domains, groups
+    from . import domains, projects
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -545,17 +552,17 @@ async def get_allowed_vfolder_hosts_by_group(
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
     # Group's allowed_vfolder_hosts.
-    if group_id is not None:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
-            (groups.c.domain_name == domain_name)
-            & (groups.c.id == group_id)
-            & (groups.c.is_active),
+    if project_id is not None:
+        query = sa.select([projects.c.allowed_vfolder_hosts]).where(
+            (projects.c.domain_name == domain_name)
+            & (projects.c.id == project_id)
+            & (projects.c.is_active),
         )
         if values := await conn.scalar(query):
             allowed_hosts = allowed_hosts | values
     elif domain_admin:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
+        query = sa.select([projects.c.allowed_vfolder_hosts]).where(
+            (projects.c.domain_name == domain_name) & (projects.c.is_active),
         )
         if rows := (await conn.execute(query)).fetchall():
             for row in rows:
@@ -570,14 +577,14 @@ async def get_allowed_vfolder_hosts_by_user(
     resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
-    group_id: Optional[uuid.UUID] = None,
+    project_id: Optional[uuid.UUID] = None,
 ) -> VFolderHostPermissionMap:
     """
-    Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
+    Union `allowed_vfolder_hosts` from domain, projects, and keypair_resource_policy.
 
-    All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
+    All available `allowed_vfolder_hosts` of projects which requester associated will be merged.
     """
-    from . import association_groups_users, domains, groups
+    from . import association_projects_users, domains, projects
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -587,28 +594,28 @@ async def get_allowed_vfolder_hosts_by_user(
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
     # User's Groups' allowed_vfolder_hosts.
-    if group_id is not None:
-        j = groups.join(
-            association_groups_users,
+    if project_id is not None:
+        j = projects.join(
+            association_projects_users,
             (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (groups.c.id == group_id)
-                & (association_groups_users.c.user_id == user_uuid)
+                (projects.c.id == association_projects_users.c.project_id)
+                & (projects.c.id == project_id)
+                & (association_projects_users.c.user_id == user_uuid)
             ),
         )
     else:
-        j = groups.join(
-            association_groups_users,
+        j = projects.join(
+            association_projects_users,
             (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (association_groups_users.c.user_id == user_uuid)
+                (projects.c.id == association_projects_users.c.project_id)
+                & (association_projects_users.c.user_id == user_uuid)
             ),
         )
     query = (
-        sa.select([groups.c.allowed_vfolder_hosts])
+        sa.select([projects.c.allowed_vfolder_hosts])
         .select_from(j)
         .where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
+            (projects.c.domain_name == domain_name) & (projects.c.is_active),
         )
     )
     if rows := (await conn.execute(query)).fetchall():
@@ -725,10 +732,12 @@ async def prepare_vfolder_mounts(
             user_uuid=user_scope.user_uuid,
             resource_policy=resource_policy,
             domain_name=user_scope.domain_name,
-            group_id=user_scope.group_id,
+            project_id=user_scope.project_id,
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
-        if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
+        if vfolder["project_id"] is not None and vfolder["project_id"] != str(
+            user_scope.project_id
+        ):
             # User's accessible group vfolders should not be mounted
             # if they do not belong to the execution kernel.
             continue
@@ -744,7 +753,7 @@ async def prepare_vfolder_mounts(
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
             requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
-        if vfolder["name"] == ".local" and vfolder["group"] is not None:
+        if vfolder["name"] == ".local" and vfolder["project_id"] is not None:
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
                 vfolder["host"],
@@ -853,7 +862,7 @@ async def ensure_host_permission_allowed(
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    project_id: Optional[uuid.UUID] = None,
 ) -> None:
     allowed_hosts = await filter_host_allowed_permission(
         db_conn,
@@ -861,7 +870,7 @@ async def ensure_host_permission_allowed(
         user_uuid=user_uuid,
         resource_policy=resource_policy,
         domain_name=domain_name,
-        group_id=group_id,
+        project_id=project_id,
     )
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
         raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
@@ -874,7 +883,7 @@ async def filter_host_allowed_permission(
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    project_id: Optional[uuid.UUID] = None,
 ) -> VFolderHostPermissionMap:
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
@@ -882,11 +891,13 @@ async def filter_host_allowed_permission(
             db_conn, resource_policy, domain_name, user_uuid
         )
         allowed_hosts = allowed_hosts | allowed_hosts_by_user
-    if "group" in allowed_vfolder_types and group_id is not None:
-        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-            db_conn, resource_policy, domain_name, group_id
+    if (
+        "group" in allowed_vfolder_types or "project" in allowed_vfolder_types
+    ) and project_id is not None:
+        allowed_hosts_by_project = await get_allowed_vfolder_hosts_by_project(
+            db_conn, resource_policy, domain_name, project_id
         )
-        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+        allowed_hosts = allowed_hosts | allowed_hosts_by_project
     return allowed_hosts
 
 
@@ -933,7 +944,7 @@ async def initiate_vfolder_clone(
                     "creator": vfolder_info.email,
                     "ownership_type": VFolderOwnershipType("user"),
                     "user": vfolder_info.user_id,
-                    "group": None,
+                    "project": None,
                     "unmanaged_path": "",
                     "cloneable": vfolder_info.cloneable,
                     "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
@@ -1048,8 +1059,8 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
-    from ai.backend.manager.models import association_groups_users as agus
+    from ai.backend.manager.models import ProjectRow, UserRow
+    from ai.backend.manager.models import association_projects_users as apus
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
@@ -1066,26 +1077,27 @@ async def ensure_quota_scope_accessible_by_user(
                     return
         raise InvalidAPIParameters
 
-    # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group = await conn.scalar(query)
-    if quota_scope_group:
+    # Lookup project table to match if quota is scoped to the project
+    query = sa.select(ProjectRow).where(ProjectRow.id == quota_scope.scope_id)
+    quota_scope_project = await conn.scalar(query)
+    if quota_scope_project:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_group.domain == user["domain"]:
+                if quota_scope_project.domain == user["domain"]:
                     return
             case _:
                 query = (
-                    sa.select([agus.c.group_id])
-                    .select_from(agus)
+                    sa.select([apus.c.project_id])
+                    .select_from(apus)
                     .where(
-                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
+                        (apus.c.project_id == quota_scope.scope_id)
+                        & (apus.c.user_id == user["uuid"])
                     )
                 )
-                matched_group_id = await conn.scalar(query)
-                if matched_group_id:
+                matched_project_id = await conn.scalar(query)
+                if matched_project_id:
                     return
 
     raise InvalidAPIParameters
@@ -1098,11 +1110,21 @@ class VirtualFolder(graphene.ObjectType):
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
-    user = graphene.UUID()  # User.id (current owner, null in project vfolders)
-    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
-    group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
-    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
-    creator = graphene.String()  # User.email (always set)
+    user = graphene.UUID(description="id of owner user. Should be null for project vfolders")
+    user_email = graphene.String(
+        description="email of owner user. Should be null for project vfolders"
+    )
+    project_id = graphene.UUID(description="id of owner project. Should be null for user vfolders")
+    project_name = graphene.String(
+        description="name of owner project. Should be null for user vfolders"
+    )
+    group = graphene.UUID(
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `project_id`"
+    )
+    group_name = graphene.String(
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `project_name`"
+    )
+    creator = graphene.String(description="Creator's email. Not nullable")
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
     permission = graphene.String()
@@ -1136,8 +1158,10 @@ class VirtualFolder(graphene.ObjectType):
             name=row["name"],
             user=row["user"],
             user_email=_get_field("users_email"),
-            group=row["group"],
-            group_name=_get_field("groups_name"),
+            project_id=_get_field("projects_id"),
+            project_name=_get_field("projects_name"),
+            group=_get_field("projects_id"),  # legacy
+            group_name=_get_field("projects_name"),  # legacy
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
@@ -1162,8 +1186,8 @@ class VirtualFolder(graphene.ObjectType):
         "host": ("vfolders_host", None),
         "quota_scope_id": ("vfolders_quota_scope_id", None),
         "name": ("vfolders_name", None),
-        "group": ("vfolders_group", uuid.UUID),
-        "group_name": ("groups_name", None),
+        "project_id": ("vfolders_project_id", uuid.UUID),
+        "project_name": ("projects_name", None),
         "user": ("vfolders_user", uuid.UUID),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
@@ -1196,8 +1220,8 @@ class VirtualFolder(graphene.ObjectType):
         "host": ("vfolders_host", None),
         "quota_scope_id": ("vfolders_quota_scope_id", None),
         "name": ("vfolders_name", None),
-        "group": ("vfolders_group", None),
-        "group_name": ("groups_name", None),
+        "project_id": ("vfolders_project_id", None),
+        "project_name": ("project_name", None),
         "user": ("vfolders_user", None),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
@@ -1219,21 +1243,21 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from .group import groups
+        from .project import projects
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
-            groups, vfolders.c.group == groups.c.id, isouter=True
+            projects, vfolders.c.project_id == projects.c.id, isouter=True
         )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(vfolders.c.group == group_id)
+        if project_id is not None:
+            query = query.where(vfolders.c.project_id == project_id)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -1251,27 +1275,27 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
     ) -> Sequence[VirtualFolder]:
-        from .group import groups
+        from .project import projects
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
-            groups, vfolders.c.group == groups.c.id, isouter=True
+            projects, vfolders.c.project_id == projects.c.id, isouter=True
         )
         query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            sa.select([vfolders, users.c.email, projects.c.name.label("projects_name")])
             .select_from(j)
             .limit(limit)
             .offset(offset)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(vfolders.c.group == group_id)
+        if project_id is not None:
+            query = query.where(vfolders.c.project_id == project_id)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -1296,7 +1320,7 @@ class VirtualFolder(graphene.ObjectType):
         ids: list[str],
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID | None = None,
+        project_id: uuid.UUID | None = None,
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
@@ -1313,8 +1337,8 @@ class VirtualFolder(graphene.ObjectType):
             query = query.where(VFolderRow.user == user_id)
             if domain_name is not None:
                 query = query.where(UserRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(VFolderRow.group == group_id)
+        if project_id is not None:
+            query = query.where(VFolderRow.project_id == project_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1335,11 +1359,11 @@ class VirtualFolder(graphene.ObjectType):
         user_uuids: Sequence[uuid.UUID],
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from .user import users
 
-        # TODO: num_attached count group-by
+        # TODO: num_attached count project-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
         query = (
             sa.select([vfolders])
@@ -1349,8 +1373,8 @@ class VirtualFolder(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(vfolders.c.group == group_id)
+        if project_id is not None:
+            query = query.where(vfolders.c.project_id == project_id)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
@@ -1367,7 +1391,7 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
@@ -1405,7 +1429,7 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
@@ -1452,26 +1476,30 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from ai.backend.manager.models import association_groups_users as agus
+        from ai.backend.manager.models import association_projects_users as apus
 
-        from .group import groups
+        from .project import projects
 
-        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+        query = sa.select([apus.c.project_id]).select_from(apus).where(apus.c.user_id == user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
 
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
-        j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
-        query = sa.select([sa.func.count()]).select_from(j).where(vfolders.c.group.in_(group_ids))
+        project_rows = result.fetchall()
+        project_ids = [project_row.project_id for project_row in project_rows]
+        j = sa.join(vfolders, projects, vfolders.c.project_id == projects.c.id)
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(j)
+            .where(vfolders.c.project_id.in_(project_ids))
+        )
 
         if domain_name is not None:
-            query = query.where(groups.c.domain_name == domain_name)
+            query = query.where(projects.c.domain_name == domain_name)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1487,33 +1515,33 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models import association_groups_users as agus
+        from ai.backend.manager.models import association_projects_users as apus
 
-        from .group import groups
+        from .project import projects
 
-        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+        query = sa.select([apus.c.project_id]).select_from(apus).where(apus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
-        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+        project_rows = result.fetchall()
+        project_ids = [project_row.project_id for project_row in project_rows]
+        j = vfolders.join(projects, vfolders.c.project_id == projects.c.id)
         query = (
             sa.select([
                 vfolders,
-                groups.c.name.label("groups_name"),
+                projects.c.name.label("projects_name"),
             ])
             .select_from(j)
-            .where(vfolders.c.group.in_(group_ids))
+            .where(vfolders.c.project_id.in_(project_ids))
             .limit(limit)
             .offset(offset)
         )
         if domain_name is not None:
-            query = query.where(groups.c.domain_name == domain_name)
+            query = query.where(projects.c.domain_name == domain_name)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1671,7 +1699,7 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
+        from ai.backend.manager.models import ProjectRow, UserRow
 
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
@@ -1705,9 +1733,9 @@ class QuotaScope(graphene.ObjectType):
                     )
                 else:
                     query = (
-                        sa.select(GroupRow)
-                        .where(GroupRow.id == qsid.scope_id)
-                        .options(selectinload(GroupRow.resource_policy_row))
+                        sa.select(ProjectRow)
+                        .where(ProjectRow.id == qsid.scope_id)
+                        .options(selectinload(ProjectRow.resource_policy_row))
                     )
                 result = await sess.scalar(query)
                 resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
@@ -2058,9 +2086,9 @@ class ModelCard(graphene.ObjectType):
             model_store_project_gids = (
                 (
                     await db_session.execute(
-                        sa.select([GroupRow.id]).where(
-                            (GroupRow.type == ProjectType.MODEL_STORE)
-                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
+                        sa.select([ProjectRow.id]).where(
+                            (ProjectRow.type == ProjectType.MODEL_STORE)
+                            & (ProjectRow.domain_name == graph_ctx.user["domain_name"])
                         )
                     )
                 )
@@ -2068,7 +2096,7 @@ class ModelCard(graphene.ObjectType):
                 .all()
             )
         additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
-            VFolderRow.group.in_(model_store_project_gids)
+            VFolderRow.project_id.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
         cnt_query = cnt_query.where(additional_cond)

@@ -33,7 +33,7 @@ _default_list_fields = (
     user_fields["is_active"],
     user_fields["created_at"],
     user_fields["domain_name"],
-    user_fields["groups"],
+    user_fields["projects"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
     user_fields["sudo_session_enabled"],
@@ -50,7 +50,7 @@ _default_detail_fields = (
     user_fields["created_at"],
     user_fields["domain_name"],
     user_fields["role"],
-    user_fields["groups"],
+    user_fields["projects"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
     user_fields["sudo_session_enabled"],
@@ -125,7 +125,7 @@ class User(BaseFunction):
     async def list(
         cls,
         status: str | None = None,
-        group: str | None = None,
+        project: str | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
     ) -> Sequence[dict]:
         """
@@ -133,20 +133,20 @@ class User(BaseFunction):
 
         :param status: Fetches users in a specific status
                        (active, inactive, deleted, before-verification).
-        :param group: Fetch users in a specific group.
+        :param project: Fetch users in a specific project.
         :param fields: Additional per-user query fields to fetch.
         """
         query = textwrap.dedent(
             """\
-            query($status: String, $group: UUID) {
-                users(status: $status, group_id: $group) {$fields}
+            query($status: String, $project: UUID) {
+                users(status: $status, project_id: $project) {$fields}
             }
         """
         )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "status": status,
-            "group": group,
+            "project": project,
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["users"]
@@ -156,7 +156,7 @@ class User(BaseFunction):
     async def paginated_list(
         cls,
         status: str | None = None,
-        group: str | None = None,
+        project: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
@@ -169,14 +169,14 @@ class User(BaseFunction):
 
         :param status: Fetches users in a specific status
                        (active, inactive, deleted, before-verification).
-        :param group: Fetch users in a specific group.
+        :param project: Fetch users in a specific project.
         :param fields: Additional per-user query fields to fetch.
         """
         return await fetch_paginated_result(
             "user_list",
             {
                 "status": (status, "String"),
-                "group_id": (group, "UUID"),
+                "project_id": (project, "UUID"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },
@@ -273,7 +273,7 @@ class User(BaseFunction):
         description: str = "",
         allowed_client_ip: Iterable[str] | Undefined = undefined,
         totp_activated: bool = False,
-        group_ids: Iterable[str] | Undefined = undefined,
+        project_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool = False,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
@@ -311,7 +311,7 @@ class User(BaseFunction):
         set_if_set(inputs, "username", username)
         set_if_set(inputs, "full_name", full_name)
         set_if_set(inputs, "allowed_client_ip", allowed_client_ip)
-        set_if_set(inputs, "group_ids", group_ids)
+        set_if_set(inputs, "project_ids", project_ids)
         variables = {
             "email": email,
             "input": inputs,
@@ -324,7 +324,6 @@ class User(BaseFunction):
     async def update(
         cls,
         email: str,
-        *,
         password: str | Undefined = undefined,
         username: str | Undefined = undefined,
         full_name: str | Undefined = undefined,
@@ -335,7 +334,7 @@ class User(BaseFunction):
         description: str | Undefined = undefined,
         allowed_client_ip: Iterable[str] | Undefined = undefined,
         totp_activated: bool | Undefined = undefined,
-        group_ids: Iterable[str] | Undefined = undefined,
+        project_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
         main_access_key: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
@@ -364,7 +363,7 @@ class User(BaseFunction):
         set_if_set(inputs, "description", description)
         set_if_set(inputs, "allowed_client_ip", allowed_client_ip)
         set_if_set(inputs, "totp_activated", totp_activated)
-        set_if_set(inputs, "group_ids", group_ids)
+        set_if_set(inputs, "project_ids", project_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
         set_if_set(inputs, "main_access_key", main_access_key)
         variables = {

@@ -51,9 +51,9 @@ from ai.backend.manager.config import load as load_config
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
-    GroupRow,
     KernelRow,
     ProjectResourcePolicyRow,
+    ProjectRow,
     ScalingGroupRow,
     SessionRow,
     UserResourcePolicyRow,
@@ -836,8 +836,8 @@ async def session_info(database_engine):
     user_password = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
-    group_id = str(uuid.uuid4()).replace("-", "")
-    group_name = str(uuid.uuid4()).split("-")[0]
+    project_id = str(uuid.uuid4()).replace("-", "")
+    project_name = str(uuid.uuid4()).split("-")[0]
     sgroup_name = str(uuid.uuid4()).split("-")[0]
     session_id = str(uuid.uuid4()).replace("-", "")
     session_creation_id = str(uuid.uuid4()).replace("-", "")
@@ -866,14 +866,14 @@ async def session_info(database_engine):
         )
         db_sess.add(project_resource_policy)
 
-        group = GroupRow(
-            id=group_id,
-            name=group_name,
+        project = ProjectRow(
+            id=project_id,
+            name=project_name,
             domain_name=domain_name,
             total_resource_slots={},
             resource_policy=resource_policy_name,
         )
-        db_sess.add(group)
+        db_sess.add(project)
 
         user = UserRow(
             uuid=user_uuid,
@@ -891,7 +891,7 @@ async def session_info(database_engine):
             cluster_size=1,
             domain_name=domain_name,
             scaling_group_name=sgroup_name,
-            group_id=group_id,
+            project_id=project_id,
             user_uuid=user_uuid,
             vfolder_mounts={},
         )
@@ -900,7 +900,7 @@ async def session_info(database_engine):
         kern = KernelRow(
             session_id=session_id,
             domain_name=domain_name,
-            group_id=group_id,
+            project_id=project_id,
             user_uuid=user_uuid,
             cluster_role=DEFAULT_ROLE,
             occupied_slots={},
@@ -918,7 +918,7 @@ async def session_info(database_engine):
         await db_sess.execute(sa.delete(KernelRow).where(KernelRow.session_id == session_id))
         await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
         await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
-        await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(sa.delete(ProjectRow).where(ProjectRow.id == project_id))
         await db_sess.execute(
             sa.delete(ProjectResourcePolicyRow).where(
                 ProjectResourcePolicyRow.name == resource_policy_name

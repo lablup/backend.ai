@@ -67,9 +67,9 @@ from ..models import (
     SessionRow,
     SessionStatus,
     UserRole,
-    groups,
     kernels,
     keypairs,
+    projects,
     query_accessible_vfolders,
     scaling_groups,
     session_templates,
@@ -218,7 +218,7 @@ overwritten_param_check = t.Dict({
     t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
     t.Key("image", default=None): t.Null | t.String,
     tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
-    t.Key("group", default=None): t.Null | t.String,
+    tx.AliasedKey(["project", "group"], default=None): t.Null | t.String,
     t.Key("domain", default=None): t.Null | t.String,
     t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
     t.Key("tag", default=None): t.Null | t.String,
@@ -270,7 +270,7 @@ async def query_userinfo(
             request["user"]["domain_name"],
             request["keypair"]["resource_policy"],
             params["domain"] or request["user"]["domain_name"],
-            params["group"],
+            params["project"],
             query_on_behalf_of=(
                 None if params["owner_access_key"] is undefined else params["owner_access_key"]
             ),
@@ -301,7 +301,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
 
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
@@ -312,7 +312,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params["architecture"],
             UserScope(
                 domain_name=domain_name,
-                group_id=group_id,
+                project_id=project_id,
                 user_uuid=request["user"]["uuid"],
                 user_role=request["user"]["role"],
             ),
@@ -360,9 +360,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 SessionTypes
             )
             | UndefChecker,
-            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default=undefined,
+            ): (UndefChecker | t.Null | t.String),
             tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
@@ -425,17 +426,17 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         template = template_info["template"]
         if not template:
             raise TaskTemplateNotFound
-        group_name = None
-        if template_info["domain_name"] and template_info["group_id"]:
+        project_name = None
+        if template_info["domain_name"] and template_info["project_id"]:
             query = (
-                sa.select([groups.c.name])
-                .select_from(groups)
+                sa.select([projects.c.name])
+                .select_from(projects)
                 .where(
-                    (groups.c.domain_name == template_info["domain_name"])
-                    & (groups.c.id == template_info["group_id"]),
+                    (projects.c.domain_name == template_info["domain_name"])
+                    & (projects.c.id == template_info["project_id"]),
                 )
             )
-            group_name = await conn.scalar(query)
+            project_name = await conn.scalar(query)
 
     if isinstance(template, str):
         template = json.loads(template)
@@ -447,8 +448,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     }
     if "domain_name" in template_info:
         param_from_template["domain"] = template_info["domain_name"]
-    if group_name:
-        param_from_template["group"] = group_name
+    if project_name:
+        param_from_template["project"] = project_name
     if template["spec"]["session_type"] == "interactive":
         param_from_template["session_type"] = SessionTypes.INTERACTIVE
     elif template["spec"]["session_type"] == "batch":
@@ -544,7 +545,10 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "session_type": tx.Enum(
             SessionTypes
         ),
-        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+        tx.AliasedKey(
+            ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+            default="default",
+        ): t.String,
         tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
         tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
         tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
@@ -623,7 +627,10 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "sess_type": tx.Enum(
             SessionTypes
         ),
-        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+        tx.AliasedKey(
+            ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+            default="default",
+        ): t.String,
         tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
         tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
         t.Key("tag", default=None): t.Null | t.String,
@@ -664,7 +671,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.debug("task template: {}", template)
         if not template:
             raise TaskTemplateNotFound
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
         sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
@@ -673,7 +680,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             params["session_name"],
             UserScope(
                 domain_name=domain_name,
-                group_id=group_id,
+                project_id=project_id,
                 user_uuid=request["user"]["uuid"],
                 user_role=request["user"]["role"],
             ),
@@ -1264,7 +1271,8 @@ async def get_info(request: web.Request) -> web.Response:
             )
         await root_ctx.registry.increment_session_usage(sess)
         resp["domainName"] = sess.domain_name
-        resp["groupId"] = str(sess.group_id)
+        resp["groupId"] = str(sess.project_id)  # legacy
+        resp["projectId"] = str(sess.project_id)
         resp["userId"] = str(sess.user_uuid)
         resp["lang"] = sess.main_kernel.image  # legacy
         resp["image"] = sess.main_kernel.image

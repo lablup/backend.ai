@@ -60,7 +60,7 @@ __all__: Sequence[str] = (
     "UserRow",
     "User",
     "UserList",
-    "UserGroup",
+    "UserProject",
     "UserRole",
     "UserInput",
     "ModifyUserInput",
@@ -170,7 +170,7 @@ class UserRow(Base):
 
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
-    groups = relationship("AssocGroupUserRow", back_populates="user")
+    projects = relationship("AssocProjectUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
 
@@ -184,12 +184,12 @@ class UserRow(Base):
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
 
-class UserGroup(graphene.ObjectType):
+class UserProject(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserGroup]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserProject]:
         if row is None:
             return None
         return cls(
@@ -200,14 +200,14 @@ class UserGroup(graphene.ObjectType):
     @classmethod
     async def batch_load_by_user_id(cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]):
         async with ctx.db.begin() as conn:
-            from .group import association_groups_users as agus
-            from .group import groups
+            from .project import association_projects_users as apus
+            from .project import projects
 
-            j = agus.join(groups, agus.c.group_id == groups.c.id)
+            j = apus.join(projects, apus.c.project_id == projects.c.id)
             query = (
-                sa.select([agus.c.user_id, groups.c.name, groups.c.id])
+                sa.select([apus.c.user_id, projects.c.name, projects.c.id])
                 .select_from(j)
-                .where(agus.c.user_id.in_(user_ids))
+                .where(apus.c.user_id.in_(user_ids))
             )
             return await batch_multiresult(
                 ctx,
@@ -249,15 +249,28 @@ class User(graphene.ObjectType):
         )
     )
 
-    groups = graphene.List(lambda: UserGroup)
+    groups = graphene.List(
+        lambda: UserProject,
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `projects`",
+    )  # legacy
+    projects = graphene.List(lambda: UserProject)
 
     async def resolve_groups(
         self,
         info: graphene.ResolveInfo,
-    ) -> Iterable[UserGroup]:
+    ) -> Iterable[UserProject]:
         ctx: GraphQueryContext = info.context
         manager = ctx.dataloader_manager
-        loader = manager.get_loader(ctx, "UserGroup.by_user_id")
+        loader = manager.get_loader(ctx, "UserProject.by_user_id")
+        return await loader.load(self.id)
+
+    async def resolve_projects(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[UserProject]:
+        ctx: GraphQueryContext = info.context
+        manager = ctx.dataloader_manager
+        loader = manager.get_loader(ctx, "UserProject.by_user_id")
         return await loader.load(self.id)
 
     @classmethod
@@ -295,7 +308,7 @@ class User(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: UUID = None,
+        project_id: UUID = None,
         is_active: bool = None,
         status: str = None,
         limit: int = None,
@@ -303,11 +316,11 @@ class User(graphene.ObjectType):
         """
         Load user's information. Group names associated with the user are also returned.
         """
-        if group_id is not None:
-            from .group import association_groups_users as agus
+        if project_id is not None:
+            from .project import association_projects_users as apus
 
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select([users]).select_from(j).where(agus.c.group_id == group_id)
+            j = users.join(apus, apus.c.user_id == users.c.uuid)
+            query = sa.select([users]).select_from(j).where(apus.c.project_id == project_id)
         else:
             query = sa.select([users]).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -372,16 +385,18 @@ class User(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: UUID = None,
+        project_id: UUID = None,
         is_active: bool = None,
         status: str = None,
         filter: str = None,
     ) -> int:
-        if group_id is not None:
-            from .group import association_groups_users as agus
+        if project_id is not None:
+            from .project import association_projects_users as apus
 
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select([sa.func.count()]).select_from(j).where(agus.c.group_id == group_id)
+            j = users.join(apus, apus.c.user_id == users.c.uuid)
+            query = (
+                sa.select([sa.func.count()]).select_from(j).where(apus.c.project_id == project_id)
+            )
         else:
             query = sa.select([sa.func.count()]).select_from(users)
         if domain_name is not None:
@@ -392,7 +407,7 @@ class User(graphene.ObjectType):
             _statuses = ACTIVE_USER_STATUSES if is_active else INACTIVE_USER_STATUSES
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
-            if group_id is not None:
+            if project_id is not None:
                 qfparser = QueryFilterParser({
                     k: ("users_" + v[0], v[1])
                     for k, v in cls._queryfilter_fieldspec.items()
@@ -413,20 +428,20 @@ class User(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: UUID = None,
+        project_id: UUID = None,
         is_active: bool = None,
         status: str = None,
         filter: str = None,
         order: str = None,
     ) -> Sequence[User]:
-        if group_id is not None:
-            from .group import association_groups_users as agus
+        if project_id is not None:
+            from .project import association_projects_users as apus
 
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
+            j = users.join(apus, apus.c.user_id == users.c.uuid)
             query = (
                 sa.select([users])
                 .select_from(j)
-                .where(agus.c.group_id == group_id)
+                .where(apus.c.project_id == project_id)
                 .limit(limit)
                 .offset(offset)
             )
@@ -440,7 +455,7 @@ class User(graphene.ObjectType):
             _statuses = ACTIVE_USER_STATUSES if is_active else INACTIVE_USER_STATUSES
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
-            if group_id is not None:
+            if project_id is not None:
                 qfparser = QueryFilterParser({
                     k: ("users_" + v[0], v[1])
                     for k, v in cls._queryfilter_fieldspec.items()
@@ -450,7 +465,7 @@ class User(graphene.ObjectType):
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         if order is not None:
-            if group_id is not None:
+            if project_id is not None:
                 qoparser = QueryOrderParser({
                     k: ("users_" + v[0], v[1])
                     for k, v in cls._queryorder_colmap.items()
@@ -544,7 +559,14 @@ class UserInput(graphene.InputObjectType):
     status = graphene.String(required=False, default_value=UserStatus.ACTIVE)
     domain_name = graphene.String(required=True, default_value="default")
     role = graphene.String(required=False, default_value=UserRole.USER)
-    group_ids = graphene.List(lambda: graphene.String, required=False)
+    group_ids = graphene.List(
+        lambda: graphene.String,
+        required=False,
+        deprecation_reason="Deprecated since 24.03.01; Recommend to use `project_id`",
+    )
+    project_ids = graphene.List(
+        lambda: graphene.String, required=False, description="Added in 24.03.01"
+    )
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False, default_value=None)
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
@@ -600,7 +622,7 @@ class CreateUser(graphene.Mutation):
             _status = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
         else:
             _status = UserStatus(props.status)
-        group_ids = [] if props.group_ids is Undefined else props.group_ids
+        project_ids = [] if props.project_ids is Undefined else props.project_ids
 
         user_data = {
             "username": username,
@@ -621,7 +643,7 @@ class CreateUser(graphene.Mutation):
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from .group import ProjectType, association_groups_users, groups
+            from .project import ProjectType, association_projects_users, projects
 
             if result.rowcount == 0:
                 return
@@ -654,27 +676,29 @@ class CreateUser(graphene.Mutation):
             )
             await conn.execute(update_query)
 
-            model_store_query = sa.select([groups.c.id]).where(
-                groups.c.type == ProjectType.MODEL_STORE
+            model_store_query = sa.select([projects.c.id]).where(
+                projects.c.type == ProjectType.MODEL_STORE
             )
             model_store_gid = (await conn.execute(model_store_query)).first()["id"]
-            gids_to_join = [*group_ids, model_store_gid]
+            pids_to_join = [*project_ids, model_store_gid]
 
-            # Add user to groups if group_ids parameter is provided.
-            if gids_to_join:
+            # Add user to project if project_ids parameter is provided.
+            if pids_to_join:
                 query = (
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == props.domain_name)
-                    .where(groups.c.id.in_(gids_to_join))
+                    sa.select([projects.c.id])
+                    .select_from(projects)
+                    .where(projects.c.domain_name == props.domain_name)
+                    .where(projects.c.id.in_(pids_to_join))
                 )
-                grps = (await conn.execute(query)).all()
-                if grps:
-                    group_data = [
-                        {"user_id": created_user.uuid, "group_id": grp.id} for grp in grps
+                prjs = (await conn.execute(query)).all()
+                if prjs:
+                    project_data = [
+                        {"user_id": created_user.uuid, "project_id": prj.id} for prj in prjs
                     ]
-                    group_insert_query = sa.insert(association_groups_users).values(group_data)
-                    await conn.execute(group_insert_query)
+                    project_insert_query = sa.insert(association_projects_users).values(
+                        project_data
+                    )
+                    await conn.execute(project_insert_query)
 
             return created_user
 
@@ -843,38 +867,38 @@ class ModifyUser(graphene.Mutation):
                             kp_updates,
                         )
 
-            # If domain is changed and no group is associated, clear previous domain's group.
+            # If domain is changed and no project is associated, clear previous domain's project.
             if prev_domain_name != updated_user.domain_name and not props.group_ids:
-                from .group import association_groups_users, groups
+                from .project import association_projects_users, projects
 
                 await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
+                    sa.delete(association_projects_users).where(
+                        association_projects_users.c.user_id == updated_user.uuid
                     ),
                 )
 
-            # Update user's group if group_ids parameter is provided.
+            # Update user's project if project_ids parameter is provided.
             if props.group_ids and updated_user is not None:
-                from .group import association_groups_users, groups  # noqa
+                from .project import association_projects_users, projects  # noqa
 
-                # Clear previous groups associated with the user.
+                # Clear previous projects associated with the user.
                 await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
+                    sa.delete(association_projects_users).where(
+                        association_projects_users.c.user_id == updated_user.uuid
                     ),
                 )
-                # Add user to new groups.
+                # Add user to new projects.
                 result = await conn.execute(
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(props.group_ids)),
+                    sa.select([projects.c.id])
+                    .select_from(projects)
+                    .where(projects.c.domain_name == updated_user.domain_name)
+                    .where(projects.c.id.in_(props.group_ids)),
                 )
                 grps = result.fetchall()
                 if grps:
-                    values = [{"user_id": updated_user.uuid, "group_id": grp.id} for grp in grps]
+                    values = [{"user_id": updated_user.uuid, "project_id": grp.id} for grp in grps]
                     await conn.execute(
-                        sa.insert(association_groups_users).values(values),
+                        sa.insert(association_projects_users).values(values),
                     )
 
             return updated_user

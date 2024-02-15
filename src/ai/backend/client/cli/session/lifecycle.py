@@ -145,6 +145,7 @@ def _create_cmd(docs: str = None):
         assign_agent: str | None,
         # resource grouping
         domain: str | None,  # click_start_option
+        project: str | None,  # click_start_option
         group: str | None,  # click_start_option
     ) -> None:
         """
@@ -164,6 +165,13 @@ def _create_cmd(docs: str = None):
         else:
             name = name
 
+        if group:
+            print_warn("`--group` option is deprecated. Use `--project` option instead.")
+            if not project:
+                project = group
+            else:
+                print_fail("Cannot use `--project` and `--group` options simultaneously.")
+                sys.exit(ExitCode.FAILURE)
         ######
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
@@ -194,7 +202,7 @@ def _create_cmd(docs: str = None):
                     resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     bootstrap_script=(
                         bootstrap_script.read() if bootstrap_script is not None else None
@@ -371,7 +379,7 @@ def _create_from_template_cmd(docs: str = None):
         resource_opts: Sequence[str],  # click_start_option
         # resource grouping
         domain: str | None,  # click_start_option
-        group: str | None,  # click_start_option
+        project: str | None,  # click_start_option
         # template overrides
         no_mount: bool,
         no_env: bool,
@@ -425,7 +433,7 @@ def _create_from_template_cmd(docs: str = None):
                     resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     tag=tag,
                 )
@@ -1047,7 +1055,7 @@ def _fetch_session_names():
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],
-        session_fields["group_name"],
+        session_fields["project_name"],
         session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],

@@ -128,13 +128,24 @@ START_OPTION = [
         ),
     ),
     click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
+        "-j",
+        "--project",
+        metavar="PROJECT_NAME",
         default=None,
         help=(
-            "Group name where the session is spawned. "
-            "User should be a member of the group to execute the code."
+            "Project name where the session is spawned. "
+            "User should be a member of the project to execute the code."
+        ),
+    ),
+    click.option(
+        "-g",
+        "--group",
+        metavar="PROJECT_NAME",
+        default=None,
+        help=(
+            "Project name where the session is spawned. "
+            "User should be a member of the project to execute the code. "
+            "This option is deprecated, use `--project` option instead."
         ),
     ),
 ]

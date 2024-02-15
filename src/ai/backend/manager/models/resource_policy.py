@@ -124,7 +124,7 @@ project_resource_policies = sa.Table(
 
 class ProjectResourcePolicyRow(Base):
     __table__ = project_resource_policies
-    projects = relationship("GroupRow", back_populates="resource_policy_row")
+    projects = relationship("ProjectRow", back_populates="resource_policy_row")
 
     def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
         self.name = name
@@ -675,13 +675,13 @@ class ProjectResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from .group import GroupRow
+        from .project import ProjectRow
 
         query = (
-            sa.select(GroupRow)
-            .where((GroupRow.id.in_(project_uuids)))
-            .order_by(GroupRow.resource_policy)
-            .options(selectinload(GroupRow.resource_policy_row))
+            sa.select(ProjectRow)
+            .where((ProjectRow.id.in_(project_uuids)))
+            .order_by(ProjectRow.resource_policy)
+            .options(selectinload(ProjectRow.resource_policy_row))
         )
         async with ctx.db.begin_readonly_session() as sess:
             return [

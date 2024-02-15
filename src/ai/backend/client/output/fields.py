@@ -4,9 +4,9 @@ from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
     DependencyListFormatter,
-    GroupListFormatter,
     InlineRoutingFormatter,
     KernelStatFormatter,
+    ProjectListFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
     nested_dict_formatter,
@@ -73,7 +73,7 @@ domain_fields = FieldSet([
 ])
 
 
-group_fields = FieldSet([
+project_fields = FieldSet([
     FieldSpec("id"),
     FieldSpec("name"),
     FieldSpec("description"),
@@ -164,6 +164,8 @@ session_fields = FieldSet([
     FieldSpec("domain_name"),
     FieldSpec("group_name", "Project/Group"),
     FieldSpec("group_id"),
+    FieldSpec("project_name", "Project/Group"),
+    FieldSpec("project_id"),
     FieldSpec("agent_ids"),
     FieldSpec("user_email"),
     FieldSpec("user_id"),
@@ -248,7 +250,8 @@ user_fields = FieldSet([
     FieldSpec("modified_at"),
     FieldSpec("domain_name"),
     FieldSpec("role"),
-    FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+    FieldSpec("groups { id name }", formatter=ProjectListFormatter()),
+    FieldSpec("projects { id name }", formatter=ProjectListFormatter()),
     FieldSpec("allowed_client_ip"),
     FieldSpec("totp_activated"),
     FieldSpec("sudo_session_enabled"),
@@ -262,6 +265,7 @@ vfolder_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("user", alt_name="user_id"),
     FieldSpec("group", alt_name="group_id"),
+    FieldSpec("project", alt_name="project_id"),
     FieldSpec("creator"),
     FieldSpec("status"),
     FieldSpec("unmanaged_path"),
