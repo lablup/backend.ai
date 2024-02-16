@@ -43,7 +43,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py==0.2.3",
+//     "etcd-client-py==0.2.4",
 //     "faker~=13.12.0",
 //     "graphene~=3.3.0",
 //     "graypy==2.1.0",
@@ -936,36 +936,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ae1a974c728c076a49392a695102124f650f45361c654bb7c0bef1bb644c52d5",
-              "url": "https://files.pythonhosted.org/packages/bc/6c/53daaa366940957c4a10760bd96a79ce0b746a904d42c2ffdda572d1f785/boto3-1.34.41-py3-none-any.whl"
+              "hash": "179cdcff2dee116ff0bbe10c21a374fff8ae0d9ea3842bd8dd2c9f69e8185d91",
+              "url": "https://files.pythonhosted.org/packages/15/ac/f51d13299fb897ca4314b4085ee7bc409985ec7e478adbd327102f0fe14e/boto3-1.34.43-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9fd66f22a4cdd63165a7a19186fff9b6e3d742e83498ea3f3231bab6ae4bf0f3",
-              "url": "https://files.pythonhosted.org/packages/99/4b/9f7a58aa0515856bad38ca9a6340485f70961a5ddd5f5660b9ee6021666a/boto3-1.34.41.tar.gz"
+              "hash": "ed646f600b76939d54fa1ff868415793551a5a08b9de0a09696b46d116da7da5",
+              "url": "https://files.pythonhosted.org/packages/f5/68/2bccad434276f94f42a9331f3056eb0c0b0b36466f5179d4c43d374b6bd1/boto3-1.34.43.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.35.0,>=1.34.41",
+            "botocore<1.35.0,>=1.34.43",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.11.0,>=0.10.0"
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.41"
+          "version": "1.34.43"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9b5827332da766da487e5a5b14b36e02528be9f2e899f909577afb7001eb441d",
-              "url": "https://files.pythonhosted.org/packages/ce/8e/f96d93e59a59dd9b8b41735e67a0529585ebb8da6f4e3c6169779c6c9552/botocore-1.34.41-py3-none-any.whl"
+              "hash": "ab7d8046a8c3326ecf3d9f9884e79aa77fed864416ed8af52b9e22ab055acf4e",
+              "url": "https://files.pythonhosted.org/packages/74/f8/fb598ee499f19c1532cf47a6eb34c3c20447f9f81e48bb82a017a49bab6a/botocore-1.34.43-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3a6943c75a0d292ab6e008bce58ee6503776969479f991f5ad03a5d877af29ae",
-              "url": "https://files.pythonhosted.org/packages/7f/bf/fb0d863155fb42fc52df560fd021ab65672c2b564551847cc3eee889592f/botocore-1.34.41.tar.gz"
+              "hash": "00dea9fd602dc97420318d373079bdfcc8da34501aaa908ab98b477526bdefec",
+              "url": "https://files.pythonhosted.org/packages/86/13/c7e79ed15fe9fcd2b1fe9fe7eb7685a3eb9bd4346b6a3cb1c099863809dd/botocore-1.34.43.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -977,7 +977,7 @@
             "urllib3<2.1,>=1.25.4; python_version >= \"3.10\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.34.41"
+          "version": "1.34.43"
         },
         {
           "artifacts": [
@@ -1440,29 +1440,29 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3ca6018c5833c848fbb79c7eefeed9002f47d3314966435d69db2107e8f8c3ff",
-              "url": "https://files.pythonhosted.org/packages/86/85/d0edf98489d3acd738d3cb4fef579c39184d242c3d7747d0655a907765b1/etcd_client_py-0.2.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "27ec60f4c201c36783bfdbc6b2d1b12b4d9b178558d447376ca62ee6ea9f01af",
+              "url": "https://files.pythonhosted.org/packages/2d/84/a7acd3e5e0f5fe485922a3e091b701b6feedcf2fee428c888ea682062858/etcd_client_py-0.2.4-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e792b6b99afb9e07cd77d6957931ad2663be4c719462a8f73e2ed8e422c28f71",
-              "url": "https://files.pythonhosted.org/packages/92/ac/15c896a7e995414b7b7fc38b826ad65a6d8ce37088dd4248a8a39b4153f0/etcd_client_py-0.2.3-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+              "hash": "80bdfb08618e7b389e95516c80d12de3217b277a43df6ec7392846a208b963df",
+              "url": "https://files.pythonhosted.org/packages/21/d4/609928a030ca1591e2d6fcef74a9b3e7ae2633abdf6dff4e95b931904804/etcd_client_py-0.2.4-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4fe84f79932eedc196e49255c38e3040be8680f5b7c8d8bed9536e50005aef37",
-              "url": "https://files.pythonhosted.org/packages/e2/2d/a04cd180c842fc7d4e953f753e9aa9bc8f533291cfade73e201f982a8197/etcd_client_py-0.2.3.tar.gz"
+              "hash": "7645042b051ea9b9f08b6cfc6b12e79374a6f07138b7712724f5d3e48543f1e1",
+              "url": "https://files.pythonhosted.org/packages/83/da/2685deefc6664f81ad2a2374a5dddbd9d65aa3a5a595b7f723d1d2e0833f/etcd_client_py-0.2.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5a61bc85ef7b4a42dd112395ee21ec0d62303bb8692d80db06a237bab93e283e",
-              "url": "https://files.pythonhosted.org/packages/e9/9e/5b1410451e2095b8531b221e09edf576976c97ebdd920f18ce4df9533e5d/etcd_client_py-0.2.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "738b0cabd1c22891a3889ed9c8120dcbfbe6284d3cd36dcd781cc9149a57cc81",
+              "url": "https://files.pythonhosted.org/packages/e0/12/2b96fc4d929741940de32a8b114f0412d56b4456485f1ed5516d649e900d/etcd_client_py-0.2.4.tar.gz"
             }
           ],
           "project_name": "etcd-client-py",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.2.3"
+          "version": "0.2.4"
         },
         {
           "artifacts": [
@@ -1585,13 +1585,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8e4bad367015430ff253fe49d500fdc3396c1a434db5740828c728e45bcce245",
-              "url": "https://files.pythonhosted.org/packages/82/41/7fb855444cead5b2213e053447ce3a0b7bf2c3529c443e0cf75b2f13b405/google_auth-2.27.0-py2.py3-none-any.whl"
+              "hash": "7634d29dcd1e101f5226a23cbc4a0c6cda6394253bf80e281d9c5c6797869c53",
+              "url": "https://files.pythonhosted.org/packages/ff/ce/1b4dc8b5ecdc9a99202b093729192b69301c33064d0e312fb8d9e384dbe0/google_auth-2.28.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e863a56ccc2d8efa83df7a80272601e43487fa9a728a376205c86c26aaefa821",
-              "url": "https://files.pythonhosted.org/packages/71/10/8a86f8c81350bff52399b9e1125bc72963812c179567e5e6e93dd74c0bbb/google-auth-2.27.0.tar.gz"
+              "hash": "3cfc1b6e4e64797584fb53fc9bd0b7afa9b7c0dba2004fa7dcc9349e58cc3195",
+              "url": "https://files.pythonhosted.org/packages/22/1d/65514adf8e2fc3546f4fc7025afe00828597eb98c414ef3327867dc263c6/google-auth-2.28.0.tar.gz"
             }
           ],
           "project_name": "google-auth",
@@ -1609,7 +1609,7 @@
             "rsa<5,>=3.1.4"
           ],
           "requires_python": ">=3.7",
-          "version": "2.27.0"
+          "version": "2.28.0"
         },
         {
           "artifacts": [
@@ -3871,13 +3871,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "11bd87fe6c543358122c43db2e9dfc5940900ef9b8975502ab7043792928638b",
-              "url": "https://files.pythonhosted.org/packages/4c/af/d1e772e33d127bd399044269c5e6bd5b79cb2172fc2b786a02636c74606c/textual-0.50.1-py3-none-any.whl"
+              "hash": "c25c8d5f462ca169fa50add10f4d3604d98409b6a9f8dadff6a269cc7027516c",
+              "url": "https://files.pythonhosted.org/packages/14/7b/736c5945c3e41fcf331f360dcadbd83448f54c1aa44bd9f23fe4c5c6d63d/textual-0.51.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "415bef44b2dfa702d17ebb08637c0141eb54767cfbeafe60d07e62104183b56a",
-              "url": "https://files.pythonhosted.org/packages/73/9d/865d5d60512c2483d4d207e46b6b106749a63bb7bad0fdc8ecf2909bb59f/textual-0.50.1.tar.gz"
+              "hash": "ca3d58c00a360ef1988a9be2dbb34d8a8526f2b9fe40c2ed7ac6687875422efd",
+              "url": "https://files.pythonhosted.org/packages/64/b3/d33af0cacb5d8838e65b9d591ce5e47a063e1a0eba736568f3c222aa004f/textual-0.51.0.tar.gz"
             }
           ],
           "project_name": "textual",
@@ -3889,7 +3889,7 @@
             "typing-extensions<5.0.0,>=4.4.0"
           ],
           "requires_python": "<4.0,>=3.8",
-          "version": "0.50.1"
+          "version": "0.51.0"
         },
         {
           "artifacts": [
@@ -4250,19 +4250,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "00835f959ff24ebc32c55da8df9d46e8df25e3c4bfacb43e98b61fde51a4bc41",
-              "url": "https://files.pythonhosted.org/packages/b8/b9/fd100e50ab166e5c2a6933f04c711e378b6ec93e2c74f84a693aa408d8e1/types_setuptools-69.0.0.20240125-py3-none-any.whl"
+              "hash": "7b450d7a853f40488ae13630d9fa29abc10458e5b2d81e9534f34a842b38fd65",
+              "url": "https://files.pythonhosted.org/packages/ed/66/66f59cdc7adc46afcc708635f2cc7b9b74f09c54d070569e52a491befc95/types_setuptools-69.1.0.20240215-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "22ad498cb585b22ce8c97ada1fccdf294a2e0dd7dc984a28535a84ea82f45b3f",
-              "url": "https://files.pythonhosted.org/packages/33/d2/d51f630222844d3d39dc80cb7f34f3df1765ee2ffed22f9b82e111afe1cc/types-setuptools-69.0.0.20240125.tar.gz"
+              "hash": "2a4fdd3a3ca643c57359e584db2dd2b5db7481a82ecc21ea368bc4317bfc0505",
+              "url": "https://files.pythonhosted.org/packages/ae/ce/6d3b66ea6be73f740eb3f9b5202770e6dbd254bdaa4921a2aa0accad272c/types-setuptools-69.1.0.20240215.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "69.0.0.20240125"
+          "version": "69.1.0.20240215"
         },
         {
           "artifacts": [
@@ -4642,7 +4642,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py==0.2.3",
+    "etcd-client-py==0.2.4",
     "faker~=13.12.0",
     "graphene~=3.3.0",
     "graypy==2.1.0",
