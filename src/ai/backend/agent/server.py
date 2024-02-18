@@ -40,7 +40,7 @@ from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
-from etcetra.types import WatchEventType
+from etcd_client import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
