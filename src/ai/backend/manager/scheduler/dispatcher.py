@@ -714,8 +714,10 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
-        if not requested_architectures:
-            raise GenericBadRequest("Requested session has no architecture information")
+        if not sess_ctx.kernels:
+            raise GenericBadRequest(
+                f"Given session does not have any sibling kernel. (id: {sess_ctx.id}"
+            )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
