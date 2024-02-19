@@ -543,7 +543,7 @@ Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'
 Resolve the error message 'Pants is not abailable for your platform', When installing Backend.AI with pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When installing Backend.AI, you may find the following error message that 'Pants is not available for your platform'.
+When installing Backend.AI, you may find the following error message saying 'Pants is not available for your platform' if you have installed Pants 2.17 or older with prior versions of Backend.AI.
 
 .. code-block:: text
 
@@ -553,18 +553,8 @@ When installing Backend.AI, you may find the following error message that 'Pants
    Bootstrapping Pants 2.19.0 using cpython 3.9.15
    Installing pantsbuild.pants==2.19.0 into a virtual environment at /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.4/65.4 KB 3.3 MB/s eta 0:00:00
-   ERROR: Could not find a version that satisfies the requirement pantsbuild.pants==2.19.0 (from versions: 0.0.17, 0.0.18, 0.0.20, 0.0.21, 0.0.22, 0.0.23, 0.0.24, 0.0.25, 0.0.26, 0.0.27, 0.0.28,
-   0.0.29, 0.0.30, 0.0.31, 0.0.32, 0.0.33, 0.0.34, 0.0.35, 0.0.36, 0.0.37, 0.0.38, 0.0.39, 0.0.40, 0.0.41, 0.0.42, 0.0.43, 0.0.44, 0.0.45, 0.0.46, 0.0.47, 0.0.48, 0.0.49, 0.0.50, 0.0.51, 0.0.52
-   , 0.0.53, 0.0.54, 0.0.55, 0.0.56, 0.0.57, 0.0.58, 0.0.59, 0.0.60, 0.0.61, 0.0.62, 0.0.63, 0.0.64, 0.0.65, 0.0.66, 0.0.67, 0.0.68, 0.0.69, 0.0.70, 0.0.71, 0.0.72, 0.0.73, 0.0.74, 0.0.75, 0.0.7
-   6, 0.0.77, 0.0.79, 0.0.80, 0.0.81, 0.0.82, 1.0.0, 1.0.1, 1.1.0, 1.2.0, 1.2.1, 1.3.0, 1.4.0, 1.5.0, 1.6.0, 1.7.0, 1.15.0, 1.16.0, 1.17.0, 1.18.0, 1.19.0, 1.20.0, 1.21.0, 1.22.0, 1.23.0, 1.24.0
-   , 1.25.0, 1.26.0, 1.27.0, 1.28.0, 2.5.0, 2.5.1, 2.5.2, 2.6.0, 2.6.1, 2.7.0, 2.7.1, 2.7.2, 2.8.0, 2.8.1, 2.9.0rc0, 2.9.0rc1, 2.9.0rc2, 2.9.0rc3, 2.9.0rc4, 2.9.0rc5, 2.9.0rc6, 2.9.0, 2.9.1rc0,
-   2.9.1rc1, 2.9.1rc2, 2.9.1, 2.9.2rc0, 2.9.2, 2.10.0rc0, 2.10.0rc1, 2.10.0rc2, 2.10.0rc3, 2.10.0rc4, 2.10.0rc5, 2.10.0, 2.10.1rc0, 2.10.1rc1, 2.10.1, 2.11.0rc0, 2.11.0rc1, 2.11.0rc2, 2.11.0rc3,
-   2.11.0rc4, 2.11.0rc5, 2.11.0rc6, 2.11.0, 2.11.1rc0, 2.11.1rc1, 2.11.1rc2, 2.11.1rc3, 2.11.1, 2.12.0a0, 2.12.0rc0, 2.12.0rc1, 2.12.0rc2, 2.12.0rc3, 2.12.0, 2.12.1rc0, 2.12.1rc1, 2.12.1rc2, 2.
-   12.1rc3, 2.12.1rc4, 2.12.1, 2.13.0a0, 2.13.0a1, 2.13.0rc0, 2.13.0rc1, 2.13.0rc2, 2.13.0rc3, 2.13.0, 2.13.1rc0, 2.13.1rc1, 2.13.1rc2, 2.13.1, 2.14.0a0, 2.14.0a1, 2.14.0rc0, 2.14.0rc1, 2.14.0rc
-   2, 2.14.0rc3, 2.14.0rc4, 2.14.0rc5, 2.14.0, 2.14.1rc0, 2.14.1, 2.14.2rc0, 2.14.2rc1, 2.14.2rc2, 2.14.2, 2.15.0a0, 2.15.0a1, 2.15.0rc0, 2.15.0rc1, 2.15.0rc2, 2.15.0rc3, 2.15.0rc4, 2.15.0rc5, 2
-   .15.0rc6, 2.15.0rc7, 2.15.0, 2.15.1rc0, 2.15.1rc1, 2.15.1rc2, 2.15.1rc3, 2.15.1, 2.15.2rc0, 2.15.2, 2.16.0a0, 2.16.0a1, 2.16.0rc0, 2.16.0rc1, 2.16.0rc2, 2.16.0rc3, 2.16.0rc4, 2.16.0rc5, 2.16.
-   0rc6, 2.16.0rc7, 2.16.0, 2.16.1rc0, 2.16.1rc3, 2.16.1rc4, 2.16.1, 2.17.0.dev0, 2.17.0.dev1, 2.17.0.dev2, 2.17.0.dev3, 2.17.0.dev4, 2.17.0.dev5, 2.17.0a1, 2.17.0rc0, 2.17.0rc1, 2.17.0rc2, 2.17
-   .0rc3, 2.17.0rc4, 2.17.0rc5, 2.17.0, 2.17.1rc0, 2.17.1rc1, 2.17.1rc2, 2.17.1rc3, 2.17.1, 2.18.0.dev0, 2.18.0.dev1, 2.18.0.dev3, 2.18.0.dev4, 2.18.0.dev5, 2.18.0.dev6, 2.18.0.dev7, 2.18.0a0)
+   ERROR: Could not find a version that satisfies the requirement pantsbuild.pants==2.19.0 (from versions: 0.0.17, 0.0.18, 0.0.20, 0.0.21, 0.0.22, ... (a long list of versions) ..., 2.17.0,
+   2.17.1rc0, 2.17.1rc1, 2.17.1rc2, 2.17.1rc3, 2.17.1, 2.18.0.dev0, 2.18.0.dev1, 2.18.0.dev3, 2.18.0.dev4, 2.18.0.dev5, 2.18.0.dev6, 2.18.0.dev7, 2.18.0a0)
    ERROR: No matching distribution found for pantsbuild.pants==2.19.0
    Install failed: Command '['/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/bin/python', '-sE', '-m', 'pip', '--disable-pip-versi
    on-check', '--no-python-version-warning', '--log', PosixPath('/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/pants-install.log'
@@ -589,7 +579,8 @@ When installing Backend.AI, you may find the following error message that 'Pants
 
    [ERROR] Cannot proceed the installation because Pants is not available for your platform!
 
-To solve this error, you install Pants from the following link https://www.pantsbuild.org/2.18/docs/getting-started/installing-pants
+To resolve this error, `reinstall or upgrade Pants <https://www.pantsbuild.org/2.19/docs/getting-started/installing-pants>`_.
+As of the Pants 2.18.0 release, they no longer use the Python Package Index but GitHub releases to distribute the binary builds.
 
 
 Resolving missing directories error when running Pants
