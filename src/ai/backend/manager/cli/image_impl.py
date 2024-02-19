@@ -211,8 +211,8 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
-        except Exception as e:
-            log.exception(f"An error occurred. (e: {str(e)})")
+        except Exception:
+            log.exception("An error occurred.")
 
 
 async def validate_image_canonical(
@@ -255,5 +255,5 @@ async def validate_image_canonical(
 
         except UnknownImageReference as e:
             log.error(f"{e}")
-        except Exception as e:
-            log.exception(f"An error occurred. (e: {str(e)})")
+        except Exception:
+            log.exception("An error occurred.")
