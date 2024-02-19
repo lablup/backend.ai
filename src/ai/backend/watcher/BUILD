@@ -6,11 +6,16 @@ python_sources(
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/watcher/agent/**",
+        "//src/ai/backend/watcher/storage/**",
+    ],
     allowed_dependencies=[
+        "//src/ai/backend/watcher/agent/**",
+        "//src/ai/backend/watcher/storage/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",  # not auto-inferred
+        "//src/ai/backend/cli/**",
     ],
 )
 
@@ -41,13 +46,41 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        # Bundle agent and storage watcher plugins
+        "//src/ai/backend/watcher/agent:src",
+        "//src/ai/backend/watcher/agent:buildscript",
+        "//src/ai/backend/watcher/storage:src",
+        "//src/ai/backend/watcher/storage:buildscript",
         "!!stubs/trafaret:stubs",
     ],
 )
 
 scie_binary(
     name="backendai-watcher",
+    fat=False,
     dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-watcher-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+run_shell_command(
+    name="checksum",
+    command=(
+        "find . -name 'backendai-watcher-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
+    workdir="/dist",
+    execution_dependencies=[
+        ":backendai-watcher",
+        ":backendai-watcher-fat",
+    ],
+    tags=["checksum"],
 )
 
 resource(name="version", source="VERSION")
