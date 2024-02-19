@@ -175,7 +175,7 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
                 timeout_sec=timeout_sec,
             )
 
-    async def poll_check_mount(
+    async def poll_directory_mount(
         self,
         mount_paths: list[str],
         *,
