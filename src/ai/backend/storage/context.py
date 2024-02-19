@@ -27,6 +27,7 @@ from .api.client import init_client_app
 from .api.manager import init_manager_app
 from .api.types import WebMiddleware
 from .cephfs import CephFSVolume
+from .ddn import EXAScalerFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
@@ -62,6 +63,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
+    EXAScalerFSVolume.name: EXAScalerFSVolume,
 }
 
 
