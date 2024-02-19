@@ -1,0 +1,48 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 8121 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = ""                                   # env: BACKEND_ETCD_USER
+password = ""				    # env: BACKEND_ETCD_PASSWORD
+
+
+[logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "simple"
+
+[debug]
+# Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
+enabled = false
+
+[watcher]
+node-id = "i-agent-watcher-01"
+event-loop = "uvloop"
+ipc-base-path = "/tmp/backend.ai/ipc"
+allowed-plugins = [
+    "ai.backend.watcher_modules.agent.watcher",
+    "ai.backend.watcher_modules.agent.webapp",
+]
+
+[module.agent-watcher]
+service-name = "backendai-agent"
+ipc-base-path = "/tmp/backend.ai/ipc"
+poll-directory-mount = true
+
+[module.agent-watcher.event]
+connect-server = true   # Initiate `event_dispatcher` and `event_producer`
+consumer-group = "agent-watcher"
