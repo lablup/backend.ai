@@ -160,19 +160,26 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
-        group_id = row["id"]
-        group_resource_slots = row["total_resource_slots"]
-        if group_id is None:
-            raise InvalidAPIParameters("Unknown user group")
-        group_resource_policy = {
-            "total_resource_slots": group_resource_slots,
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-        }
-        group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(
-            group_id, db_sess=SASession(conn)
-        )
-        group_remaining = group_limits - group_occupied
+        # if row is None:
+        #     raise InvalidAPIParameters(
+        #         "Unable to check remaining resources because the user is not belong to any project"
+        #     )
+        if row is not None:
+            group_id = row["id"]
+            group_resource_slots = row["total_resource_slots"]
+            if group_id is None:
+                raise InvalidAPIParameters("Unknown user group")
+            group_resource_policy = {
+                "total_resource_slots": group_resource_slots,
+                "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+            }
+            group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
+            group_occupied = await root_ctx.registry.get_group_occupancy(
+                group_id, db_sess=SASession(conn)
+            )
+            group_remaining = group_limits - group_occupied
+        else:
+            group_remaining = None
 
         # Check domain resource limit.
         query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
@@ -189,12 +196,11 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.
         # To keep legacy, we just merge all remaining slots into `keypair_remainig`.
+        remaining_by_scope = [keypair_remaining, domain_remaining]
+        if group_remaining is not None:
+            remaining_by_scope.append(group_remaining)
         for slot in known_slot_types:
-            keypair_remaining[slot] = min(
-                keypair_remaining[slot],
-                group_remaining[slot],
-                domain_remaining[slot],
-            )
+            keypair_remaining[slot] = min(*[remaining[slot] for remaining in remaining_by_scope])
 
         # Prepare per scaling group resource.
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
