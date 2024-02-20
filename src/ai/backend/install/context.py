@@ -282,12 +282,6 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
-    def get_container_registry_fixture_filename(self) -> str:
-        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-            return "example-container-registries-backendai-multiarch.json"
-        else:
-            return "example-container-registries-backendai.json"
-
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
 
@@ -295,7 +289,7 @@ class Context(metaclass=ABCMeta):
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
         with self.resource_path(
-            "ai.backend.install.fixtures", self.get_container_registry_fixture_filename()
+            "ai.backend.install.fixtures", "example-container-registries-backendai.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
@@ -768,18 +762,13 @@ class Context(metaclass=ABCMeta):
                             database="backend",
                         )
                     ) as conn:
-                        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                            project = "stable,community,multiarch"
-                        else:
-                            project = "stable,community"
-
                         await conn.execute(
                             "INSERT INTO container_registries (id, url, hostname, type, project) VALUES ($1, $2, $3, $4, $5);",
                             "fe878f09-06cc-4b91-9242-4c71015cce04",
                             "https://cr.backend.ai",
                             "cr.backend.ai",
                             "harbor2",
-                            project,
+                            "stable,community,multiarch",
                         )
 
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])

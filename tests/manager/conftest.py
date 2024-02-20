@@ -70,6 +70,7 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import (
+    load_table,
     pgsql_connect_opts,
     populate_fixture,
 )
@@ -411,7 +412,7 @@ def database(request, local_config, test_db) -> None:
         cli_schema_oneshot.invoke(click_ctx)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def database_engine(local_config, database):
     async with connect_database(local_config) as db:
         yield db
@@ -434,6 +435,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-backendai.json",
     ]
 
     async def init_fixture() -> None:
@@ -471,6 +473,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((load_table(engine, "container_registries").delete()))
         finally:
             await engine.dispose()
 

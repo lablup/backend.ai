@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
-from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
 
 from ..defs import PASSWORD_PLACEHOLDER
-from .base import Base, IDColumn, mapper_registry, privileged_mutation
+from .base import Base, IDColumn, privileged_mutation, set_if_set
 from .gql_relay import AsyncNode
 from .user import UserRole
 
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 __all__: Sequence[str] = (
-    "container_registries",
     "ContainerRegistryRow",
     "ContainerRegistry",
     "CreateContainerRegistry",
@@ -31,45 +29,25 @@ __all__: Sequence[str] = (
     "DeleteContainerRegistry",
 )
 
-container_registries = sa.Table(
-    "container_registries",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column("url", sa.String(length=255), index=True),
-    sa.Column("hostname", sa.String(length=50), index=True),
-    sa.Column(
+
+class ContainerRegistryRow(Base):
+    __tablename__ = "container_registries"
+    id = IDColumn()
+    url = sa.Column("url", sa.String(length=255), index=True)
+    hostname = sa.Column("hostname", sa.String(length=50), index=True)
+    type = sa.Column(
         "type",
         sa.Enum("docker", "harbor", "harbor2", name="container_registry_type"),
         default="docker",
         index=True,
-    ),
-    sa.Column("project", sa.Text, nullable=True),  # harbor only
-    sa.Column("username", sa.String(length=255), nullable=True),
-    sa.Column("password", sa.String(length=255), nullable=True),
-    sa.Column("ssl_verify", sa.Boolean, default=True, index=True),
-)
-
-
-class ContainerRegistryRow(Base):
-    __table__ = container_registries
-    # __tablename__ = "container_registries"
-    # id = IDColumn()
-    # url = sa.Column("url", sa.String(length=255), index=True)
-    # hostname = sa.Column("hostname", sa.String(length=50), index=True)
-    # type = sa.Column(
-    #     "type",
-    #     sa.Enum("docker", "harbor", "harbor2", name="container_registry_type"),
-    #     default="docker",
-    #     index=True,
-    # )
-    # project = sa.Column("project", sa.Text, nullable=True)  # harbor only
-    # username = sa.Column("username", sa.String(length=255), nullable=True)
-    # password = sa.Column("password", sa.String(length=255), nullable=True)
-    # ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
+    )
+    project = sa.Column("project", sa.Text, nullable=True)  # harbor only
+    username = sa.Column("username", sa.String(length=255), nullable=True)
+    password = sa.Column("password", sa.String(length=255), nullable=True)
+    ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
 
     def __init__(
         self,
-        id: uuid.UUID,
         hostname: str,
         url: str,
         type: str,
@@ -78,7 +56,6 @@ class ContainerRegistryRow(Base):
         password: Optional[str] = None,
         project: Optional[str] = None,
     ) -> None:
-        self.id = id
         self.hostname = hostname
         self.url = url
         self.type = type
@@ -155,17 +132,17 @@ class ContainerRegistry(graphene.ObjectType):
     #     raise NotImplementedError
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ContainerRegistry:
+    def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
         return cls(
-            id=row["id"],
-            hostname=row["name"],
+            id=row.id,
+            hostname=row.hostname,
             config=ContainerRegistryConfig(
-                url=row["url"],
-                type=row["type"],
-                project=row["project"],
-                username=row["username"],
-                password=PASSWORD_PLACEHOLDER if row["password"] is not None else None,
-                ssl_verify=row["ssl_verify"],
+                url=row.url,
+                type=row.type,
+                project=row.project.split(",") if row.project is not None else [],
+                username=row.username,
+                password=PASSWORD_PLACEHOLDER if row.password is not None else None,
+                ssl_verify=row.ssl_verify,
             ),
         )
 
@@ -207,18 +184,20 @@ class CreateContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
+
         data = {
             "hostname": hostname,
             "url": props.url,
             "type": props.type,
-            "project": props.project,
+            "project": ",".join(props.project) if props.project is not None else None,
             "username": props.username,
             "password": props.password,
             "ssl_verify": props.ssl_verify,
         }
 
         async with ctx.db.begin_session() as session:
-            await session.execute(sa.insert(container_registries).values(data))
+            query = sa.insert(ContainerRegistryRow).values(data)
+            await session.execute(query)
 
         container_registry = await ContainerRegistry.load_registry(ctx, hostname)
         return cls(container_registry=container_registry)
@@ -245,22 +224,28 @@ class ModifyContainerRegistry(graphene.Mutation):
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        data = {
-            "hostname": hostname,
-            "url": props.url,
-            "type": props.type,
-            "project": props.project,
-            "username": props.username,
-            "password": props.password,
-            "ssl_verify": props.ssl_verify,
-        }
+
+        input_config: Dict[str, Any] = {}
+
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "type")
+        set_if_set(props, input_config, "project")
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+
+        if "project" in input_config.keys():
+            input_config["project"] = ",".join(input_config["project"])
 
         async with ctx.db.begin_session() as session:
-            await session.execute(
-                sa.update(container_registries)
+            query = (
+                sa.update(ContainerRegistryRow)
+                .values(input_config)
                 .where(ContainerRegistryRow.hostname == hostname)
-                .values(data)
             )
+
+            await session.execute(query)
+
         container_registry = await ContainerRegistry.load_registry(ctx, hostname)
         return cls(container_registry=container_registry)
 
@@ -287,7 +272,7 @@ class DeleteContainerRegistry(graphene.Mutation):
         container_registry = await ContainerRegistry.load_registry(ctx, hostname)
         async with ctx.db.begin_session() as session:
             await session.execute(
-                sa.delete(container_registries).where(ContainerRegistryRow.hostname == hostname)
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
             )
 
         return cls(container_registry=container_registry)

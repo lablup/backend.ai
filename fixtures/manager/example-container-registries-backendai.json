@@ -5,7 +5,7 @@
             "hostname": "cr.backend.ai",
             "url": "https://cr.backend.ai",
             "type": "harbor2",
-            "project": "stable,community"
+            "project": "stable,community,multiarch"
         }
     ]
 }

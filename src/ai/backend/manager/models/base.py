@@ -1236,6 +1236,14 @@ def set_if_set(
             target[target_key or name] = v
 
 
+async def load_table(engine: SAEngine, table_name: str) -> sa.Table:
+    async with engine.begin() as conn:
+        return await conn.run_sync(
+            lambda conn, table_name: sa.Table(table_name, sa.MetaData(), autoload_with=conn),
+            table_name,
+        )
+
+
 async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
