@@ -142,13 +142,13 @@ def keypair_resource_policy() -> str:
 
 
 @pytest.fixture
-def make_txt_file() -> Generator[TextIOWrapper, None, None]:
-    FILE_NAME = "test.txt"
-    with open(FILE_NAME, "w") as f:
+def txt_file() -> Generator[TextIOWrapper, None, None]:
+    filepath = "test.txt"
+    with open(filepath, "w") as f:
         f.write("This file is for testing.")
     yield f
 
-    os.remove(FILE_NAME)
+    os.remove(filepath)
 
 
 run_user = make_run_fixture("user_file")
