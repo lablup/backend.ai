@@ -185,18 +185,18 @@ class CreateContainerRegistry(graphene.Mutation):
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
 
-        data = {
-            "hostname": hostname,
-            "url": props.url,
-            "type": props.type,
-            "project": ",".join(props.project) if props.project is not None else None,
-            "username": props.username,
-            "password": props.password,
-            "ssl_verify": props.ssl_verify,
-        }
+        input_config: Dict[str, Any] = {"hostname": hostname, "url": props.url, "type": props.type}
+
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "project")
+
+        if "project" in input_config.keys():
+            input_config["project"] = ",".join(input_config["project"])
 
         async with ctx.db.begin_session() as session:
-            query = sa.insert(ContainerRegistryRow).values(data)
+            query = sa.insert(ContainerRegistryRow).values(input_config)
             await session.execute(query)
 
         container_registry = await ContainerRegistry.load_registry(ctx, hostname)
@@ -229,10 +229,10 @@ class ModifyContainerRegistry(graphene.Mutation):
 
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
-        set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "project")
 
         if "project" in input_config.keys():
             input_config["project"] = ",".join(input_config["project"])
