@@ -323,7 +323,9 @@ class ModeMenu(Static):
         self._enabled_menus = set()
         self._enabled_menus.add(InstallModes.PACKAGE)
         self._non_interactive = args.non_interactive
-        if args.target_path is not None and args.target_path != str(Path.home() / "backendai"):
+        if args.target_path is not None and args.target_path != Path(
+            str(Path.home() / "backendai")
+        ):
             self._dist_info.target_path = args.target_path
         mode = args.mode
         try:
