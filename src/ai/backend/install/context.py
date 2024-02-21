@@ -73,13 +73,20 @@ class Context(metaclass=ABCMeta):
 
     _post_guides: list[PostGuide]
 
-    def __init__(self, dist_info: DistInfo, app: App) -> None:
+    def __init__(
+        self,
+        dist_info: DistInfo,
+        app: App,
+        *,
+        non_interactive: bool = False,
+    ) -> None:
         self._post_guides = []
         self.app = app
         self.log = current_log.get()
         self.cwd = Path.cwd()
         self.dist_info = dist_info
         self.wget_sema = asyncio.Semaphore(3)
+        self.non_interactive = non_interactive
         self.install_info = self.hydrate_install_info()
 
     @abstractmethod
