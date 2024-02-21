@@ -271,7 +271,13 @@ class Context(metaclass=ABCMeta):
 
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-set-user-main-access-keys.json"
+        ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
             "ai.backend.install.fixtures", "example-resource-presets.json"
