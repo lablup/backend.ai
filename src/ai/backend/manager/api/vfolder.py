@@ -2026,7 +2026,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
                 & (agus.c.group_id == vf_info["group"])
-                & (users.c.status == ACTIVE_USER_STATUSES),
+                & (users.c.status.in_(ACTIVE_USER_STATUSES)),
             )
         )
         result = await conn.execute(query)
@@ -2045,7 +2045,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Do not share to users who have already been shared the folder.
         query = (
-            sa.select([vfolder_permissions.c.user])
+            sa.select([vfolder_permissions])
             .select_from(vfolder_permissions)
             .where(
                 (vfolder_permissions.c.user.in_(users_to_share))
@@ -3212,7 +3212,12 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+            sa.select([vfolders.c.host])
+            .select_from(vfolders)
+            .where(
+                (vfolders.c.id == vfolder_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+            )
         )
         folder_host = await conn.scalar(query)
     if folder_host not in allowed_hosts_by_user:
@@ -3298,6 +3303,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
     cors.add(add_route("POST", r"/{name}/purge", purge))
+    cors.add(add_route("POST", r"/{name}/recover", recover))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
