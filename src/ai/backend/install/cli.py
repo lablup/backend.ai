@@ -480,7 +480,7 @@ class InstallerApp(App):
                 yield PackageSetup(id="pkg-setup", non_interactive=self._args.non_interactive)
         yield Footer()
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         header = self.query_one("Header", Header)
         header.tall = True
         self.title = "Backend.AI Installer"
