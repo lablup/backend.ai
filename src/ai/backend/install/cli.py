@@ -385,10 +385,13 @@ class ModeMenu(Static):
         text.append("\n\n")
         text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
         cast(Static, self.query_one("#heading")).update(text)
+        self.log.info("on_mount: injecting selection")
+        self.log.info("on_mount: non_interactive=%s", self._non_interactive)
         if self._non_interactive:
             # Trigger the selected mode immediately.
             lv: ListView = cast(ListView, self.app.query_one("#mode-list"))
-            li: ListItem = cast(ListItem, self.app.query_one("#mode-{self._mode.value.lower()}"))
+            li: ListItem = cast(ListItem, self.app.query_one(f"#mode-{self._mode.lower()}"))
+            # TODO: fix the screen update??
             lv.post_message(ListView.Selected(lv, li))
 
     def action_cursor_up(self) -> None:
