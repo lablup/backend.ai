@@ -404,7 +404,7 @@ def database(request, local_config, test_db):
         cli_schema_oneshot.invoke(click_ctx)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 async def database_engine(local_config, database):
     async with connect_database(local_config) as db:
         yield db
