@@ -6,7 +6,6 @@ import os
 import sys
 import textwrap
 from pathlib import Path
-from typing import cast
 from weakref import WeakSet
 
 import click
@@ -62,7 +61,7 @@ class DevSetup(Static):
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
+        _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
         ctx = DevContext(dist_info, self.app, non_interactive=self._non_interactive)
         try:
@@ -78,7 +77,7 @@ class DevSetup(Static):
             install_report = InstallReport(ctx.install_info, id="install-report")
             self.query_one("TabPane#tab-dev-report Label").remove()
             self.query_one("TabPane#tab-dev-report").mount(install_report)
-            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-dev-report"
+            self.query_one("TabbedContent", TabbedContent).active = "tab-dev-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -117,7 +116,7 @@ class PackageSetup(Static):
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
+        _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
         ctx = PackageContext(dist_info, self.app, non_interactive=self._non_interactive)
         try:
@@ -147,7 +146,7 @@ class PackageSetup(Static):
             install_report = InstallReport(ctx.install_info, id="install-report")
             self.query_one("TabPane#tab-pkg-report Label").remove()
             self.query_one("TabPane#tab-pkg-report").mount(install_report)
-            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-pkg-report"
+            self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -377,10 +376,8 @@ class ModeMenu(Static):
                 )
         yield Label(id="mode-desc")
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         self.call_later(self.update_platform_info)
-        self.log.info("on_mount: injecting selection")
-        self.log.info("on_mount: non_interactive=%s", self._non_interactive)
         if self._non_interactive:
             # Trigger the selected mode immediately.
             lv = self.app.query_one("#mode-list", ListView)
@@ -407,20 +404,20 @@ class ModeMenu(Static):
         if InstallModes.DEVELOP not in self._enabled_menus:
             return
         self.app.sub_title = "Development Setup"
-        switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
+        switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "dev-setup"
-        dev_setup: DevSetup = cast(DevSetup, self.app.query_one("#dev-setup"))
-        switcher.call_later(dev_setup.begin_install, self._dist_info)
+        dev_setup = self.app.query_one("#dev-setup", DevSetup)
+        self.app.call_later(dev_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
         if InstallModes.PACKAGE not in self._enabled_menus:
             return
         self.app.sub_title = "Package Setup"
-        switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
+        switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "pkg-setup"
-        pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
-        switcher.call_later(pkg_setup.begin_install, self._dist_info)
+        pkg_setup = self.app.query_one("#pkg-setup", PackageSetup)
+        self.app.call_later(pkg_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
@@ -484,7 +481,7 @@ class InstallerApp(App):
         yield Footer()
 
     async def on_mount(self) -> None:
-        header: Header = cast(Header, self.query_one("Header"))
+        header = self.query_one("Header", Header)
         header.tall = True
         self.title = "Backend.AI Installer"
 
