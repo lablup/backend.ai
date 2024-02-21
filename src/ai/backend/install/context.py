@@ -676,8 +676,17 @@ class Context(metaclass=ABCMeta):
             Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
-    async def prepare_local_vfolder_host(self) -> None:
+    async def get_db_connection(self):
         halfstack = self.install_info.halfstack_config
+        return await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+    async def prepare_local_vfolder_host(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -686,15 +695,7 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
-        async with aiotools.closing_async(
-            await asyncpg.connect(
-                host=halfstack.postgres_addr.face.host,
-                port=halfstack.postgres_addr.face.port,
-                user=halfstack.postgres_user,
-                password=halfstack.postgres_password,
-                database="backend",
-            )
-        ) as conn:
+        async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
                 "modify-vfolder",
@@ -734,8 +735,6 @@ class Context(metaclass=ABCMeta):
         ])
 
     async def populate_images(self) -> None:
-        halfstack = self.install_info.halfstack_config
-
         data: Any
         for image_source in self.dist_info.image_sources:
             match image_source:
@@ -753,15 +752,7 @@ class Context(metaclass=ABCMeta):
                     }
                     await self.etcd_put_json("config", data)
 
-                    async with aiotools.closing_async(
-                        await asyncpg.connect(
-                            host=halfstack.postgres_addr.face.host,
-                            port=halfstack.postgres_addr.face.port,
-                            user=halfstack.postgres_user,
-                            password=halfstack.postgres_password,
-                            database="backend",
-                        )
-                    ) as conn:
+                    async with aiotools.closing_async(await self.get_db_connection()) as conn:
                         await conn.execute(
                             "INSERT INTO container_registries (id, url, hostname, type, project) VALUES ($1, $2, $3, $4, $5);",
                             "fe878f09-06cc-4b91-9242-4c71015cce04",
@@ -797,15 +788,7 @@ class Context(metaclass=ABCMeta):
                     }
                     await self.etcd_put_json("config", data)
 
-                    async with aiotools.closing_async(
-                        await asyncpg.connect(
-                            host=halfstack.postgres_addr.face.host,
-                            port=halfstack.postgres_addr.face.port,
-                            user=halfstack.postgres_user,
-                            password=halfstack.postgres_password,
-                            database="backend",
-                        )
-                    ) as conn:
+                    async with aiotools.closing_async(await self.get_db_connection()) as conn:
                         await conn.execute(
                             "INSERT INTO container_registries (id, url, hostname, type, username) VALUES ($1, $2, $3, $4, $5);",
                             "abc42a05-4471-41fa-8772-10bf6452c7d1",
