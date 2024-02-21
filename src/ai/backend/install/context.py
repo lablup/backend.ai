@@ -374,6 +374,7 @@ class Context(metaclass=ABCMeta):
         await self.etcd_put_json("", data)
         data = {}
         # TODO: in dev-mode, enable these.
+        data["api"] = {}
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
