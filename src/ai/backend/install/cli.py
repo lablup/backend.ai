@@ -378,21 +378,23 @@ class ModeMenu(Static):
         yield Label(id="mode-desc")
 
     async def on_mount(self) -> None:
+        self.call_later(self.update_platform_info)
+        self.log.info("on_mount: injecting selection")
+        self.log.info("on_mount: non_interactive=%s", self._non_interactive)
+        if self._non_interactive:
+            # Trigger the selected mode immediately.
+            lv = self.app.query_one("#mode-list", ListView)
+            li = self.app.query_one(f"#mode-{self._mode.lower()}", ListItem)
+            lv.post_message(ListView.Selected(lv, li))
+
+    async def update_platform_info(self) -> None:
         os_info = await detect_os()
         text = Text()
         text.append("Platform: ")
         text.append_text(os_info.__rich__())  # type: ignore
         text.append("\n\n")
         text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
-        cast(Static, self.query_one("#heading")).update(text)
-        self.log.info("on_mount: injecting selection")
-        self.log.info("on_mount: non_interactive=%s", self._non_interactive)
-        if self._non_interactive:
-            # Trigger the selected mode immediately.
-            lv: ListView = cast(ListView, self.app.query_one("#mode-list"))
-            li: ListItem = cast(ListItem, self.app.query_one(f"#mode-{self._mode.lower()}"))
-            # TODO: fix the screen update??
-            lv.post_message(ListView.Selected(lv, li))
+        self.query_one("#heading", Static).update(text)
 
     def action_cursor_up(self) -> None:
         self.lv.action_cursor_up()
