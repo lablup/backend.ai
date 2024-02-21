@@ -227,6 +227,8 @@ class ModifyContainerRegistry(graphene.Mutation):
 
         input_config: Dict[str, Any] = {}
 
+        # Question: Can we also change the hostname here (through props)?
+        # If it should be possible, we should add the hostname to the `ModifyContainerRegistryInput`
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
         set_if_set(props, input_config, "username")
