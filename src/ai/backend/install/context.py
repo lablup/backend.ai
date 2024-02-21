@@ -561,7 +561,10 @@ class Context(metaclass=ABCMeta):
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
                 print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
                 print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
-        for user in keypair_data["users"]:
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
+            current_shell = os.environ.get("SHELL", "sh")
+            user_data = json.loads(Path(user_path).read_bytes())
+        for user in user_data["users"]:
             username = user["username"]
             with open(base_path / f"env-local-{username}-session.sh", "w") as fp:
                 print(
