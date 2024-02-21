@@ -275,6 +275,7 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool = False,
+        default_groups: Iterable[str],
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -307,6 +308,7 @@ class User(BaseFunction):
             "domain_name": domain_name,
             "totp_activated": totp_activated,
             "sudo_session_enabled": sudo_session_enabled,
+            "default_groups": default_groups,
         }
         set_if_set(inputs, "username", username)
         set_if_set(inputs, "full_name", full_name)
