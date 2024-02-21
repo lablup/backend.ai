@@ -550,7 +550,7 @@ class UserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
-    default_groups = graphene.List(lambda: graphene.String, required=False, default_valur=None)
+    default_groups = graphene.List(lambda: graphene.String, required=False, default_value=None)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
