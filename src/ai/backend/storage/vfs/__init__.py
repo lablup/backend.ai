@@ -232,17 +232,18 @@ class BaseFSOpModel(AbstractFSOpModel):
 
     def scan_tree(
         self,
-        target_path: Path,
+        path: Path,
+        *,
         recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
 
-        def _scandir(target_path: Path, q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
+        def _scandir(path: Path, q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
             count = 0
             limit = self.scandir_limit
             next_paths: deque[Path] = deque()
-            next_paths.append(target_path)
+            next_paths.append(path)
             while next_paths:
                 next_path = next_paths.popleft()
                 with os.scandir(next_path) as scanner:
@@ -258,7 +259,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                                 entry_type = DirEntryType.SYMLINK
                                 try:
                                     symlink_dst = Path(entry).resolve()
-                                    symlink_dst = symlink_dst.relative_to(target_path)
+                                    symlink_dst = symlink_dst.relative_to(path)
                                 except (ValueError, RuntimeError):
                                     # ValueError and ELOOP
                                     pass
@@ -270,7 +271,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                             continue
                         item = DirEntry(
                             name=entry.name,
-                            path=Path(entry.path).relative_to(target_path),
+                            path=Path(entry.path).relative_to(path),
                             type=entry_type,
                             stat=Stat(
                                 size=entry_stat.st_size,
@@ -288,7 +289,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
             try:
-                await loop.run_in_executor(None, _scandir, target_path, q.sync_q)
+                await loop.run_in_executor(None, _scandir, path, q.sync_q)
             finally:
                 await q.async_q.put(SENTINEL)
 
@@ -313,17 +314,17 @@ class BaseFSOpModel(AbstractFSOpModel):
 
     async def scan_tree_usage(
         self,
-        target_path: Path,
+        path: Path,
     ) -> TreeUsage:
         total_size = 0
         total_count = 0
         start_time = time.monotonic()
         _timeout = 30
 
-        def _calc_usage(target_path: Path) -> None:
+        def _calc_usage(path: Path) -> None:
             nonlocal total_size, total_count
             next_paths: deque[Path] = deque()
-            next_paths.append(target_path)
+            next_paths.append(path)
             while next_paths:
                 next_path = next_paths.popleft()
                 with os.scandir(next_path) as scanner:  # type: ignore
@@ -344,7 +345,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
         loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, _calc_usage, target_path)
+            await loop.run_in_executor(None, _calc_usage, path)
         except TimeoutError:
             # -1 indicates "too many"
             total_size = -1
@@ -353,9 +354,9 @@ class BaseFSOpModel(AbstractFSOpModel):
 
     async def scan_tree_size(
         self,
-        target_path: Path,
+        path: Path,
     ) -> BinarySize:
-        info = await run(["du", "-hs", target_path])
+        info = await run(["du", "-hs", path])
         used_bytes, _ = info.split()
         return BinarySize.finite_from_str(used_bytes)
 
@@ -489,7 +490,11 @@ class BaseVolume(AbstractVolume):
 
     @final
     def scandir(
-        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+        self,
+        vfid: VFolderID,
+        relpath: PurePosixPath,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
         return self.fsop_model.scan_tree(target_path, recursive=recursive)
@@ -664,6 +669,7 @@ class BaseVolume(AbstractVolume):
         self,
         vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
+        *,
         recursive: bool = False,
     ) -> None:
         target_paths = [self.sanitize_vfpath(vfid, p) for p in relpaths]
