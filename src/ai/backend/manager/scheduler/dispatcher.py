@@ -777,10 +777,10 @@ class SchedulerDispatcher(aobject):
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    rr_state: RoundRobinState | None = (
-                        await sched_ctx.registry.shared_config.get_roundrobin_state(
-                            sgroup_name, requested_architecture
-                        )
+                    rr_state: (
+                        RoundRobinState | None
+                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
+                        sgroup_name, requested_architecture
                     )
 
                     if rr_state is not None:
@@ -1333,7 +1333,7 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warn("prepare(): timeout while executing start_session()")
+            log.warning("prepare(): timeout while executing start_session()")
 
     async def scale_services(
         self,
@@ -1512,7 +1512,7 @@ class SchedulerDispatcher(aobject):
                         endpoint,
                     )
                 except Exception as e:
-                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                    log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,
