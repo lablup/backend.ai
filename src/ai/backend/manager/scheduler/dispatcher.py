@@ -725,7 +725,7 @@ class SchedulerDispatcher(aobject):
 
         try:
             if not candidate_agents:
-                raise InstanceNotAvailable(extra_msg="No agents are registered with the manager")
+                raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -1032,7 +1032,7 @@ class SchedulerDispatcher(aobject):
                         ]
                         if not candidate_agents:
                             raise InstanceNotAvailable(
-                                extra_msg="No agents are registered with the manager"
+                                extra_msg="No agents are available for scheduling"
                             )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
