@@ -81,7 +81,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
             ) as rpc:
                 result = await rpc.call.ping("pong")
                 print(f"Received response from ag:{agent_id}: {result}")
-                # TODO: When get_node_hwinfo() of CPUPlugin and MemoryPlugin are implemented, use the code below.
+                # FIXME: Use gather_hwinfo() when we implement get_node_hwinfo() of CPUPlugin and MemoryPlugin like below.
                 # result = await rpc.call.gather_hwinfo()
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
