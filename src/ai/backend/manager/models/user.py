@@ -660,7 +660,6 @@ class CreateUser(graphene.Mutation):
                 groups.c.type == ProjectType.MODEL_STORE
             )
             model_store_gid = (await conn.execute(model_store_query)).first()["id"]
-
             gids_to_join = [*group_ids, model_store_gid]
 
             # Add user to groups if group_ids parameter is provided.
