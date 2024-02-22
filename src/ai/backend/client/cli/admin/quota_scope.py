@@ -5,6 +5,7 @@ import click
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 
 from ...output.fields import group_fields, quota_scope_fields, user_fields
 from ..pretty import print_error, print_fail
@@ -25,9 +26,14 @@ def quota_scope():
     """Quota scope administration commands."""
 
 
-def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, session: Session):
+def _get_qsid_from_identifier(
+    type: QuotaScopeType,
+    domain_name: str,
+    identifier: str,
+    session: Session,
+) -> QuotaScopeID | None:
     match type:
-        case "user":
+        case QuotaScopeType.USER:
             try:
                 user_id = uuid.UUID(identifier)
             except ValueError:
@@ -39,13 +45,12 @@ def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, sess
                 )
                 if user_info is None:
                     return None
-                user_qsid = f"user:{user_info['uuid']}"
+                user_id = user_info["uuid"]
             else:
-                # In case identifier is the user ID
-                user_qsid = f"user:{user_id}"
-            return user_qsid
-
-        case "project":
+                # Use the user_id as-is if it's already a valid uuid.
+                pass
+            return QuotaScopeID(type, user_id)
+        case QuotaScopeType.PROJECT:
             try:
                 project_id = uuid.UUID(identifier)
             except ValueError:
@@ -57,11 +62,11 @@ def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, sess
                 )
                 if project_info is None:
                     return None
-                project_qsid = f"project:{project_info['id']}"
+                project_id = project_info["id"]
             else:
-                # In case identifier is the project ID
-                project_qsid = f"project:{project_id}"
-            return project_qsid
+                # Use the project_id as-is if it's already a valid uuid.
+                pass
+            return QuotaScopeID(type, project_id)
 
 
 @quota_scope.command()
@@ -71,11 +76,12 @@ def _get_qsid_from_identifier(type: str, domain_name: str, identifier: str, sess
 @click.option(
     "-t",
     "--type",
-    type=click.Choice(["user", "project"]),
-    default="user",
+    "type_",
+    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def get(host, domain_name, identifier, type):
+def get(host, domain_name, identifier, type_):
     """Get a quota scope.
 
     \b
@@ -91,7 +97,7 @@ def get(host, domain_name, identifier, type):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type,
+                type=type_,
                 domain_name=domain_name,
                 identifier=identifier,
                 session=session,
@@ -120,11 +126,12 @@ def get(host, domain_name, identifier, type):
 @click.option(
     "-t",
     "--type",
-    type=click.Choice(["user", "project"]),
-    default="user",
+    "type_",
+    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def set(host, domain_name, identifier, limit_bytes, type):
+def set(host, domain_name, identifier, limit_bytes, type_):
     """Set a quota scope.
 
     \b
@@ -136,7 +143,7 @@ def set(host, domain_name, identifier, limit_bytes, type):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type,
+                type=type_,
                 domain_name=domain_name,
                 identifier=identifier,
                 session=session,
@@ -162,11 +169,12 @@ def set(host, domain_name, identifier, limit_bytes, type):
 @click.option(
     "-t",
     "--type",
-    type=click.Choice(["user", "project"]),
-    default="user",
+    "type_",
+    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def unset(host, domain_name, identifier, type):
+def unset(host, domain_name, identifier, type_):
     """Unset a quota scope.
 
     \b
@@ -177,7 +185,7 @@ def unset(host, domain_name, identifier, type):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type,
+                type=type_,
                 domain_name=domain_name,
                 identifier=identifier,
                 session=session,
