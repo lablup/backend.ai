@@ -96,6 +96,7 @@ jobs:
           labels: backport
           assignees: ${{ github.actor }}
       - name: Enable auto-merge
-        run: gh pr merge ${{ steps.pr.outputs.number }} --auto --squash
+        if: ${{ steps.pr.outputs.pull-request-number }}
+        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --auto --squash
         env:
           GH_TOKEN: ${{ github.token }}
