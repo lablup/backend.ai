@@ -804,25 +804,23 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 @attrs.define(slots=True, frozen=True)
 class QuotaScopeID:
     scope_type: QuotaScopeType
-    scope_id: Any
+    scope_id: uuid.UUID
 
     @classmethod
     def parse(cls, raw: str) -> QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
-        match scope_type:
-            case "project":
-                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
-            case "user":
-                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+        match scope_type.lower():
+            case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
+                return cls(t, uuid.UUID(rest))
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+                raise ValueError(f"Unsupported quota scope type {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
             case uuid.UUID():
                 return f"{self.scope_type.value}:{str(self.scope_id)}"
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Unsupported quota scope id {self.scope_id!r}")
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -833,7 +831,7 @@ class QuotaScopeID:
             case uuid.UUID():
                 return self.scope_id.hex
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Unsupported quota scope id {self.scope_id!r}")
 
 
 class VFolderID:
@@ -968,7 +966,7 @@ class QuotaConfig:
         return cls.Validator()
 
 
-class QuotaScopeType(str, enum.Enum):
+class QuotaScopeType(enum.StrEnum):
     USER = "user"
     PROJECT = "project"
 

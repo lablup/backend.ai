@@ -47,7 +47,7 @@ def _get_qsid_from_identifier(
                 )
                 if user_info is None:
                     return None
-                user_id = user_info["uuid"]
+                user_id = uuid.UUID(user_info["uuid"])
             else:
                 # Use the user_id as-is if it's already a valid uuid.
                 pass
@@ -64,7 +64,7 @@ def _get_qsid_from_identifier(
                 )
                 if project_info is None:
                     return None
-                project_id = project_info["id"]
+                project_id = uuid.UUID(project_info["id"])
             else:
                 # Use the project_id as-is if it's already a valid uuid.
                 pass
@@ -74,8 +74,16 @@ def _get_qsid_from_identifier(
 @quota_scope.command()
 @pass_ctx_obj
 @click.argument("host", type=str)
-@click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
+@click.option(
+    "-d",
+    "--domain",
+    "--domain-name",
+    "domain_name",
+    type=str,
+    default="default",
+    help="Specify the domain name",
+)
 @click.option(
     "-t",
     "--type",
@@ -128,9 +136,17 @@ def get(
 @quota_scope.command(name="set")
 @pass_ctx_obj
 @click.argument("host", type=str)
-@click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
 @click.argument("limit_bytes", type=int)
+@click.option(
+    "-d",
+    "--domain",
+    "--domain-name",
+    "domain_name",
+    type=str,
+    default="default",
+    help="Specify the domain name",
+)
 @click.option(
     "-t",
     "--type",
@@ -179,8 +195,16 @@ def set_(
 @quota_scope.command()
 @pass_ctx_obj
 @click.argument("host", type=str)
-@click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
+@click.option(
+    "-d",
+    "--domain",
+    "--domain-name",
+    "domain_name",
+    type=str,
+    default="default",
+    help="Specify the domain name",
+)
 @click.option(
     "-t",
     "--type",
