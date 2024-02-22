@@ -1324,6 +1324,8 @@ def _build_sql_stmt_from_sql_arg(
 
     if offset is not None:
         stmt = stmt.offset(offset)
+    for cond in conditions:
+        stmt = stmt.where(cond)
     return stmt, conditions
 
 
