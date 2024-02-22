@@ -4,11 +4,12 @@ import uuid
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.session import Session
 from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType
 
+from ...cli.extensions import pass_ctx_obj
+from ...cli.types import CLIContext
 from ...output.fields import group_fields, quota_scope_fields, user_fields
-from ..pretty import print_error, print_fail
+from ...session import Session
 from . import admin
 
 _user_query_fields = (
@@ -71,6 +72,7 @@ def _get_qsid_from_identifier(
 
 
 @quota_scope.command()
+@pass_ctx_obj
 @click.argument("host", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
@@ -83,6 +85,7 @@ def _get_qsid_from_identifier(
     help="Specify per-user quota scope or per-project quota scope",
 )
 def get(
+    ctx: CLIContext,
     host: str,
     domain_name: str,
     identifier: str,
@@ -109,22 +112,21 @@ def get(
                 session=session,
             )
             if qsid is None:
-                print_fail("Identifier is not valid")
+                ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
             result = session.QuotaScope.get_quota_scope(
                 host=host,
                 qsid=qsid,
                 fields=qs_query_fields,
             )
-
-            print(f"Used {result['usage_bytes']} bytes out of {result['hard_limit_bytes']} bytes.")
-
+            ctx.output.print_item(result, qs_query_fields)
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @quota_scope.command(name="set")
+@pass_ctx_obj
 @click.argument("host", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
@@ -138,6 +140,7 @@ def get(
     help="Specify per-user quota scope or per-project quota scope",
 )
 def set_(
+    ctx: CLIContext,
     host: str,
     domain_name: str,
     identifier: str,
@@ -161,7 +164,7 @@ def set_(
                 session=session,
             )
             if qsid is None:
-                print_fail("Identifier is not valid")
+                ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
             session.QuotaScope.set_quota_scope(
                 host=host,
@@ -169,11 +172,12 @@ def set_(
                 config=QuotaConfig(limit_bytes=limit_bytes),
             )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @quota_scope.command()
+@pass_ctx_obj
 @click.argument("host", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
@@ -186,6 +190,7 @@ def set_(
     help="Specify per-user quota scope or per-project quota scope",
 )
 def unset(
+    ctx: CLIContext,
     host: str,
     domain_name: str,
     identifier: str,
@@ -207,12 +212,12 @@ def unset(
                 session=session,
             )
             if qsid is None:
-                print_fail("Identifier is not valid")
+                ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
             session.QuotaScope.unset_quota_scope(
                 host=host,
                 qsid=qsid,
             )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
