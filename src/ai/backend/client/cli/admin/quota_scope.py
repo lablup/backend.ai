@@ -27,12 +27,13 @@ def quota_scope():
 
 
 def _get_qsid_from_identifier(
-    type: QuotaScopeType,
-    domain_name: str,
+    type_: QuotaScopeType,
     identifier: str,
+    *,
+    domain_name: str,
     session: Session,
 ) -> QuotaScopeID | None:
-    match type:
+    match type_:
         case QuotaScopeType.USER:
             try:
                 user_id = uuid.UUID(identifier)
@@ -49,7 +50,7 @@ def _get_qsid_from_identifier(
             else:
                 # Use the user_id as-is if it's already a valid uuid.
                 pass
-            return QuotaScopeID(type, user_id)
+            return QuotaScopeID(type_, user_id)
         case QuotaScopeType.PROJECT:
             try:
                 project_id = uuid.UUID(identifier)
@@ -66,7 +67,7 @@ def _get_qsid_from_identifier(
             else:
                 # Use the project_id as-is if it's already a valid uuid.
                 pass
-            return QuotaScopeID(type, project_id)
+            return QuotaScopeID(type_, project_id)
 
 
 @quota_scope.command()
@@ -77,11 +78,16 @@ def _get_qsid_from_identifier(
     "-t",
     "--type",
     "type_",
-    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    type=click.Choice([*QuotaScopeType], case_sensitive=False),
     default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def get(host, domain_name, identifier, type_):
+def get(
+    host: str,
+    domain_name: str,
+    identifier: str,
+    type_: QuotaScopeType,
+) -> None:
     """Get a quota scope.
 
     \b
@@ -97,9 +103,9 @@ def get(host, domain_name, identifier, type_):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type_,
+                type_,
+                identifier,
                 domain_name=domain_name,
-                identifier=identifier,
                 session=session,
             )
             if qsid is None:
@@ -118,7 +124,7 @@ def get(host, domain_name, identifier, type_):
             sys.exit(ExitCode.FAILURE)
 
 
-@quota_scope.command()
+@quota_scope.command(name="set")
 @click.argument("host", type=str)
 @click.argument("domain_name", type=str)
 @click.argument("identifier", type=str)
@@ -127,11 +133,17 @@ def get(host, domain_name, identifier, type_):
     "-t",
     "--type",
     "type_",
-    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    type=click.Choice([*QuotaScopeType], case_sensitive=False),
     default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def set(host, domain_name, identifier, limit_bytes, type_):
+def set_(
+    host: str,
+    domain_name: str,
+    identifier: str,
+    limit_bytes: int,
+    type_: QuotaScopeType,
+) -> None:
     """Set a quota scope.
 
     \b
@@ -143,9 +155,9 @@ def set(host, domain_name, identifier, limit_bytes, type_):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type_,
+                type_,
+                identifier,
                 domain_name=domain_name,
-                identifier=identifier,
                 session=session,
             )
             if qsid is None:
@@ -170,11 +182,16 @@ def set(host, domain_name, identifier, limit_bytes, type_):
     "-t",
     "--type",
     "type_",
-    type=click.Choice([*QuotaScopeType.__members__.keys()], case_sensitive=False),
+    type=click.Choice([*QuotaScopeType], case_sensitive=False),
     default=QuotaScopeType.USER,
     help="Specify per-user quota scope or per-project quota scope",
 )
-def unset(host, domain_name, identifier, type_):
+def unset(
+    host: str,
+    domain_name: str,
+    identifier: str,
+    type_: QuotaScopeType,
+) -> None:
     """Unset a quota scope.
 
     \b
@@ -185,9 +202,9 @@ def unset(host, domain_name, identifier, type_):
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
-                type=type_,
+                type_,
+                identifier,
                 domain_name=domain_name,
-                identifier=identifier,
                 session=session,
             )
             if qsid is None:
