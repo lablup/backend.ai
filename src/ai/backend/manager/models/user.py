@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
@@ -27,7 +26,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 
-from ..api.exceptions import GroupNotFound, VFolderOperationFailed
+from ..api.exceptions import VFolderOperationFailed
 from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
@@ -552,7 +551,6 @@ class UserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
-    default_groups = graphene.List(lambda: graphene.String, required=False, default_value=None)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -663,18 +661,7 @@ class CreateUser(graphene.Mutation):
             )
             model_store_gid = (await conn.execute(model_store_query)).first()["id"]
 
-            async def get_group_ids(conn, g_names):
-                g_ids = await asyncio.gather(*[
-                    conn.scalar(sa.select([groups.c.id]).where(groups.c.name == name))
-                    for name in g_names
-                ])
-                for name, g_id in zip(g_names, g_ids):
-                    if g_id is None:
-                        raise GroupNotFound(f"Group '{name}' does not exist")
-                return g_ids
-
-            default_group_ids = await get_group_ids(conn, props.default_groups)
-            gids_to_join = [*default_group_ids, *group_ids, model_store_gid]
+            gids_to_join = [*group_ids, model_store_gid]
 
             # Add user to groups if group_ids parameter is provided.
             if gids_to_join:
