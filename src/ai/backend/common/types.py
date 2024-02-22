@@ -818,7 +818,7 @@ class QuotaScopeID:
     def __str__(self) -> str:
         match self.scope_id:
             case uuid.UUID():
-                return f"{self.scope_type.value}:{str(self.scope_id)}"
+                return f"{self.scope_type}:{str(self.scope_id)}"
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 

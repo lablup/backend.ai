@@ -3,6 +3,7 @@ import uuid
 
 import click
 
+from ai.backend.cli.params import ByteSizeParamType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType
 
@@ -103,7 +104,6 @@ def get(
 
     \b
     HOST: Name of the host to get quota scope.
-    DOMAIN_NAME: Domain name of user or project.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
     qs_query_fields = (
@@ -137,7 +137,7 @@ def get(
 @pass_ctx_obj
 @click.argument("host", type=str)
 @click.argument("identifier", type=str)
-@click.argument("limit_bytes", type=int)
+@click.argument("limit_bytes", type=ByteSizeParamType())
 @click.option(
     "-d",
     "--domain",
@@ -167,7 +167,6 @@ def set_(
 
     \b
     HOST: Name of the host to set quota scope.
-    DOMAIN_NAME: Domain name of user or project.
     IDENTIFIER: ID or email for user, ID or name for project.
     LIMIT_BYTES: Size to be allocated to quota scope of a user or project. (in bytes)
     """
@@ -224,7 +223,6 @@ def unset(
 
     \b
     HOST: Name of the host to unset quota scope.
-    DOMAIN_NAME: Domain name of user or project.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
     with Session() as session:
