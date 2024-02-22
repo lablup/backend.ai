@@ -220,14 +220,12 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     ),
 )
 @click.option(
-    "-d",
-    "--default-group",
+    "-g",
+    "--group",
     type=CommaSeparatedListType(),
     default=None,
     help=(
-        "Add default group. "
-        'default group name is "default". '
-        '(e.g., --default-group "group1","group2",...)'
+        "Add group. " 'default group name is "default". ' '(e.g., --group "group1","group2",...)'
     ),
 )
 def add(
@@ -243,7 +241,7 @@ def add(
     allowed_ip: str | None,
     description: str,
     sudo_session_enabled: bool,
-    default_group: Iterable[str] | None,
+    group: Iterable[str] | None,
 ):
     """
     Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
@@ -267,7 +265,7 @@ def add(
                 allowed_client_ip=allowed_ip,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
-                default_groups=default_group if default_group is not None else ["default"],
+                default_groups=group if group is not None else ["default"],
                 fields=(
                     user_fields["domain_name"],
                     user_fields["email"],
