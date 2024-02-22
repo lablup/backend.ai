@@ -103,7 +103,7 @@ def get(
     """Get a quota scope.
 
     \b
-    HOST: Name of the host to get quota scope.
+    HOST: Name of the vfolder host (storage volume) to query the quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
     qs_query_fields = (
@@ -166,9 +166,9 @@ def set_(
     """Set a quota scope.
 
     \b
-    HOST: Name of the host to set quota scope.
+    HOST: Name of the vfolder host (storage volume) to set the quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
-    LIMIT_BYTES: Size to be allocated to quota scope of a user or project. (in bytes)
+    LIMIT_BYTES: Byte-size to be allocated to quota scope of a user or project. (e.g., 1t, 500g)
     """
     with Session() as session:
         try:
@@ -222,7 +222,7 @@ def unset(
     """Unset a quota scope.
 
     \b
-    HOST: Name of the host to unset quota scope.
+    HOST: Name of the vfolder host (storage volume) to unset the given quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
     with Session() as session:
