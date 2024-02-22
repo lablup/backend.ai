@@ -13,6 +13,7 @@ import uuid
 from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -33,7 +34,7 @@ import trafaret as t
 import yaml
 from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -212,9 +213,13 @@ def check_api_params(
     return wrap
 
 
+class BaseResponseModel(BaseModel):
+    status: Annotated[int, Field(strict=True, gt=0)] = 200
+
+
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseResponseModel)
 
 TPydanticResponse: TypeAlias = TResponseModel | list
 THandlerFuncWithoutParam: TypeAlias = Callable[
@@ -229,8 +234,8 @@ def ensure_stream_response_type(
     response: TResponseModel | list | TAnyResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseModel():
-            return web.json_response(response.model_dump(mode="json"))
+        case BaseResponseModel(status):
+            return web.json_response(response.model_dump(mode="json"), status=status)
         case list():
             return web.json_response(
                 TypeAdapter(list[TResponseModel]).dump_python(response, mode="json")
