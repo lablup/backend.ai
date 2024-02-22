@@ -8,53 +8,61 @@ on:
 jobs:
   backport-target-branch:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.milestones.outputs.matrix }}
+      latest_commit: ${{ steps.commit.outputs.latest_commit }}
+      commit_message: ${{ steps.commit.outputs.commit_message }}
+      pr_number: ${{ steps.commit.outputs.pr_number }}
+      latest_release: ${{ steps.commit.outputs.latest_release }}
     steps:
       - uses: actions/checkout@v4
       - name: Extract pr_number from commit message
+        id: commit
         run: |
           latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
           echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
           commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
           echo "commit_message=$commit_message" >> $GITHUB_OUTPUT
           pr_number=$(echo $commit_message | grep -oP "\(#\d+\)$" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
+          echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
+          echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
       - name: Check if this is a merged pr commit
         run: |
-          if [[ -z "$pr_number" ]]; then
+          if [[ -z "${{ steps.commit.outputs.pr_number }}" ]]; then
             echo "This is not a merged pr commit."
             exit 0
           fi
-      - name: Get latest release
+          # 실패표시없이 종료시키는 방법으로 수정
+      - name: Get target milestones
+        id: milestones
         run: |
-          latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
-          echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
-      - name: Get target milestone
-        run: |
-          tartget_milestone=$(gh pr view $pr_number --json milestone.title --jq .milestone.title)
-      - uses: actions/checkout@v4
-      - name: Get milestone list
-        run: |
+          target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
+
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
-      - name: Remove Backlog from milestone list
-        run: |
+          echo $milestones
+
           milestones=($milestones)
           for i in "${!milestones[@]}"; do
             if [[ "${milestones[$i]}" == "Backlog" ]]; then
               unset 'milestones[$i]'
             fi
           done
-      - name: Sort milestone list
-        run: |
-          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort))
-      - name: Get target milestones
-        run: |
+          echo "${milestones[@]}"
+
+          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -r))
+          echo "${sort_milestones[@]}"
           for i in "${!sort_milestones[@]}"; do
-            echo "$i: ${sort_milestones[$i]}"
             if [[ "${sort_milestones[$i]}" == "$target_milestone" ]]; then
               target_milestones=("${sort_milestones[@]:0:$((i+1))}")
               break
             fi
           done
-          echo "matrix={\"milestone\":[$(printf "%s," "${target_milestones[@]}")]}" >> $GITHUB_OUTPUT
+          matrix=$(jq -nc '{include: $ARGS.positional | map_values({milestone: .})}' --args "${target_milestones[@]}")
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: echo ${{ steps.milestones.outputs.matrix }}
 
   backport:
     runs-on: ubuntu-latest
@@ -67,9 +75,17 @@ jobs:
           ref: ${{ matrix.milestone }}
       - name: Cherry-pick
         run: |
-          git cherry-pick ${{ needs.backport-target-branch.outputs.latest_commit }}
-          git commit --amend -m "${{ needs.backport-target-branch.outputs.commit_message }} Backported-from: main($latest_release) Backported-to: ${{ matrix.milestone }} Backport-of: ${{ needs.backport-target-branch.outputs.pr_number }}"
+          git config --global user.name "$GITHUB_ACTOR"
+          git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git fetch origin main --depth=2
+          git cherry-pick --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
+          git commit \
+            --amend -m "${{ needs.backport-target-branch.outputs.commit_message }}" \
+            --trailer "Backported-from=main($latest_release)" \
+            --trailer "Backported-to=${{ matrix.milestone }}" \
+            --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
       - name: Create Bakport PR
+        id: pr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -80,4 +96,6 @@ jobs:
           labels: backport
           assignees: ${{ github.actor }}
       - name: Enable auto-merge
-        run: gh pr merge ${{ needs.backport-target-branch.outputs.pr_number }} --auto
+        run: gh pr merge ${{ steps.pr.outputs.number }} --auto --squash
+        env:
+          GH_TOKEN: ${{ github.token }}
