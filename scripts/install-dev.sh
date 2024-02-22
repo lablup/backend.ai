@@ -972,16 +972,6 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
 
-  # Docker registry setup
-  show_info "Configuring the Lablup's official image registry..."
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-  else
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-  fi
-
   # Scan the container image registry
   show_info "Scanning the image registry..."
   ./backend.ai mgr image rescan cr.backend.ai
