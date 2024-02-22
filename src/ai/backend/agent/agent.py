@@ -1389,7 +1389,7 @@ class AbstractAgent(
             match result:
                 case NotImplementedError():
                     continue
-                case BaseException():
+                case Exception():
                     hwinfo[device_name] = {
                         "status": "unavailable",
                         "status_info": str(result),
