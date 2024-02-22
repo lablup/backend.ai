@@ -5,7 +5,7 @@ import click
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType
 
 from ...output.fields import group_fields, quota_scope_fields, user_fields
 from ..pretty import print_error, print_fail
@@ -166,9 +166,8 @@ def set_(
             session.QuotaScope.set_quota_scope(
                 host=host,
                 qsid=qsid,
-                hard_limit_bytes=limit_bytes,
+                config=QuotaConfig(limit_bytes=limit_bytes),
             )
-
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -214,7 +213,6 @@ def unset(
                 host=host,
                 qsid=qsid,
             )
-
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
