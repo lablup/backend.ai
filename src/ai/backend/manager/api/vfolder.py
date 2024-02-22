@@ -118,7 +118,6 @@ from .utils import (
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
-    pydantic_response_api_handler,
 )
 
 if TYPE_CHECKING:
@@ -2314,6 +2313,13 @@ async def delete_by_name(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class IDRequestModel(BaseModel):
+    name: str = Field(
+        validation_alias=AliasChoices("vfolder_name", "vfolderName", "name"),
+        description="Target vfolder name",
+    )
+
+
 class CompactVFolderInfoModel(BaseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
@@ -2321,11 +2327,11 @@ class CompactVFolderInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_response_api_handler
-async def get_vfolder_id(request: web.Request) -> CompactVFolderInfoModel:
+@pydantic_params_api_handler(IDRequestModel)
+async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
 
-    folder_name = request.match_info["name"]
+    folder_name = params.name
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -3446,7 +3452,7 @@ def create_app(default_cors_options):
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
     cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
-    cors.add(add_route("GET", r"/{name}/id", get_vfolder_id))
+    cors.add(add_route("GET", r"/_/id", get_vfolder_id))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
