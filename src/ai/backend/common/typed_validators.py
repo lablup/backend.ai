@@ -1,4 +1,5 @@
 import datetime
+import enum
 import re
 from typing import Annotated, Any, TypeAlias
 
@@ -156,3 +157,92 @@ def session_name_validator(s: str) -> str:
 
 SessionName = Annotated[str, AfterValidator(session_name_validator)]
 """Validator with extended re.ASCII option to match session name string literal"""
+
+
+class _SlugPydanticAnnotation:
+    _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+    min_length: int | None = None
+    max_length: int | None = None
+    allow_dot: bool = False
+
+    @classmethod
+    def _validate(
+        cls,
+        value: str,
+    ) -> str:
+        if cls.min_length is not None and len(value) < cls.min_length:
+            raise AssertionError(f"value is too short (min length {cls.min_length})")
+        if cls.max_length is not None and len(value) > cls.max_length:
+            raise AssertionError(f"value is too long (max length {cls.max_length})")
+
+        _val = value
+        if cls.allow_dot and value.startswith("."):
+            _val = value[1:]
+        if not cls._rx_slug.search(_val):
+            raise AssertionError(f"Given value is not valid slug. (value: {_val})")
+        return _val
+
+    @classmethod
+    def _serialize(cls, value: str) -> str:
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.str_schema(),
+            # serialization=core_schema.plain_serializer_function_ser_schema(
+            #     cls._serialize,
+            #     info_arg=False,
+            #     return_schema=core_schema.str_schema(),
+            # ),
+        )
+
+
+class _VFolderNamePydanticAnnotation(_SlugPydanticAnnotation):
+    allow_dot = True
+
+
+VFolderName = Annotated[str, _VFolderNamePydanticAnnotation]
+"""Virtual folder name validator"""
+
+
+class EnumNamePydanticAnnotation:
+    t_enum = enum.Enum
+
+    @classmethod
+    def _validate(
+        cls,
+        value: str,
+    ) -> enum.Enum:
+        try:
+            _value = cls.t_enum[value]
+        except KeyError:
+            raise AssertionError(
+                f"Given value is not valid enum name. (value: {value}, enum: {cls.t_enum})"
+            )
+        return _value
+
+    @classmethod
+    def _serialize(cls, value: enum.Enum) -> str:
+        return value.name
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.str_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize,
+                info_arg=False,
+                return_schema=core_schema.str_schema(),
+            ),
+        )

@@ -241,12 +241,12 @@ def ensure_stream_response_type(
             raise RuntimeError(f"Unsupported response type ({type(response)})")
 
 
-def pydantic_response_api_handler(
+def pydantic_api_reponse_handler(
     handler: THandlerFuncWithoutParam,
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
-    For handlers with params to consume use @pydantic_params_api_handler() or
+    For handlers with params to consume use @pydantic_api_params_handler() or
     @check_api_params() decorator (only when request param is validated with trafaret).
     """
 
@@ -260,7 +260,7 @@ def pydantic_response_api_handler(
     return wrapped
 
 
-def pydantic_params_api_handler(
+def pydantic_api_params_handler(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
