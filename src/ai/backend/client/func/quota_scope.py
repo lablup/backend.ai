@@ -1,6 +1,8 @@
 import textwrap
 from typing import Any, Sequence
 
+from ai.backend.common.types import QuotaScopeID
+
 from ..output.fields import group_fields, quota_scope_fields, user_fields
 from ..output.types import FieldSpec
 from ..session import api_session
@@ -81,7 +83,7 @@ class QuotaScope(BaseFunction):
     async def get_quota_scope(
         cls,
         host: str,
-        qsid: str,
+        qsid: QuotaScopeID,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ):
         query = textwrap.dedent(
@@ -96,7 +98,7 @@ class QuotaScope(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "storage_host_name": host,
-            "quota_scope_id": qsid,
+            "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["quota_scope"]["details"]
@@ -106,7 +108,7 @@ class QuotaScope(BaseFunction):
     async def set_quota_scope(
         cls,
         host: str,
-        qsid: str,
+        qsid: QuotaScopeID,
         hard_limit_bytes: int,
         fields: Sequence[FieldSpec] = _default_quota_scope_fields,
     ):
@@ -124,7 +126,7 @@ class QuotaScope(BaseFunction):
         set_if_set(inputs, "hard_limit_bytes", hard_limit_bytes)
         variables = {
             "storage_host_name": host,
-            "quota_scope_id": qsid,
+            "quota_scope_id": str(qsid),
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -135,7 +137,7 @@ class QuotaScope(BaseFunction):
     async def unset_quota_scope(
         cls,
         host: str,
-        qsid: str,
+        qsid: QuotaScopeID,
         fields: Sequence[FieldSpec] = _default_quota_scope_fields,
     ):
         query = textwrap.dedent(
@@ -150,7 +152,7 @@ class QuotaScope(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "storage_host_name": host,
-            "quota_scope_id": qsid,
+            "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["unset_quota_scope"]["quota_scope"]
