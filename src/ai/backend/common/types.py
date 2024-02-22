@@ -813,14 +813,14 @@ class QuotaScopeID:
             case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
                 return cls(t, uuid.UUID(rest))
             case _:
-                raise ValueError(f"Unsupported quota scope type {scope_type!r}")
+                raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
             case uuid.UUID():
                 return f"{self.scope_type.value}:{str(self.scope_id)}"
             case _:
-                raise ValueError(f"Unsupported quota scope id {self.scope_id!r}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -831,7 +831,7 @@ class QuotaScopeID:
             case uuid.UUID():
                 return self.scope_id.hex
             case _:
-                raise ValueError(f"Unsupported quota scope id {self.scope_id!r}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
 
 class VFolderID:
