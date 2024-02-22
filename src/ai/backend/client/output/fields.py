@@ -323,9 +323,9 @@ routing_fields = FieldSet([
 
 
 quota_scope_fields = FieldSet([
-    FieldSpec("usage_bytes"),
+    FieldSpec("usage_bytes", formatter=sizebytes_output_formatter),
     FieldSpec("usage_count"),
-    FieldSpec("hard_limit_bytes"),
+    FieldSpec("hard_limit_bytes", formatter=sizebytes_output_formatter),
     FieldSpec("quota_scope_id"),
     FieldSpec("storage_host_name"),
 ])
