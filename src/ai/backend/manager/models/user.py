@@ -1098,7 +1098,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
 
         async with engine.begin_session() as conn:
             await conn.execute(
@@ -1113,7 +1113,7 @@ class PurgeUser(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            await initiate_vfolder_purge(
+            await initiate_vfolder_deletion(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
