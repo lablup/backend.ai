@@ -1292,8 +1292,8 @@ def _build_sql_stmt_from_connection_args(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
 ) -> tuple[sa.sql.Select, list[WhereClauseType]]:
@@ -1306,8 +1306,8 @@ def _build_sql_stmt_from_connection_args(
     id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
-        parser = QueryOrderParser()
-        ordering_item_list = parser.parse_order(orm_class, order_expr)
+        parser = order_expr.parser
+        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
 
     # Apply SQL order_by
     match pagination_order:
@@ -1346,8 +1346,8 @@ def _build_sql_stmt_from_connection_args(
         stmt = stmt.limit(requested_page_size + 1)
 
     if filter_expr is not None:
-        condition_parser = QueryFilterParser()
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+        condition_parser = filter_expr.parser
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
 
     for cond in conditions:
         stmt = stmt.where(cond)
@@ -1358,8 +1358,8 @@ def _build_sql_stmt_from_sql_arg(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     *,
     limit: int | None = None,
     offset: int | None = None,
@@ -1368,22 +1368,23 @@ def _build_sql_stmt_from_sql_arg(
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
-        parser = QueryOrderParser()
-        stmt = parser.append_ordering(stmt, order_expr)
+        parser = order_expr.parser
+        stmt = parser.append_ordering(stmt, order_expr.expr)
 
     # default order_by id column
     stmt = stmt.order_by(id_column.asc())
 
     if filter_expr is not None:
-        condition_parser = QueryFilterParser()
-        # stmt = condition_parser.append_filter(stmt, filter_expr)
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+        condition_parser = filter_expr.parser
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
 
     if limit is not None:
         stmt = stmt.limit(limit)
 
     if offset is not None:
         stmt = stmt.offset(offset)
+    for cond in conditions:
+        stmt = stmt.where(cond)
     return stmt, conditions
 
 
@@ -1395,12 +1396,22 @@ class GraphQLConnectionSQLInfo(NamedTuple):
     requested_page_size: int | None
 
 
+class FilterExprArg(NamedTuple):
+    expr: str
+    parser: QueryFilterParser
+
+
+class OrderExprArg(NamedTuple):
+    expr: str
+    parser: QueryOrderParser
+
+
 def generate_sql_info_for_gql_connection(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     offset: int | None = None,
     after: str | None = None,
     first: int | None = None,
