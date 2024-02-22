@@ -715,12 +715,16 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
+        if not sess_ctx.kernels:
+            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
 
         try:
+            if not candidate_agents:
+                raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -1011,12 +1015,24 @@ class SchedulerDispatcher(aobject):
                     agent: Optional[AgentRow] = kernel.agent_row
                     if agent is not None:
                         # Check the resource availability of the manually designated agent
-                        query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
-                        available_agent_slots = (await agent_db_sess.execute(query)).scalar()
-                        if available_agent_slots is None:
-                            raise GenericBadRequest(f"No such agent: {agent.id}")
-                        for key in available_agent_slots:
-                            if available_agent_slots[key] >= kernel.requested_slots[key]:
+                        result = (
+                            await agent_db_sess.execute(
+                                sa.select([
+                                    AgentRow.available_slots,
+                                    AgentRow.occupied_slots,
+                                ]).where(AgentRow.id == agent.id)
+                            )
+                        ).fetchall()[0]
+
+                        if result is None:
+                            raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+                        available_slots, occupied_slots = result
+
+                        for key in available_slots.keys():
+                            if (
+                                available_slots[key] - occupied_slots[key]
+                                >= kernel.requested_slots[key]
+                            ):
                                 continue
                             else:
                                 raise InstanceNotAvailable(
@@ -1024,7 +1040,7 @@ class SchedulerDispatcher(aobject):
                                         f"The designated agent ({agent.id}) does not have "
                                         f"the enough remaining capacity ({key}, "
                                         f"requested: {sess_ctx.requested_slots[key]}, "
-                                        f"available: {available_agent_slots[key]})."
+                                        f"remaining: {available_slots[key] - occupied_slots[key]})."
                                     ),
                                 )
                         agent_id = agent.id
@@ -1033,6 +1049,10 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
+                        if not candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg="No agents are available for scheduling"
+                            )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
