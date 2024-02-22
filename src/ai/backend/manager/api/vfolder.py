@@ -2396,7 +2396,7 @@ async def delete_from_trash_bin(
     await ensure_vfolder_status(
         request, VFolderAccessStatus.HARD_DELETABLE, folder_id_or_name=folder_id
     )
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
