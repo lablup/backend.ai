@@ -345,7 +345,6 @@ def vfolder_check_exists(
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
         tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
         tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("quota", default=None): tx.BinarySize | t.Null,
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
