@@ -102,7 +102,7 @@ class BaseQuotaModel(AbstractQuotaModel):
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: QuotaConfig,
+        config: QuotaConfig,
     ) -> None:
         # This is a no-op.
         pass
