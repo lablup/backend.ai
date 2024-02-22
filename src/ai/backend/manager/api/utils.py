@@ -234,7 +234,7 @@ def ensure_stream_response_type(
     response: TResponseModel | list | TAnyResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseResponseModel(status):
+        case BaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
         case list():
             return web.json_response(
