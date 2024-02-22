@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import click
 
 from ...session import Session
@@ -13,7 +15,7 @@ def resource() -> None:
 
 
 @resource.command()
-def query_slots():
+def query_slots() -> None:
     """
     Get available resource slots.
     """
@@ -27,7 +29,7 @@ def query_slots():
 
 
 @resource.command()
-def vfolder_types():
+def vfolder_types() -> None:
     """
     Get available vfolder types.
     """
@@ -41,7 +43,7 @@ def vfolder_types():
 
 
 @resource.command()
-def docker_registries():
+def docker_registries() -> None:
     """
     Get registered docker registries.
     """
@@ -55,7 +57,7 @@ def docker_registries():
 
 
 @resource.command()
-def recalculate_usage():
+def recalculate_usage() -> None:
     """
     Re-calculate resource occupation by sessions.
 
@@ -73,7 +75,7 @@ def recalculate_usage():
 @resource.command()
 @click.argument("month", metavar="MONTH")
 @click.argument("groups", metavar="GROUP_IDS", nargs=-1)
-def usage_per_month(month, groups):
+def usage_per_month(month: str, groups: Sequence[str]) -> None:
     """
     Get session usage stats of target groups for specific month.
 
@@ -136,7 +138,7 @@ def usage_per_month(month, groups):
 @click.argument("group")
 @click.argument("start_date")
 @click.argument("end_date")
-def usage_per_period(group, start_date, end_date):
+def usage_per_period(group: str, start_date: str, end_date: str) -> None:
     with Session() as session:
         item = session.Resource.usage_per_period(group, start_date, end_date)
         if "g_id" in item:

@@ -31,8 +31,6 @@ sandbox-type = "docker"
 scratch-type = "hostdir"
 scratch-root = "./scratches"
 scratch-size = "1G"
-scratch-nfs-address = ""
-scratch-nfs-options = ""
 
 
 [watcher]
@@ -70,6 +68,13 @@ protocol = "tcp"
 ssl-enabled = true
 ssl-verify = false
 
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
 
 [resource]
 reserved-cpu = 1

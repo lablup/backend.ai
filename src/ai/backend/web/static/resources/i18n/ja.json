@@ -232,7 +232,25 @@
       "PortsTitleWithRange": "ポート値 (1024 ~ 65535 の間)",
       "PrePortConfigWillDisappear": "保存されていない事前開放ポート値は消えます。",
       "StartModelServing": "モデルサービス開始",
-      "ModelStorage": "モデルストレージフォルダ"
+      "ModelStorage": "モデルストレージフォルダ",
+      "PreOpenPortRangeGuide": "複数の値をカンマ（、）またはスペースで区切って入力できます。",
+      "preopen": "事前開放ポート",
+      "Network": "ネットワーク",
+      "Enable": "活性化",
+      "FolderAliasInvalid": "英語の大文字と小文字、数字、アンダースコア（_）、スラッシュ（/）、ダッシュ（-）のみを入力できます。",
+      "PreOpenPortMaxCountLimit": "count}}までプレオープンポートを設定できる。",
+      "StartTimeMustBeInTheFuture": "開始時刻は現在時刻より後でなければならない。",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "コンテナあたりのリソース割り当て",
+      "NumberOfContainer": "コンテナ数",
+      "EnterEnvironmentVariable": "変数名の入力",
+      "EnvironmentVariableNamePatternError": "変数名は文字またはアンダースコアで始まり、文字、数字、アンダースコアのみを含むことができます。",
+      "EnvironmentVariableDuplicateName": "既に存在する変数名です。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -288,7 +306,9 @@
       "EnterValidSessionName": "正しいセッション名を入力してください",
       "SessionNameRequired": "セッション名を入力してください",
       "SluggedStrings": "最低4文字以上の固有の文字列で入力してください。",
-      "SessionNameAlreadyExist": "同じ名前のセッションが既にあります"
+      "SessionNameAlreadyExist": "同じ名前のセッションが既にあります",
+      "SessionNameTooLong64": "64文字以下で入力してください。",
+      "PleaseFollowSessionNameRule": "少なくとも4文字以上の文字、数字、「.」、「_」、「-」の組み合わせで入力してください。"
     },
     "Interactive": "インタラクティブ",
     "Batch": "バッチ",
@@ -369,7 +389,6 @@
     "DeleteAll": "すべて削除",
     "Update": "更新",
     "Delete": "削除",
-    "Dismiss": "退出させる",
     "DismissAndProceed": "却下して続行",
     "Close": "閉じる",
     "Confirm": "確認",
@@ -422,7 +441,9 @@
     "Control": "コントロール",
     "NewPassword": "新しいパスワード",
     "Enabled": "有効",
-    "StorageProxies": "ストレージ"
+    "StorageProxies": "ストレージ",
+    "None": "なし",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "許可",
@@ -499,7 +520,8 @@
     "KeypairDetail": "キーフェア情報",
     "SignoutSeccessfullyFinished": "ユーザーアカウントが正常に削除されました。",
     "Status": "状態",
-    "NoUserToDisplay": "ユーザー情報がありません。"
+    "NoUserToDisplay": "ユーザー情報がありません。",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "フォルダー",
@@ -664,7 +686,8 @@
     "Used": "使用済み",
     "Pipeline": "パイプラインフォルダ",
     "DialogDataFolder": "FastTrackでパイプライン作成時に自動的に生成されるパイプライン専用フォルダ。",
-    "DialogModelFolder": "モデルを選択して実行したり、モデルを管理することができます。"
+    "DialogModelFolder": "モデルを選択して実行したり、モデルを管理することができます。",
+    "SearchByName": "名前で検索"
   },
   "dialog": {
     "warning": {
@@ -755,7 +778,8 @@
     "RAM": "RAM（GB）",
     "SharedMemory": "共有メモリ（GB）",
     "NoResourcePresetToDisplay": "リソースプリセット情報がありません。",
-    "Deleted": "リソースプリセットの削除に成功しました"
+    "Deleted": "リソースプリセットの削除に成功しました",
+    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない"
   },
   "usersettings": {
     "General": "一般",
@@ -891,7 +915,8 @@
     "PleaseSelectOption": "オプションを1つ選択してください。",
     "RegistrySuccessfullyModified": "レジストリが正常に修正されました。",
     "NoRegistryToDisplay": "レジストリ情報がありません。",
-    "ModifyRegistry": "レジストリの修正"
+    "ModifyRegistry": "レジストリの修正",
+    "ConfirmNoUserName": "ユーザーとパスワードが指定されていません。"
   },
   "resourceGroup": {
     "ResourceGroups": "リソースグループ",
@@ -1329,7 +1354,7 @@
     "FormValidationFailed": "フォーム検証の失敗",
     "StartNewServing": "新サービス開始",
     "ServiceName": "サービス名",
-    "ServiceNameRule": "4～64文字の英字、数字、アンダーライン(_)、ハイフン(-)、ピリオド(.)のみを許可し、英文で英字または数字で終わる必要があります。",
+    "ServiceNameRule": "4～24文字の英字、数字、アンダーライン(_)、ハイフン(-)、ピリオド(.)のみを許可し、英文で英字または数字で終わる必要があります。",
     "OpenToPublic": "アプリを外部に公開",
     "DesiredRoutingCount": "希望のルーティング数",
     "ServingRouteErrorModalTitle": "サービングルートエラー",

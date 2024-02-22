@@ -76,6 +76,7 @@ from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
+from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
 from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
@@ -234,13 +235,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         loop = current_loop()
 
         # Create the scratch, config, and work directories.
-        if (
-            sys.platform.startswith("linux")
-            and self.local_config["container"]["scratch-type"] == "memory"
-        ):
+        scratch_type = self.local_config["container"]["scratch-type"]
+        scratch_root = self.local_config["container"]["scratch-root"]
+        scratch_size = self.local_config["container"]["scratch-size"]
+
+        if sys.platform.startswith("linux") and scratch_type == "memory":
             await loop.run_in_executor(None, partial(self.tmp_dir.mkdir, exist_ok=True))
             await create_scratch_filesystem(self.scratch_dir, 64)
             await create_scratch_filesystem(self.tmp_dir, 64)
+        elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+            await create_loop_filesystem(scratch_root, scratch_size, self.kernel_id)
         else:
             await loop.run_in_executor(None, partial(self.scratch_dir.mkdir, exist_ok=True))
 
@@ -435,58 +439,48 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         if cluster_info["network_name"] == "host":
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": "host",
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            })
         elif cluster_info["network_name"] is not None:
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": cluster_info["network_name"],
-                    },
-                    "NetworkingConfig": {
-                        "EndpointsConfig": {
-                            cluster_info["network_name"]: {
-                                "Aliases": [self.kernel_config["cluster_hostname"]],
-                            },
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": cluster_info["network_name"],
+                },
+                "NetworkingConfig": {
+                    "EndpointsConfig": {
+                        cluster_info["network_name"]: {
+                            "Aliases": [self.kernel_config["cluster_hostname"]],
                         },
                     },
-                }
-            )
+                },
+            })
             if self.gwbridge_subnet is not None:
-                self.container_configs.append(
-                    {
-                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
-                    }
-                )
+                self.container_configs.append({
+                    "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                })
         elif self.local_config["container"].get("alternative-bridge") is not None:
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                },
+            })
         # RDMA mounts
         ib_root = Path("/dev/infiniband")
         if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "Devices": [
-                            {
-                                "PathOnHost": "/dev/infiniband",
-                                "PathInContainer": "/dev/infiniband",
-                                "CgroupPermissions": "rwm",
-                            },
-                        ],
-                    },
-                }
-            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "Devices": [
+                        {
+                            "PathOnHost": "/dev/infiniband",
+                            "PathInContainer": "/dev/infiniband",
+                            "CgroupPermissions": "rwm",
+                        },
+                    ],
+                },
+            })
 
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -881,24 +875,29 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await container.start()
             except asyncio.CancelledError:
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(
+                        container_id=cid, message="Container creation cancelled"
+                    )
                 raise
             except Exception:
                 # Oops, we have to restore the allocated resources!
-                if (
-                    sys.platform.startswith("linux")
-                    and self.local_config["container"]["scratch-type"] == "memory"
-                ):
+                scratch_type = self.local_config["container"]["scratch-type"]
+                scratch_root = self.local_config["container"]["scratch-root"]
+                if sys.platform.startswith("linux") and scratch_type == "memory":
                     await destroy_scratch_filesystem(self.scratch_dir)
                     await destroy_scratch_filesystem(self.tmp_dir)
+                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
                     await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
+                elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+                    await destroy_loop_filesystem(scratch_root, self.kernel_id)
+                else:
+                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
                 self.port_pool.update(host_ports)
                 async with self.resource_lock:
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(container_id=cid, message="unknown")
                 raise
 
             additional_network_names: Set[str] = set()
@@ -917,7 +916,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    host_port = int((await container.port(port))[0]["HostPort"])
+                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    if ports is None:
+                        raise ContainerCreationError(
+                            container_id=cid, message="Container port not found"
+                        )
+                    host_port = int(ports[0]["HostPort"])
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
@@ -1454,18 +1458,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
+                scratch_type = self.local_config["container"]["scratch-type"]
                 scratch_root = self.local_config["container"]["scratch-root"]
                 scratch_dir = scratch_root / str(kernel_id)
                 tmp_dir = scratch_root / f"{kernel_id}_tmp"
                 try:
-                    if (
-                        sys.platform.startswith("linux")
-                        and self.local_config["container"]["scratch-type"] == "memory"
-                    ):
+                    if sys.platform.startswith("linux") and scratch_type == "memory":
                         await destroy_scratch_filesystem(scratch_dir)
                         await destroy_scratch_filesystem(tmp_dir)
+                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
                         await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+                    elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+                        await destroy_loop_filesystem(scratch_root, kernel_id)
+                    else:
+                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
                 except CalledProcessError:
                     pass
                 except FileNotFoundError:
@@ -1473,15 +1479,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            await docker.networks.create(
-                {
-                    "Name": network_name,
-                    "Driver": "bridge",
-                    "Labels": {
-                        "ai.backend.cluster-network": "1",
-                    },
-                }
-            )
+            await docker.networks.create({
+                "Name": network_name,
+                "Driver": "bridge",
+                "Labels": {
+                    "ai.backend.cluster-network": "1",
+                },
+            })
 
     async def destroy_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:

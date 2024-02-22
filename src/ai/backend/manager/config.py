@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import json
-
 """
 Configuration Schema on etcd
 ----------------------------
@@ -46,6 +42,8 @@ Alias keys are also URL-quoted in the same way.
        - timezone: "UTC"  # pytz-compatible timezone names (e.g., "Asia/Seoul")
      + api
        - allow-origins: "*"
+       - allow-openapi-schema-introspection: "yes" | "no"  # (default: no)
+       - allow-graphql-schema-introspection: "yes" | "no"  # (default: no)
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
                                               # (default: false)
@@ -174,6 +172,9 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
+from __future__ import annotations
+
+import json
 import logging
 import os
 import secrets
@@ -234,82 +235,72 @@ NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
 manager_local_config_iv = (
-    t.Dict(
-        {
-            t.Key("db"): t.Dict(
-                {
-                    t.Key("type", default="postgresql"): t.Enum("postgresql"),
-                    t.Key("addr"): tx.HostPortPair,
-                    t.Key("name"): tx.Slug[2:64],
-                    t.Key("user"): t.String,
-                    t.Key("password"): t.String,
-                    t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
-                    t.Key("max-overflow", default=64): t.ToInt[
-                        -1:  # -1 is infinite  # type: ignore
-                    ],
-                }
+    t.Dict({
+        t.Key("db"): t.Dict({
+            t.Key("type", default="postgresql"): t.Enum("postgresql"),
+            t.Key("addr"): tx.HostPortPair,
+            t.Key("name"): tx.Slug[2:64],
+            t.Key("user"): t.String,
+            t.Key("password"): t.String,
+            t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+            t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
+            t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
+            t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
+        }),
+        t.Key("manager"): t.Dict({
+            t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
+                type="dir", auto_create=True
             ),
-            t.Key("manager"): t.Dict(
-                {
-                    t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
-                        type="dir", auto_create=True
-                    ),
-                    t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],
-                    t.Key("id", default=f"i-{socket.gethostname()}"): t.String,
-                    t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
-                    t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
-                    t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
-                    t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
-                    t.Key(
-                        "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
-                    ): tx.Path(type="file"),
-                    t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
-                    t.Key("secret", default=None): t.Null | t.String,
-                    t.Key("ssl-enabled", default=False): t.ToBool,
-                    t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                    t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
-                    t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
-                    t.Key("distributed-lock", default="pg_advisory"): t.Enum(
-                        "filelock", "pg_advisory", "redlock", "etcd"
-                    ),
-                    t.Key("pid-file", default=os.devnull): tx.Path(
-                        type="file",
-                        allow_nonexisting=True,
-                        allow_devnull=True,
-                    ),
-                    t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
-                    t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
-                    t.Key("hide-agents", default=False): t.Bool,
-                    t.Key(
-                        "agent-selection-resource-priority",
-                        default=["cuda", "rocm", "tpu", "cpu", "mem"],
-                    ): t.List(t.String),
-                    t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
-                    t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-                    tx.AliasedKey(
-                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48100
-                    ): t.ToInt[1:65535],
-                    t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
-                }
-            ).allow_extra("*"),
-            t.Key("docker-registry"): t.Dict(
-                {  # deprecated in v20.09
-                    t.Key("ssl-verify", default=True): t.ToBool,
-                }
-            ).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
-            t.Key("debug"): t.Dict(
-                {
-                    t.Key("enabled", default=False): t.ToBool,
-                    t.Key("asyncio", default=False): t.Bool,
-                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
-                    t.Key("log-events", default=False): t.ToBool,
-                    t.Key("log-scheduler-ticks", default=False): t.ToBool,
-                    t.Key("periodic-sync-stats", default=False): t.ToBool,
-                }
-            ).allow_extra("*"),
-        }
-    )
+            t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],
+            t.Key("id", default=f"i-{socket.gethostname()}"): t.String,
+            t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
+            t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
+            t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
+            t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
+            t.Key(
+                "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
+            ): tx.Path(type="file"),
+            t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
+            t.Key("secret", default=None): t.Null | t.String,
+            t.Key("ssl-enabled", default=False): t.ToBool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
+            t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
+            t.Key("distributed-lock", default="pg_advisory"): t.Enum(
+                "filelock", "pg_advisory", "redlock", "etcd"
+            ),
+            t.Key("pid-file", default=os.devnull): tx.Path(
+                type="file",
+                allow_nonexisting=True,
+                allow_devnull=True,
+            ),
+            t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("hide-agents", default=False): t.Bool,
+            t.Key(
+                "agent-selection-resource-priority",
+                default=["cuda", "rocm", "tpu", "cpu", "mem"],
+            ): t.List(t.String),
+            t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
+            t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
+            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48100): t.ToInt[
+                1:65535
+            ],
+            t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
+        }).allow_extra("*"),
+        t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
+            t.Key("ssl-verify", default=True): t.ToBool,
+        }).allow_extra("*"),
+        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("debug"): t.Dict({
+            t.Key("enabled", default=False): t.ToBool,
+            t.Key("asyncio", default=False): t.Bool,
+            t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
+            t.Key("log-events", default=False): t.ToBool,
+            t.Key("log-scheduler-ticks", default=False): t.ToBool,
+            t.Key("periodic-sync-stats", default=False): t.ToBool,
+        }).allow_extra("*"),
+    })
     .merge(config.etcd_config_iv)
     .allow_extra("*")
 )
@@ -320,12 +311,10 @@ _config_defaults: Mapping[str, Any] = {
     },
     "api": {
         "allow-origins": "*",
+        "allow-openapi-schema-introspection": False,
+        "allow-graphql-schema-introspection": False,
     },
-    "redis": {
-        "addr": None,
-        "password": None,
-        "redis_helper_config": config.redis_helper_default_config,
-    },
+    "redis": config.redis_default_config,
     "docker": {
         "registry": {},
         "image": {
@@ -356,18 +345,16 @@ _config_defaults: Mapping[str, Any] = {
     },
 }
 
-container_registry_iv = t.Dict(
-    {
-        t.Key(""): tx.URL,
-        t.Key("type", default="docker"): t.String,
-        t.Key("username", default=None): t.Null | t.String,
-        t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): (
-            t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
-        ),
-        tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
-    }
-).allow_extra("*")
+container_registry_iv = t.Dict({
+    t.Key(""): tx.URL,
+    t.Key("type", default="docker"): t.String,
+    t.Key("username", default=None): t.Null | t.String,
+    t.Key("password", default=None): t.Null | t.String(allow_blank=True),
+    t.Key("project", default=None): (
+        t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
+    ),
+    tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
+}).allow_extra("*")
 
 
 def container_registry_serialize(v: dict[str, Any]) -> dict[str, str]:
@@ -390,112 +377,79 @@ session_hang_tolerance_iv = t.Dict(
     {
         t.Key(
             "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
-        ): t.Dict(
-            {
-                t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
-                t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
-            }
-        ).ignore_extra(
-            "*"
-        ),
+        ): t.Dict({
+            t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
+            t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
+        }).ignore_extra("*"),
     },
 )
 
 
-shared_config_iv = t.Dict(
-    {
-        t.Key("system", default=_config_defaults["system"]): t.Dict(
-            {
-                t.Key("timezone", default=_config_defaults["system"]["timezone"]): tx.TimeZone,
-            }
-        ).allow_extra("*"),
-        t.Key("api", default=_config_defaults["api"]): t.Dict(
-            {
-                t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
-            }
-        ).allow_extra("*"),
-        t.Key("redis", default=_config_defaults["redis"]): t.Dict(
-            {
-                t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
-                    tx.HostPortPair
-                ),
-                t.Key("service_name", default=None): t.Null | t.String,
-                t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
-                t.Key(
-                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
-                ): config.redis_helper_config_iv,
-            }
-        ).allow_extra("*"),
-        t.Key("docker", default=_config_defaults["docker"]): t.Dict(
-            {
-                t.Key("registry"): t.Mapping(t.String, container_registry_iv),
-                t.Key("image", default=_config_defaults["docker"]["image"]): t.Dict(
-                    {
-                        t.Key(
-                            "auto_pull", default=_config_defaults["docker"]["image"]["auto_pull"]
-                        ): t.Enum("digest", "tag", "none"),
-                    }
-                ).allow_extra("*"),
-            }
-        ).allow_extra("*"),
-        t.Key("plugins", default=_config_defaults["plugins"]): t.Dict(
-            {
-                t.Key("accelerator", default=_config_defaults["plugins"]["accelerator"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-                t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-            }
-        ).allow_extra("*"),
-        t.Key("network", default=_config_defaults["network"]): t.Dict(
-            {
-                t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict(
-                    {
-                        t.Key(
-                            "agent", default=_config_defaults["network"]["subnet"]["agent"]
-                        ): tx.IPNetwork,
-                        t.Key(
-                            "container", default=_config_defaults["network"]["subnet"]["container"]
-                        ): tx.IPNetwork,
-                    }
-                ).allow_extra("*"),
-                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null | t.Dict(
-                    {
-                        t.Key(
-                            "mtu", default=_config_defaults["network"]["overlay"]["mtu"]
-                        ): t.ToInt(gte=1),
-                    }
-                ).allow_extra("*"),
-            }
-        ).allow_extra("*"),
-        t.Key("watcher", default=_config_defaults["watcher"]): t.Dict(
-            {
-                t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
-                t.Key(
-                    "file-io-timeout", default=_config_defaults["watcher"]["file-io-timeout"]
-                ): t.ToFloat(),
-            }
-        ).allow_extra("*"),
-        t.Key("auth", default=None): (
-            t.Dict(
-                {
-                    t.Key("max_password_age", default=None): t.Null | tx.TimeDuration(),
-                }
-            ).allow_extra("*")
-            | t.Null
+shared_config_iv = t.Dict({
+    t.Key("system", default=_config_defaults["system"]): t.Dict({
+        t.Key("timezone", default=_config_defaults["system"]["timezone"]): tx.TimeZone,
+    }).allow_extra("*"),
+    t.Key("api", default=_config_defaults["api"]): t.Dict({
+        t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
+        t.Key(
+            "allow-graphql-schema-introspection",
+            default=_config_defaults["api"]["allow-graphql-schema-introspection"],
+        ): t.ToBool,
+        t.Key(
+            "allow-openapi-schema-introspection",
+            default=_config_defaults["api"]["allow-openapi-schema-introspection"],
+        ): t.ToBool,
+    }).allow_extra("*"),
+    t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
+    t.Key("docker", default=_config_defaults["docker"]): t.Dict({
+        t.Key("registry"): t.Mapping(t.String, container_registry_iv),
+        t.Key("image", default=_config_defaults["docker"]["image"]): t.Dict({
+            t.Key("auto_pull", default=_config_defaults["docker"]["image"]["auto_pull"]): t.Enum(
+                "digest", "tag", "none"
+            ),
+        }).allow_extra("*"),
+    }).allow_extra("*"),
+    t.Key("plugins", default=_config_defaults["plugins"]): t.Dict({
+        t.Key("accelerator", default=_config_defaults["plugins"]["accelerator"]): t.Mapping(
+            t.String, t.Mapping(t.String, t.Any)
         ),
-        t.Key("session", default=_config_defaults["session"]): t.Dict(
-            {
-                t.Key(
-                    "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
-                ): session_hang_tolerance_iv,
-            },
-        ).allow_extra("*"),
-        t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
-    }
-).allow_extra("*")
+        t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
+            t.String, t.Mapping(t.String, t.Any)
+        ),
+    }).allow_extra("*"),
+    t.Key("network", default=_config_defaults["network"]): t.Dict({
+        t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict({
+            t.Key("agent", default=_config_defaults["network"]["subnet"]["agent"]): tx.IPNetwork,
+            t.Key(
+                "container", default=_config_defaults["network"]["subnet"]["container"]
+            ): tx.IPNetwork,
+        }).allow_extra("*"),
+        t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null
+        | t.Dict({
+            t.Key("mtu", default=_config_defaults["network"]["overlay"]["mtu"]): t.ToInt(gte=1),
+        }).allow_extra("*"),
+    }).allow_extra("*"),
+    t.Key("watcher", default=_config_defaults["watcher"]): t.Dict({
+        t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
+        t.Key(
+            "file-io-timeout", default=_config_defaults["watcher"]["file-io-timeout"]
+        ): t.ToFloat(),
+    }).allow_extra("*"),
+    t.Key("auth", default=None): (
+        t.Dict({
+            t.Key("max_password_age", default=None): t.Null | tx.TimeDuration(),
+        }).allow_extra("*")
+        | t.Null
+    ),
+    t.Key("session", default=_config_defaults["session"]): t.Dict(
+        {
+            t.Key(
+                "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
+            ): session_hang_tolerance_iv,
+        },
+    ).allow_extra("*"),
+    t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
+}).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {
     "_types": {
@@ -503,36 +457,24 @@ _volume_defaults: dict[str, Any] = {
     },
 }
 
-volume_config_iv = t.Dict(
-    {
-        t.Key("_types", default=_volume_defaults["_types"]): t.Dict(
-            {
-                t.Key("user", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
-                    "*"
-                ),
-                t.Key("group", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
-                    "*"
-                ),
-            }
-        ).allow_extra("*"),
-        t.Key("default_host"): t.String,
-        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
-        t.Key("proxies"): t.Mapping(
-            tx.Slug,
-            t.Dict(
-                {
-                    t.Key("client_api"): t.String,
-                    t.Key("manager_api"): t.String,
-                    t.Key("secret"): t.String,
-                    t.Key("ssl_verify"): t.ToBool,
-                    t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(
-                        delimiter=","
-                    ),
-                }
-            ),
-        ),
-    }
-).allow_extra("*")
+volume_config_iv = t.Dict({
+    t.Key("_types", default=_volume_defaults["_types"]): t.Dict({
+        t.Key("user", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra("*"),
+        t.Key("group", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra("*"),
+    }).allow_extra("*"),
+    t.Key("default_host"): t.String,
+    t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
+    t.Key("proxies"): t.Mapping(
+        tx.Slug,
+        t.Dict({
+            t.Key("client_api"): t.String,
+            t.Key("manager_api"): t.String,
+            t.Key("secret"): t.String,
+            t.Key("ssl_verify"): t.ToBool,
+            t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(delimiter=","),
+        }),
+    ),
+}).allow_extra("*")
 
 
 ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
@@ -609,7 +551,10 @@ def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalCo
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
+        print(
+            "ConfigurationError: Could not read or validate the manager local config:",
+            file=sys.stderr,
+        )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:
@@ -626,7 +571,6 @@ class SharedConfig(AbstractConfig):
         etcd_password: Optional[str],
         namespace: str,
     ) -> None:
-        # WARNING: importing etcd3/grpc must be done after forks.
         super().__init__()
         credentials = None
         if etcd_user:

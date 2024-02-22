@@ -19,6 +19,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NamedTuple,
     Optional,
     Protocol,
     Sequence,
@@ -37,6 +38,7 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphql import Undefined
 from graphql.language import ast  # pants: no-infer-dep
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
@@ -52,7 +54,6 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
-    BinarySize,
     EndpointId,
     JSONSerializableMixin,
     KernelId,
@@ -67,10 +68,15 @@ from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
+from .gql_relay import (
+    AsyncListConnectionField,
+    AsyncNode,
+    ConnectionPaginationOrder,
+)
+from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
-
     from .gql import GraphQueryContext
     from .user import UserRole
 
@@ -104,6 +110,11 @@ pgsql_connect_opts = {
 # helper functions
 def zero_if_none(val):
     return 0 if val is None else val
+
+
+class FixtureOpModes(enum.StrEnum):
+    INSERT = "insert"
+    UPDATE = "update"
 
 
 class EnumType(TypeDecorator, SchemaType):
@@ -236,17 +247,14 @@ class ResourceSlotColumn(TypeDecorator):
             return value.to_json()
         return value
 
-    def process_result_value(
-        self, raw_value: dict[str, str] | None, dialect
-    ) -> ResourceSlot | None:
-        if raw_value is None:
+    def process_result_value(self, value: dict[str, str] | None, dialect) -> ResourceSlot | None:
+        if value is None:
             return None
-        # legacy handling
-        interim_value: Dict[str, Any] = raw_value
-        mem = raw_value.get("mem")
-        if isinstance(mem, str) and not mem.isdigit():
-            interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value)
+        try:
+            return ResourceSlot.from_json(value)
+        except ArithmeticError:
+            # for legacy-compat scenario
+            return ResourceSlot.from_user_input(value, None)
 
     def copy(self):
         return ResourceSlotColumn()
@@ -439,9 +447,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()
-        return VFolderHostPermissionMap(
-            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
-        )
+        return VFolderHostPermissionMap({
+            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+        })
 
 
 class CurrencyTypes(enum.Enum):
@@ -759,14 +767,17 @@ def privileged_query(required_role: UserRole):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
                 raise GenericForbidden("superadmin privilege required")
-            return await func(executor, info, *args, **kwargs)
+            return await func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -792,7 +803,10 @@ def scoped_query(
     def wrap(resolve_func):
         @functools.wraps(resolve_func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
@@ -841,7 +855,7 @@ def scoped_query(
             if kwargs.get("project", None) is not None:
                 kwargs["project"] = group_id
             kwargs[user_key] = user_id
-            return await resolve_func(executor, info, *args, **kwargs)
+            return await resolve_func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -934,12 +948,15 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -951,13 +968,16 @@ async def simple_db_mutate(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
     except sa.exc.StatementError as e:
+        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate(): other error")
         return result_cls(False, f"unexpected error: {e}")
 
 
@@ -993,13 +1013,16 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -1013,13 +1036,18 @@ async def simple_db_mutate_returning_item(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)
     except sa.exc.StatementError as e:
+        log.warning(
+            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
+        )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate_returning_item(): other error")
         return result_cls(False, f"unexpected error: {e}", None)
 
 
@@ -1031,9 +1059,14 @@ def set_if_set(
     clean_func=None,
     target_key: Optional[str] = None,
 ) -> None:
+    """
+    Set the target dict with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
     v = getattr(src, name)
-    # NOTE: unset optional fields are passed as null.
-    if v is not None:
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
         if callable(clean_func):
             target[target_key or name] = clean_func(v)
         else:
@@ -1042,24 +1075,313 @@ def set_if_set(
 
 async def populate_fixture(
     engine: SAEngine,
-    fixture_data: Mapping[str, Sequence[Dict[str, Any]]],
-    *,
-    ignore_unique_violation: bool = False,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
+        if table_name.startswith("__"):
+            # skip reserved names like "__mode"
+            continue
+        assert not isinstance(rows, str)
         table: sa.Table = getattr(models, table_name)
         assert isinstance(table, sa.Table)
+        if not rows:
+            return
+        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
         async with engine.begin() as conn:
+            # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, EnumType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls[row[col.name]]
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls[row[col.name]]
                 elif isinstance(col.type, EnumValueType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls(row[col.name])
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls(row[col.name])
                 elif isinstance(
                     col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
                 ):
                     for row in rows:
-                        row[col.name] = col.type._schema.from_json(row[col.name])
-            await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+                        if col.name in row:
+                            row[col.name] = col.type._schema.from_json(row[col.name])
+
+            match op_mode:
+                case FixtureOpModes.INSERT:
+                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
+                    await conn.execute(stmt)
+                case FixtureOpModes.UPDATE:
+                    stmt = sa.update(table)
+                    pkcols = []
+                    for pkidx, pkcol in enumerate(table.primary_key):
+                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        pkcols.append(pkcol)
+                    update_data = []
+                    # Extract the data column names from the FIRST row
+                    # (Therefore a fixture dataset for a single table in the udpate mode should
+                    # have consistent set of attributes!)
+                    try:
+                        datacols: list[sa.Column] = [
+                            getattr(table.columns, name)
+                            for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
+                        ]
+                    except AttributeError as e:
+                        raise ValueError(
+                            f"fixture for table {table_name!r} has an invalid column name: "
+                            f"{e.args[0]!r}"
+                        )
+                    stmt = stmt.values({
+                        datacol.name: sa.bindparam(datacol.name) for datacol in datacols
+                    })
+                    for row in rows:
+                        update_row = {}
+                        for pkidx, pkcol in enumerate(pkcols):
+                            try:
+                                update_row[f"_pk_{pkidx}"] = row[pkcol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing primary key column for update"
+                                    f"query: {pkcol.name!r}"
+                                )
+                        for datacol in datacols:
+                            try:
+                                update_row[datacol.name] = row[datacol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing data column for update"
+                                    f"query: {datacol.name!r}"
+                                )
+                        update_data.append(update_row)
+                    await conn.execute(stmt, update_data)
+
+
+class InferenceSessionError(graphene.ObjectType):
+    class InferenceSessionErrorInfo(graphene.ObjectType):
+        src = graphene.String(required=True)
+        name = graphene.String(required=True)
+        repr = graphene.String(required=True)
+
+    session_id = graphene.UUID()
+
+    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
+
+
+class AsyncPaginatedConnectionField(AsyncListConnectionField):
+    def __init__(self, type, *args, **kwargs):
+        kwargs.setdefault("filter", graphene.String())
+        kwargs.setdefault("order", graphene.String())
+        kwargs.setdefault("offset", graphene.Int())
+        super().__init__(type, *args, **kwargs)
+
+
+PaginatedConnectionField = AsyncPaginatedConnectionField
+
+
+class ConnectionArgs(NamedTuple):
+    cursor: str | None
+    pagination_order: ConnectionPaginationOrder | None
+    requested_page_size: int | None
+
+
+def validate_connection_args(
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> ConnectionArgs:
+    """
+    Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
+    It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
+    """
+    order: ConnectionPaginationOrder | None = None
+    cursor: str | None = None
+    requested_page_size: int | None = None
+
+    if after is not None:
+        order = ConnectionPaginationOrder.FORWARD
+        cursor = after
+    if first is not None:
+        if first < 0:
+            raise ValueError("Argument 'first' must be a non-negative integer.")
+        order = ConnectionPaginationOrder.FORWARD
+        requested_page_size = first
+
+    if before is not None:
+        if order is ConnectionPaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = ConnectionPaginationOrder.BACKWARD
+        cursor = before
+    if last is not None:
+        if last < 0:
+            raise ValueError("Argument 'last' must be a non-negative integer.")
+        if order is ConnectionPaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = ConnectionPaginationOrder.BACKWARD
+        requested_page_size = last
+
+    return ConnectionArgs(cursor, order, requested_page_size)
+
+
+def _build_sql_stmt_from_connection_args(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    *,
+    connection_args: ConnectionArgs,
+) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+    stmt = sa.select(orm_class)
+    conditions: list[WhereClauseType] = []
+
+    cursor_id, pagination_order, requested_page_size = connection_args
+
+    # Default ordering by id column
+    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
+    ordering_item_list: list[OrderingItem] = []
+    if order_expr is not None:
+        parser = QueryOrderParser()
+        ordering_item_list = parser.parse_order(orm_class, order_expr)
+
+    # Apply SQL order_by
+    match pagination_order:
+        case ConnectionPaginationOrder.FORWARD | None:
+            set_ordering = lambda col, direction: (
+                col.asc() if direction == OrderDirection.ASC else col.desc()
+            )
+        case ConnectionPaginationOrder.BACKWARD:
+            set_ordering = lambda col, direction: (
+                col.desc() if direction == OrderDirection.ASC else col.asc()
+            )
+    # id column should be applied last
+    for col, direction in [*ordering_item_list, id_ordering_item]:
+        stmt = stmt.order_by(set_ordering(col, direction))
+
+    # Set cursor by comparing scalar values of subquery that queried by cursor id
+    if cursor_id is not None:
+        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
+        match pagination_order:
+            case ConnectionPaginationOrder.FORWARD | None:
+                conditions.append(id_column > _id)
+                set_subquery = lambda col, subquery, direction: (
+                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
+                )
+            case ConnectionPaginationOrder.BACKWARD:
+                conditions.append(id_column < _id)
+                set_subquery = lambda col, subquery, direction: (
+                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
+                )
+        for col, direction in ordering_item_list:
+            subq = sa.select(col).where(id_column == _id).scalar_subquery()
+            stmt = stmt.where(set_subquery(col, subq, direction))
+
+    if requested_page_size is not None:
+        # Add 1 to determine has_next_page or has_previous_page
+        stmt = stmt.limit(requested_page_size + 1)
+
+    if filter_expr is not None:
+        condition_parser = QueryFilterParser()
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+
+    for cond in conditions:
+        stmt = stmt.where(cond)
+    return stmt, conditions
+
+
+def _build_sql_stmt_from_sql_arg(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    *,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+    stmt = sa.select(orm_class)
+    conditions: list[WhereClauseType] = []
+
+    if order_expr is not None:
+        parser = QueryOrderParser()
+        stmt = parser.append_ordering(stmt, order_expr)
+
+    # default order_by id column
+    stmt = stmt.order_by(id_column.asc())
+
+    if filter_expr is not None:
+        condition_parser = QueryFilterParser()
+        # stmt = condition_parser.append_filter(stmt, filter_expr)
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    if offset is not None:
+        stmt = stmt.offset(offset)
+    return stmt, conditions
+
+
+class GraphQLConnectionSQLInfo(NamedTuple):
+    sql_stmt: sa.sql.Select
+    sql_conditions: list[WhereClauseType]
+    cursor: str | None
+    pagination_order: ConnectionPaginationOrder | None
+    requested_page_size: int | None
+
+
+def generate_sql_info_for_gql_connection(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    offset: int | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> GraphQLConnectionSQLInfo:
+    """
+    Get GraphQL arguments and generate SQL query statement, cursor that points an id of a node, pagination order, and page size.
+    If `offset` is None, return SQL query parsed from GraphQL Connection spec arguments.
+    Else, return normally paginated SQL query and `first` is used as SQL limit.
+    """
+
+    if offset is None:
+        connection_args = validate_connection_args(
+            after=after, first=first, before=before, last=last
+        )
+        stmt, conditions = _build_sql_stmt_from_connection_args(
+            info,
+            orm_class,
+            id_column,
+            filter_expr,
+            order_expr,
+            connection_args=connection_args,
+        )
+        return GraphQLConnectionSQLInfo(
+            stmt,
+            conditions,
+            connection_args.cursor,
+            connection_args.pagination_order,
+            connection_args.requested_page_size,
+        )
+    else:
+        page_size = first
+        stmt, conditions = _build_sql_stmt_from_sql_arg(
+            info,
+            orm_class,
+            id_column,
+            filter_expr,
+            order_expr,
+            limit=page_size,
+            offset=offset,
+        )
+        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)

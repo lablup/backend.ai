@@ -243,7 +243,25 @@
       "PreOpenPortPanelTitle": "Preopen ports to set (optional)",
       "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535.",
       "MinMemory": "The minimum memory capacity for the currently selected runtime environment is {{size}}iB.",
-      "ModelStorage": "Model Storage"
+      "ModelStorage": "Model Storage",
+      "Enable": "Enable",
+      "Network": "Network",
+      "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
+      "preopen": "preopen",
+      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed.",
+      "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open ports.",
+      "EnqueueComputeSessionWarning": "If you set it larger than the currently available resources, the session creation will be delayed in the queue until it becomes available.",
+      "TemplateAndHistory": "Templates & history",
+      "StartTimeMustBeInTheFuture": "The start time must be after the current time.",
+      "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit",
+      "SessionName": "SessionName",
+      "ResetFormConfirm": "ResetFormConfirm",
+      "ScheduleTimeSimple": "ScheduleTimeSimple",
+      "ResourceAllocationPerContainer": "Resource Allocation Per Container",
+      "NumberOfContainer": "Number of container",
+      "EnterEnvironmentVariable": "Enter Variable name",
+      "EnvironmentVariableNamePatternError": "Variable name must start with a letter or underscore, and can only contain letters, numbers, and underscores.",
+      "EnvironmentVariableDuplicateName": "A variable name that already exists."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -276,7 +294,7 @@
     "AllowedClientIps": "Allowed client IPs",
     "CommaSeparated": "comma-separated",
     "TryPreferredPort": "Try preferred port",
-    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"SSH Key Download\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
+    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"DOWNLOAD SSH KEY\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
     "SFTPExtraNotification": "It is recommended to delete sessions after they have been used, as there is a limit on the number of sessions. Sessions that are not used for uploading files within a certain period of time may be automatically deleted.",
     "Readmore": "Read More...",
     "Readless": "Read less",
@@ -320,7 +338,9 @@
       "SessionNameRequired": "Session name is required",
       "SluggedStrings": "Slugged strings (>3 chars)",
       "EnterValidSessionName": "Enter valid session name",
-      "SessionNameAlreadyExist": "Session name already exists"
+      "SessionNameAlreadyExist": "Session name already exists",
+      "SessionNameTooLong64": "Please enter 64 characters or less.",
+      "PleaseFollowSessionNameRule": "Please enter a combination of at least 4 letters, numbers, '.', '_', and '-'."
     },
     "EnvironmentInfo": "Environment Info",
     "DownloadingSessionLogs": "Downloading session logs.",
@@ -403,7 +423,7 @@
     "ExpiredDate": "Expired Date",
     "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
     "TokenExpiredDateError": "The token expiration time must be after the current time",
-    "ServiceNameRule": "Only allow 4 to 64 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "resources": "Resources",
     "Image": "Image"
@@ -428,7 +448,6 @@
     "DeleteAll": "Delete All",
     "Update": "Update",
     "Delete": "Delete",
-    "Dismiss": "Dismiss",
     "DismissAndProceed": "Dismiss and Proceed",
     "Close": "Close",
     "Confirm": "Confirm",
@@ -514,7 +533,9 @@
     "Control": "Control",
     "NewPassword": "New Password",
     "Enabled": "Enabled",
-    "StorageProxies": "Storages"
+    "StorageProxies": "Storages",
+    "None": "None",
+    "Image": "Image"
   },
   "credential": {
     "Permission": "Permission",
@@ -591,7 +612,8 @@
     "KeypairDetail": "Keypair Detail",
     "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
     "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
-    "SignoutSeccessfullyFinished": "Signout is seccessfully finished"
+    "SignoutSeccessfullyFinished": "Signout is seccessfully finished",
+    "EnableSudoSession": "Enable sudo session"
   },
   "data": {
     "Folders": "Folders",
@@ -756,7 +778,8 @@
     "HostDetails": "Displays quota information for the selected storage host.",
     "ProjectFolder": "Project Folder",
     "Pipeline": "Pipeline Folders",
-    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack."
+    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack.",
+    "SearchByName": "Search by name"
   },
   "dialog": {
     "warning": {
@@ -847,7 +870,8 @@
     "MinimumMemUnit": "Memory starts with 1 GB",
     "MinimumShmemUnit": "The minimum unit for shared memory is 0.01 GB.",
     "RAM": "RAM (GB)",
-    "SharedMemory": "Shared memory (GB)"
+    "SharedMemory": "Shared memory (GB)",
+    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory"
   },
   "usersettings": {
     "General": "General",
@@ -983,7 +1007,8 @@
     "RescanFailed": "Rescan Failed.",
     "NoRegistryToDisplay": "No Registries to display",
     "RegistrySuccessfullyModified": "Registry successfully modified.",
-    "PleaseSelectOption": "Please Select Option"
+    "PleaseSelectOption": "Please Select Option",
+    "ConfirmNoUserName": "User and password not specified, would you like to save?"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",

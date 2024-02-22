@@ -17,8 +17,6 @@ import os
 import sys
 from pathlib import Path
 
-import sphinx_rtd_theme
-
 root_path = Path(__file__).parent.parent
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
@@ -44,7 +42,6 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
-    "sphinxcontrib.openapi",
     "sphinx_autodoc_typehints",
 ]
 
@@ -63,6 +60,7 @@ master_doc = "index"
 
 # General information about the project.
 from datetime import date
+
 project = "Backend.AI Documentation"
 copyright = f"2015-{date.today().year}, Lablup Inc."
 author = "Lablup Inc."
@@ -128,10 +126,10 @@ todo_include_todos = False
 numfig = True
 
 intersphinx_mapping = {
-    "python": ("http://docs.python.org/3", None),
-    "multidict": ("https://multidict.readthedocs.io/en/stable/", None),
-    "yarl": ("https://yarl.readthedocs.io/en/stable/", None),
-    "aiohttp": ("https://aiohttp.readthedocs.io/en/stable/", None),
+    "python": ("https://docs.python.org/3", None),
+    "multidict": ("https://multidict.aio-libs.org/en/stable/", None),
+    "yarl": ("https://yarl.aio-libs.org/en/stable/", None),
+    "aiohttp": ("https://docs.aiohttp.org/en/stable/", None),
 }
 
 
@@ -151,6 +149,7 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_extra_path = ["manager/rest-reference/openapi.json"]
 
 # Custom sidebar templates, maps document names to template names.
 # html_sidebars = {}
@@ -235,3 +234,11 @@ autodoc_default_options = {
     "member-order": "bysource",
 }
 autodoc_member_order = "bysource"
+
+# Design template append for new revamped webpage 2023-10-31
+html_style = 'css/customTheme.css'
+
+html_js_files = [
+    'js/custom.js',
+]
+

@@ -75,11 +75,9 @@ def key_by_remaining_slots(
 
 
 class FIFOSlotScheduler(AbstractScheduler):
-    config_iv = t.Dict(
-        {
-            t.Key("num_retries_to_skip", default=0): t.ToInt(gte=0),
-        }
-    ).allow_extra("*")
+    config_iv = t.Dict({
+        t.Key("num_retries_to_skip", default=0): t.ToInt(gte=0),
+    }).allow_extra("*")
 
     def pick_session(
         self,

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, AsyncIterator, Self
+import sys
+from pathlib import Path
+from pprint import pformat
+from typing import AsyncIterator, Self
 
 import attrs
 import click
@@ -9,21 +12,38 @@ import click
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import RedisConnectionInfo
-from ai.backend.manager.config import SharedConfig
 
-if TYPE_CHECKING:
-    from ..config import LocalConfig
+from ..config import LocalConfig, SharedConfig
+from ..config import load as load_config
 
 
 class CLIContext:
-    local_config: LocalConfig
-
+    _local_config: LocalConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, local_config: LocalConfig) -> None:
-        self.local_config = local_config
+    def __init__(self, config_path: Path, log_level: str) -> None:
+        self.config_path = config_path
+        self.log_level = log_level
+        self._local_config = None
+
+    @property
+    def local_config(self) -> LocalConfig:
+        # Lazy-load the configuration only when requested.
+        try:
+            if self._local_config is None:
+                self._local_config = load_config(self.config_path, self.log_level)
+        except ConfigurationError as e:
+            print(
+                "ConfigurationError: Could not read or validate the manager local config:",
+                file=sys.stderr,
+            )
+            print(pformat(e.invalid_data), file=sys.stderr)
+            raise click.Abort()
+        return self._local_config
 
     def __enter__(self) -> Self:
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
@@ -31,12 +51,7 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            if (
-                "drivers" in self.local_config["logging"]
-                and "file" in self.local_config["logging"]["drivers"]
-            ):
-                self.local_config["logging"]["drivers"].remove("file")
-            self._logger = LocalLogger(self.local_config["logging"])
+            self._logger = LocalLogger({})
             self._logger.__enter__()
         return self
 
@@ -44,6 +59,50 @@ class CLIContext:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()
+
+
+@contextlib.asynccontextmanager
+async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
+    local_config = cli_ctx.local_config
+    creds = None
+    if local_config["etcd"]["user"]:
+        creds = {
+            "user": local_config["etcd"]["user"],
+            "password": local_config["etcd"]["password"],
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        # TODO: provide a way to specify other scope prefixes
+    }
+    etcd = AsyncEtcd(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["namespace"],
+        scope_prefix_map,
+        credentials=creds,
+    )
+    try:
+        yield etcd
+    finally:
+        await etcd.close()
+
+
+@contextlib.asynccontextmanager
+async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedConfig]:
+    local_config = cli_ctx.local_config
+    # scope_prefix_map is created inside ConfigServer
+    shared_config = SharedConfig(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["user"],
+        local_config["etcd"]["password"],
+        local_config["etcd"]["namespace"],
+    )
+    await shared_config.reload()
+    raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
+    local_config["redis"] = redis_config_iv.check(raw_redis_config)
+    try:
+        yield shared_config
+    finally:
+        await shared_config.close()
 
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)
