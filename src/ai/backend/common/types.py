@@ -675,16 +675,16 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError("Unknown slots", unknown_slots)
+            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, value: Any, unit: str) -> Decimal:
+    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
         try:
-            if unit == "bytes":
+            if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
                     return Decimal(value) if value.is_finite() else value
                 if isinstance(value, int):
@@ -694,8 +694,11 @@ class ResourceSlot(UserDict):
                 value = Decimal(value)
                 if value.is_finite():
                     value = value.quantize(Quantum).normalize()
-        except ArithmeticError:
-            raise ValueError("Cannot convert to decimal", value)
+        except (
+            ArithmeticError,
+            ValueError,  # catch wrapped errors from BinarySize.from_str()
+        ):
+            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
         return value
 
     @classmethod
@@ -710,16 +713,16 @@ class ResourceSlot(UserDict):
         return result
 
     @classmethod
-    def _guess_slot_type(cls, key: str) -> str:
+    def _guess_slot_type(cls, key: str) -> SlotTypes:
         if "mem" in key:
-            return "bytes"
-        return "count"
+            return SlotTypes.BYTES
+        return SlotTypes.COUNT
 
     @classmethod
     def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
         try:
             data = {
-                k: cls._normalize_value(v, slot_types[k])
+                k: cls._normalize_value(k, v, slot_types[k])
                 for k, v in policy["total_resource_slots"].items()
                 if v is not None and k in slot_types
             }
@@ -731,23 +734,25 @@ class ResourceSlot(UserDict):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
         return cls(data)
 
     @classmethod
     def from_user_input(
-        cls, obj: Mapping[str, Any], slot_types: Optional[Mapping]
+        cls,
+        obj: Mapping[str, Any],
+        slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> "ResourceSlot":
         try:
             if slot_types is None:
                 data = {
-                    k: cls._normalize_value(v, cls._guess_slot_type(k))
+                    k: cls._normalize_value(k, v, cls._guess_slot_type(k))
                     for k, v in obj.items()
                     if v is not None
                 }
             else:
                 data = {
-                    k: cls._normalize_value(v, slot_types[k])
+                    k: cls._normalize_value(k, v, slot_types[SlotName(k)])
                     for k, v in obj.items()
                     if v is not None
                 }
@@ -756,7 +761,10 @@ class ResourceSlot(UserDict):
                     if k not in data:
                         data[k] = Decimal(0)
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            extra_guide = ""
+            if e.args[0] == "shmem":
+                extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
@@ -767,7 +775,7 @@ class ResourceSlot(UserDict):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
@@ -796,25 +804,23 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 @attrs.define(slots=True, frozen=True)
 class QuotaScopeID:
     scope_type: QuotaScopeType
-    scope_id: Any
+    scope_id: uuid.UUID
 
     @classmethod
     def parse(cls, raw: str) -> QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
-        match scope_type:
-            case "project":
-                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
-            case "user":
-                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+        match scope_type.lower():
+            case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
+                return cls(t, uuid.UUID(rest))
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+                raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
             case uuid.UUID():
-                return f"{self.scope_type.value}:{str(self.scope_id)}"
+                return f"{self.scope_type}:{str(self.scope_id)}"
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -825,7 +831,7 @@ class QuotaScopeID:
             case uuid.UUID():
                 return self.scope_id.hex
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
 
 class VFolderID:
@@ -960,7 +966,7 @@ class QuotaConfig:
         return cls.Validator()
 
 
-class QuotaScopeType(str, enum.Enum):
+class QuotaScopeType(enum.StrEnum):
     USER = "user"
     PROJECT = "project"
 
@@ -1183,7 +1189,7 @@ class RoundRobinState(JSONSerializableMixin):
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
-SSLContextType: TypeAlias = Literal[False] | Fingerprint | SSLContext | None
+SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):

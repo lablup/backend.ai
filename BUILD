@@ -14,6 +14,7 @@ python_requirements(
         "typing-extensions": ["typing_extensions"],
         "more-itertools": ["more_itertools"],
         "zipstream-new": ["zipstream"],
+        "etcd-client-py": ["etcd_client"],
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],

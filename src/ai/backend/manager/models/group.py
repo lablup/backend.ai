@@ -36,7 +36,9 @@ from .base import (
     GUID,
     Base,
     EnumValueType,
+    FilterExprArg,
     IDColumn,
+    OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
@@ -54,6 +56,8 @@ from .gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
+from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -91,20 +95,20 @@ _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "user_id",
         GUID,
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "group_id",
         GUID,
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
 
 
@@ -652,7 +656,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
@@ -667,7 +671,7 @@ class PurgeGroup(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            await initiate_vfolder_purge(
+            await initiate_vfolder_deletion(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
@@ -830,6 +834,16 @@ class GroupNode(graphene.ObjectType):
         from .user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter, QueryFilterParser(UserNode._queryfilter_fieldspec))
+            if filter is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order, QueryOrderParser(UserNode._queryorder_colmap))
+            if order is not None
+            else None
+        )
         (
             query,
             conditions,
@@ -840,8 +854,8 @@ class GroupNode(graphene.ObjectType):
             info,
             UserRow,
             UserRow.uuid,
-            filter,
-            order,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,
@@ -884,6 +898,12 @@ class GroupNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
+        )
         (
             query,
             conditions,
@@ -894,8 +914,8 @@ class GroupNode(graphene.ObjectType):
             info,
             GroupRow,
             GroupRow.id,
-            filter_expr,
-            order_expr,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,

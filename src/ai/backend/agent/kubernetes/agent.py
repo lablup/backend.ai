@@ -381,7 +381,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     ),
                 )
             else:
-                log.warn(
+                log.warning(
                     "Mount {}:{} -> Mount type {} it not supported on K8s Agent. Skipping mount",
                     mount.source,
                     mount.target,

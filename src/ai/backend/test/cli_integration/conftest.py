@@ -5,8 +5,9 @@ import re
 import secrets
 from collections import namedtuple
 from contextlib import closing
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Iterator, Sequence, Tuple
+from typing import Callable, Generator, Iterator, Sequence, Tuple
 
 import pexpect
 import pytest
@@ -138,6 +139,16 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
 def keypair_resource_policy() -> str:
     fake = Faker()
     return fake.unique.word()
+
+
+@pytest.fixture
+def txt_file() -> Generator[TextIOWrapper, None, None]:
+    filepath = "test.txt"
+    with open(filepath, "w") as f:
+        f.write("This file is for testing.")
+    yield f
+
+    os.remove(filepath)
 
 
 run_user = make_run_fixture("user_file")

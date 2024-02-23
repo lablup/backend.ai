@@ -16,9 +16,9 @@ def get_tag():
 
 def get_prev_tag():
     tag = get_tag()
-    p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', tag + '^'], capture_output=True)
+    subprocess.run(['git', 'clone', '--filter=blob:none', '--no-checkout', f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}.git', '.git-tmp'])
+    p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', tag + '^'], capture_output=True, cwd='.git-tmp')
     prev_tag = p.stdout.decode().strip()
-
     return prev_tag
 
 def main():

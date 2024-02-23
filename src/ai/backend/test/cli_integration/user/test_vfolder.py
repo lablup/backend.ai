@@ -1,9 +1,14 @@
 import json
+import os
 from contextlib import closing
+from io import TextIOWrapper
+
+import pytest
 
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
+@pytest.mark.dependency()
 def test_create_vfolder(run_user: ClientRunnerFunc):
     """
     Test create vfolder function.
@@ -47,6 +52,7 @@ def test_create_vfolder(run_user: ClientRunnerFunc):
     assert test_folder2.get("permission") == "ro", "Test folder 2 permission mismatch."
 
 
+@pytest.mark.dependency(depends=["test_create_vfolder"])
 def test_rename_vfolder(run_user: ClientRunnerFunc):
     """
     Test rename vfolder function.
@@ -71,6 +77,131 @@ def test_rename_vfolder(run_user: ClientRunnerFunc):
     assert bool(test_folder3), "Test folder 3 doesn't exist!"
 
 
+@pytest.mark.dependency(depends=["test_create_vfolder"])
+def test_upload_file(run_user: ClientRunnerFunc, txt_file: TextIOWrapper):
+    """
+    Test for uploading a file to the vfolder.
+    !! Make sure you execute this test after test_create_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    vfolder_name = "test_folder2"
+    file_name = txt_file.name
+
+    # Upload the file to vfolder
+    with closing(run_user(["vfolder", "upload", vfolder_name, file_name])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "File upload failed."
+
+    # Check if the file has been successfully uploaded
+    with closing(run_user(["vfolder", "ls", vfolder_name])) as p:
+        p.expect(EOF)
+        assert file_name in p.before.decode(), "File was not uploaded successfully."
+
+
+@pytest.mark.dependency(depends=["test_create_vfolder", "test_upload_file"])
+def test_rename_file(run_user: ClientRunnerFunc):
+    """
+    Test for renaming a file from the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file !!
+    Otherwise, it will raise an error.
+    """
+
+    vfolder_name = "test_folder2"
+    old_file_name = "test.txt"
+    new_file_name = "new.txt"
+
+    with closing(
+        run_user(["vfolder", "rename-file", vfolder_name, old_file_name, new_file_name])
+    ) as p:
+        p.expect(EOF)
+        assert "Renamed." in p.before.decode(), "File rename failed."
+
+    with closing(run_user(["vfolder", "ls", vfolder_name])) as p:
+        p.expect(EOF)
+        assert new_file_name in p.before.decode(), "File was not renamed successfully."
+
+
+@pytest.mark.dependency(depends=["test_create_vfolder", "test_upload_file", "test_rename_file"])
+def test_download_file(run_user: ClientRunnerFunc):
+    """
+    Test for downloading a file from the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file !!
+    Otherwise, it will raise an error.
+    """
+
+    vfolder_name = "test_folder2"
+    file_name = "new.txt"
+
+    # Download the file from vfolder
+    with closing(run_user(["vfolder", "download", vfolder_name, file_name])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "File download failed."
+
+    # Check if the file has been successfully downloaded
+    assert os.path.isfile(file_name), "File was not downloaded successfully."
+
+    # remove the file for testing
+    os.remove(file_name)
+
+
+@pytest.mark.dependency(depends=["test_create_vfolder"])
+def test_mkdir_vfolder(run_user: ClientRunnerFunc):
+    """
+    Test for creating an empty directory in the vfolder.
+    !! Make sure you execute this test after test_create_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    vfolder_name = "test_folder2"
+    dir_paths = ["tmp", "test/dir"]
+
+    # Create directory in the vfolder
+    with closing(run_user(["vfolder", "mkdir", vfolder_name, dir_paths[0]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "Directory creation failed."
+
+    # Create already existing directory with exist-ok option
+    with closing(run_user(["vfolder", "mkdir", "-e", vfolder_name, dir_paths[0]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "Exist-ok option does not work properly."
+
+    # Test whether the parent directory is created automatically
+    with closing(run_user(["vfolder", "mkdir", "-p", vfolder_name, dir_paths[1]])) as p:
+        p.expect(EOF)
+        assert "Done." in p.before.decode(), "The parent directory is not created automatically."
+
+
+@pytest.mark.dependency(
+    depends=["test_create_vfolder", "test_upload_file", "test_rename_file", "test_mkdir_vfolder"]
+)
+def test_mv_file(run_user: ClientRunnerFunc):
+    """
+    Test for moving a file within the vfolder.
+    !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file, 4. test_mkdir_vfolder !!
+    Otherwise, it will raise an error.
+    """
+
+    vfolder_name = "test_folder2"
+    dir_path = "tmp"
+    file_name = "new.txt"
+
+    with closing(
+        run_user(["vfolder", "mv", vfolder_name, file_name, f"{dir_path}/{file_name}"])
+    ) as p:
+        p.expect(EOF)
+        assert "Moved." in p.before.decode(), "File move failed."
+
+    with closing(run_user(["vfolder", "ls", vfolder_name])) as p:
+        p.expect(EOF)
+        assert file_name not in p.before.decode(), "File was not moved successfully."
+
+    with closing(run_user(["vfolder", "ls", vfolder_name, dir_path])) as p:
+        p.expect(EOF)
+        assert file_name in p.before.decode(), "File was not moved successfully."
+
+
+@pytest.mark.dependency(depends=["test_create_vfolder", "test_rename_file"])
 def test_delete_vfolder(run_user: ClientRunnerFunc):
     """
     Test delete vfolder function.

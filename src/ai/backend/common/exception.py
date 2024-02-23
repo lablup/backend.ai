@@ -50,7 +50,7 @@ class InvalidImageName(ValueError):
 
 class InvalidImageTag(ValueError):
     """
-    Represents an invalid string for image tag.
+    Represents an invalid string for image tag and full image name.
     Image tag should be a string of form below
 
     ```
@@ -58,8 +58,16 @@ class InvalidImageTag(ValueError):
     ```
     """
 
+    def __init__(self, tag: str, full_name: str | None = None) -> None:
+        super().__init__(tag, full_name)
+        self._tag = tag
+        self._full_name = full_name
+
     def __str__(self) -> str:
-        return f"Invalid or duplicate image name tag: {self.args[0]}"
+        if self._full_name is not None:
+            return f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._full_name}"
+        else:
+            return f"Invalid or duplicate image name tag: {self._tag}"
 
 
 class AliasResolutionFailed(ValueError):

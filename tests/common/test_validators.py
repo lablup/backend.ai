@@ -528,7 +528,7 @@ def test_vfolder_id():
         iv.check(":/x")
     with pytest.raises(t.DataError):
         iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
-    with pytest.raises(ValueError, match="Unsupported vFolder quota scope type abc"):
+    with pytest.raises(ValueError, match="Invalid quota scope type"):
         iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")

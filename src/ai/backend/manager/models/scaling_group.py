@@ -30,6 +30,7 @@ from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixi
 
 from .base import (
     Base,
+    IDColumn,
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
@@ -142,60 +143,60 @@ scaling_groups = sa.Table(
 sgroups_for_domains = sa.Table(
     "sgroups_for_domains",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_groups = sa.Table(
     "sgroups_for_groups",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
 )
 
 
 sgroups_for_keypairs = sa.Table(
     "sgroups_for_keypairs",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
 
 

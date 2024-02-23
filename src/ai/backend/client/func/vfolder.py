@@ -1,6 +1,7 @@
 import asyncio
+import uuid
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -47,8 +48,9 @@ class ResponseFailed(Exception):
 
 
 class VFolder(BaseFunction):
-    def __init__(self, name: str):
+    def __init__(self, name: str, id: Optional[uuid.UUID] = None):
         self.name = name
+        self.id = id
 
     @api_function
     @classmethod
@@ -60,7 +62,6 @@ class VFolder(BaseFunction):
         group: str = None,
         usage_mode: str = "general",
         permission: str = "rw",
-        quota: str = "0",
         cloneable: bool = False,
     ):
         rqst = Request("POST", "/folders")
@@ -71,7 +72,6 @@ class VFolder(BaseFunction):
             "group": group,
             "usage_mode": usage_mode,
             "permission": permission,
-            "quota": quota,
             "cloneable": cloneable,
         })
         async with rqst.fetch() as resp:
@@ -204,6 +204,15 @@ class VFolder(BaseFunction):
             page_size=page_size,
         )
 
+    async def _get_id_by_name(self) -> uuid.UUID:
+        rqst = Request("GET", "/folders/_/id")
+        rqst.set_json({
+            "name": self.name,
+        })
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return uuid.UUID(data["id"])
+
     @api_function
     @classmethod
     async def list_hosts(cls):
@@ -238,16 +247,46 @@ class VFolder(BaseFunction):
             return {}
 
     @api_function
-    async def purge(self):
-        rqst = Request("POST", "/folders/{0}/purge".format(self.name))
+    async def purge(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/purge")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
+        async with rqst.fetch():
+            return {}
+
+    async def _restore(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/restore-from-trash-bin")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
         async with rqst.fetch():
             return {}
 
     @api_function
     async def recover(self):
-        rqst = Request("POST", "/folders/{0}/recover".format(self.name))
-        async with rqst.fetch():
-            return {}
+        return await self._restore()
+
+    @api_function
+    async def restore(self):
+        return await self._restore()
+
+    @api_function
+    async def delete_trash(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/delete-from-trash-bin")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
+        return {}
 
     @api_function
     async def rename(self, new_name):

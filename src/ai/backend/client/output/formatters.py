@@ -115,21 +115,25 @@ class NestedDictOutputFormatter(OutputFormatter):
 
 class MiBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = round(value / 2**20, 1)
+        if value is not None:
+            value = round(value / 2**20, 1)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = round(value / 2**20, 1)
+        if value is not None:
+            value = round(value / 2**20, 1)
         return super().format_json(value, field)
 
 
 class SizeBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = humanize.naturalsize(value, binary=True, gnu=True)
+        if value is not None:
+            value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = humanize.naturalsize(value, binary=True, gnu=True)
+        if value is not None:
+            value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_json(value, field)
 
 

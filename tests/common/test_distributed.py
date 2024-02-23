@@ -14,7 +14,6 @@ from typing import Any, Callable, Iterable, List, Tuple
 import aiotools
 import attrs
 import pytest
-from etcetra.types import HostPortPair as EtcdHostPortPair
 from redis.asyncio import Redis
 
 from ai.backend.common import config
@@ -35,7 +34,7 @@ class TimerNodeContext:
 @dataclass
 class EtcdLockContext:
     namespace: str
-    addr: EtcdHostPortPair
+    addr: HostPortPair
     lock_name: str
 
 

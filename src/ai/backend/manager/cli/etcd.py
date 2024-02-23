@@ -199,7 +199,7 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
 @click.pass_obj
 def list_images(cli_ctx, short, installed) -> None:
     """List all configured images."""
-    log.warn("etcd list-images command is deprecated, use image list instead")
+    log.warning("etcd list-images command is deprecated, use image list instead")
     asyncio.run(list_images_impl(cli_ctx, short, installed))
 
 
@@ -209,7 +209,7 @@ def list_images(cli_ctx, short, installed) -> None:
 @click.pass_obj
 def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
     """Show the details of the given image or alias."""
-    log.warn("etcd inspect-image command is deprecated, use image inspect instead")
+    log.warning("etcd inspect-image command is deprecated, use image inspect instead")
     asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
@@ -219,7 +219,7 @@ def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.pass_obj
 def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
     """Forget (delete) a specific image."""
-    log.warn("etcd forget-image command is deprecated, use image forget instead")
+    log.warning("etcd forget-image command is deprecated, use image forget instead")
     asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
@@ -237,7 +237,7 @@ def set_image_resource_limit(
     architecture,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
-    log.warn(
+    log.warning(
         "etcd set-image-resource-limit command is deprecated, use image set-resource-limit instead"
     )
     asyncio.run(
@@ -260,7 +260,7 @@ def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
-    log.warn("etcd rescan-images command is deprecated, use image rescan instead")
+    log.warning("etcd rescan-images command is deprecated, use image rescan instead")
     asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
@@ -271,7 +271,7 @@ def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
 @click.pass_obj
 def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
     """Add an image alias from the given alias to the target image reference."""
-    log.warn("etcd alias command is deprecated, use image alias instead")
+    log.warning("etcd alias command is deprecated, use image alias instead")
     asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
 
 
@@ -280,7 +280,7 @@ def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> No
 @click.pass_obj
 def dealias(cli_ctx: CLIContext, alias: str) -> None:
     """Remove an alias."""
-    log.warn("etcd dealias command is deprecated, use image dealias instead")
+    log.warning("etcd dealias command is deprecated, use image dealias instead")
     asyncio.run(dealias_impl(cli_ctx, alias))
 
 
