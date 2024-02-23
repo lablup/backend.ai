@@ -35,7 +35,9 @@ from .base import (
     GUID,
     Base,
     EnumValueType,
+    FilterExprArg,
     IDColumn,
+    OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
@@ -53,6 +55,8 @@ from .gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
+from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -656,7 +660,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
@@ -670,7 +674,7 @@ class PurgeGroup(graphene.Mutation):
             result = await db_conn.execute(delete_query)
 
         try:
-            await initiate_vfolder_purge(
+            await initiate_vfolder_deletion(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
@@ -833,6 +837,16 @@ class GroupNode(graphene.ObjectType):
         from .user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter, QueryFilterParser(UserNode._queryfilter_fieldspec))
+            if filter is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order, QueryOrderParser(UserNode._queryorder_colmap))
+            if order is not None
+            else None
+        )
         (
             query,
             conditions,
@@ -843,8 +857,8 @@ class GroupNode(graphene.ObjectType):
             info,
             UserRow,
             UserRow.uuid,
-            filter,
-            order,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,
@@ -887,6 +901,12 @@ class GroupNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
+        )
         (
             query,
             conditions,
@@ -897,8 +917,8 @@ class GroupNode(graphene.ObjectType):
             info,
             GroupRow,
             GroupRow.id,
-            filter_expr,
-            order_expr,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,

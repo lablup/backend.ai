@@ -30,9 +30,11 @@ from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_N
 from .base import (
     Base,
     EnumValueType,
+    FilterExprArg,
     IDColumn,
     IPColumn,
     Item,
+    OrderExprArg,
     PaginatedList,
     batch_multiresult,
     batch_result,
@@ -1103,7 +1105,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
 
         async with engine.begin_session() as conn:
             await conn.execute(
@@ -1117,7 +1119,7 @@ class PurgeUser(graphene.Mutation):
             target_vfs = result.fetchall()
 
         try:
-            await initiate_vfolder_purge(
+            await initiate_vfolder_deletion(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
@@ -1382,6 +1384,48 @@ class UserNode(graphene.ObjectType):
             user_row = (await db_session.scalars(query)).first()
             return cls.from_row(user_row)
 
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "uuid": ("uuid", None),
+        "username": ("username", None),
+        "email": ("email", None),
+        "need_password_change": ("need_password_change", None),
+        "full_name": ("full_name", None),
+        "description": ("description", None),
+        "is_active": ("is_active", None),
+        "status": ("status", enum_field_getter(UserStatus)),
+        "status_info": ("status_info", None),
+        "created_at": ("created_at", dtparse),
+        "modified_at": ("modified_at", dtparse),
+        "domain_name": ("domain_name", None),
+        "role": ("role", enum_field_getter(UserRole)),
+        "resource_policy": ("domain_name", None),
+        "allowed_client_ip": ("allowed_client_ip", None),
+        "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", dtparse),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": ("main_access_key", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "uuid": ("uuid", None),
+        "username": ("username", None),
+        "email": ("email", None),
+        "need_password_change": ("need_password_change", None),
+        "full_name": ("full_name", None),
+        "is_active": ("is_active", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "created_at": ("created_at", None),
+        "modified_at": ("modified_at", None),
+        "domain_name": ("domain_name", None),
+        "role": ("role", None),
+        "resource_policy": ("resource_policy", None),
+        "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", None),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": ("main_access_key", None),
+    }
+
     @classmethod
     async def get_connection(
         cls,
@@ -1395,6 +1439,16 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
         (
             query,
             conditions,
@@ -1405,8 +1459,8 @@ class UserNode(graphene.ObjectType):
             info,
             UserRow,
             UserRow.uuid,
-            filter_expr,
-            order_expr,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,

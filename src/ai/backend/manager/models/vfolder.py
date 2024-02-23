@@ -51,8 +51,10 @@ from .base import (
     Base,
     BigInt,
     EnumValueType,
+    FilterExprArg,
     IDColumn,
     Item,
+    OrderExprArg,
     PaginatedList,
     QuotaScopeIDType,
     batch_multiresult,
@@ -95,7 +97,7 @@ __all__: Sequence[str] = (
     "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
-    "initiate_vfolder_purge",
+    "initiate_vfolder_deletion",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
@@ -148,7 +150,7 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
-class VFolderOperationStatus(str, enum.Enum):
+class VFolderOperationStatus(enum.StrEnum):
     """
     Introduce virtual folder current status for storage-proxy operations.
     """
@@ -158,12 +160,14 @@ class VFolderOperationStatus(str, enum.Enum):
     CLONING = "cloning"
     MOUNTED = "mounted"
     ERROR = "error"
-    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
-    DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
-    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
+
+    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_ERROR = "delete-error"
 
 
-class VFolderAccessStatus(str, enum.Enum):
+class VFolderAccessStatus(enum.StrEnum):
     """
     Introduce virtual folder desired status for storage-proxy operations.
     Not added to db scheme  and determined only by current vfolder status.
@@ -172,14 +176,24 @@ class VFolderAccessStatus(str, enum.Enum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     RECOVERABLE = "recoverable"
-    DELETABLE = "deletable"
-    PURGABLE = "purgable"
+    SOFT_DELETABLE = "soft-deletable"  # Able to move to `trash bin`
+    HARD_DELETABLE = "hard-deletable"  # Able to delete vfolder in storage proxy
+    PURGABLE = "purgable"  # Able to delete vfolder row in DB. The real data of vfolder should be deleted already.
 
+
+SOFT_DELETED_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_PENDING,
+    VFolderOperationStatus.DELETE_ONGOING,
+)
+
+HARD_DELETED_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_COMPLETE,
+    VFolderOperationStatus.DELETE_ERROR,
+)
 
 DEAD_VFOLDER_STATUSES = (
-    VFolderOperationStatus.DELETE_ONGOING,
-    VFolderOperationStatus.DELETE_COMPLETE,
-    VFolderOperationStatus.PURGE_ONGOING,
+    *SOFT_DELETED_VFOLDER_STATUSES,
+    *HARD_DELETED_VFOLDER_STATUSES,
 )
 
 
@@ -252,6 +266,7 @@ vfolders = sa.Table(
     #   "delete-ongoing": "2022-10-25T10:22:30"
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
+    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -817,17 +832,20 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
+    now = datetime.now(tzutc())
+
     async def _update() -> None:
         async with engine.begin_session() as db_session:
             query = (
                 sa.update(vfolders)
                 .values(
                     status=update_status,
+                    status_changed=now,
                     status_history=sql_json_merge(
                         vfolders.c.status_history,
                         (),
                         {
-                            update_status.name: datetime.now(tzutc()).isoformat(),
+                            update_status.name: now.isoformat(),
                         },
                     ),
                 )
@@ -978,7 +996,7 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
-async def initiate_vfolder_purge(
+async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
@@ -992,16 +1010,16 @@ async def initiate_vfolder_purge(
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
-    async def _purge_task(reporter: ProgressReporter) -> None:
-        await purge_vfolders(
+    async def _delete_task(reporter: ProgressReporter) -> None:
+        await delete_vfolders(
             requested_vfolders, db=db_engine, storage_manager=storage_manager, reporter=reporter
         )
 
-    task_id = await background_task_manager.start(_purge_task)
-    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+    task_id = await background_task_manager.start(_delete_task, total_progress=vfolder_info_len)
+    log.debug("Started deleting vfolders {}", [str(x) for x in vfolder_ids])
 
     return task_id
 
@@ -1578,6 +1596,16 @@ class VFolderNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
         (
             query,
             conditions,
@@ -1588,8 +1616,8 @@ class VFolderNode(graphene.ObjectType):
             info,
             VFolderRow,
             VFolderRow.id,
-            filter_expr,
-            order_expr,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,
@@ -1613,7 +1641,7 @@ class VFolderConnection(Connection):
         node = VFolderNode
 
 
-async def purge_vfolders(
+async def delete_vfolders(
     requested_vfolders: Sequence[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
@@ -1701,8 +1729,8 @@ class PurgeVFolder(graphene.Mutation):
                 VFolderDeletionInfo(VFolderID.from_row(row), row.host) for row in vfolder_rows
             ]
 
-        async def _purge_task(reporter: ProgressReporter) -> None:
-            await purge_vfolders(
+        async def _delete_task(reporter: ProgressReporter) -> None:
+            await delete_vfolders(
                 vfolder_infos,
                 db=graph_ctx.db,
                 storage_manager=graph_ctx.storage_manager,
@@ -1710,7 +1738,7 @@ class PurgeVFolder(graphene.Mutation):
             )
 
         task_id = await graph_ctx.background_task_manager.start(
-            _purge_task, total_progress=len(vfolder_infos)
+            _delete_task, total_progress=len(vfolder_infos)
         )
         return PurgeVFolder(ok=True, msg="", task_id=task_id)
 
@@ -2032,6 +2060,62 @@ class ModelCard(graphene.ObjectType):
         )
     )
 
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("vfolders_id", uuid.UUID),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", uuid.UUID),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", uuid.UUID),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "unmanaged_path": ("vfolders_unmanaged_path", None),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            enum_field_getter(VFolderUsageMode),
+        ),
+        "permission": (
+            "vfolders_permission",
+            enum_field_getter(VFolderPermission),
+        ),
+        "ownership_type": (
+            "vfolders_ownership_type",
+            enum_field_getter(VFolderOwnershipType),
+        ),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", dtparse),
+        "last_used": ("vfolders_last_used", dtparse),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": (
+            "vfolders_status",
+            enum_field_getter(VFolderOperationStatus),
+        ),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("vfolders_id", None),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", None),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", None),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "usage_mode": ("vfolders_usage_mode", None),
+        "permission": ("vfolders_permission", None),
+        "ownership_type": ("vfolders_ownership_type", None),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", None),
+        "last_used": ("vfolders_last_used", None),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
+    }
+
     def resolve_created_at(
         self,
         info: graphene.ResolveInfo,
@@ -2211,6 +2295,16 @@ class ModelCard(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
         (
             query,
             conditions,
@@ -2221,8 +2315,8 @@ class ModelCard(graphene.ObjectType):
             info,
             VFolderRow,
             VFolderRow.id,
-            filter_expr,
-            order_expr,
+            _filter_arg,
+            _order_expr,
             offset,
             after=after,
             first=first,
