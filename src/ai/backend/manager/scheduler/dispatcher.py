@@ -8,6 +8,7 @@ import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -745,6 +746,37 @@ class SchedulerDispatcher(aobject):
             agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
+
+                async with self.db.begin_session() as db_sess:
+                    result = (
+                        await db_sess.execute(
+                            sa.select([AgentRow.available_slots, AgentRow.occupied_slots]).where(
+                                AgentRow.id == agent_id
+                            )
+                        )
+                    ).fetchall()[0]
+
+                if result is None:
+                    raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+
+                available_slots, occupied_slots = result
+
+                for key in available_slots.keys():
+                    if (
+                        available_slots[key] - occupied_slots.get(key, Decimal("0"))
+                        >= sess_ctx.requested_slots[key]
+                    ):
+                        continue
+                    else:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                f"The designated agent ({agent_id}) does not have "
+                                f"the enough remaining capacity ({key}, "
+                                f"requested: {sess_ctx.requested_slots[key]}, "
+                                f"remaining: {available_slots[key] - occupied_slots[key]})."
+                            ),
+                        )
+
             else:
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
