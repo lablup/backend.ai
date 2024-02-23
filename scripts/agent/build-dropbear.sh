@@ -2,15 +2,8 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8")
+distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8")
 
-ubuntu1604_builder_dockerfile=$(cat <<'EOF'
-FROM ubuntu:16.04
-RUN apt-get update
-RUN apt-get install -y make gcc
-RUN apt-get install -y autoconf automake zlib1g-dev
-EOF
-)
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
 RUN apt-get update
@@ -70,7 +63,6 @@ temp_dir=$(mktemp -d -t dropbear-build.XXXXX)
 echo "Using temp directory: $temp_dir"
 echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
-echo "$ubuntu1604_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu16.04.dockerfile"
 echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu18.04.dockerfile"
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu20.04.dockerfile"
 echo "$ubuntu2204_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu22.04.dockerfile"
