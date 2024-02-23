@@ -206,7 +206,7 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
-class KernelLifecycleEventReason(str, enum.Enum):
+class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
     ANOMALY_DETECTED = "anomaly-detected"
@@ -238,6 +238,8 @@ class KernelLifecycleEventReason(str, enum.Enum):
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        if value is None:
+            return None
         try:
             return cls(value)
         except ValueError:

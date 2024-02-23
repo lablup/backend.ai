@@ -82,7 +82,7 @@ class PasswordColumn(TypeDecorator):
         return _hash_password(value)
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """
     User's role.
     """
@@ -93,7 +93,7 @@ class UserRole(str, enum.Enum):
     MONITOR = "monitor"
 
 
-class UserStatus(str, enum.Enum):
+class UserStatus(enum.StrEnum):
     """
     User account status.
     """

@@ -223,7 +223,7 @@ AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 
-class AbstractPermission(str, enum.Enum):
+class AbstractPermission(enum.StrEnum):
     """
     Abstract enum type for permissions
     """
@@ -244,15 +244,15 @@ class VFolderHostPermission(AbstractPermission):
     SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
 
 
-class LogSeverity(str, enum.Enum):
-    CRITICAL = "critical"
-    ERROR = "error"
-    WARNING = "warning"
-    INFO = "info"
-    DEBUG = "debug"
+class LogSeverity(enum.StrEnum):
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
 
 
-class SlotTypes(str, enum.Enum):
+class SlotTypes(enum.StrEnum):
     COUNT = "count"
     BYTES = "bytes"
     UNIQUE = "unique"
@@ -264,42 +264,42 @@ class HardwareMetadata(TypedDict):
     metadata: Dict[str, str]
 
 
-class AutoPullBehavior(str, enum.Enum):
+class AutoPullBehavior(enum.StrEnum):
     DIGEST = "digest"
     TAG = "tag"
     NONE = "none"
 
 
-class ServicePortProtocols(str, enum.Enum):
+class ServicePortProtocols(enum.StrEnum):
     HTTP = "http"
     TCP = "tcp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
 
 
-class SessionTypes(str, enum.Enum):
+class SessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
 
 
-class SessionResult(str, enum.Enum):
+class SessionResult(enum.StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
 
 
-class ClusterMode(str, enum.Enum):
+class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
 
 
-class CommitStatus(str, enum.Enum):
+class CommitStatus(enum.StrEnum):
     READY = "ready"
     ONGOING = "ongoing"
 
 
-class AbuseReportValue(str, enum.Enum):
+class AbuseReportValue(enum.StrEnum):
     DETECTED = "detected"
     CLEANING = "cleaning"
 
@@ -342,12 +342,12 @@ class IntrinsicSlotNames(enum.Enum):
     MEMORY = SlotName("mem")
 
 
-class DefaultForUnspecified(str, enum.Enum):
+class DefaultForUnspecified(enum.StrEnum):
     LIMITED = "LIMITED"
     UNLIMITED = "UNLIMITED"
 
 
-class HandlerForUnknownSlotName(str, enum.Enum):
+class HandlerForUnknownSlotName(enum.StrEnum):
     DROP = "drop"
     ERROR = "error"
 
@@ -355,7 +355,7 @@ class HandlerForUnknownSlotName(str, enum.Enum):
 Quantum = Decimal("0.000")
 
 
-class MountPermission(str, enum.Enum):
+class MountPermission(enum.StrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -364,7 +364,7 @@ class MountPermission(str, enum.Enum):
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
-class MountTypes(str, enum.Enum):
+class MountTypes(enum.StrEnum):
     VOLUME = "volume"
     BIND = "bind"
     TMPFS = "tmpfs"
@@ -863,7 +863,7 @@ class VFolderID:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
 
-class VFolderUsageMode(str, enum.Enum):
+class VFolderUsageMode(enum.StrEnum):
     """
     Usage mode of virtual folder.
 
