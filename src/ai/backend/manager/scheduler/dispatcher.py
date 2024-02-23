@@ -715,12 +715,16 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
+        if not sess_ctx.kernels:
+            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
 
         try:
+            if not candidate_agents:
+                raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -1001,7 +1005,7 @@ class SchedulerDispatcher(aobject):
                                     AgentRow.occupied_slots,
                                 ]).where(AgentRow.id == agent.id)
                             )
-                        ).fecthall()[0]
+                        ).fetchall()[0]
 
                         if result is None:
                             raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
@@ -1028,6 +1032,10 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
+                        if not candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg="No agents are available for scheduling"
+                            )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
@@ -1337,7 +1345,7 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warn("prepare(): timeout while executing start_session()")
+            log.warning("prepare(): timeout while executing start_session()")
 
     async def scale_services(
         self,
@@ -1516,7 +1524,7 @@ class SchedulerDispatcher(aobject):
                         endpoint,
                     )
                 except Exception as e:
-                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                    log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,
