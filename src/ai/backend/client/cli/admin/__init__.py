@@ -25,4 +25,5 @@ from . import (  # noqa
     storage,
     user,
     vfolder,
+    quota_scope,
 )
