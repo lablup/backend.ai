@@ -85,10 +85,11 @@ class GPFSOpModel(BaseFSOpModel):
         self,
         mount_path: Path,
         scandir_limit: int,
+        delete_concurrency: int,
         api_client: GPFSAPIClient,
         fs: str,
     ) -> None:
-        super().__init__(mount_path, scandir_limit)
+        super().__init__(mount_path, scandir_limit, delete_concurrency)
         self.api_client = api_client
         self.fs = fs
 
@@ -155,6 +156,7 @@ class GPFSVolume(BaseVolume):
         return GPFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.local_config["storage-proxy"]["delete-concurrency"],
             self.api_client,
             self.fs,
         )

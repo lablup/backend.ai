@@ -16,7 +16,6 @@ import aiofiles.os
 import janus
 import trafaret as t
 
-from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -190,9 +189,10 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 
 class BaseFSOpModel(AbstractFSOpModel):
-    def __init__(self, mount_path: Path, scandir_limit: int) -> None:
+    def __init__(self, mount_path: Path, scandir_limit: int, delete_concurrency: int = 20) -> None:
         self.mount_path = mount_path
         self.scandir_limit = scandir_limit
+        self.delete_sema = asyncio.Semaphore(delete_concurrency)
 
     async def copy_tree(
         self,
@@ -225,11 +225,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        # FileLock - what if the FSOp model can perform concurrent delete??
-        # Plus, does FileLock work with mounted directory?
-        # Semaphore - cannot lock on a certain directory.
-        lock_path = path.parent / f"{path.name}.lock"
-        async with FileLock(lock_path, remove_when_unlock=True):
+        async with self.delete_sema:
             loop = asyncio.get_running_loop()
             try:
                 await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
@@ -376,6 +372,7 @@ class BaseVolume(AbstractVolume):
         return BaseFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.local_config["storage-proxy"]["delete-concurrency"],
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:
