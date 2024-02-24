@@ -16,6 +16,7 @@ import aiofiles.os
 import janus
 import trafaret as t
 
+from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -226,11 +227,13 @@ class BaseFSOpModel(AbstractFSOpModel):
         path: Path,
     ) -> None:
         async with self.delete_sema:
-            loop = asyncio.get_running_loop()
-            try:
-                await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
-            except FileNotFoundError:
-                pass
+            lock_path = path.parent / f"{path.name}.lock"
+            async with FileLock(lock_path, remove_when_unlock=True):
+                loop = asyncio.get_running_loop()
+                try:
+                    await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
+                except FileNotFoundError:
+                    pass
 
     def scan_tree(
         self,
