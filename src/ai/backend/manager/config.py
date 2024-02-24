@@ -246,7 +246,6 @@ manager_local_config_iv = (
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
             t.Key("conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
-            t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
         t.Key("manager"): t.Dict({

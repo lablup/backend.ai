@@ -37,7 +37,7 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # lock-conn-timeout = 30
 
 # This setting causes the pool to recycle connections after the given number of seconds has passed.
-# Default is -1, which means infinite. 
+# Default is -1, which means infinite.
 # https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
 # https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
 # pool-recycle = -1
