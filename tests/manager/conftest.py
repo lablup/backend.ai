@@ -185,6 +185,7 @@ def local_config(
             "pool-recycle": -1,
             "conn-timeout": 0,
             "max-overflow": 64,
+            "lock-conn-timeout": 0,
         },
         "manager": {
             "id": f"i-{test_id}",

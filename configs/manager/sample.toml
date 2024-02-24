@@ -31,6 +31,11 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # Default is 0, which means infinite
 # conn-timeout = 30
 
+# The connections for lock lifetime
+# Distribution locks wait for `lock-conn-timeout` seconds and lock context should finish within this time.
+# Default is 0, which means infinite
+# lock-conn-timeout = 30
+
 # This setting causes the pool to recycle connections after the given number of seconds has passed.
 # Default is -1, which means infinite. 
 # https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
@@ -128,7 +133,7 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 # "filelock" is the simplest one when the manager is deployed on only one node.
 # "pg_advisory" uses PostgreSQL's session-level advisory lock.
 # "redlock" uses Redis-based distributed lock (Redlock) -- currently not supported.
-# "etcd" uses etcd-based distributed lock via etcetra.
+# "etcd" uses etcd-based distributed lock via etcd-client-py.
 # distributed-lock = "pg_advisory"
 
 # The Docker image name that is used for importing external Docker images.
@@ -207,6 +212,10 @@ ssl-verify = false
 ca-certs = ""
 keyfile = ""
 certfile = ""
+
+# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
+# fqdn = false
+# localname = "manager"
 
 
 # Specify additional package namespaces to include in the logs
