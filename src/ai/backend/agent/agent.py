@@ -2388,7 +2388,7 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
-    # This should be removed after agent-watcher is fully implemented
+    # TODO: This should be removed after agent-watcher is fully implemented
     err_msg: str | None = None
 
     mountpoint = Path(event.dir_name)
@@ -2432,7 +2432,7 @@ async def handle_volume_umount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
-    # This should be removed after agent-watcher is fully implemented
+    # TODO: This should be removed after agent-watcher is fully implemented
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
     err_msg: str | None = None
 
