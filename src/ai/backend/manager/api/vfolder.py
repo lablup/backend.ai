@@ -32,18 +32,17 @@ import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
-import trafaret as t
 from aiohttp import web
 from pydantic import (
     AliasChoices,
     BaseModel,
+    EmailStr,
     Field,
 )
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
-from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -74,7 +73,6 @@ from ..models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionValidator,
     agents,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
@@ -117,8 +115,7 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
-    check_api_params,
-    get_user_scopes,
+    get_user_scopes_by_email,
     pydantic_api_params_handler,
 )
 
@@ -315,20 +312,42 @@ def vfolder_permission_required(
     return _wrapper
 
 
+class CreateRequestModel(BaseModel):
+    name: tv.VFolderName = Field(
+        description="Name for vfolder.",
+    )
+    folder_host: str = Field(
+        validation_alias=AliasChoices("host", "folder_host"),
+        description="Storage host of vfolder.",
+    )
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL,
+        description=f"Usage mode that apply to vfolder. One of {[mode.value for mode in VFolderUsageMode]}.",
+    )
+    permission: VFolderPermission = Field(
+        default=VFolderPermission.READ_WRITE,
+        validation_alias=AliasChoices("perm", "permission"),
+        description=f"Permission that apply to vfolder. One of {[perm.value for perm in VFolderPermission]}.",
+    )
+    unmanaged_path: str = Field(
+        validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
+        description="Path of vfolder that is not belong to any host. (Admin only)",
+    )
+    project_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "project_id",
+            "projectId",
+        ),
+        description="Project ID to which the vfolder belongs.",
+    )
+    cloneable: bool = Field(default=False, description="Allow clone the vfolder.")
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("name"): tx.Slug(allow_dot=True),
-        t.Key("host", default=None) >> "folder_host": t.String | t.Null,
-        t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
-        t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
-        tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
-        tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("cloneable", default=False): t.Bool,
-    }),
-)
-async def create(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(CreateRequestModel)
+async def create(request: web.Request, params: CreateRequestModel) -> web.Response:
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -336,18 +355,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
+    project_id = params.project_id
+    folder_name = params.name
+    folder_host = params.folder_host
+    unmanaged_path = params.unmanaged_path
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
         access_key,
-        params["name"],
-        params["folder_host"],
-        params["usage_mode"].value,
-        params["permission"].value,
+        folder_name,
+        folder_host,
+        params.usage_mode.value,
+        params.permission.value,
     )
-    folder_host = params["folder_host"]
-    unmanaged_path = params["unmanaged_path"]
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
@@ -356,67 +376,39 @@ async def create(request: web.Request, params: Any) -> web.Response:
     else:
         # Resolve host for the new virtual folder.
         if not folder_host:
-            folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
-            if not folder_host:
+            _folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
+            if not _folder_host:
                 raise InvalidAPIParameters(
                     "You must specify the vfolder host because the default host is not configured."
                 )
+            folder_host = _folder_host
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
-    if not verify_vfolder_name(params["name"]):
-        raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
-    if params["name"].startswith(".") and params["name"] != ".local":
-        if params["group"] is not None:
+    if not verify_vfolder_name(folder_name):
+        raise InvalidAPIParameters(f"{folder_name} is reserved for internal operations.")
+    if folder_name.startswith(".") and folder_name != ".local":
+        if project_id is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
-    group_uuid: uuid.UUID | None = None
-    group_type: ProjectType | None = None
+    project_type: ProjectType | None = None
 
     async with root_ctx.db.begin_session() as sess:
-        match group_id_or_name:
-            case str():
-                # Convert the group name to group uuid.
-                log.debug("group_id_or_name(str):{}", group_id_or_name)
-                query = (
-                    sa.select(GroupRow)
-                    .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.name == group_id_or_name)
-                    )
-                    .options(selectinload(GroupRow.resource_policy_row))
-                )
-                result = await sess.execute(query)
-                group_row = result.scalar()
-                _gid, max_vfolder_count, max_quota_scope_size = (
-                    group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
-                )
-                if _gid is None:
-                    raise GroupNotFound(extra_data=group_id_or_name)
-                group_uuid = _gid
-                group_type = group_row.type
+        match project_id:
             case uuid.UUID():
-                # Check if the group belongs to the current domain.
-                log.debug("group_id_or_name(uuid):{}", group_id_or_name)
                 query = (
                     sa.select(GroupRow)
-                    .where(
-                        (GroupRow.domain_name == domain_name) & (GroupRow.id == group_id_or_name)
-                    )
+                    .where((GroupRow.domain_name == domain_name) & (GroupRow.id == project_id))
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
-                result = await sess.execute(query)
-                group_row = result.scalar()
-                _gid, max_vfolder_count, max_quota_scope_size = (
-                    group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                project_row = await sess.scalar(query)
+                if project_row is None:
+                    raise GroupNotFound(extra_data=project_id)
+                max_vfolder_count, max_quota_scope_size = (
+                    project_row.resource_policy_row.max_vfolder_count,
+                    project_row.resource_policy_row.max_quota_scope_size,
                 )
-                if _gid is None:
-                    raise GroupNotFound(extra_data=group_id_or_name)
-                group_uuid = group_id_or_name
-                group_type = group_row.type
+                project_type = project_row.type
             case None:
                 query = (
                     sa.select(UserRow)
@@ -429,18 +421,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     user_row.resource_policy_row.max_vfolder_count,
                     user_row.resource_policy_row.max_quota_scope_size,
                 )
-            case _:
-                raise GroupNotFound(extra_data=group_id_or_name)
-
-        # Check if group exists when it's given a non-empty value.
-        if group_id_or_name and group_uuid is None:
-            raise GroupNotFound(extra_data=group_id_or_name)
 
         # Determine the ownership type and the quota scope ID.
-        if group_uuid is not None:
+        if project_id is not None:
             ownership_type = "group"
-            quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
-            if not request["is_admin"] and group_type != ProjectType.MODEL_STORE:
+            quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, project_id)
+            if not request["is_admin"] and project_type != ProjectType.MODEL_STORE:
                 raise GenericForbidden("no permission")
         else:
             ownership_type = "user"
@@ -450,12 +436,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
 
-    if group_type == ProjectType.MODEL_STORE:
-        if params["permission"] != VFolderPermission.READ_WRITE:
+    if project_type == ProjectType.MODEL_STORE:
+        if params.permission != VFolderPermission.READ_WRITE:
             raise InvalidAPIParameters(
                 "Setting custom permission is not supported for model store vfolder"
             )
-        if params["usage_mode"] != VFolderUsageMode.MODEL:
+        if params.usage_mode != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
                 "Only Model VFolder can be created under the model store project"
             )
@@ -469,7 +455,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 user_uuid=user_uuid,
                 resource_policy=keypair_resource_policy,
                 domain_name=domain_name,
-                group_id=group_uuid,
+                group_id=project_id,
                 permission=VFolderHostPermission.CREATE,
             )
 
@@ -496,7 +482,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [
-            (vfolders.c.name == params["name"]),
+            (vfolders.c.name == folder_name),
             (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
         ]
         entries = await query_accessible_vfolders(
@@ -508,7 +494,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
         if len(entries) > 0:
-            raise VFolderAlreadyExists(extra_data=params["name"])
+            raise VFolderAlreadyExists(extra_data=params.name)
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
@@ -547,40 +533,40 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise VFolderCreationFailed from e
 
         # By default model store VFolder should be considered as read only for every users but without the creator
-        if group_type == ProjectType.MODEL_STORE:
-            params["permission"] = VFolderPermission.READ_ONLY
+        if project_type == ProjectType.MODEL_STORE:
+            params.permission = VFolderPermission.READ_ONLY
 
         # TODO: include quota scope ID in the database
         # TODO: include quota scope ID in the API response
         insert_values = {
             "id": vfid.folder_id.hex,
-            "name": params["name"],
+            "name": params.name,
             "quota_scope_id": str(quota_scope_id),
-            "usage_mode": params["usage_mode"],
-            "permission": params["permission"],
+            "usage_mode": params.usage_mode,
+            "permission": params.permission,
             "last_used": None,
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid if ownership_type == "user" else None,
-            "group": group_uuid if ownership_type == "group" else None,
+            "group": project_id if ownership_type == "group" else None,
             "unmanaged_path": "",
-            "cloneable": params["cloneable"],
+            "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
         resp = {
             "id": vfid.folder_id.hex,
-            "name": params["name"],
+            "name": params.name,
             "quota_scope_id": str(quota_scope_id),
             "host": folder_host,
-            "usage_mode": params["usage_mode"].value,
-            "permission": params["permission"].value,
+            "usage_mode": params.usage_mode.value,
+            "permission": params.permission.value,
             "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
-            "group": str(group_uuid) if ownership_type == "group" else None,
-            "cloneable": params["cloneable"],
+            "group": str(project_id) if ownership_type == "group" else None,
+            "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
         if unmanaged_path:
@@ -594,7 +580,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
 
             # Here we grant creator the permission to alter VFolder contents
-            if group_type == ProjectType.MODEL_STORE:
+            if project_type == ProjectType.MODEL_STORE:
                 query = sa.insert(vfolder_permissions).values({
                     "user": request["user"]["uuid"],
                     "vfolder": vfid.folder_id.hex,
@@ -607,16 +593,26 @@ async def create(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=201)
 
 
+class ListVFolderRequestModel(BaseModel):
+    project_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "project_id",
+            "projectId",
+        ),
+        description="Project ID to which the vfolder belongs.",
+    )
+    owner_user_email: EmailStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("owner_user_email", "ownerUserEmail", "email"),
+        description="Email of the user to list vfolders.",
+    )
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("all", default=False): t.ToBool,
-        tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
-        tx.AliasedKey(["owner_user_email", "ownerUserEmail"], default=None): t.Email | t.Null,
-    }),
-)
-async def list_folders(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(ListVFolderRequestModel)
+async def list_folders(request: web.Request, params: ListVFolderRequestModel) -> web.Response:
     resp = []
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -624,26 +620,23 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 
     log.info("VFOLDER.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
     entries: List[Mapping[str, Any]] | Sequence[Mapping[str, Any]]
-    owner_user_uuid, owner_user_role = await get_user_scopes(request, params)
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-        if params["all"]:
-            raise InvalidAPIParameters("Deprecated use of 'all' option")
-        else:
-            extra_vf_conds = None
-            if params["group_id"] is not None:
-                # Note: user folders should be returned even when group_id is specified.
-                extra_vf_conds = (vfolders.c.group == params["group_id"]) | (
-                    vfolders.c.user.isnot(None)
-                )
-            entries = await query_accessible_vfolders(
-                conn,
-                owner_user_uuid,
-                user_role=owner_user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=extra_vf_conds,
-            )
+        owner_user_uuid, owner_user_role = await get_user_scopes_by_email(
+            request, conn, params.owner_user_email
+        )
+        extra_vf_conds = None
+        if params.project_id is not None:
+            # Note: user folders should be returned even when group_id is specified.
+            extra_vf_conds = (vfolders.c.group == params.project_id) | (vfolders.c.user.isnot(None))
+        entries = await query_accessible_vfolders(
+            conn,
+            owner_user_uuid,
+            user_role=owner_user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=extra_vf_conds,
+        )
         for entry in entries:
             resp.append({
                 "name": entry["name"],
@@ -731,14 +724,21 @@ async def fetch_exposed_volume_fields(
     return volume_usage
 
 
+class ListHostRequestModel(BaseModel):
+    project_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "project_id",
+            "projectId",
+        ),
+        description="Project ID to which the vfolder belongs.",
+    )
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
-    }),
-)
-async def list_hosts(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(ListHostRequestModel)
+async def list_hosts(request: web.Request, params: ListHostRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log.info(
@@ -747,20 +747,20 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         access_key,
     )
     domain_name = request["user"]["domain_name"]
-    group_id = params["group_id"]
+    project_id = params.project_id
     domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly() as conn:
         allowed_hosts = VFolderHostPermissionMap()
         if "user" in allowed_vfolder_types:
             allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-                conn, resource_policy, domain_name, request["user"]["uuid"], group_id
+                conn, resource_policy, domain_name, request["user"]["uuid"], project_id
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_user
         if "group" in allowed_vfolder_types:
             allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                conn, resource_policy, domain_name, group_id, domain_admin=domain_admin
+                conn, resource_policy, domain_name, project_id, domain_admin=domain_admin
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
@@ -820,14 +820,22 @@ async def list_all_hosts(request: web.Request) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class VolumePerfMetricRequestModel(BaseModel):
+    folder_host: str = Field(
+        validation_alias=AliasChoices(
+            "folder_host",
+            "folderHost",
+        ),
+        description="The name of the storage host from which to import the performance metric.",
+    )
+
+
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("folder_host"): t.String,
-    })
-)
-async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(VolumePerfMetricRequestModel)
+async def get_volume_perf_metric(
+    request: web.Request, params: VolumePerfMetricRequestModel
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log.info(
@@ -835,7 +843,7 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
         request["user"]["email"],
         access_key,
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(params.folder_host)
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
@@ -922,23 +930,28 @@ async def get_info(
     return web.json_response(resp, status=200)
 
 
+class UsageRequestModel(IDBasedRequestModel):
+    folder_host: str = Field(
+        validation_alias=AliasChoices(
+            "folder_host",
+            "folderHost",
+        ),
+        description="Storage host of vfolder.",
+    )
+
+
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("folder_host"): t.String,
-        t.Key("id"): tx.UUID,
-    })
-)
-async def get_usage(request: web.Request, params: Any) -> web.Response:
-    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+@pydantic_api_params_handler(UsageRequestModel)
+async def get_usage(request: web.Request, params: UsageRequestModel) -> web.Response:
+    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(params.folder_host)
     log.info(
         "VFOLDER.GET_USAGE (email:{}, volume_name:{}, vf:{})",
         request["user"]["email"],
         volume_name,
-        params["id"],
+        params.vfolder_id,
     )
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -946,7 +959,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         "folder/usage",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params.vfolder_id)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -955,24 +968,19 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("folder_host"): t.String,
-        t.Key("id"): tx.UUID,
-    })
-)
-async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
-    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+@pydantic_api_params_handler(UsageRequestModel)
+async def get_used_bytes(request: web.Request, params: UsageRequestModel) -> web.Response:
+    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
-    log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(params.folder_host)
+    log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params.vfolder_id)
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
         "folder/used-bytes",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params.vfolder_id)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -1488,21 +1496,30 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class UpdateInvitationRequestModel(BaseModel):
+    permission: VFolderPermission = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "permission",
+            "perm",
+        ),
+        description=f"VFolder permissions. One of {[perm.value for perm in VFolderPermission]}",
+    )
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["perm", "permission"]): VFolderPermissionValidator,
-    }),
-)
-async def update_invitation(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(UpdateInvitationRequestModel)
+async def update_invitation(
+    request: web.Request, params: UpdateInvitationRequestModel
+) -> web.Response:
     """
     Update sent invitation's permission. Other fields are not allowed to be updated.
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     inv_id = request.match_info["inv_id"]
-    perm = params["perm"]
+    perm = params.permission
     log.info(
         "VFOLDER.UPDATE_INVITATION (email:{}, ak:{}, inv:{})",
         request["user"]["email"],
@@ -1528,7 +1545,7 @@ class InviteRequestModel(IDBasedRequestModel):
     perm: VFolderPermission = Field(
         validation_alias=AliasChoices("perm", "permission"),
         default=VFolderPermission.READ_WRITE,
-        description="Permission for invitees",
+        description=f"Permission that apply to vfolder. One of {[perm.value for perm in VFolderPermission]}.",
     )
     emails: list[str] = Field(
         validation_alias=AliasChoices("emails", "user_ids", "userIDs"),
@@ -1701,14 +1718,19 @@ async def invitations(request: web.Request) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class AcceptInvitationRequestModel(BaseModel):
+    inv_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("inv_id", "invId", "invitation_id", "invitationId"),
+        description="VFolder Invitation ID",
+    )
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("inv_id"): t.String,
-    }),
-)
-async def accept_invitation(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(AcceptInvitationRequestModel)
+async def accept_invitation(
+    request: web.Request, params: AcceptInvitationRequestModel
+) -> web.Response:
     """Accept invitation by invitee.
 
     * `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is
@@ -1719,7 +1741,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
-    inv_id = params["inv_id"]
+    inv_id = params.inv_id
     log.info(
         "VFOLDER.ACCEPT_INVITATION (email:{}, ak:{}, inv:{})",
         request["user"]["email"],
@@ -1792,18 +1814,23 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
     return web.json_response({})
 
 
+class DeleteInvitationRequestModel(BaseModel):
+    inv_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("inv_id", "invId", "invitation_id", "invitationId"),
+        description="VFolder Invitation ID",
+    )
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("inv_id"): t.String,
-    })
-)
-async def delete_invitation(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(DeleteInvitationRequestModel)
+async def delete_invitation(
+    request: web.Request, params: DeleteInvitationRequestModel
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     request_email = request["user"]["email"]
-    inv_id = params["inv_id"]
+    inv_id = params.inv_id
     log.info(
         "VFOLDER.DELETE_INVITATION (email:{}, ak:{}, inv:{})",
         request["user"]["email"],
@@ -1852,7 +1879,7 @@ class ShareRequestModel(IDBasedRequestModel):
     perm: VFolderPermission = Field(
         validation_alias=AliasChoices("perm", "permission"),
         default=VFolderPermission.READ_WRITE,
-        description="Permission for invitees",
+        description=f"Permission that apply to vfolder. One of {[perm.value for perm in VFolderPermission]}.",
     )
     emails: list[str] = Field(
         validation_alias=AliasChoices("emails", "user_ids", "userIDs"),
@@ -2475,6 +2502,7 @@ class CloneRequestModel(IDBasedRequestModel):
     )
     permission: VFolderPermission = Field(
         default=VFolderPermission.READ_WRITE,
+        validation_alias=AliasChoices("perm", "permission"),
         description=f"Permission that apply to cloned vfolder. One of {[perm.value for perm in VFolderPermission]}",
     )
 
@@ -2643,14 +2671,20 @@ async def clone(request: web.Request, params: CloneRequestModel, row: VFolderRow
     return web.json_response(resp, status=201)
 
 
+class ListSharedVFolderRequestModel(BaseModel):
+    vfolder_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="VFolder ID to be listed",
+    )
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["vfolder_id", "vfolderId"], default=None): tx.UUID | t.Null,
-    }),
-)
-async def list_shared_vfolders(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(ListSharedVFolderRequestModel)
+async def list_shared_vfolders(
+    request: web.Request, params: ListSharedVFolderRequestModel
+) -> web.Response:
     """
     List shared vfolders.
 
@@ -2658,7 +2692,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    target_vfid = params["vfolder_id"]
+    target_vfid = params.vfolder_id
     log.info(
         "VFOLDER.LIST_SHARED_VFOLDERS (email:{}, ak:{})",
         request["user"]["email"],
@@ -2701,16 +2735,24 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     return web.json_response(resp, status=200)
 
 
+class UpdateSharedVFolderRequestModel(IDBasedRequestModel):
+    user: uuid.UUID = Field(
+        validation_alias=AliasChoices("user", "user_id", "userId"),
+        description="Target user ID to override VFolder permission",
+    )
+    perm: VFolderPermission = Field(
+        validation_alias=AliasChoices("perm", "permission"),
+        default=VFolderPermission.READ_WRITE,
+        description=f"Permission that apply to vfolder. One of {[perm.value for perm in VFolderPermission]}.",
+    )
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("vfolder"): tx.UUID,
-        t.Key("user"): tx.UUID,
-        tx.AliasedKey(["perm", "permission"]): VFolderPermissionValidator | t.Null,
-    }),
-)
-async def update_shared_vfolder(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(UpdateSharedVFolderRequestModel)
+async def update_shared_vfolder(
+    request: web.Request, params: UpdateSharedVFolderRequestModel
+) -> web.Response:
     """
     Update permission for shared vfolders.
 
@@ -2718,9 +2760,9 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    vfolder_id = params["vfolder"]
-    user_uuid = params["user"]
-    perm = params["perm"]
+    vfolder_id = params.vfolder_id
+    user_uuid = params.user
+    perm = params.perm
     log.info(
         "VFOLDER.UPDATE_SHARED_VFOLDER(email:{}, ak:{}, vfid:{}, uid:{}, perm:{})",
         request["user"]["email"],
@@ -2748,15 +2790,24 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     return web.json_response(resp, status=200)
 
 
+class FsTabContentRequestModel(BaseModel):
+    agent_id: str = Field(
+        validation_alias=AliasChoices("agent_id", "agentId"),
+        description="Target user ID to override VFolder permission",
+    )
+    fstab_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("fstab_path", "fstabPath", "fstab"),
+        description="fstab file path",
+    )
+
+
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("fstab_path", default=None): t.String | t.Null,
-        t.Key("agent_id", default=None): t.String | t.Null,
-    }),
-)
-async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(FsTabContentRequestModel)
+async def get_fstab_contents(
+    request: web.Request, params: FsTabContentRequestModel
+) -> web.Response:
     """
     Return the contents of `/etc/fstab` file.
     """
@@ -2765,58 +2816,49 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
         "VFOLDER.GET_FSTAB_CONTENTS(email:{}, ak:{}, ag:{})",
         request["user"]["email"],
         access_key,
-        params["agent_id"],
+        params.agent_id,
     )
-    if params["fstab_path"] is None:
-        params["fstab_path"] = "/etc/fstab"
-    if params["agent_id"] is not None:
-        # Return specific agent's fstab.
-        watcher_info = await get_watcher_info(request, params["agent_id"])
-        try:
-            client_timeout = aiohttp.ClientTimeout(total=10.0)
-            async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "fstab"
-                async with sess.get(url, headers=headers, params=params) as watcher_resp:
-                    if watcher_resp.status == 200:
-                        content = await watcher_resp.text()
-                        resp = {
-                            "content": content,
-                            "node": "agent",
-                            "node_id": params["agent_id"],
-                        }
-                        return web.json_response(resp)
-                    else:
-                        message = await watcher_resp.text()
-                        raise BackendAgentError(
-                            "FAILURE", f"({watcher_resp.status}: {watcher_resp.reason}) {message}"
-                        )
-        except asyncio.CancelledError:
-            raise
-        except asyncio.TimeoutError:
-            log.error(
-                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
-                access_key,
-                params["agent_id"],
-            )
-            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
-        except Exception:
-            log.exception(
-                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                "unexpected error while reading from watcher (agent:{})",
-                access_key,
-                params["agent_id"],
-            )
-            raise InternalServerError
-    else:
-        resp = {
-            "content": (
-                "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
-            ),
-            "node": "manager",
-            "node_id": "manager",
-        }
-        return web.json_response(resp)
+    fstab_path = params.fstab_path or "/etc/fstab"
+    # Return specific agent's fstab.
+    watcher_info = await get_watcher_info(request, params.agent_id)
+    try:
+        client_timeout = aiohttp.ClientTimeout(total=10.0)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+            url = watcher_info["addr"] / "fstab"
+            async with sess.get(
+                url, headers=headers, params={"fstab_path": fstab_path, "agent_id": params.agent_id}
+            ) as watcher_resp:
+                if watcher_resp.status == 200:
+                    content = await watcher_resp.text()
+                    resp = {
+                        "content": content,
+                        "node": "agent",
+                        "node_id": params.agent_id,
+                    }
+                    return web.json_response(resp)
+                else:
+                    message = await watcher_resp.text()
+                    raise BackendAgentError(
+                        "FAILURE", f"({watcher_resp.status}: {watcher_resp.reason}) {message}"
+                    )
+    except asyncio.CancelledError:
+        raise
+    except asyncio.TimeoutError:
+        log.error(
+            "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
+            access_key,
+            params.agent_id,
+        )
+        raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
+    except Exception:
+        log.exception(
+            "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
+            "unexpected error while reading from watcher (agent:{})",
+            access_key,
+            params.agent_id,
+        )
+        raise InternalServerError
 
 
 @superadmin_required
@@ -2922,20 +2964,44 @@ async def list_mounts(request: web.Request) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class MountHostRequestModel(BaseModel):
+    fs_location: str = Field(
+        validation_alias=AliasChoices("fs_location", "fsLocation"),
+        description="fs_location to mount.",
+    )
+    name: str = Field(
+        description="destination of mount.",
+    )
+    fs_type: str = Field(
+        default="nfs",
+        validation_alias=AliasChoices("fs_type", "fsType"),
+        description="fs_type of mount",
+    )
+    options: str | None = Field(
+        default=None,
+        description="Mount command options.",
+    )
+    scaling_group: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
+        description="Scaling group to which the agent to be mounted belongs.",
+    )
+    fstab_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("fstab_path", "fstabPath"),
+        description="fstab file path.",
+    )
+    edit_fstab: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("edit_fstab", "editFstab"),
+        description="Flag to edit fstab file.",
+    )
+
+
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("fs_location"): t.String,
-        t.Key("name"): t.String,
-        t.Key("fs_type", default="nfs"): t.String,
-        t.Key("options", default=None): t.String | t.Null,
-        t.Key("scaling_group", default=None): t.String | t.Null,
-        t.Key("fstab_path", default=None): t.String | t.Null,
-        t.Key("edit_fstab", default=False): t.ToBool,
-    }),
-)
-async def mount_host(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(MountHostRequestModel)
+async def mount_host(request: web.Request, params: MountHostRequestModel) -> web.Response:
     """
     Mount device into vfolder host.
 
@@ -2948,7 +3014,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})"
-    log_args = (access_key, params["name"], params["fs_location"], params["scaling_group"])
+    log_args = (access_key, params.name, params.fs_location, params.scaling_group)
     log.info(log_fmt, *log_args)
     mount_prefix = await root_ctx.shared_config.get_raw("volumes/_mount")
     if mount_prefix is None:
@@ -2968,8 +3034,8 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.select([agents.c.id]).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
         )
-        if params["scaling_group"] is not None:
-            query = query.where(agents.c.scaling == params["scaling_group"])
+        if params.scaling_group is not None:
+            query = query.where(agents.c.scaling == params.scaling_group)
         result = await conn.execute(query)
         rows = result.fetchall()
 
@@ -2983,7 +3049,9 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
             try:
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 url = watcher_info["addr"] / "mounts"
-                async with sess.post(url, json=params, headers=headers) as resp:
+                async with sess.post(
+                    url, json=params.model_dump(mode="json"), headers=headers
+                ) as resp:
                     if resp.status == 200:
                         data = {
                             "success": True,
@@ -3027,17 +3095,31 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class UmountHostRequestModel(BaseModel):
+    name: str = Field(
+        description="Target mount path to umount.",
+    )
+    scaling_group: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
+        description="Scaling group to which the agent to be mounted belongs.",
+    )
+    fstab_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("fstab_path", "fstabPath"),
+        description="fstab file path.",
+    )
+    edit_fstab: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("edit_fstab", "editFstab"),
+        description="Flag to edit fstab file.",
+    )
+
+
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("name"): t.String,
-        t.Key("scaling_group", default=None): t.String | t.Null,
-        t.Key("fstab_path", default=None): t.String | t.Null,
-        t.Key("edit_fstab", default=False): t.ToBool,
-    }),
-)
-async def umount_host(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(UmountHostRequestModel)
+async def umount_host(request: web.Request, params: UmountHostRequestModel) -> web.Response:
     """
     Unmount device from vfolder host.
 
@@ -3049,12 +3131,12 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
-    log_args = (access_key, params["name"], params["scaling_group"])
+    log_args = (access_key, params.name, params.scaling_group)
     log.info(log_fmt, *log_args)
     mount_prefix = await root_ctx.shared_config.get_raw("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
+    mountpoint = Path(mount_prefix) / params.name
     assert Path(mount_prefix) != mountpoint
 
     async with root_ctx.db.begin() as conn, conn.begin():
@@ -3070,7 +3152,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         for kern in _kernels:
             if kern.mounts:
                 _mounted.update([m[1] for m in kern.mounts])
-        if params["name"] in _mounted:
+        if params.name in _mounted:
             return web.json_response(
                 {
                     "title": "Target host is used in sessions",
@@ -3082,8 +3164,8 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.select([agents.c.id]).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
         )
-        if params["scaling_group"] is not None:
-            query = query.where(agents.c.scaling == params["scaling_group"])
+        if params.scaling_group is not None:
+            query = query.where(agents.c.scaling == params.scaling_group)
         result = await conn.execute(query)
         _agents = result.fetchall()
 
@@ -3108,7 +3190,9 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
             try:
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 url = watcher_info["addr"] / "mounts"
-                async with sess.delete(url, json=params, headers=headers) as resp:
+                async with sess.delete(
+                    url, json=params.model_dump(mode="json"), headers=headers
+                ) as resp:
                     if resp.status == 200:
                         data = {
                             "success": True,
@@ -3160,21 +3244,26 @@ async def storage_task_exception_handler(
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 
 
+class ChangeVFolderOwnershipRequestModel(IDBasedRequestModel):
+    user_email: EmailStr = Field(
+        default=None,
+        validation_alias=AliasChoices("user_email", "userEmail", "email"),
+        description="Email of the user to list vfolders.",
+    )
+
+
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("vfolder"): tx.UUID,
-        t.Key("user_email"): t.String,
-    }),
-)
-async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
+@pydantic_api_params_handler(ChangeVFolderOwnershipRequestModel)
+async def change_vfolder_ownership(
+    request: web.Request, params: ChangeVFolderOwnershipRequestModel
+) -> web.Response:
     """
     Change the ownership of vfolder
     For now, we only provide changing the ownership of user-folder
     """
-    vfolder_id = params["vfolder"]
-    user_email = params["user_email"]
+    vfolder_id = params.vfolder_id
+    user_email = params.user_email
     root_ctx: RootContext = request.app["_root.context"]
 
     allowed_hosts_by_user = VFolderHostPermissionMap()

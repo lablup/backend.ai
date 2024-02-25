@@ -50,6 +50,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -110,6 +112,51 @@ async def get_user_uuid_scopes(
             raise InvalidAPIParameters(str(e))
         except RuntimeError as e:
             raise GenericForbidden(str(e))
+
+
+async def get_user_scopes_by_email(
+    request: web.Request,
+    conn: SAConnection,
+    email: str | None,
+) -> tuple[uuid.UUID, UserRole]:
+    if not request["is_authorized"]:
+        raise GenericForbidden("Only authorized requests may have user scopes.")
+    if email is not None:
+        user_query = (
+            sa.select([users.c.uuid, users.c.role, users.c.domain_name])
+            .select_from(users)
+            .where(
+                (users.c.email == email),
+            )
+        )
+        result = await conn.execute(user_query)
+        row = result.first()
+        if row is None:
+            raise InvalidAPIParameters("Cannot delegate an unknown user")
+        owner_user_uuid = row["uuid"]
+        owner_user_role = row["role"]
+        owner_user_domain = row["domain_name"]
+        if request["is_superadmin"]:
+            pass
+        elif request["is_admin"]:
+            if request["user"]["domain_name"] != owner_user_domain:
+                raise GenericForbidden(
+                    "Domain-admins can perform operations on behalf of "
+                    "other users in the same domain only.",
+                )
+            if owner_user_role == UserRole.SUPERADMIN:
+                raise GenericForbidden(
+                    "Domain-admins cannot perform operations on behalf of super-admins.",
+                )
+            pass
+        else:
+            raise GenericForbidden(
+                "Only admins can perform operations on behalf of other users.",
+            )
+    else:
+        owner_user_uuid = request["user"]["uuid"]
+        owner_user_role = request["user"]["role"]
+    return owner_user_uuid, owner_user_role
 
 
 async def get_user_scopes(
