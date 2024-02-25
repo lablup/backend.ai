@@ -13,9 +13,9 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Concatenate,
-    Coroutine,
     Dict,
     List,
     Mapping,
@@ -24,6 +24,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeAlias,
+    TypeVar,
 )
 
 import aiohttp
@@ -212,16 +213,26 @@ async def ensure_vfolder_status(
         return entries
 
 
+class IDBasedRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id",
+    )
+
+
+T_RequestModel = TypeVar("T_RequestModel", bound=IDBasedRequestModel)
+
+
 def vfolder_permission_required(
     perm: VFolderPermission,
 ) -> Callable[
     [
         Callable[
-            Concatenate[web.Request, IDBasedRequestModel, VFolderRow, P],
-            Coroutine[Any, Any, web.Response],
+            Concatenate[web.Request, T_RequestModel, VFolderRow, P],
+            Awaitable[web.Response],
         ]
     ],
-    Callable[Concatenate[web.Request, IDBasedRequestModel, P], Coroutine[Any, Any, web.Response]],
+    Callable[Concatenate[web.Request, T_RequestModel, P], Awaitable[web.Response]],
 ]:
     """
     Checks if the target vfolder exists and is either:
@@ -234,15 +245,13 @@ def vfolder_permission_required(
 
     def _wrapper(
         handler: Callable[
-            Concatenate[web.Request, IDBasedRequestModel, VFolderRow, P],
-            Coroutine[Any, Any, web.Response],
+            Concatenate[web.Request, T_RequestModel, VFolderRow, P],
+            Awaitable[web.Response],
         ],
-    ) -> Callable[
-        Concatenate[web.Request, IDBasedRequestModel, P], Coroutine[Any, Any, web.Response]
-    ]:
+    ) -> Callable[Concatenate[web.Request, T_RequestModel, P], Awaitable[web.Response]]:
         @functools.wraps(handler)
         async def _wrapped(
-            request: web.Request, params: IDBasedRequestModel, *args: P.args, **kwargs: P.kwargs
+            request: web.Request, params: T_RequestModel, *args: P.args, **kwargs: P.kwargs
         ) -> web.Response:
             root_ctx: RootContext = request.app["_root.context"]
             domain_name = request["user"]["domain_name"]
@@ -304,13 +313,6 @@ def vfolder_permission_required(
         return _wrapped
 
     return _wrapper
-
-
-class IDBasedRequestModel(BaseModel):
-    vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
-        description="Target vfolder id",
-    )
 
 
 @auth_required
