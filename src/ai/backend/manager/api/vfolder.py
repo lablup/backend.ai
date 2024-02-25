@@ -323,7 +323,6 @@ class IDBasedRequestModel(BaseModel):
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
         tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
         tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("quota", default=None): tx.BinarySize | t.Null,
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
@@ -558,7 +557,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
@@ -575,7 +573,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
+            "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
