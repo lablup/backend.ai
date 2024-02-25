@@ -11,7 +11,6 @@ from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
 from ai.backend.cli.params import (
     BoolExprType,
-    ByteSizeParamCheckType,
     ByteSizeParamType,
     CommaSeparatedKVListParamType,
     OptionalType,
@@ -111,24 +110,12 @@ def list_allowed_types():
     ),
 )
 @click.option(
-    "-q",
-    "--quota",
-    metavar="QUOTA",
-    type=ByteSizeParamCheckType(),
-    default="0",
-    help=(
-        "Quota of the virtual folder. "
-        "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
-        "Default is maximum amount possible."
-    ),
-)
-@click.option(
     "--cloneable",
     "--allow-clone",
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, quota, cloneable):
+def create(name, host, group, host_path, usage_mode, permission, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -144,7 +131,6 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     group=group,
                     usage_mode=usage_mode,
                     permission=permission,
-                    quota=quota,
                     cloneable=cloneable,
                 )
             else:
@@ -154,7 +140,6 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     group=group,
                     usage_mode=usage_mode,
                     permission=permission,
-                    quota=quota,
                     cloneable=cloneable,
                 )
             print('Virtual folder "{0}" is created.'.format(result["name"]))
@@ -166,9 +151,9 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @vfolder.command()
 @click.argument("name", type=str)
 def delete(name):
-    """Delete the given virtual folder.
+    """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
     This operation can be retracted by
-    calling `recover()`.
+    calling `restore()`.
 
     \b
     NAME: Name of a virtual folder.
@@ -200,15 +185,48 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def recover(name):
-    """Recover the given virtual folder from deleted status.
+def delete_trash(name):
+    """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
+    This operation is irreversible!
 
     NAME: Name of a virtual folder.
     """
     with Session() as session:
         try:
-            session.VFolder(name).recover()
-            print_done("Recovered.")
+            session.VFolder(name).delete_trash()
+            print_done("Delete completed.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def recover(name):
+    """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).restore()
+            print_done("Restored.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def restore(name):
+    """Restore the given virtual folder from deleted status, from trash bin.
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).restore()
+            print_done("Restored.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
