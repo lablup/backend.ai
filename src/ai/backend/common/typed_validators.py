@@ -195,11 +195,6 @@ class _SlugPydanticAnnotation:
         return core_schema.no_info_after_validator_function(
             cls._validate,
             core_schema.str_schema(),
-            # serialization=core_schema.plain_serializer_function_ser_schema(
-            #     cls._serialize,
-            #     info_arg=False,
-            #     return_schema=core_schema.str_schema(),
-            # ),
         )
 
 

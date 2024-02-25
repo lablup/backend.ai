@@ -2175,9 +2175,9 @@ async def delete(request: web.Request, params: DeleteRequestModel) -> web.Respon
 
 
 class IDRequestModel(BaseModel):
-    name: str = Field(
+    name: tv.VFolderName = Field(
         validation_alias=AliasChoices("vfolder_name", "vfolderName", "name"),
-        description="Target vfolder name",
+        description="Target vfolder name to get ID.",
     )
 
 
@@ -2189,7 +2189,7 @@ class CompactVFolderInfoModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_api_params_handler(IDRequestModel)
-async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
+async def get_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
 
     folder_name = params.name
@@ -3385,7 +3385,7 @@ def create_app(default_cors_options):
     cors.add(root_resource.add_route("GET", list_folders))
     cors.add(root_resource.add_route("DELETE", delete))
     cors.add(add_route("GET", "/info", get_info))
-    cors.add(add_route("GET", "/id", get_vfolder_id))
+    cors.add(add_route("GET", "/id", get_id))
     cors.add(add_route("GET", "/hosts", list_hosts))
     cors.add(add_route("GET", "/all-hosts", list_all_hosts))
     cors.add(add_route("GET", "/allowed-types", list_allowed_types))
