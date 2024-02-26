@@ -712,6 +712,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
 
         node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
+        assert node_id_offset is not None, '"peers.myself" not found in initial_peers!'
         node_id = node_id_offset + process_index.get() + 1
 
         raft_addr = initial_peers.get(node_id).get_addr()
