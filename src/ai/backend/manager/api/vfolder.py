@@ -36,7 +36,6 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     BaseModel,
-    EmailStr,
     Field,
 )
 from sqlalchemy.orm import load_only, selectinload
@@ -602,7 +601,7 @@ class ListVFolderRequestModel(BaseModel):
         ),
         description="Project ID to which the vfolder belongs.",
     )
-    owner_user_email: EmailStr | None = Field(
+    owner_user_email: str | None = Field(
         default=None,
         validation_alias=AliasChoices("owner_user_email", "ownerUserEmail", "email"),
         description="Email of the user to list vfolders.",
@@ -3245,7 +3244,7 @@ async def storage_task_exception_handler(
 
 
 class ChangeVFolderOwnershipRequestModel(IDBasedRequestModel):
-    user_email: EmailStr = Field(
+    user_email: str = Field(
         default=None,
         validation_alias=AliasChoices("user_email", "userEmail", "email"),
         description="Email of the user to list vfolders.",
