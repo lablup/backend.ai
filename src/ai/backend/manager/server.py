@@ -33,8 +33,8 @@ import aiotools
 import click
 from aiohttp import web
 from aiotools import process_index
+from raftify import ClusterJoinTicket, InitialRole, Peer, Peers, Raft, RaftServiceClient
 from raftify import Config as RaftConfig
-from raftify import InitialRole, Peer, Peers, Raft
 from raftify import RaftConfig as RaftCoreConfig
 from setproctitle import setproctitle
 
@@ -714,7 +714,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
         node_id = node_id_offset + process_index.get() + 1
 
-        raft_addr = initial_peers.get(node_id)
+        raft_addr = initial_peers.get(node_id).get_addr()
 
         store = HashStore()
 
@@ -731,6 +731,33 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
         raft_cluster = root_ctx.raft_ctx.cluster
         raft_cluster.run()  # type: ignore
+
+        if raft_cluster_configs["bootstrap-done"]:
+            # First follower manager execute join procedure
+            if node_id - node_id_offset == 1:
+                # TODO: Find leader_id by asking for leader_id to someone in initial_peers
+                leader_id, leader_addr = [
+                    (id_, peer.get_addr())
+                    for id_, peer in initial_peers.to_dict().items()
+                    if peer.get_role() == InitialRole.LEADER
+                ][0]
+
+                all_tickets = [
+                    ClusterJoinTicket(
+                        peer["node-id"],
+                        f"{peer['host']}:{peer['port']}",
+                        leader_id,
+                        leader_addr,
+                        initial_peers,
+                    )
+                    for peer in all_peers
+                ]
+
+                await root_ctx.raft_ctx.cluster.join(all_tickets)
+                # TODO: Find a way to automatically close the leave_joint if possible
+                await asyncio.sleep(2)
+                client = await RaftServiceClient.build(leader_addr)
+                await client.leave_joint()
 
         # Webserver only for raft testing
         asyncio.create_task(

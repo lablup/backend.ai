@@ -328,6 +328,7 @@ manager_local_config_iv = (
 )
 
 manager_raft_cluster_config_iv = t.Dict({
+    t.Key("bootstrap-done", default=False): t.ToBool,
     t.Key("restore-wal-from", default=None): t.Int | t.Null,
     t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
     t.Key("peers"): t.Dict({

@@ -73,7 +73,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=24.0.1",
-//     "raftify==0.1.45",
+//     "raftify==0.1.56",
 //     "redis[hiredis]==4.5.5",
 //     "rich~=13.6",
 //     "setproctitle~=1.3.2",
@@ -3398,19 +3398,14 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4bc907d1258d738476f49d0a3f81d98a5f5b77c86bdfadcc4fa85cbf888558c8",
-              "url": "https://files.pythonhosted.org/packages/73/ea/5d39b23a88a90b804f6441cc6e04bca71b2054e46126ada75bfc0342d9c3/raftify-0.1.45-cp311-cp311-macosx_11_0_arm64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "1d845200960b43962ffe9f9c3e6d4668982f5980680fd492cffe3beef5ea4f2e",
-              "url": "https://files.pythonhosted.org/packages/d7/6c/3c8508b92b4eeb0c0829a4285bd5af682489b424496f633454e2a64b2dab/raftify-0.1.45.tar.gz"
+              "hash": "03a691dcdc67d835d888ab4a32bfd656b66101e9a6e5ab89743138741c0da552",
+              "url": "https://files.pythonhosted.org/packages/d7/64/eaa29217787fed5b30351225d4111cacfe05224b1180cdc0a9155c7a109f/raftify-0.1.56.tar.gz"
             }
           ],
           "project_name": "raftify",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "0.1.45"
+          "version": "0.1.56"
         },
         {
           "artifacts": [
@@ -4304,19 +4299,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "af72aea155e91adfc61c3ae9e0e342dbc0cba726d6cba4b6c72c1f34e47291cd",
-              "url": "https://files.pythonhosted.org/packages/b7/f4/6a90020cd2d93349b442bfcb657d0dc91eee65491600b2cb1d388bc98e6b/typing_extensions-4.9.0-py3-none-any.whl"
+              "hash": "69b1a937c3a517342112fb4c6df7e72fc39a38e7891a5730ed4985b5214b5475",
+              "url": "https://files.pythonhosted.org/packages/f9/de/dc04a3ea60b22624b51c703a84bbe0184abcd1d0b9bc8074b5d6b7ab90bb/typing_extensions-4.10.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "23478f88c37f27d76ac8aee6c905017a143b0b1b886c3c9f66bc2fd94f9f5783",
-              "url": "https://files.pythonhosted.org/packages/0c/1d/eb26f5e75100d531d7399ae800814b069bc2ed2a7410834d57374d010d96/typing_extensions-4.9.0.tar.gz"
+              "hash": "b0abd7c89e8fb96f98db18d86106ff1d90ab692004eb746cf6eda2682f91b3cb",
+              "url": "https://files.pythonhosted.org/packages/16/3a/0d26ce356c7465a19c9ea8814b960f8a36c3b0d07c323176620b7b483e44/typing_extensions-4.10.0.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "4.9.0"
+          "version": "4.10.0"
         },
         {
           "artifacts": [
@@ -4672,7 +4667,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=24.0.1",
-    "raftify==0.1.45",
+    "raftify==0.1.56",
     "redis[hiredis]==4.5.5",
     "rich~=13.6",
     "setproctitle~=1.3.2",
