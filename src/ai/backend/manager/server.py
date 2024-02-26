@@ -760,10 +760,12 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 client = await RaftServiceClient.build(leader_addr)
                 await client.leave_joint()
 
-        # Webserver only for raft testing
-        asyncio.create_task(
-            WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
-        )
+        if raft_cluster_configs["raft-debug-webserver-enabled"]:
+            # Create webserver only for raft testing
+            asyncio.create_task(
+                WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
+            )
+
     yield
 
 
