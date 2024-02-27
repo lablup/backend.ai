@@ -82,7 +82,10 @@ class EndpointRow(Base):
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
     model = sa.Column(
-        "model", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
+        "model",
+        GUID,
+        sa.ForeignKey("vfolders.id", ondelete="NULL"),
+        nullable=True,
     )
     model_mount_destiation = sa.Column(
         "model_mount_destiation",
@@ -288,7 +291,9 @@ class EndpointTokenRow(Base):
 
     id = IDColumn()
     token = sa.Column("token", sa.String(), nullable=False)
-    endpoint = ForeignKeyIDColumn("endpoint", "endpoints.id")
+    endpoint = sa.Column(
+        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="NULL"), nullable=True
+    )
     session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
     domain = sa.Column(
         "domain",
