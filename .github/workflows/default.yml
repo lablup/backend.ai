@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: arc-runner-set
     steps:
     - name: Calculate the fetch depth
@@ -81,7 +81,7 @@ jobs:
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: arc-runner-set
     steps:
     - name: Calculate the fetch depth
@@ -144,7 +144,7 @@ jobs:
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -160,7 +160,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: maxnowack/local-cache@v1
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
