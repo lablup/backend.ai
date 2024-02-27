@@ -84,7 +84,7 @@ class EndpointRow(Base):
     model = sa.Column(
         "model",
         GUID,
-        sa.ForeignKey("vfolders.id", ondelete="NULL"),
+        sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
     model_mount_destiation = sa.Column(
@@ -292,7 +292,7 @@ class EndpointTokenRow(Base):
     id = IDColumn()
     token = sa.Column("token", sa.String(), nullable=False)
     endpoint = sa.Column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="NULL"), nullable=True
+        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
     )
     session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
     domain = sa.Column(

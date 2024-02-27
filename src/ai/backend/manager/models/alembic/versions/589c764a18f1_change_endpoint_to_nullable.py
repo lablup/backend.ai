@@ -32,7 +32,7 @@ def upgrade():
         "endpoints",
         ["endpoint"],
         ["id"],
-        ondelete="NULL",
+        ondelete="SET NULL",
     )
     op.drop_constraint("fk_endpoints_model_vfolders", "endpoints", type_="foreignkey")
     op.create_foreign_key(
@@ -41,7 +41,7 @@ def upgrade():
         "vfolders",
         ["model"],
         ["id"],
-        ondelete="NULL",
+        ondelete="SET NULL",
     )
 
 
@@ -51,12 +51,14 @@ def downgrade():
     endpoint_tokens = sa.Table(
         "endpoint_tokens",
         metadata,
-        sa.Column("endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="NULL"), nullable=True),
+        sa.Column(
+            "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
+        ),
         extend_existing=True,
     )
     endpoints = sa.Table(
         "endpoints",
-        sa.Column("model", GUID, sa.ForeignKey("vfolders.id", ondelete="NULL"), nullable=True),
+        sa.Column("model", GUID, sa.ForeignKey("vfolders.id", ondelete="SET NULL"), nullable=True),
         extend_existing=True,
     )
     delete_endpoint_tokens = sa.delete(endpoint_tokens).where(
