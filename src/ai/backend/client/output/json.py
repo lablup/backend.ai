@@ -203,7 +203,11 @@ class JsonOutputHandler(BaseOutputHandler):
                 print(
                     json.dumps(
                         {
-                            "error": error.reason,
+                            "error": error.data["title"],
+                            "api": {
+                                "status": error.status,
+                                "reason": error.reason,
+                            },
                             "data": error.data,
                         },
                         **_json_opts,
