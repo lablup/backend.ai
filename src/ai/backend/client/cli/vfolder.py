@@ -483,7 +483,7 @@ def mkdir(name, paths, parents, exist_ok):
                 print("Failed to create:")
                 print(
                     tabulate(
-                        map(lambda item: [item["item"], item["msg"]], results["success"]),
+                        map(lambda item: [item["item"], item["msg"]], results["failed"]),
                         headers=["Item", "Error"],
                     )
                 )
