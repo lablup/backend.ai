@@ -768,7 +768,7 @@ async def prepare_vfolder_mounts(
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
                     "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
-                    "relpath": str(user_scope.user_uuid.hex),
+                    "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
                 },
             ):
