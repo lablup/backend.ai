@@ -199,9 +199,10 @@ class AgentStatFormatter(OutputFormatter):
         def format_value(metric: MetricValue, binary: bool) -> str:
             formatter = value_formatters.get(
                 metric["unit_hint"],
+                # a fallback implementation
                 lambda m, _: "{} / {} {}".format(
                     m["current"],
-                    m["capacity"],
+                    m["capacity"] if m["capacity"] is not None else "(unknown)",
                     m["unit_hint"],
                 ),
             )
