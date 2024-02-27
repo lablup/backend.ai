@@ -204,7 +204,7 @@ class AgentStatFormatter(OutputFormatter):
                 # a fallback implementation
                 lambda m, _: "{} / {} {}".format(
                     m["current"],
-                    m["capacity"] if m["capacity"] is not None else "(unknown)",
+                    "(unknown)" if m["capacity"] is None else m["capacity"],
                     "" if unit_hint == "count" else unit_hint,
                 ),
             )
