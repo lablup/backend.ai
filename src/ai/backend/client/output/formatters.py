@@ -176,6 +176,7 @@ class AgentStatFormatter(OutputFormatter):
         except TypeError:
             return ""
 
+        percent_formatter = lambda metric, _: "{} %".format(metric["pct"])
         value_formatters: Mapping[str, Callable[[MetricValue, bool], str]] = {
             "bytes": lambda metric, binary: "{} / {}".format(
                 humanize.naturalsize(int(metric["current"]), binary=binary, gnu=binary),
@@ -191,19 +192,20 @@ class AgentStatFormatter(OutputFormatter):
             "bps": lambda metric, _: "{}/s".format(
                 humanize.naturalsize(float(metric["current"])),
             ),
-            "pct": lambda metric, _: "{} %".format(
-                metric["pct"],
-            ),
+            "pct": percent_formatter,
+            "percent": percent_formatter,
+            "%": percent_formatter,
         }
 
         def format_value(metric: MetricValue, binary: bool) -> str:
+            unit_hint = metric["unit_hint"]
             formatter = value_formatters.get(
-                metric["unit_hint"],
+                unit_hint,
                 # a fallback implementation
                 lambda m, _: "{} / {} {}".format(
                     m["current"],
                     m["capacity"] if m["capacity"] is not None else "(unknown)",
-                    m["unit_hint"],
+                    "" if unit_hint == "count" else unit_hint,
                 ),
             )
             return formatter(metric, binary)

@@ -82,12 +82,39 @@ class StatModes(enum.Enum):
 
 
 class MetricTypes(enum.Enum):
-    USAGE = 0  # for instant snapshot (e.g., used memory bytes, used cpu msec)
-    RATE = 1  # for rate of increase (e.g., I/O bps)
-    UTILIZATION = (
-        2  # for ratio of resource occupation time per measurement interval (e.g., CPU util)
-    )
-    ACCUMULATED = 3  # for accumulated value (e.g., total number of events)
+    """
+    Specifies the type of a metric value.
+
+    Currently this DOES NOT affect calculation and processing of the metric,
+    but serves as a metadata for code readers.
+    The actual calculation and formatting is controlled by :meth:`Metric.current_hook()`,
+    :attr:`Metric.unit_hint` and :attr:`Metric.stats_filter`.
+    """
+
+    GAUGE = 0
+    """
+    Represents a instantly measured occupancy value.
+    (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
+    """
+    USAGE = 0
+    """
+    This is same to GAUGE, but just kept for backward compatibility of compute plugins.
+    """
+    RATE = 1
+    """
+    Represents a rate of changes calculated from underlying gauge/accumulation values
+    (e.g., I/O bps calculated from RX/TX accum.bytes)
+    """
+    UTILIZATION = 2
+    """
+    Represents a ratio of resource occupation time per each measurement interval
+    (e.g., CPU utilization)
+    """
+    ACCUMULATION = 3
+    """
+    Represents an accumulated value
+    (e.g., total number of events, total period of occupation)
+    """
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -345,7 +372,6 @@ class StatContext:
                     else:
                         self.node_metrics[metric_key].update(node_measure.per_node)
                     # update per-device metric
-                    # NOTE: device IDs are defined by each metric keys.
                     for dev_id, measure in node_measure.per_device.items():
                         if metric_key not in self.device_metrics:
                             self.device_metrics[metric_key] = {}
