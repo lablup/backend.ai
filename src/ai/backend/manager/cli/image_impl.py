@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pprint import pformat, pprint
+from typing import Optional
 
 import click
 import sqlalchemy as sa
@@ -9,7 +10,8 @@ from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -192,3 +194,66 @@ async def dealias(cli_ctx, alias):
             log.exception("Alias not found.")
             return
         await session.delete(alias_row)
+
+
+async def validate_image_alias(cli_ctx, alias: str) -> None:
+    async with (
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_readonly_session() as session,
+    ):
+        try:
+            image_row = await ImageRow.from_alias(session, alias)
+            for key, value in validate_image_labels(image_row.labels).items():
+                print(f"{key:<40}: ", end="")
+                if isinstance(value, list):
+                    value = f'[{", ".join(value)}]'
+                print(value)
+
+        except UnknownImageReference:
+            log.error(f"No images were found with alias: {alias}")
+        except Exception:
+            log.exception("An error occurred.")
+
+
+async def validate_image_canonical(
+    cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
+) -> None:
+    async with (
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_readonly_session() as session,
+    ):
+        try:
+            if current or architecture is not None:
+                if current:
+                    architecture = architecture or CURRENT_ARCH
+                image_row = await session.scalar(
+                    sa.select(ImageRow).where(
+                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
+                    )
+                )
+                if image_row is None:
+                    raise UnknownImageReference(f"{canonical}/{architecture}")
+                for key, value in validate_image_labels(image_row.labels).items():
+                    print(f"{key:<40}: ", end="")
+                    if isinstance(value, list):
+                        value = f'{", ".join(value)}'
+                    print(value)
+            else:
+                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                image_rows = rows.fetchall()
+                if not image_rows:
+                    raise UnknownImageReference(f"{canonical}")
+                for i, image_row in enumerate(image_rows):
+                    if i > 0:
+                        print("-" * 50)
+                    print(f"{'architecture':<40}: {image_row.architecture}")
+                    for key, value in validate_image_labels(image_row.labels).items():
+                        print(f"{key:<40}: ", end="")
+                        if isinstance(value, list):
+                            value = f'{", ".join(value)}'
+                        print(value)
+
+        except UnknownImageReference as e:
+            log.error(f"{e}")
+        except Exception:
+            log.exception("An error occurred.")
