@@ -207,8 +207,8 @@ class JsonOutputHandler(BaseOutputHandler):
                             "api": {
                                 "status": error.status,
                                 "reason": error.reason,
+                                **error.data,
                             },
-                            "data": error.data,
                         },
                         **_json_opts,
                     )
