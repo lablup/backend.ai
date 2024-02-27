@@ -193,7 +193,7 @@ class AgentStatFormatter(OutputFormatter):
         def format_value(metric, binary):
             formatter = value_formatters.get(
                 metric["unit_hint"],
-                lambda m: "{} / {} {}".format(
+                lambda m, _: "{} / {} {}".format(
                     m["current"],
                     m["capacity"],
                     m["unit_hint"],
