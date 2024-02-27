@@ -5,7 +5,21 @@
             "hostname": "cr.backend.ai",
             "url": "https://cr.backend.ai",
             "type": "harbor2",
-            "project": "stable,community,multiarch"
+            "project": "stable"
+        },
+        {
+            "id": "f9617204-12c8-4a44-b650-98201a2fb406",
+            "hostname": "cr.backend.ai",
+            "url": "https://cr.backend.ai",
+            "type": "harbor2",
+            "project": "community"
+        },
+        {
+            "id": "d53a6b55-78dd-4412-8786-585777300870",
+            "hostname": "cr.backend.ai",
+            "url": "https://cr.backend.ai",
+            "type": "harbor2",
+            "project": "multiarch"
         }
     ]
 }

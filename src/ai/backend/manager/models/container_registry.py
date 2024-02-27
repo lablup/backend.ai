@@ -51,7 +51,7 @@ class ContainerRegistryRow(Base):
         default="docker",
         index=True,
     )
-    project = sa.Column("project", sa.Text, nullable=True)  # harbor only
+    project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
     ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
@@ -92,10 +92,10 @@ class ContainerRegistryRow(Base):
         cls,
         session: AsyncSession,
         hostname: str,
-    ) -> ContainerRegistryRow:
+    ) -> Sequence[ContainerRegistryRow]:
         query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
         result = await session.execute(query)
-        row = result.scalar()
+        row = result.fetchall()
         if row is None:
             raise NoResultFound
         return row
@@ -104,7 +104,7 @@ class ContainerRegistryRow(Base):
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.List(graphene.String)
+    project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -113,7 +113,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String()
     type = graphene.String()
-    project = graphene.List(graphene.String)
+    project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -122,7 +122,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.List(graphene.String)
+    project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -155,7 +155,7 @@ class ContainerRegistry(graphene.ObjectType):
             config=ContainerRegistryConfig(
                 url=row.url,
                 type=row.type,
-                project=row.project.split(",") if row.project is not None else [],
+                project=row.project,
                 username=row.username,
                 password=PASSWORD_PLACEHOLDER if row.password is not None else None,
                 ssl_verify=row.ssl_verify,
@@ -233,15 +233,16 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
     @classmethod
-    async def load_registry(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
+    async def load_by_hostname(
+        cls, ctx: GraphQueryContext, hostname: str
+    ) -> Sequence[ContainerRegistry]:
         async with ctx.db.begin_readonly_session() as session:
-            return cls.from_row(
-                ctx,
-                await ContainerRegistryRow.get_by_hostname(
-                    session,
-                    hostname,
-                ),
+            rows = await ContainerRegistryRow.get_by_hostname(
+                session,
+                hostname,
             )
+
+            return [cls.from_row(ctx, row) for row in rows]
 
 
 class ContainerRegistryConnection(Connection):
@@ -266,28 +267,25 @@ class CreateContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
+        input_config: dict[str, Any] = {"hostname": hostname, "url": props.url, "type": props.type}
 
-        input_config: Dict[str, Any] = {"hostname": hostname, "url": props.url, "type": props.type}
-
+        set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
-        set_if_set(props, input_config, "project")
-
-        if "project" in input_config.keys():
-            input_config["project"] = ",".join(input_config["project"])
 
         async with ctx.db.begin_session() as session:
             query = sa.insert(ContainerRegistryRow).values(input_config)
             await session.execute(query)
-
-        container_registry = await ContainerRegistry.load_registry(ctx, hostname)
-        return cls(container_registry=container_registry)
+            container_registry = ContainerRegistry.from_row(
+                ctx, ContainerRegistryRow(**input_config)
+            )
+            return cls(container_registry=container_registry)
 
 
 class ModifyContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistry)
+    container_registries = graphene.List(ContainerRegistry)
 
     class Arguments:
         hostname = graphene.String(required=True)
@@ -305,19 +303,19 @@ class ModifyContainerRegistry(graphene.Mutation):
         hostname: str,
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
+        print("Modify!!")
         ctx: GraphQueryContext = info.context
 
         input_config: Dict[str, Any] = {}
 
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
+        set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
-        set_if_set(props, input_config, "project")
 
-        if "project" in input_config.keys():
-            input_config["project"] = ",".join(input_config["project"])
+        print("input_config!!", input_config)
 
         async with ctx.db.begin_session() as session:
             query = (
@@ -326,10 +324,14 @@ class ModifyContainerRegistry(graphene.Mutation):
                 .where(ContainerRegistryRow.hostname == hostname)
             )
 
+            print("befroe execute!!")
             await session.execute(query)
+            print("af execute!!")
 
-        container_registry = await ContainerRegistry.load_registry(ctx, hostname)
-        return cls(container_registry=container_registry)
+            print("af execute!! 2")
+            container_registries = await ContainerRegistry.load_by_hostname(ctx, hostname)
+            print("af execute!! 3")
+        return cls(container_registries=container_registries)
 
 
 class DeleteContainerRegistry(graphene.Mutation):
@@ -351,7 +353,7 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        container_registry = await ContainerRegistry.load_registry(ctx, hostname)
+        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
         async with ctx.db.begin_session() as session:
             await session.execute(
                 sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
