@@ -12,8 +12,18 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.logging_utils import BraceStyleAdapter
 
 from ..defs import PASSWORD_PLACEHOLDER
-from .base import Base, IDColumn, privileged_mutation, set_if_set
-from .gql_relay import AsyncNode
+from .base import (
+    Base,
+    FilterExprArg,
+    IDColumn,
+    OrderExprArg,
+    generate_sql_info_for_gql_connection,
+    privileged_mutation,
+    set_if_set,
+)
+from .gql_relay import AsyncNode, ConnectionResolverResult
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -119,17 +129,21 @@ class ContainerRegistryConfig(graphene.ObjectType):
 
 
 class ContainerRegistry(graphene.ObjectType):
-    hostname = graphene.String()
-    config = graphene.Field(ContainerRegistryConfig)
-
     class Meta:
         interfaces = (AsyncNode,)
 
-    # TODO: `get_node()` should be implemented to query a scalar object directly by ID
-    #       (https://docs.graphene-python.org/en/latest/relay/nodes/#nodes)
-    # @classmethod
-    # def get_node(cls, info: graphene.ResolveInfo, id):
-    #     raise NotImplementedError
+    hostname = graphene.String()
+    config = graphene.Field(ContainerRegistryConfig)
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistry:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, reg_id = AsyncNode.resolve_global_id(info, id)
+        select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            reg_row = await db_session.scalar(select_stmt)
+            return cls.from_row(graph_ctx, reg_row)
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
@@ -145,6 +159,67 @@ class ContainerRegistry(graphene.ObjectType):
                 ssl_verify=row.ssl_verify,
             ),
         )
+
+    _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
+        "id": ("id", None),
+        "hostname": ("hostname", None),
+    }
+
+    _queryorder_colmap: dict[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "hostname": ("hostname", None),
+    }
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            ContainerRegistry,
+            ContainerRegistry.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(ContainerRegistry)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            reg_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(graph_ctx, row) for row in reg_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
     async def load_all(
