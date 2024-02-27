@@ -484,7 +484,6 @@ def mkdir(name, paths, parents, exist_ok):
                 print(
                     tabulate(
                         map(lambda item: [item["item"], item["msg"]], results["failed"]),
-                        headers=["Item", "Error"],
                     )
                 )
             print_done("Done.")
