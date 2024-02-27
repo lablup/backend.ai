@@ -21,7 +21,7 @@ from .base import (
     privileged_mutation,
     set_if_set,
 )
-from .gql_relay import AsyncNode, ConnectionResolverResult
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserRole
@@ -143,6 +143,8 @@ class ContainerRegistry(graphene.ObjectType):
         select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             reg_row = await db_session.scalar(select_stmt)
+            if reg_row is None:
+                raise ValueError(f"Container registry not found (id: {reg_id})")
             return cls.from_row(graph_ctx, reg_row)
 
     @classmethod
@@ -201,8 +203,8 @@ class ContainerRegistry(graphene.ObjectType):
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            ContainerRegistry,
-            ContainerRegistry.id,
+            ContainerRegistryRow,
+            ContainerRegistryRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -211,7 +213,7 @@ class ContainerRegistry(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(ContainerRegistry)
+        cnt_query = sa.select(sa.func.count()).select_from(ContainerRegistryRow)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -240,6 +242,11 @@ class ContainerRegistry(graphene.ObjectType):
                     hostname,
                 ),
             )
+
+
+class ContainerRegistryConnection(Connection):
+    class Meta:
+        node = ContainerRegistry
 
 
 class CreateContainerRegistry(graphene.Mutation):

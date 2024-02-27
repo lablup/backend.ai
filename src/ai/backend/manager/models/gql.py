@@ -18,6 +18,7 @@ from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverRes
 
 from .container_registry import (
     ContainerRegistry,
+    ContainerRegistryConnection,
     CreateContainerRegistry,
     DeleteContainerRegistry,
     ModifyContainerRegistry,
@@ -720,7 +721,7 @@ class Queries(graphene.ObjectType):
         ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
     )
     container_registry_nodes = PaginatedConnectionField(
-        ContainerRegistry, description="Added in 24.03.0."
+        ContainerRegistryConnection, description="Added in 24.03.0."
     )
 
     model_card = graphene.Field(
