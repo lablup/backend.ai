@@ -93,7 +93,7 @@ class MetricTypes(enum.Enum):
 
     GAUGE = 0
     """
-    Represents a instantly measured occupancy value.
+    Represents an instantly measured occupancy value.
     (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
     """
     USAGE = 0
