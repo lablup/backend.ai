@@ -782,6 +782,13 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    container_registry_node = graphene.Field(
+        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    container_registry_nodes = PaginatedConnectionField(
+        ContainerRegistry, description="Added in 24.03.0."
+    )
+
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
@@ -2328,6 +2335,39 @@ class Queries(graphene.ObjectType):
         return await ContainerRegistry.load_all(ctx)
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> ContainerRegistry:
+        return await ContainerRegistry.get_node(info, id)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ContainerRegistry.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
