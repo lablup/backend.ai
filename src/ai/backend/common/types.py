@@ -332,7 +332,7 @@ MetricValue = TypedDict(
         "stats.avg": str,
         "stats.diff": str,
         "stats.rate": str,
-        "stats.version": Optional[str],
+        "stats.version": Optional[int],
     },
 )
 
