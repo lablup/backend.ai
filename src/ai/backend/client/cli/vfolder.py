@@ -447,6 +447,7 @@ def cp(filenames):
 
 
 @vfolder.command()
+@pass_ctx_obj
 @click.argument("name", type=str)
 @click.argument("paths", type=str, nargs=-1)
 @click.option(
@@ -463,7 +464,13 @@ def cp(filenames):
     is_flag=True,
     help="Allow specifying already existing directories",
 )
-def mkdir(name, paths, parents, exist_ok):
+def mkdir(
+    ctx: CLIContext,
+    name: str,
+    paths: list[str],
+    parents: bool,
+    exist_ok: bool,
+) -> None:
     """Create an empty directory in the virtual folder.
 
     \b
@@ -476,19 +483,9 @@ def mkdir(name, paths, parents, exist_ok):
     with Session() as session:
         try:
             results = session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
-            if results["success"]:
-                print("Successfully created:")
-                print(tabulate(map(lambda item: [item["item"]], results["success"])))
-            if results["failed"]:
-                print("Failed to create:")
-                print(
-                    tabulate(
-                        map(lambda item: [item["item"], item["msg"]], results["failed"]),
-                    )
-                )
-            print_done("Done.")
+            ctx.output.print_result_set(results)
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
