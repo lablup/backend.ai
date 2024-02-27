@@ -8,11 +8,13 @@ from typing import Any, AsyncIterator, Mapping, Optional, cast
 import aiohttp
 import aiohttp.client_exceptions
 import aiotools
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .base import (
     BaseContainerRegistry,
@@ -29,8 +31,16 @@ class HarborRegistry_v1(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
-        registry_projects = self.registry_info["project"]
-        rqst_args: dict[str, Any] = {}
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.hostname == self.registry_info.hostname
+                )
+            )
+            registry_projects = result.fetchall()
+
+        rqst_args = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
@@ -171,8 +181,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
-        registry_projects = self.registry_info["project"]
-        rqst_args: dict[str, Any] = {}
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.hostname == self.registry_info.hostname
+                )
+            )
+            registry_projects = [res[0] for res in result.fetchall()]
+            print("registry_projects!!", registry_projects)
+            log.info(f"registry_projects!! {registry_projects}")
+
+        rqst_args = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
