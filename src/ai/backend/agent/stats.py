@@ -108,9 +108,9 @@ class NodeMeasurement:
     type: MetricTypes
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
-    unit_hint: Optional[str] = None
     stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    unit_hint: str = "count"
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -122,9 +122,9 @@ class ContainerMeasurement:
     key: MetricKey
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
-    unit_hint: Optional[str] = None
     stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    unit_hint: str = "count"
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -136,9 +136,9 @@ class ProcessMeasurement:
     key: MetricKey
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
-    unit_hint: Optional[str] = None
     stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    unit_hint: str = "count"
 
 
 class MovingStatistics:
@@ -228,11 +228,11 @@ class MovingStatistics:
 class Metric:
     key: str
     type: MetricTypes
+    unit_hint: str
     stats: MovingStatistics
     stats_filter: FrozenSet[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    unit_hint: Optional[str] = None
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
     def update(self, value: Measurement):
@@ -274,12 +274,10 @@ class Metric:
 class StatContext:
     agent: "AbstractAgent"
     mode: StatModes
-    node_metrics: Mapping[MetricKey, Metric]
-    device_metrics: Mapping[MetricKey, MutableMapping[DeviceId, Metric]]
-    kernel_metrics: MutableMapping[KernelId, MutableMapping[MetricKey, Metric]]
-    process_metrics: MutableMapping[
-        ContainerId, MutableMapping[PID, MutableMapping[MetricKey, Metric]]
-    ]
+    node_metrics: dict[MetricKey, Metric]
+    device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
+    kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
+    process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
 
     def __init__(
         self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
@@ -322,12 +320,12 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks = []
+            _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
             for computer in self.agent.computers.values():
-                _tasks.append(computer.instance.gather_node_measures(self))
+                _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             for result in results:
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     log.error("collect_node_stat(): gather_node_measures() error", exc_info=result)
                     continue
                 for node_measure in result:
@@ -349,7 +347,6 @@ class StatContext:
                     # update per-device metric
                     # NOTE: device IDs are defined by each metric keys.
                     for dev_id, measure in node_measure.per_device.items():
-                        dev_id = str(dev_id)
                         if metric_key not in self.device_metrics:
                             self.device_metrics[metric_key] = {}
                         if dev_id not in self.device_metrics[metric_key]:
@@ -371,7 +368,7 @@ class StatContext:
             "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
             "devices": {
                 metric_key: {
-                    dev_id: obj.to_serializable_dict() for dev_id, obj in per_device.items()
+                    str(dev_id): obj.to_serializable_dict() for dev_id, obj in per_device.items()
                 }
                 for metric_key, per_device in self.device_metrics.items()
             },
@@ -418,7 +415,7 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks = []
+            _tasks: list[asyncio.Task[Sequence[ContainerMeasurement]]] = []
             kernel_id = None
             for computer in self.agent.computers.values():
                 _tasks.append(
@@ -466,7 +463,7 @@ class StatContext:
             for kernel_id in updated_kernel_ids:
                 metrics = self.kernel_metrics[kernel_id]
                 serializable_metrics = {
-                    key: obj.to_serializable_dict() for key, obj in metrics.items()
+                    str(key): obj.to_serializable_dict() for key, obj in metrics.items()
                 }
                 if self.agent.local_config["debug"]["log-stats"]:
                     log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
@@ -513,7 +510,7 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks = []
+            _tasks: list[asyncio.Task[Sequence[ProcessMeasurement]]] = []
             for computer in self.agent.computers.values():
                 _tasks.append(
                     asyncio.create_task(
@@ -525,7 +522,7 @@ class StatContext:
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_cids: Set[ContainerId] = set()
             for result in results:
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     log.error(
                         "collect_per_container_process_stat(): gather_process_measures() error",
                         exc_info=result,
@@ -563,7 +560,7 @@ class StatContext:
                     for pid in self.process_metrics[cid].keys():
                         metrics = self.process_metrics[cid][pid]
                         serializable_metrics = {
-                            key: obj.to_serializable_dict() for key, obj in metrics.items()
+                            str(key): obj.to_serializable_dict() for key, obj in metrics.items()
                         }
                         serializable_table[pid] = serializable_metrics
                     if self.agent.local_config["debug"]["log-stats"]:
