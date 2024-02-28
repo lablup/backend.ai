@@ -469,6 +469,7 @@ kernels = sa.Table(
         default=KernelRole.COMPUTE,
         server_default=KernelRole.COMPUTE.name,
         nullable=False,
+        index=True,
     ),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),

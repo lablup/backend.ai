@@ -22,6 +22,7 @@ from typing import (
     NamedTuple,
     Optional,
     Protocol,
+    Self,
     Sequence,
     Type,
     TypeVar,
@@ -77,6 +78,8 @@ from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import Dialect
+
     from .gql import GraphQueryContext
     from .user import UserRole
 
@@ -117,7 +120,11 @@ class FixtureOpModes(enum.StrEnum):
     UPDATE = "update"
 
 
-class EnumType(TypeDecorator, SchemaType):
+T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
+T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
+
+
+class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -128,8 +135,7 @@ class EnumType(TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts):
-        assert issubclass(enum_cls, enum.Enum)
+    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -137,13 +143,21 @@ class EnumType(TypeDecorator, SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[T_Enum],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.name if value else None
 
-    def process_result_value(self, value: str, dialect):
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return EnumType(self._enum_cls, **self._opts)
 
     @property
@@ -151,7 +165,7 @@ class EnumType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
-class EnumValueType(TypeDecorator, SchemaType):
+class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -162,8 +176,7 @@ class EnumValueType(TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts):
-        assert issubclass(enum_cls, enum.Enum)
+    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -171,17 +184,60 @@ class EnumValueType(TypeDecorator, SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[T_Enum],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.value if value else None
 
-    def process_result_value(self, value: str, dialect):
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return EnumValueType(self._enum_cls, **self._opts)
 
     @property
-    def python_type(self):
+    def python_type(self) -> T_Enum:
+        return self._enum_class
+
+
+class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+    """
+    Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
+    """
+
+    impl = sa.VARCHAR
+    cache_ok = True
+
+    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+        self._opts = opts
+        super().__init__(length=64, **opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(
+        self,
+        value: Optional[T_StrEnum],
+        dialect: Dialect,
+    ) -> Optional[str]:
+        return value.value if value is not None else None
+
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_StrEnum]:
+        return self._enum_cls(value) if value is not None else None
+
+    def copy(self, **kw) -> type[Self]:
+        return StrEnumType(self._enum_cls, **self._opts)
+
+    @property
+    def python_type(self) -> T_StrEnum:
         return self._enum_class
 
 
@@ -203,13 +259,21 @@ class CurvePublicKeyColumn(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(sa.String(40))
 
-    def process_bind_param(self, value: Optional[PublicKey], dialect) -> Optional[str]:
+    def process_bind_param(
+        self,
+        value: Optional[PublicKey],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.decode("ascii") if value else None
 
-    def process_result_value(self, raw_value: str | None, dialect) -> Optional[PublicKey]:
-        if raw_value is None:
+    def process_result_value(
+        self,
+        value: str | None,
+        dialect: Dialect,
+    ) -> Optional[PublicKey]:
+        if value is None:
             return None
-        return PublicKey(raw_value.encode("ascii"))
+        return PublicKey(value.encode("ascii"))
 
 
 class QuotaScopeIDType(TypeDecorator):
@@ -223,11 +287,19 @@ class QuotaScopeIDType(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(sa.String(64))
 
-    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+    def process_bind_param(
+        self,
+        value: Optional[QuotaScopeID],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return str(value) if value else None
 
-    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
-        return QuotaScopeID.parse(raw_value)
+    def process_result_value(
+        self,
+        value: Optional[str],
+        dialect: Dialect,
+    ) -> Optional[QuotaScopeID]:
+        return QuotaScopeID.parse(value) if value else None
 
 
 class ResourceSlotColumn(TypeDecorator):
@@ -239,15 +311,21 @@ class ResourceSlotColumn(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Union[Mapping, ResourceSlot, None], dialect
-    ) -> Optional[Mapping]:
+        self,
+        value: Optional[ResourceSlot],
+        dialect: Dialect,
+    ) -> Optional[Mapping[str, str]]:
         if value is None:
             return None
         if isinstance(value, ResourceSlot):
             return value.to_json()
         return value
 
-    def process_result_value(self, value: dict[str, str] | None, dialect) -> ResourceSlot | None:
+    def process_result_value(
+        self,
+        value: Optional[dict[str, str]],
+        dialect: Dialect,
+    ) -> Optional[ResourceSlot]:
         if value is None:
             return None
         try:
@@ -255,9 +333,6 @@ class ResourceSlotColumn(TypeDecorator):
         except ArithmeticError:
             # for legacy-compat scenario
             return ResourceSlot.from_user_input(value, None)
-
-    def copy(self):
-        return ResourceSlotColumn()
 
 
 class StructuredJSONColumn(TypeDecorator):
@@ -272,13 +347,17 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON)
         else:
             return super().load_dialect_impl(dialect)
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[Any],
+        dialect: Dialect,
+    ) -> Optional[Any]:
         if value is None:
             return self._schema.check({})
         try:
@@ -290,12 +369,16 @@ class StructuredJSONColumn(TypeDecorator):
             )
         return value
 
-    def process_result_value(self, raw_value, dialect):
-        if raw_value is None:
+    def process_result_value(
+        self,
+        value: Optional[Any],
+        dialect: Dialect,
+    ) -> Optional[Any]:
+        if value is None:
             return self._schema.check({})
-        return self._schema.check(raw_value)
+        return self._schema.check(value)
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONColumn(self._schema)
 
 
@@ -314,10 +397,10 @@ class StructuredJSONObjectColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         return self._schema.to_json(value)
 
-    def process_result_value(self, raw_value, dialect):
-        return self._schema.from_json(raw_value)
+    def process_result_value(self, value, dialect):
+        return self._schema.from_json(value)
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONObjectColumn(self._schema)
 
 
@@ -337,12 +420,12 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
 
-    def process_result_value(self, raw_value, dialect):
-        if raw_value is None:
+    def process_result_value(self, value, dialect):
+        if value is None:
             return []
-        return [self._schema.from_json(item) for item in raw_value]
+        return [self._schema.from_json(item) for item in value]
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONObjectListColumn(self._schema)
 
 
@@ -354,12 +437,10 @@ class URLColumn(TypeDecorator):
     impl = sa.types.UnicodeText
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
-        if isinstance(value, yarl.URL):
-            return str(value)
-        return value
+    def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
+        return str(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
         if value is not None:
@@ -402,16 +483,20 @@ class PermissionListColumn(TypeDecorator):
         self._perm_type = perm_type
 
     @overload
-    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]: ...
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission], dialect: Dialect
+    ) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect: Dialect) -> List[str]: ...
 
     def process_bind_param(
-        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+        self,
+        value: Sequence[AbstractPermission] | Sequence[str] | None,
+        dialect: Dialect,
     ) -> List[str]:
         if value is None:
             return []
@@ -420,7 +505,11 @@ class PermissionListColumn(TypeDecorator):
         except ValueError:
             raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
 
-    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
+    def process_result_value(
+        self,
+        value: Sequence[str] | None,
+        dialect: Dialect,
+    ) -> set[AbstractPermission]:
         if value is None:
             return set()
         return set(self._perm_type(perm) for perm in value)
@@ -435,7 +524,11 @@ class VFolderHostPermissionColumn(TypeDecorator):
     cache_ok = True
     perm_col = PermissionListColumn(VFolderHostPermission)
 
-    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+    def process_bind_param(
+        self,
+        value: Mapping[str, Any] | None,
+        dialect: Dialect,
+    ) -> Mapping[str, Any]:
         if value is None:
             return {}
         return {
@@ -443,7 +536,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
         }
 
     def process_result_value(
-        self, value: Mapping[str, Any] | None, dialect
+        self,
+        value: Mapping[str, Any] | None,
+        dialect: Dialect,
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()

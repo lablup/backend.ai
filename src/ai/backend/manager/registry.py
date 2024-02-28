@@ -46,6 +46,7 @@ from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -3417,6 +3418,8 @@ async def handle_model_service_status_update(
             route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
         except SessionNotFound:
             return
+        except NoResultFound:
+            return
         data: dict[str, Any] = {}
         match event.new_status:
             case ModelServiceStatus.HEALTHY:
@@ -3584,6 +3587,8 @@ async def invoke_session_callback(
 
                 await execute_with_txn_retry(_update, context.db.begin_session, conn)
                 await execute_with_txn_retry(_clear_error, context.db.begin_session, conn)
+    except NoResultFound:
+        pass  # Cases when we try to create a inference session for validation (/services/_/try API)
     except Exception:
         log.exception("error while updating route status:")
 

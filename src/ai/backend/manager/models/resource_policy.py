@@ -73,6 +73,8 @@ keypair_resource_policies = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
     sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
+    sa.Column("max_pending_session_count", sa.Integer(), nullable=True),
+    sa.Column("max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True),
     sa.Column(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
     ),
