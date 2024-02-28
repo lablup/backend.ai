@@ -952,16 +952,21 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
+def main(
+    ctx: click.Context,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool = False,
+) -> None:
     """
     Start the manager service as a foreground process.
     """
-    cfg = load_config(config_path, "DEBUG" if debug else log_level)
+    cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

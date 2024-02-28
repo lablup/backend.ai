@@ -86,7 +86,7 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: QuotaConfig,
+        config: QuotaConfig,
     ) -> None:
         """
         Update the quota option of the given quota scope.
@@ -153,7 +153,8 @@ class AbstractFSOpModel(metaclass=ABCMeta):
     def scan_tree(
         self,
         path: Path,
-        recursive=False,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         """
         Iterates over all files within the given path recursively.
@@ -320,7 +321,11 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     def scandir(
-        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+        self,
+        vfid: VFolderID,
+        relpath: PurePosixPath,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         pass
 
@@ -404,6 +409,7 @@ class AbstractVolume(metaclass=ABCMeta):
         self,
         vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
+        *,
         recursive: bool = False,
     ) -> None:
         pass

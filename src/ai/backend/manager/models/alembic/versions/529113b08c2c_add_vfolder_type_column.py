@@ -24,16 +24,16 @@ down_revision = "c481d3dc6c7d"
 branch_labels = None
 depends_on = None
 
-vfperm_choices = list(map(lambda v: v.value, VFolderPermission))
+vfperm_choices = list(map(str, VFolderPermission))
 # vfolderpermission type should already be defined.
 
-vfusagemode_choices = list(map(lambda v: v.value, VFolderUsageMode))
+vfusagemode_choices = list(map(str, VFolderUsageMode))
 vfolderusagemode = postgresql.ENUM(
     *vfusagemode_choices,
     name="vfolderusagemode",
 )
 
-vfownershiptype_choices = list(map(lambda v: v.value, VFolderOwnershipType))
+vfownershiptype_choices = list(map(str, VFolderOwnershipType))
 vfolderownershiptype = postgresql.ENUM(
     *vfownershiptype_choices,
     name="vfolderownershiptype",
