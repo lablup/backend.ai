@@ -332,12 +332,17 @@ async def watcher_server(loop, pidx, args):
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> None:
+def main(
+    ctx: click.Context,
+    config_path: str,
+    log_level: LogSeverity,
+    debug: bool,
+) -> None:
     watcher_config_iv = (
         t.Dict({
             t.Key("watcher"): t.Dict({
@@ -370,10 +375,10 @@ def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> N
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
     if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        log_level = LogSeverity.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)

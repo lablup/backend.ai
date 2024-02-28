@@ -339,7 +339,7 @@ class KeyPair(graphene.ObjectType):
             .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count()]).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -351,7 +351,7 @@ class KeyPair(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return len(result.all())
 
     @classmethod
     async def load_slice(

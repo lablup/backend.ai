@@ -211,6 +211,7 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
+    LogSeverity,
     RoundRobinState,
     SlotName,
     SlotTypes,
@@ -245,6 +246,7 @@ manager_local_config_iv = (
             t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
+            t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
         t.Key("manager"): t.Dict({
             t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
@@ -503,7 +505,10 @@ class LocalConfig(AbstractConfig):
         raise NotImplementedError
 
 
-def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalConfig:
+def load(
+    config_path: Optional[Path] = None,
+    log_level: LogSeverity = LogSeverity.INFO,
+) -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
@@ -534,10 +539,10 @@ def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalCo
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -570,7 +575,6 @@ class SharedConfig(AbstractConfig):
         etcd_password: Optional[str],
         namespace: str,
     ) -> None:
-        # WARNING: importing etcd3/grpc must be done after forks.
         super().__init__()
         credentials = None
         if etcd_user:
