@@ -57,6 +57,7 @@ from .base import (
     OrderExprArg,
     PaginatedList,
     QuotaScopeIDType,
+    StrEnumType,
     batch_multiresult,
     generate_sql_info_for_gql_connection,
     metadata,
@@ -253,9 +254,9 @@ vfolders = sa.Table(
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
-        EnumValueType(VFolderOperationStatus),
+        StrEnumType(VFolderOperationStatus),
         default=VFolderOperationStatus.READY,
-        server_default=VFolderOperationStatus.READY.value,
+        server_default=VFolderOperationStatus.READY,
         nullable=False,
     ),
     # status_history records the most recent status changes for each status
@@ -1207,7 +1208,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            enum_field_getter(VFolderOperationStatus),
+            lambda s: VFolderOperationStatus(s),
         ),
     }
 

@@ -120,7 +120,8 @@ class FixtureOpModes(enum.StrEnum):
     UPDATE = "update"
 
 
-T_Enum = TypeVar("T_Enum", bound=enum.Enum)
+T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
+T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
 class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
@@ -202,6 +203,41 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     @property
     def python_type(self) -> T_Enum:
+        return self._enum_class
+
+
+class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+    """
+    Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
+    """
+
+    impl = sa.VARCHAR
+    cache_ok = True
+
+    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+        self._opts = opts
+        super().__init__(length=64, **opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(
+        self,
+        value: Optional[T_StrEnum],
+        dialect: Dialect,
+    ) -> Optional[str]:
+        return value.value if value is not None else None
+
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_StrEnum]:
+        return self._enum_cls(value) if value is not None else None
+
+    def copy(self, **kw) -> type[Self]:
+        return StrEnumType(self._enum_cls, **self._opts)
+
+    @property
+    def python_type(self) -> T_StrEnum:
         return self._enum_class
 
 
