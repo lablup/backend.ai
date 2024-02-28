@@ -32,7 +32,7 @@ from typing import (
 import sqlalchemy as sa
 import trafaret as t
 import yaml
-from aiohttp import web, web_response
+from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
@@ -231,16 +231,16 @@ THandlerFuncWithParam: TypeAlias = Callable[
 
 
 def ensure_stream_response_type(
-    response: TResponseModel | list | TAnyResponse,
+    response: BaseResponseModel | list | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case BaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
         case list():
             return web.json_response(
-                TypeAdapter(list[TResponseModel]).dump_python(response, mode="json")
+                TypeAdapter(list[BaseResponseModel]).dump_python(response, mode="json")
             )
-        case web_response.StreamResponse():
+        case web.StreamResponse():
             return response
         case _:
             raise RuntimeError(f"Unsupported response type ({type(response)})")
