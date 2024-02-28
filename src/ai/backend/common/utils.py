@@ -404,3 +404,16 @@ async def umount(
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True
+
+
+def get_first_occurrence_time(
+    status_history_records: list[dict[str, str]], status: str
+) -> str | None:
+    """
+    Get the first occurrence time of the given status from the status history records.
+    """
+
+    for status_history in status_history_records:
+        if status_history["status"] == status:
+            return status_history["timestamp"]
+    return None

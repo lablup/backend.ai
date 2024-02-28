@@ -41,6 +41,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
 )
+from ai.backend.common.utils import get_first_occurrence_time
 
 from ..api.exceptions import (
     AgentError,
@@ -76,7 +77,12 @@ from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    agg_to_array,
+    execute_with_retry,
+    sql_append_dict_to_list,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -647,7 +653,14 @@ class SessionRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[])
+    # status_history records all status changes
+    # e.g)
+    # [
+    #   {"status: "PENDING", "timestamp": "2022-10-22T10:22:30"},
+    #   {"status: "SCHEDULED", "timestamp": "2022-10-22T11:40:30"},
+    #   {"status: "PREPARING", "timestamp": "2022-10-25T10:22:30"}
+    # ]
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
 
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
@@ -693,12 +706,9 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        if self.status_history is None:
-            return None
-        try:
-            return datetime.fromisoformat(self.status_history[self.status.name])
-        except KeyError:
-            return None
+        if first := get_first_occurrence_time(self.status_history, self.status.name):
+            return datetime.fromisoformat(first)
+        return None
 
     @property
     def resource_opts(self) -> dict[str, Any]:
@@ -764,12 +774,9 @@ class SessionRow(Base):
 
                 update_values = {
                     "status": determined_status,
-                    "status_history": sql_json_merge(
+                    "status_history": sql_append_dict_to_list(
                         SessionRow.status_history,
-                        (),
-                        {
-                            determined_status.name: now.isoformat(),
-                        },
+                        {"status": determined_status.name, "timestamp": now.isoformat()},
                     ),
                 }
                 if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
@@ -800,12 +807,9 @@ class SessionRow(Base):
             now = status_changed_at
         data = {
             "status": status,
-            "status_history": sql_json_merge(
+            "status_history": sql_append_dict_to_list(
                 SessionRow.status_history,
-                (),
-                {
-                    status.name: datetime.now(tzutc()).isoformat(),
-                },
+                {"status": status.name, "timestamp": datetime.now(tzutc()).isoformat()},
             ),
         }
         if status_data is not None:
@@ -1170,7 +1174,8 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
-    status_history = graphene.JSONString()
+    status_history = graphene.JSONString()  # legacy
+    status_history_log = graphene.JSONString()
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -1210,8 +1215,8 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        status_history = row.status_history or {}
-        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        scheduled_at = get_first_occurrence_time(row.status_history, SessionStatus.SCHEDULED.name)
+
         return {
             # identity
             "id": row.id,
@@ -1243,13 +1248,11 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            "status_history": status_history,
+            "status_history_log": row.status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": (
-                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
-            ),
+            "scheduled_at": scheduled_at,
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
@@ -1360,6 +1363,10 @@ class ComputeSession(graphene.ObjectType):
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+
+    # legacy
+    async def resolve_status_history(self, _info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        return {item["status"]: item["timestamp"] for item in self.status_history_log}
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
