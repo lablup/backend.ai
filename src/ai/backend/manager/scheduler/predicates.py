@@ -406,17 +406,16 @@ async def check_pending_session_resource_limit(
                 )
             )
             failure_msgs.append(msg)
-
-    log.debug(
-        "access key:{} current-occupancy of pending sessions: {}",
-        sess_ctx.access_key,
-        current_pending_session_slots,
-    )
-    log.debug(
-        "access key:{} total-allowed of pending sessions: {}",
-        sess_ctx.access_key,
-        pending_resource_limit,
-    )
+        log.debug(
+            "access key:{} current-occupancy of pending sessions: {}",
+            sess_ctx.access_key,
+            current_pending_session_slots,
+        )
+        log.debug(
+            "access key:{} total-allowed of pending sessions: {}",
+            sess_ctx.access_key,
+            pending_resource_limit,
+        )
     if not result:
         return PredicateResult(False, "\n".join(failure_msgs))
     return PredicateResult(True)
