@@ -39,14 +39,21 @@ Version Numbering
   * The client is guaranteed to be backward-compatible with the server they share the same API specification version.
 
 
-Upgrading
-=========
+Upgrading Development Setups
+============================
 
-You can upgrade the installed Python packages using ``pip install -U ...`` command along with dependencies.
+Between the major releases (e.g., 22.03 to 22.09) upon the 6-month release cycle, you need to also peform the following explicit upgrade procedures for existing development setups.
 
-If you have cloned the stable version of source code from git, then pull and check out the next ``x.y`` release branch.
-It is recommended to re-run ``pip install -U -r requirements.txt`` as dependencies might be updated.
+Halfstack Containers and Database
+---------------------------------
 
-For the manager, ensure that your database schema is up-to-date by running ``alembic upgrade head``. If you setup your development environment with Pants and ``install-dev.sh`` script, keep your database schema up-to-date via ``./py -m alembic upgrade head`` instead of plain alembic command above.
+First, simply pull the latest ``main`` branch.
+
+Run ``./scripts/upgrade-halfstack.sh`` to automatically upgrade your ``docker-compose.halfstack.current.yml`` and the PostgreSQL database.
+
+Then, ensure that your database schema is up-to-date by running ``./py -m alembic upgrade head``.
+
+Configurations
+--------------
 
 Also check if any manual etcd configuration scheme change is required, though we will try to keep it compatible and automatically upgrade when first executed.
