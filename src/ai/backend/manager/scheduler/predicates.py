@@ -315,6 +315,7 @@ async def check_pending_session_count_limit(
     )
     pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
 
+    # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
         KeyPairResourcePolicyRow,
         KeyPairRow,
@@ -370,6 +371,7 @@ async def check_pending_session_resource_limit(
     )
     pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
 
+    # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
         KeyPairResourcePolicyRow,
         KeyPairRow,
