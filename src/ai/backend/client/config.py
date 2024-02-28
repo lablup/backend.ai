@@ -39,7 +39,7 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-API_VERSION = (8, "20240615")
+API_VERSION = (8, "20240315")
 MIN_API_VERSION = (7, "20230615")
 
 DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
