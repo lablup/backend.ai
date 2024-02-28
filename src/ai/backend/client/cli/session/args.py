@@ -2,6 +2,8 @@ from typing import Any, Callable
 
 import click
 
+from ai.backend.common.types import SessionTypes
+
 START_OPTION = [
     click.option(
         "-t",
@@ -16,8 +18,8 @@ START_OPTION = [
     click.option(
         "--type",
         metavar="SESSTYPE",
-        type=click.Choice(["batch", "interactive"]),
-        default="interactive",
+        type=click.Choice([*SessionTypes], case_sensitive=False),
+        default=SessionTypes.INTERACTIVE,
         help="Either batch or interactive",
     ),
     click.option(

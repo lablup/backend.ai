@@ -11,6 +11,7 @@ from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resou
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode
 
 from ..output.fields import routing_fields, service_fields
 from ..output.types import FieldSpec
@@ -181,8 +182,8 @@ def info(ctx: CLIContext, service_name_or_id: str):
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option("-d", "--domain", type=str, default="default")
@@ -369,8 +370,8 @@ def create(
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option("-d", "--domain", type=str, default="default")
