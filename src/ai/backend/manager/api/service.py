@@ -79,6 +79,7 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
+    BaseResponseModel,
     get_access_key_scopes,
     get_user_uuid_scopes,
     pydantic_params_api_handler,
@@ -112,7 +113,7 @@ class ListServeRequestModel(BaseModel):
     name: str | None = Field(default=None)
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
 
 
@@ -192,7 +193,7 @@ class RouteInfoModel(BaseModel):
     traffic_ratio: NonNegativeFloat
 
 
-class ServeInfoModel(BaseModel):
+class ServeInfoModel(BaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
     desired_session_count: NonNegativeInt = Field(
@@ -817,7 +818,7 @@ class ScaleRequestModel(BaseModel):
     to: int = Field(description="Ideal number of inference sessions")
 
 
-class ScaleResponseModel(BaseModel):
+class ScaleResponseModel(BaseResponseModel):
     current_route_count: int
     target_count: int
 
@@ -963,7 +964,7 @@ class TokenRequestModel(BaseModel):
     )
 
 
-class TokenResponseModel(BaseModel):
+class TokenResponseModel(BaseResponseModel):
     token: str
 
 
@@ -1044,7 +1045,7 @@ class ErrorInfoModel(BaseModel):
     error: dict[str, Any]
 
 
-class ErrorListResponseModel(BaseModel):
+class ErrorListResponseModel(BaseResponseModel):
     errors: list[ErrorInfoModel]
     retries: int
 
