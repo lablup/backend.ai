@@ -214,7 +214,7 @@ def check_api_params(
 
 
 class BaseResponseModel(BaseModel):
-    status: Annotated[int, Field(strict=True, gt=0)] = 200
+    status: Annotated[int, Field(strict=True, ge=100, lt=600)] = 200
 
 
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
@@ -231,15 +231,13 @@ THandlerFuncWithParam: TypeAlias = Callable[
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | list | web.StreamResponse,
+    response: BaseResponseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case BaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
         case list():
-            return web.json_response(
-                TypeAdapter(list[BaseResponseModel]).dump_python(response, mode="json")
-            )
+            return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
             return response
         case _:
