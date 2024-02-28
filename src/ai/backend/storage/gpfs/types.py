@@ -173,7 +173,7 @@ class GPFSJobRequest(DataClassJsonMixin):
     data: Optional[Any] = None
 
 
-class GPFSJobStatus(str, enum.Enum):
+class GPFSJobStatus(enum.StrEnum):
     RUNNING = "RUNNING"
     CANCELLING = "CANCELLING"
     CANCELLED = "CANCELLED"
@@ -193,7 +193,7 @@ class GPFSJob(DataClassJsonMixin):
     pids: Optional[List[int]] = None
 
 
-class GPFSQuotaType(str, enum.Enum):
+class GPFSQuotaType(enum.StrEnum):
     FILESET = "FILESET"
     USER = "USR"
     GROUP = "GRP"

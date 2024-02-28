@@ -30,7 +30,7 @@ branch_labels = None
 depends_on = None
 
 
-userrole_choices = list(map(lambda v: v.value, UserRole))
+userrole_choices = list(map(str, UserRole))
 userrole = postgresql.ENUM(*userrole_choices, name="userrole")
 
 

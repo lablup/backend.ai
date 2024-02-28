@@ -115,6 +115,7 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
+    BaseResponseModel,
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
@@ -129,9 +130,8 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
-    status: int = Field(default=200)
 
 
 async def ensure_vfolder_status(
@@ -2325,7 +2325,7 @@ class IDRequestModel(BaseModel):
     )
 
 
-class CompactVFolderInfoModel(BaseModel):
+class CompactVFolderInfoModel(BaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 

@@ -94,6 +94,8 @@ from .predicates import (
     check_domain_resource_limit,
     check_group_resource_limit,
     check_keypair_resource_limit,
+    check_pending_session_count_limit,
+    check_pending_session_resource_limit,
     check_reserved_batch_session,
     check_user_resource_limit,
 )
@@ -478,6 +480,14 @@ class SchedulerDispatcher(aobject):
                     ]
                     if not sess_ctx.is_private:
                         predicates += [
+                            (
+                                "pending_session_resource_limit",
+                                check_pending_session_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "pending_session_count_limit",
+                                check_pending_session_count_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
                             (
                                 "keypair_resource_limit",
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
