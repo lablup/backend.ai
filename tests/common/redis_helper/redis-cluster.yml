@@ -7,6 +7,8 @@ services:
     image: redis:7-alpine
     hostname: node01
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis
     networks:
     - testnet
     ports:
@@ -27,6 +29,8 @@ services:
     image: redis:7-alpine
     hostname: node02
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis
     networks:
     - testnet
     ports:
@@ -45,6 +49,8 @@ services:
     image: redis:7-alpine
     hostname: node03
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis
     networks:
     - testnet
     ports:
@@ -63,6 +69,8 @@ services:
     image: redis:7-alpine
     hostname: sentinel01
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis-sentinel
     networks:
     - testnet
     volumes:
@@ -85,6 +93,8 @@ services:
     image: redis:7-alpine
     hostname: sentinel02
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis-sentinel
     networks:
     - testnet
     volumes:
@@ -107,6 +117,8 @@ services:
     image: redis:7-alpine
     hostname: sentinel03
     user: ${DOCKER_USER}
+    labels:
+      - bai-test-container-type=redis-sentinel
     networks:
     - testnet
     volumes:
