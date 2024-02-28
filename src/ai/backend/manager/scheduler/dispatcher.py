@@ -8,6 +8,7 @@ import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -765,7 +766,10 @@ class SchedulerDispatcher(aobject):
                 available_slots, occupied_slots = result
 
                 for key in available_slots.keys():
-                    if available_slots[key] - occupied_slots[key] >= sess_ctx.requested_slots[key]:
+                    if (
+                        available_slots[key] - occupied_slots.get(key, Decimal("0"))
+                        >= sess_ctx.requested_slots[key]
+                    ):
                         continue
                     else:
                         raise InstanceNotAvailable(
