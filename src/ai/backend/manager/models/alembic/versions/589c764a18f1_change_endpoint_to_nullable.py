@@ -1,7 +1,7 @@
 """change_endpoint_to_nullable
 
 Revision ID: 589c764a18f1
-Revises: 7ff52ff68bfc
+Revises: 3f47af213b05
 Create Date: 2024-02-27 20:18:55.524946
 
 """
@@ -13,12 +13,15 @@ from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
 revision = "589c764a18f1"
-down_revision = "7ff52ff68bfc"
+down_revision = "3f47af213b05"
 branch_labels = None
 depends_on = None
 
 
 metadata = sa.MetaData(naming_convention=convention)
+
+
+BATCH_SIZE = 100
 
 
 def upgrade():
@@ -61,13 +64,17 @@ def downgrade():
         sa.Column("model", GUID, sa.ForeignKey("vfolders.id", ondelete="SET NULL"), nullable=True),
         extend_existing=True,
     )
-    delete_endpoint_tokens = sa.delete(endpoint_tokens).where(
-        endpoint_tokens.c.endpoint.is_(sa.null())
-    )
-    conn.execute(delete_endpoint_tokens)
 
-    delete_endpoints = sa.delete(endpoints).where(endpoints.c.model.is_(sa.null()))
-    conn.execute(delete_endpoints)
+    def _delete(table, null_field):
+        while True:
+            subq = sa.select([table.c.id]).where(null_field.is_(sa.null())).limit(BATCH_SIZE)
+            delete_stmt = sa.delete(table).where(table.c.id.in_(subq))
+            result = conn.execute(delete_stmt)
+            if result.rowcount == 0:
+                break
+
+    _delete(endpoint_tokens, endpoint_tokens.c.endpoint)
+    _delete(endpoints, endpoints.c.model)
 
     op.drop_constraint(op.f("fk_endpoints_model_vfolders"), "endpoints", type_="foreignkey")
     op.create_foreign_key(
