@@ -111,7 +111,7 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class VFolderOwnershipType(str, enum.Enum):
+class VFolderOwnershipType(enum.StrEnum):
     """
     Ownership type of virtual folder.
     """
@@ -120,7 +120,7 @@ class VFolderOwnershipType(str, enum.Enum):
     GROUP = "group"
 
 
-class VFolderPermission(str, enum.Enum):
+class VFolderPermission(enum.StrEnum):
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
@@ -139,7 +139,7 @@ class VFolderPermissionValidator(t.Trafaret):
         return VFolderPermission(value)
 
 
-class VFolderInvitationState(str, enum.Enum):
+class VFolderInvitationState(enum.StrEnum):
     """
     Virtual Folder invitation state.
     """

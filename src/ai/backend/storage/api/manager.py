@@ -1060,7 +1060,7 @@ async def delete_files(request: web.Request) -> web.Response:
                 await volume.delete_files(
                     params["vfid"],
                     params["relpaths"],
-                    params["recursive"],
+                    recursive=params["recursive"],
                 )
         return web.json_response(
             {

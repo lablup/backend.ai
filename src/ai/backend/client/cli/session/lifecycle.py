@@ -26,6 +26,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -97,8 +98,8 @@ def _create_cmd(docs: str = None):
     @click.option(
         "--cluster-mode",
         metavar="MODE",
-        type=click.Choice(["single-node", "multi-node"]),
-        default="single-node",
+        type=click.Choice([*ClusterMode], case_sensitive=False),
+        default=ClusterMode.SINGLE_NODE,
         help="The mode of clustering.",
     )
     @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")

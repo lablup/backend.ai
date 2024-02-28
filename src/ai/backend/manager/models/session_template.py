@@ -25,7 +25,7 @@ __all__: Sequence[str] = (
 )
 
 
-class TemplateType(str, enum.Enum):
+class TemplateType(enum.StrEnum):
     TASK = "task"
     CLUSTER = "cluster"
 

@@ -20,6 +20,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
@@ -346,8 +347,8 @@ def prepare_mount_arg(
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option(
@@ -409,7 +410,7 @@ def run(
     scaling_group,  # click_start_option
     resources,  # click_start_option
     cluster_size,  # click_start_option
-    cluster_mode,
+    cluster_mode: ClusterMode,
     resource_opts,  # click_start_option
     architecture,
     domain,  # click_start_option
