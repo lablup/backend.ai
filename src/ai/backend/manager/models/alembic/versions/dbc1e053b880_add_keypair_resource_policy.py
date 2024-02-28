@@ -20,7 +20,7 @@ branch_labels = None
 depends_on = None
 
 
-default_for_unspecified_choices = list(map(lambda v: v.name, DefaultForUnspecified))
+default_for_unspecified_choices = [*map(str, DefaultForUnspecified)]
 default_for_unspecified = postgresql.ENUM(
     *default_for_unspecified_choices,
     name="default_for_unspecified",

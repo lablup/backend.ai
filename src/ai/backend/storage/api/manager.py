@@ -18,7 +18,6 @@ from typing import (
     Awaitable,
     Callable,
     Iterator,
-    List,
     NotRequired,
     TypedDict,
     cast,
@@ -38,7 +37,7 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
@@ -145,7 +144,7 @@ def handle_external_errors() -> Iterator[None]:
 
 
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: RootContext, volume_name: str) -> List[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> list[str]:
         async with ctx.get_volume(volume_name) as volume:
             return [*await volume.get_capabilities()]
 
@@ -767,7 +766,7 @@ async def mkdir(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        relpath: PurePosixPath
+        relpath: PurePosixPath | list[PurePosixPath]
         parents: bool
         exist_ok: bool
 
@@ -779,7 +778,8 @@ async def mkdir(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("relpath"): tx.PurePath(relative_only=True)
+                    | t.List(tx.PurePath(relative_only=True), max_length=50),
                     t.Key("parents", default=True): t.ToBool,
                     t.Key("exist_ok", default=False): t.ToBool,
                 },
@@ -788,15 +788,53 @@ async def mkdir(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "mkdir", params)
         ctx: RootContext = request.app["ctx"]
+        vfid = params["vfid"]
+        parents = params["parents"]
+        exist_ok = params["exist_ok"]
+        relpath = params["relpath"]
+        relpaths = relpath if isinstance(relpath, list) else [relpath]
+        failed_results: list[ItemResult] = []
+        success_results: list[ItemResult] = []
+
         async with ctx.get_volume(params["volume"]) as volume:
-            with handle_fs_errors(volume, params["vfid"]):
-                await volume.mkdir(
-                    params["vfid"],
-                    params["relpath"],
-                    parents=params["parents"],
-                    exist_ok=params["exist_ok"],
+            mkdir_tasks = [
+                volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok) for rpath in relpaths
+            ]
+            result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
+            failed_cases = [isinstance(res, BaseException) for res in result_group]
+
+        for relpath, result_or_exception in zip(relpaths, result_group):
+            if isinstance(result_or_exception, BaseException):
+                log.error(
+                    "Failed to create the directory {!r} in vol:{}/vfid:{}:",
+                    relpath,
+                    volume,
+                    vfid,
+                    exc_info=result_or_exception,
                 )
-        return web.Response(status=204)
+                failed_results.append({
+                    "msg": repr(result_or_exception),
+                    "item": str(relpath),
+                })
+            else:
+                success_results.append({
+                    "msg": None,
+                    "item": str(relpath),
+                })
+        results: ResultSet = {
+            "success": success_results,
+            "failed": failed_results,
+        }
+        if all(failed_cases):
+            status_code = 422
+        elif any(failed_cases):
+            status_code = 207
+        else:
+            status_code = 200
+        return web.json_response(
+            {"results": results},
+            status=status_code,
+        )
 
 
 async def list_files(request: web.Request) -> web.Response:
@@ -1033,7 +1071,7 @@ async def delete_files(request: web.Request) -> web.Response:
                 await volume.delete_files(
                     params["vfid"],
                     params["relpaths"],
-                    params["recursive"],
+                    recursive=params["recursive"],
                 )
         return web.json_response(
             {

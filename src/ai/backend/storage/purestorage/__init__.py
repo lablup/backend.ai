@@ -54,10 +54,11 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
 
     def scan_tree(
         self,
-        target_path: Path,
-        recursive=False,
+        path: Path,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
-        raw_target_path = os.fsencode(target_path)
+        raw_target_path = os.fsencode(path)
 
         async def _aiter() -> AsyncIterator[DirEntry]:
             proc = await asyncio.create_subprocess_exec(
