@@ -223,7 +223,7 @@ vfolders = sa.Table(
     metadata,
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
-    sa.Column("host", sa.String(length=128), nullable=False),
+    sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -231,6 +231,7 @@ vfolders = sa.Table(
         EnumValueType(VFolderUsageMode),
         default=VFolderUsageMode.GENERAL,
         nullable=False,
+        index=True,
     ),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
@@ -248,6 +249,7 @@ vfolders = sa.Table(
         EnumValueType(VFolderOwnershipType),
         default=VFolderOwnershipType.USER,
         nullable=False,
+        index=True,
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
@@ -258,6 +260,7 @@ vfolders = sa.Table(
         default=VFolderOperationStatus.READY,
         server_default=VFolderOperationStatus.READY,
         nullable=False,
+        index=True,
     ),
     # status_history records the most recent status changes for each status
     # e.g)
