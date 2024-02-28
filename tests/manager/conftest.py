@@ -39,7 +39,7 @@ from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.types import HostPortPair, LogSeverity
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -237,7 +237,7 @@ def etcd_fixture(
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level="DEBUG",
+        log_level=LogSeverity.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:

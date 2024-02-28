@@ -57,6 +57,7 @@ from .base import (
     OrderExprArg,
     PaginatedList,
     QuotaScopeIDType,
+    StrEnumType,
     batch_multiresult,
     generate_sql_info_for_gql_connection,
     metadata,
@@ -111,7 +112,7 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class VFolderOwnershipType(str, enum.Enum):
+class VFolderOwnershipType(enum.StrEnum):
     """
     Ownership type of virtual folder.
     """
@@ -120,7 +121,7 @@ class VFolderOwnershipType(str, enum.Enum):
     GROUP = "group"
 
 
-class VFolderPermission(str, enum.Enum):
+class VFolderPermission(enum.StrEnum):
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
@@ -139,7 +140,7 @@ class VFolderPermissionValidator(t.Trafaret):
         return VFolderPermission(value)
 
 
-class VFolderInvitationState(str, enum.Enum):
+class VFolderInvitationState(enum.StrEnum):
     """
     Virtual Folder invitation state.
     """
@@ -222,7 +223,7 @@ vfolders = sa.Table(
     metadata,
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
-    sa.Column("host", sa.String(length=128), nullable=False),
+    sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -230,6 +231,7 @@ vfolders = sa.Table(
         EnumValueType(VFolderUsageMode),
         default=VFolderUsageMode.GENERAL,
         nullable=False,
+        index=True,
     ),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
@@ -247,16 +249,18 @@ vfolders = sa.Table(
         EnumValueType(VFolderOwnershipType),
         default=VFolderOwnershipType.USER,
         nullable=False,
+        index=True,
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
-        EnumValueType(VFolderOperationStatus),
+        StrEnumType(VFolderOperationStatus),
         default=VFolderOperationStatus.READY,
-        server_default=VFolderOperationStatus.READY.value,
+        server_default=VFolderOperationStatus.READY,
         nullable=False,
+        index=True,
     ),
     # status_history records the most recent status changes for each status
     # e.g)
@@ -768,7 +772,7 @@ async def prepare_vfolder_mounts(
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
                     "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
-                    "relpath": str(user_scope.user_uuid.hex),
+                    "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
                 },
             ):
@@ -1207,7 +1211,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            enum_field_getter(VFolderOperationStatus),
+            lambda s: VFolderOperationStatus(s),
         ),
     }
 

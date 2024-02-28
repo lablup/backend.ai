@@ -248,7 +248,7 @@ class CUDAPlugin(AbstractComputePlugin):
         return [
             NodeMeasurement(
                 MetricKey("cuda_mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_node=Measurement(Decimal(mem_used_total), Decimal(mem_avail_total)),
@@ -256,7 +256,7 @@ class CUDAPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey("cuda_util"),
-                MetricTypes.USAGE,
+                MetricTypes.UTILIZATION,
                 unit_hint="percent",
                 stats_filter=frozenset({"avg", "max"}),
                 per_node=Measurement(Decimal(util_total), Decimal(dev_count * 100)),
