@@ -40,7 +40,9 @@ START_OPTION = [
         help="The maximum duration to wait until the session starts.",
     ),
     click.option(
-        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
+        "--no-reuse",
+        is_flag=True,
+        help="Do not reuse existing sessions but return an error.",
     ),
     click.option(
         "--callback-url",
@@ -60,7 +62,10 @@ START_OPTION = [
     ),
     # extra options
     click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
+        "--tag",
+        type=str,
+        default=None,
+        help="User-defined tag string to annotate sessions.",
     ),
     # resource spec
     click.option(
