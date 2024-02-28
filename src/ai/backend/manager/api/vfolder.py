@@ -115,6 +115,7 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
+    BaseResponseModel,
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
@@ -129,9 +130,8 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
-    status: int = Field(default=200)
 
 
 async def ensure_vfolder_status(
@@ -579,7 +579,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
@@ -596,7 +595,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
+            "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
@@ -1250,18 +1249,20 @@ async def update_vfolder_options(
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict({
-        t.Key("path"): t.String,
+        t.Key("path"): t.String | t.List(t.String),
         t.Key("parents", default=True): t.ToBool,
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    if isinstance(params["path"], list) and len(params["path"]) > 50:
+        raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
-        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, path:{})",
+        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, paths:{})",
         request["user"]["email"],
         access_key,
         folder_name,
@@ -1279,9 +1280,14 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
         },
-    ):
-        pass
-    return web.Response(status=201)
+    ) as (_, storage_resp):
+        storage_reply = await storage_resp.json()
+        match storage_resp.status:
+            case 200 | 207:
+                return web.json_response(storage_reply, status=storage_resp.status)
+            # 422 will be wrapped as VFolderOperationFailed by storage_manager
+            case _:
+                raise RuntimeError("should not reach here")
 
 
 @auth_required
@@ -2319,7 +2325,7 @@ class IDRequestModel(BaseModel):
     )
 
 
-class CompactVFolderInfoModel(BaseModel):
+class CompactVFolderInfoModel(BaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 

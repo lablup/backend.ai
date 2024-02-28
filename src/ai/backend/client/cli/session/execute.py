@@ -191,20 +191,20 @@ def format_stats(stats):
         max_fraction_len = 0
         for key, metric in stats.items():
             unit = metric["unit_hint"]
-            if unit == "bytes":
-                val = metric.get("stats.max", metric["current"])
-                val = naturalsize(val, binary=True)
-                val, unit = val.rsplit(" ", maxsplit=1)
-                val = "{:,}".format(Decimal(val))
-            elif unit == "msec":
-                val = "{:,}".format(Decimal(metric["current"]))
-                unit = "msec"
-            elif unit == "percent":
-                val = metric["pct"]
-                unit = "%"
-            else:
-                val = metric["current"]
-                unit = ""
+            match unit:
+                case "bytes":
+                    val = metric.get("stats.max", metric["current"])
+                    val = naturalsize(val, binary=True)
+                    val, unit = val.rsplit(" ", maxsplit=1)
+                    val = "{:,}".format(Decimal(val))
+                case "msec" | "usec" | "sec":
+                    val = "{:,}".format(Decimal(metric["current"]))
+                case "percent" | "pct" | "%":
+                    val = metric["pct"]
+                    unit = "%"
+                case _:
+                    val = metric["current"]
+                    unit = ""
             if val is None:
                 continue
             ip, _, fp = val.partition(".")

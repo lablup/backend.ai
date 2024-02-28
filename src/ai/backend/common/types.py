@@ -299,6 +299,16 @@ class CommitStatus(enum.StrEnum):
     ONGOING = "ongoing"
 
 
+class ItemResult(TypedDict):
+    msg: Optional[str]
+    item: Optional[str]
+
+
+class ResultSet(TypedDict):
+    success: list[ItemResult]
+    failed: list[ItemResult]
+
+
 class AbuseReportValue(enum.StrEnum):
     DETECTED = "detected"
     CLEANING = "cleaning"
@@ -324,7 +334,7 @@ MetricValue = TypedDict(
     {
         "current": str,
         "capacity": Optional[str],
-        "pct": Optional[str],
+        "pct": str,
         "unit_hint": str,
         "stats.min": str,
         "stats.max": str,
@@ -332,8 +342,8 @@ MetricValue = TypedDict(
         "stats.avg": str,
         "stats.diff": str,
         "stats.rate": str,
+        "stats.version": Optional[int],
     },
-    total=False,
 )
 
 
