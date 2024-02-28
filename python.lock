@@ -34,6 +34,7 @@
 //     "attrs>=20.3",
 //     "backend.ai-krunner-alpine==5.1.0",
 //     "backend.ai-krunner-static-gnu==4.1.1",
+//     "bcrypt>=4.1.2",
 //     "boto3~=1.26",
 //     "cachetools~=5.2.0",
 //     "callosum~=1.0.3",
@@ -62,7 +63,6 @@
 //     "namedlist~=1.8",
 //     "networkx~=2.8.7",
 //     "packaging>=21.3",
-//     "passlib[bcrypt]>=1.7.4",
 //     "pexpect~=4.8",
 //     "psutil~=5.9.1",
 //     "pycryptodome>=3.14.1",
@@ -2813,31 +2813,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1",
-              "url": "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04",
-              "url": "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz"
-            }
-          ],
-          "project_name": "passlib",
-          "requires_dists": [
-            "argon2-cffi>=18.2.0; extra == \"argon2\"",
-            "bcrypt>=3.1.0; extra == \"bcrypt\"",
-            "cloud-sptheme>=1.10.1; extra == \"build-docs\"",
-            "cryptography; extra == \"totp\"",
-            "sphinx>=1.6; extra == \"build-docs\"",
-            "sphinxcontrib-fulltoc>=1.2.0; extra == \"build-docs\""
-          ],
-          "requires_python": null,
-          "version": "1.7.4"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523",
               "url": "https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl"
             },
@@ -3326,34 +3301,35 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ee32db7af8de4629a455806befa90559f307424c07b8413ccfc30bf5b221dd7e",
-              "url": "https://files.pythonhosted.org/packages/5a/4a/3f626e3974bea1e6d471bd86f7965c67cd06d5770d1fec9aae445c44da7b/pytest-8.1.0-py3-none-any.whl"
+              "hash": "edfaaef32ce5172d5466b5127b42e0d6d35ebbe4453f0e3505d96afd93f6b096",
+              "url": "https://files.pythonhosted.org/packages/a7/ea/d0ab9595a0d4b2320483e634123171deaf50885e29d442180efcbf2ed0b2/pytest-8.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f8fa04ab8f98d185113ae60ea6d79c22f8143b14bc1caeced44a0ab844928323",
-              "url": "https://files.pythonhosted.org/packages/3e/71/ad447fd2f816a01e6e1c60771232fcab50e8a3069f115d885c8ba87152da/pytest-8.1.0.tar.gz"
+              "hash": "d4051d623a2e0b7e51960ba963193b09ce6daeb9759a451844a21e4ddedfc1bd",
+              "url": "https://files.pythonhosted.org/packages/3f/c0/238f25cb27495fdbaa5c48cef9886162e9df1f3d0e957fc8326d9c24fa2f/pytest-8.0.2.tar.gz"
             }
           ],
           "project_name": "pytest",
           "requires_dists": [
             "argcomplete; extra == \"testing\"",
-            "attrs>=19.2; extra == \"testing\"",
+            "attrs>=19.2.0; extra == \"testing\"",
             "colorama; sys_platform == \"win32\"",
             "exceptiongroup>=1.0.0rc8; python_version < \"3.11\"",
             "hypothesis>=3.56; extra == \"testing\"",
             "iniconfig",
             "mock; extra == \"testing\"",
+            "nose; extra == \"testing\"",
             "packaging",
-            "pluggy<2.0,>=1.4",
+            "pluggy<2.0,>=1.3.0",
             "pygments>=2.7.2; extra == \"testing\"",
             "requests; extra == \"testing\"",
             "setuptools; extra == \"testing\"",
-            "tomli>=1; python_version < \"3.11\"",
+            "tomli>=1.0.0; python_version < \"3.11\"",
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.8",
-          "version": "8.1.0"
+          "version": "8.0.2"
         },
         {
           "artifacts": [
@@ -3859,23 +3835,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0892e7ac8bc76da499ad3ee8de8da4d7905a3110b952e2a35a940dab1ffa550e",
-              "url": "https://files.pythonhosted.org/packages/8c/72/8706c1508e3218dc8ddfff6f10df8bba122f4e22499fd48337dd67ad11cc/SQLAlchemy-1.4.51-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "afb1672b57f58c0318ad2cff80b384e816735ffc7e848d8aa51e0b0fc2f4b7bb",
+              "url": "https://files.pythonhosted.org/packages/a9/5b/3afbd03f813b7ba929887d0d1107b54e7bad4e3a10664ab21a05eb777149/SQLAlchemy-1.4.52-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7deeae5071930abb3669b5185abb6c33ddfd2398f87660fafdb9e6a5fb0f3f2f",
-              "url": "https://files.pythonhosted.org/packages/47/f3/9403aac7f66e202151712201d2485e8f6b575f418f65c1ca589352ebaf80/SQLAlchemy-1.4.51-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "cb8f9e4c4718f111d7b530c4e6fb4d28f9f110eb82e7961412955b3875b66de0",
+              "url": "https://files.pythonhosted.org/packages/81/05/73cb4865011f85fc3c4af8af06dc66b50527208f83c90b807071abba8da1/SQLAlchemy-1.4.52-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "eaeeb2464019765bc4340214fca1143081d49972864773f3f1e95dba5c7edc7d",
-              "url": "https://files.pythonhosted.org/packages/75/72/7862cedd279c2acf94fbc76ff990592e8a9730b0ca32696df56a28920965/SQLAlchemy-1.4.51-cp311-cp311-macosx_10_9_universal2.whl"
+              "hash": "80e63bbdc5217dad3485059bdf6f65a7d43f33c8bde619df5c220edf03d87296",
+              "url": "https://files.pythonhosted.org/packages/8a/a4/b5991829c34af0505e0f2b1ccf9588d1ba90f2d984ee208c90c985f1265a/SQLAlchemy-1.4.52.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7908c2025eb18394e32d65dd02d2e37e17d733cdbe7d78231c2b6d7eb20cdb9",
-              "url": "https://files.pythonhosted.org/packages/c8/56/5a8dcb01ef7b68904f2a3224343d4ab3674b5cc8f48f7cefb0701bc75ab8/SQLAlchemy-1.4.51.tar.gz"
+              "hash": "2f251af4c75a675ea42766880ff430ac33291c8d0057acca79710f9e5a77383d",
+              "url": "https://files.pythonhosted.org/packages/ab/50/d5756b1faa3c727bc3e2601ee1975c00e6adbafbbc436bea1e87af86328d/SQLAlchemy-1.4.52-cp311-cp311-macosx_10_9_universal2.whl"
             }
           ],
           "project_name": "sqlalchemy",
@@ -3912,7 +3888,7 @@
             "typing-extensions!=3.10.0.1; extra == \"aiosqlite\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "1.4.51"
+          "version": "1.4.52"
         },
         {
           "artifacts": [
@@ -4776,6 +4752,7 @@
     "attrs>=20.3",
     "backend.ai-krunner-alpine==5.1.0",
     "backend.ai-krunner-static-gnu==4.1.1",
+    "bcrypt>=4.1.2",
     "boto3~=1.26",
     "cachetools~=5.2.0",
     "callosum~=1.0.3",
@@ -4804,7 +4781,6 @@
     "namedlist~=1.8",
     "networkx~=2.8.7",
     "packaging>=21.3",
-    "passlib[bcrypt]>=1.7.4",
     "pexpect~=4.8",
     "psutil~=5.9.1",
     "pycryptodome>=3.14.1",

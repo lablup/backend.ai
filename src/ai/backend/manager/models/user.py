@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequen
 from uuid import UUID, uuid4
 
 import aiotools
+import bcrypt
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
-from passlib.hash import bcrypt
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
@@ -1412,12 +1412,12 @@ class UserConnection(Connection):
         node = UserNode
 
 
-def _hash_password(password):
-    return bcrypt.using(rounds=12).hash(password)
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf8"), bcrypt.gensalt(rounds=12)).decode("utf8")
 
 
-def _verify_password(guess, hashed):
-    return bcrypt.verify(guess, hashed)
+def _verify_password(guess: str, hashed: str) -> bool:
+    return bcrypt.checkpw(guess.encode("utf8"), hashed.encode("utf8"))
 
 
 def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
