@@ -134,6 +134,7 @@ async def check_dependencies(
         if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
             pending_dependencies.append(row)
     all_success = not pending_dependencies
+    # TODO: all_terminated
     if all_success:
         return PredicateResult(True)
     return PredicateResult(
