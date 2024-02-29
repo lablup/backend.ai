@@ -779,9 +779,9 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+    container_registry = graphene.Field(ContainerRegistry, id=graphene.UUID(required=True))
 
-    container_registries = graphene.List(ContainerRegistry)
+    container_registries = graphene.List(ContainerRegistry, hostname=graphene.String(required=True))
 
     container_registry_node = graphene.Field(
         ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
@@ -2321,19 +2321,21 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registry(
         root: Any,
         info: graphene.ResolveInfo,
-        hostname: str,
+        id: graphene.UUID,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load(ctx, id)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
+        hostname: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_all(ctx)
+        res = await ContainerRegistry.list_by_hostname(ctx, hostname)
+        return res
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
