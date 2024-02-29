@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Mapping, Optional, Seq
 
 import attr
 
+from ai.backend.common.types import ResultSet
+
 if TYPE_CHECKING:
     from ai.backend.client.cli.types import CLIContext
 
@@ -136,6 +138,13 @@ class BaseOutputHandler(metaclass=ABCMeta):
         self,
         items: Sequence[Mapping[str, Any]],
         fields: Sequence[FieldSpec],
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def print_result_set(
+        self,
+        result_set: ResultSet,
     ) -> None:
         raise NotImplementedError
 
