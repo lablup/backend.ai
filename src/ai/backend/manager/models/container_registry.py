@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 
 import graphene
@@ -32,8 +31,8 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 __all__: Sequence[str] = (
-    "ContainerRegistryRow",
     "ContainerRegistry",
+    "ContainerRegistryRow",
     "CreateContainerRegistry",
     "ModifyContainerRegistry",
     "DeleteContainerRegistry",
@@ -51,20 +50,20 @@ class ContainerRegistryRow(Base):
         default="docker",
         index=True,
     )
+    ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
     project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
-    ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
 
     def __init__(
         self,
-        hostname: str,
         url: str,
+        hostname: str,
         type: str,
         ssl_verify: bool,
+        project: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
-        project: Optional[str] = None,
     ) -> None:
         self.hostname = hostname
         self.url = url
@@ -78,7 +77,7 @@ class ContainerRegistryRow(Base):
     async def get(
         cls,
         session: AsyncSession,
-        id: uuid.UUID,
+        id: str,
     ) -> ContainerRegistryRow:
         query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == id)
         result = await session.execute(query)
@@ -95,15 +94,16 @@ class ContainerRegistryRow(Base):
     ) -> Sequence[ContainerRegistryRow]:
         query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
         result = await session.execute(query)
-        row = result.fetchall()
-        if row is None:
+        rows = result.scalars().all()
+        if not rows:
             raise NoResultFound
-        return row
+        return rows
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
+    hostname = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -113,6 +113,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String()
     type = graphene.String()
+    hostname = graphene.String()
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -122,6 +123,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
+    hostname = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -132,7 +134,6 @@ class ContainerRegistry(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    hostname = graphene.String()
     config = graphene.Field(ContainerRegistryConfig)
 
     @classmethod
@@ -151,10 +152,10 @@ class ContainerRegistry(graphene.ObjectType):
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
         return cls(
             id=row.id,
-            hostname=row.hostname,
             config=ContainerRegistryConfig(
                 url=row.url,
                 type=row.type,
+                hostname=row.hostname,
                 project=row.project,
                 username=row.username,
                 password=PASSWORD_PLACEHOLDER if row.password is not None else None,
@@ -224,6 +225,17 @@ class ContainerRegistry(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
+    async def load(cls, ctx: GraphQueryContext, id: str) -> ContainerRegistry:
+        async with ctx.db.begin_readonly_session() as session:
+            return cls.from_row(
+                ctx,
+                await ContainerRegistryRow.get(
+                    session,
+                    id,
+                ),
+            )
+
+    @classmethod
     async def load_all(
         cls,
         ctx: GraphQueryContext,
@@ -233,15 +245,13 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
     @classmethod
-    async def load_by_hostname(
-        cls, ctx: GraphQueryContext, hostname: str
+    async def list_by_hostname(
+        cls,
+        ctx: GraphQueryContext,
+        hostname: str,
     ) -> Sequence[ContainerRegistry]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await ContainerRegistryRow.get_by_hostname(
-                session,
-                hostname,
-            )
-
+            rows = await ContainerRegistryRow.get_by_hostname(session, hostname)
             return [cls.from_row(ctx, row) for row in rows]
 
 
@@ -252,10 +262,10 @@ class ContainerRegistryConnection(Connection):
 
 class CreateContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
+    id = graphene.String(required=True)
     container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        hostname = graphene.String(required=True)
         props = CreateContainerRegistryInput(required=True)
 
     @classmethod
@@ -264,10 +274,15 @@ class CreateContainerRegistry(graphene.Mutation):
         lambda id, **kwargs: (None, id),
     )
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+        cls, root, info: graphene.ResolveInfo, props: CreateContainerRegistryInput
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
-        input_config: dict[str, Any] = {"hostname": hostname, "url": props.url, "type": props.type}
+
+        input_config: dict[str, Any] = {
+            "hostname": props.hostname,
+            "url": props.url,
+            "type": props.type,
+        }
 
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
@@ -275,20 +290,27 @@ class CreateContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "ssl_verify")
 
         async with ctx.db.begin_session() as session:
-            query = sa.insert(ContainerRegistryRow).values(input_config)
-            await session.execute(query)
-            container_registry = ContainerRegistry.from_row(
-                ctx, ContainerRegistryRow(**input_config)
+            result = await session.execute(
+                sa.insert(ContainerRegistryRow)
+                .values(input_config)
+                .returning(ContainerRegistryRow.id)
             )
-            return cls(container_registry=container_registry)
+            inserted_item_id = result.scalar()
+
+            return cls(
+                id=inserted_item_id,
+                container_registry=ContainerRegistry.from_row(
+                    ctx, await ContainerRegistryRow.get(session, inserted_item_id)
+                ),
+            )
 
 
 class ModifyContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registries = graphene.List(ContainerRegistry)
+    container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        hostname = graphene.String(required=True)
+        id = graphene.String(required=True)
         props = ModifyContainerRegistryInput(required=True)
 
     @classmethod
@@ -300,38 +322,37 @@ class ModifyContainerRegistry(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        hostname: str,
+        id: graphene.String,
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
-        print("Modify!!")
         ctx: GraphQueryContext = info.context
 
         input_config: Dict[str, Any] = {}
 
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
+        set_if_set(props, input_config, "hostname")
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
 
-        print("input_config!!", input_config)
-
         async with ctx.db.begin_session() as session:
+            uuid = AsyncNode.resolve_global_id(info, id)[1]
+
             query = (
                 sa.update(ContainerRegistryRow)
                 .values(input_config)
-                .where(ContainerRegistryRow.hostname == hostname)
+                .where(ContainerRegistryRow.id == uuid)
             )
 
-            print("befroe execute!!")
             await session.execute(query)
-            print("af execute!!")
 
-            print("af execute!! 2")
-            container_registries = await ContainerRegistry.load_by_hostname(ctx, hostname)
-            print("af execute!! 3")
-        return cls(container_registries=container_registries)
+            return cls(
+                container_registry=ContainerRegistry.from_row(
+                    ctx, await ContainerRegistryRow.get(session, uuid)
+                )
+            )
 
 
 class DeleteContainerRegistry(graphene.Mutation):
@@ -339,7 +360,7 @@ class DeleteContainerRegistry(graphene.Mutation):
     container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        hostname = graphene.String(required=True)
+        id = graphene.String(required=True)
 
     @classmethod
     @privileged_mutation(
@@ -350,13 +371,14 @@ class DeleteContainerRegistry(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        hostname: str,
+        id: graphene.String,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
+        uuid = AsyncNode.resolve_global_id(info, id)[1]
+        container_registry = await ContainerRegistry.load(ctx, uuid)
         async with ctx.db.begin_session() as session:
             await session.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == uuid)
             )
 
         return cls(container_registry=container_registry)

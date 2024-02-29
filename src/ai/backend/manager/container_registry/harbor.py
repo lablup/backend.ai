@@ -189,8 +189,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 )
             )
             registry_projects = [res[0] for res in result.fetchall()]
-            print("registry_projects!!", registry_projects)
-            log.info(f"registry_projects!! {registry_projects}")
 
         rqst_args = {}
         if self.credentials:
