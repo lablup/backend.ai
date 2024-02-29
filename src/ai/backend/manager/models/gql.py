@@ -781,7 +781,9 @@ class Queries(graphene.ObjectType):
 
     container_registry = graphene.Field(ContainerRegistry, id=graphene.UUID(required=True))
 
-    container_registries = graphene.List(ContainerRegistry, hostname=graphene.String(required=True))
+    container_registries = graphene.List(
+        ContainerRegistry, hostname=graphene.String(required=True), description="Added in 24.03.0."
+    )
 
     container_registry_node = graphene.Field(
         ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."

@@ -42,10 +42,8 @@ def client() -> Client:
     return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-@pytest.mark.dependency()
-@pytest.mark.asyncio
-async def test_create_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = GraphQueryContext(
+def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
+    return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
         local_config=None,  # type: ignore
@@ -64,6 +62,12 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
     )
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+async def test_create_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
+    context = get_graphquery_context(database_engine)
 
     query = """
             mutation CreateContainerRegistry($props: CreateContainerRegistryInput!) {
@@ -109,25 +113,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 @pytest.mark.dependency(depends=["test_get_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = GraphQueryContext(
-        schema=None,  # type: ignore
-        dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
-        etcd=None,  # type: ignore
-        user={"domain": "default", "role": "superadmin"},
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
-        redis_stat=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
-        manager_status=None,  # type: ignore
-        known_slot_types=None,  # type: ignore
-        background_task_manager=None,  # type: ignore
-        storage_manager=None,  # type: ignore
-        registry=None,  # type: ignore
-        idle_checker_host=None,  # type: ignore
-    )
+    context = get_graphquery_context(database_engine)
 
     get_query = """
         query ContainerRegistries($hostname: String!) {
@@ -202,25 +188,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ):
-    context = GraphQueryContext(
-        schema=None,  # type: ignore
-        dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
-        etcd=None,  # type: ignore
-        user={"domain": "default", "role": "superadmin"},
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
-        redis_stat=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
-        manager_status=None,  # type: ignore
-        known_slot_types=None,  # type: ignore
-        background_task_manager=None,  # type: ignore
-        storage_manager=None,  # type: ignore
-        registry=None,  # type: ignore
-        idle_checker_host=None,  # type: ignore
-    )
+    context = get_graphquery_context(database_engine)
 
     query = """
         query ContainerRegistries($hostname: String!) {
@@ -277,25 +245,7 @@ async def test_modify_container_registry_allows_empty_string(
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ):
-    context = GraphQueryContext(
-        schema=None,  # type: ignore
-        dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
-        etcd=None,  # type: ignore
-        user={"domain": "default", "role": "superadmin"},
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
-        redis_stat=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
-        manager_status=None,  # type: ignore
-        known_slot_types=None,  # type: ignore
-        background_task_manager=None,  # type: ignore
-        storage_manager=None,  # type: ignore
-        registry=None,  # type: ignore
-        idle_checker_host=None,  # type: ignore
-    )
+    context = get_graphquery_context(database_engine)
 
     get_query = """
         query ContainerRegistries($hostname: String!) {
@@ -350,25 +300,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
 async def test_delete_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = GraphQueryContext(
-        schema=None,  # type: ignore
-        dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
-        etcd=None,  # type: ignore
-        user={"domain": "default", "role": "superadmin"},
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
-        redis_stat=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
-        manager_status=None,  # type: ignore
-        known_slot_types=None,  # type: ignore
-        background_task_manager=None,  # type: ignore
-        storage_manager=None,  # type: ignore
-        registry=None,  # type: ignore
-        idle_checker_host=None,  # type: ignore
-    )
+    context = get_graphquery_context(database_engine)
 
     get_query = """
         query ContainerRegistries($hostname: String!) {
