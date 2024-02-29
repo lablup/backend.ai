@@ -7,32 +7,15 @@ from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 CONTAINER_REGISTRY_FIELDS = """
-    container_registry {
-        id
-        config {
-            registry_name
-            url
-            type
-            project
-            username
-            password
-            ssl_verify
-        }
-    }
-"""
-
-CONTAINER_REGISTRIES_FIELDS = """
-    container_registries(registry_name: $registry_name) {
-        id
-        config {
-            registry_name
-            url
-            type
-            project
-            username
-            password
-            ssl_verify
-        }
+    id
+    config {
+        registry_name
+        url
+        type
+        project
+        username
+        password
+        ssl_verify
     }
 """
 
@@ -72,7 +55,9 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     query = """
             mutation CreateContainerRegistry($props: CreateContainerRegistryInput!) {
                 create_container_registry(props: $props) {
-                    $CONTAINER_REGISTRY_FIELDS
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
                 }
             }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
@@ -115,17 +100,19 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
     context = get_graphquery_context(database_engine)
 
-    get_query = """
+    query = """
         query ContainerRegistries($registry_name: String!) {
-            $CONTAINER_REGISTRIES_FIELDS
+            container_registries (registry_name: $registry_name) {
+                $CONTAINER_REGISTRY_FIELDS
+            }
         }
-        """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables: dict[str, dict | str] = {
         "registry_name": "cr.example.com",
     }
 
-    response = await client.execute_async(get_query, variables=variables, context_value=context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
 
     target_container_registries = list(
         filter(
@@ -139,7 +126,9 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     query = """
             mutation ModifyContainerRegistry($id: String!, $props: ModifyContainerRegistryInput!) {
                 modify_container_registry(id: $id, props: $props) {
-                    $CONTAINER_REGISTRY_FIELDS
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
                 }
             }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
@@ -192,9 +181,11 @@ async def test_modify_container_registry_allows_empty_string(
 
     query = """
         query ContainerRegistries($registry_name: String!) {
-            $CONTAINER_REGISTRIES_FIELDS
+            container_registries (registry_name: $registry_name) {
+                $CONTAINER_REGISTRY_FIELDS
+            }
         }
-        """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables: dict[str, dict | str] = {
         "registry_name": "cr.example.com",
@@ -214,7 +205,9 @@ async def test_modify_container_registry_allows_empty_string(
     query = """
             mutation ModifyContainerRegistry($id: String!, $props: ModifyContainerRegistryInput!) {
                 modify_container_registry(id: $id, props: $props) {
-                    $CONTAINER_REGISTRY_FIELDS
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
                 }
             }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
@@ -247,17 +240,19 @@ async def test_modify_container_registry_allows_null_for_unset(
 ):
     context = get_graphquery_context(database_engine)
 
-    get_query = """
+    query = """
         query ContainerRegistries($registry_name: String!) {
-            $CONTAINER_REGISTRIES_FIELDS
+            container_registries (registry_name: $registry_name) {
+                $CONTAINER_REGISTRY_FIELDS
+            }
         }
-        """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables: dict[str, dict | str] = {
         "registry_name": "cr.example.com",
     }
 
-    response = await client.execute_async(get_query, variables=variables, context_value=context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
 
     target_container_registries = list(
         filter(
@@ -271,7 +266,9 @@ async def test_modify_container_registry_allows_null_for_unset(
     query = """
             mutation ModifyContainerRegistry($id: String!, $props: ModifyContainerRegistryInput!) {
                 modify_container_registry(id: $id, props: $props) {
-                    $CONTAINER_REGISTRY_FIELDS
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
                 }
             }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
@@ -302,17 +299,19 @@ async def test_modify_container_registry_allows_null_for_unset(
 async def test_delete_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
     context = get_graphquery_context(database_engine)
 
-    get_query = """
+    query = """
         query ContainerRegistries($registry_name: String!) {
-            $CONTAINER_REGISTRIES_FIELDS
+            container_registries (registry_name: $registry_name) {
+                $CONTAINER_REGISTRY_FIELDS
+            }
         }
-        """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables = {
         "registry_name": "cr.example.com",
     }
 
-    response = await client.execute_async(get_query, variables=variables, context_value=context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
 
     target_container_registries = list(
         filter(
@@ -326,7 +325,9 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     query = """
             mutation DeleteContainerRegistry($id: String!) {
                 delete_container_registry(id: $id) {
-                    $CONTAINER_REGISTRY_FIELDS
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
                 }
             }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
@@ -340,11 +341,11 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     assert container_registry["config"]["registry_name"] == "cr.example.com"
 
     query = """
-            query ContainerRegistry($id: String!) {
-                container_registry(id: $id) {
-                    $CONTAINER_REGISTRY_FIELDS
-                }
+        query ContainerRegistries($registry_name: String!) {
+            container_registries (registry_name: $registry_name) {
+                $CONTAINER_REGISTRY_FIELDS
             }
+        }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     response = await client.execute_async(query, variables=variables, context_value=context)
