@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -82,7 +82,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
