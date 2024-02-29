@@ -43,29 +43,29 @@ class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
     url = sa.Column("url", sa.String(length=255), index=True)
-    hostname = sa.Column("hostname", sa.String(length=50), index=True)
+    registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
     type = sa.Column(
         "type",
         sa.Enum("docker", "harbor", "harbor2", name="container_registry_type"),
         default="docker",
         index=True,
     )
-    ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=True, index=True)
     project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
+    ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
 
     def __init__(
         self,
         url: str,
-        hostname: str,
+        registry_name: str,
         type: str,
         ssl_verify: bool,
         project: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
     ) -> None:
-        self.hostname = hostname
+        self.registry_name = registry_name
         self.url = url
         self.type = type
         self.project = project
@@ -87,12 +87,14 @@ class ContainerRegistryRow(Base):
         return row
 
     @classmethod
-    async def list_by_hostname(
+    async def list_by_registry_name(
         cls,
         session: AsyncSession,
-        hostname: str,
+        registry_name: str,
     ) -> Sequence[ContainerRegistryRow]:
-        query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.hostname == hostname)
+        query = sa.select(ContainerRegistryRow).where(
+            ContainerRegistryRow.registry_name == registry_name
+        )
         result = await session.execute(query)
         rows = result.scalars().all()
         if not rows:
@@ -103,7 +105,7 @@ class ContainerRegistryRow(Base):
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    hostname = graphene.String(required=True)
+    registry_name = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -113,7 +115,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String()
     type = graphene.String()
-    hostname = graphene.String()
+    registry_name = graphene.String()
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -123,7 +125,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    hostname = graphene.String(required=True)
+    registry_name = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -138,12 +140,12 @@ class ContainerRegistry(graphene.ObjectType):
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
         "id": ("id", None),
-        "hostname": ("hostname", None),
+        "registry_name": ("registry_name", None),
     }
 
     _queryorder_colmap: dict[str, OrderSpecItem] = {
         "id": ("id", None),
-        "hostname": ("hostname", None),
+        "registry_name": ("registry_name", None),
     }
 
     @classmethod
@@ -216,7 +218,7 @@ class ContainerRegistry(graphene.ObjectType):
             config=ContainerRegistryConfig(
                 url=row.url,
                 type=row.type,
-                hostname=row.hostname,
+                registry_name=row.registry_name,
                 project=row.project,
                 username=row.username,
                 password=PASSWORD_PLACEHOLDER if row.password is not None else None,
@@ -245,13 +247,13 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
     @classmethod
-    async def list_by_hostname(
+    async def list_by_registry_name(
         cls,
         ctx: GraphQueryContext,
-        hostname: str,
+        registry_name: str,
     ) -> Sequence[ContainerRegistry]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await ContainerRegistryRow.list_by_hostname(session, hostname)
+            rows = await ContainerRegistryRow.list_by_registry_name(session, registry_name)
             return [cls.from_row(ctx, row) for row in rows]
 
 
@@ -279,7 +281,7 @@ class CreateContainerRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {
-            "hostname": props.hostname,
+            "registry_name": props.registry_name,
             "url": props.url,
             "type": props.type,
         }
@@ -331,7 +333,7 @@ class ModifyContainerRegistry(graphene.Mutation):
 
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
-        set_if_set(props, input_config, "hostname")
+        set_if_set(props, input_config, "registry_name")
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")

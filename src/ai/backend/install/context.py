@@ -755,7 +755,7 @@ class Context(metaclass=ABCMeta):
                     async with aiotools.closing_async(await self.get_db_connection()) as conn:
                         for project in ["stable", "community", "multiarch"]:
                             await conn.execute(
-                                "INSERT INTO container_registries (id, url, hostname, type, project) VALUES ($1, $2, $3, $4, $5);",
+                                "INSERT INTO container_registries (id, url, registry_name, type, project) VALUES ($1, $2, $3, $4, $5);",
                                 "fe878f09-06cc-4b91-9242-4c71015cce04",
                                 "https://cr.backend.ai",
                                 "cr.backend.ai",
@@ -791,7 +791,7 @@ class Context(metaclass=ABCMeta):
 
                     async with aiotools.closing_async(await self.get_db_connection()) as conn:
                         await conn.execute(
-                            "INSERT INTO container_registries (id, url, hostname, type, username) VALUES ($1, $2, $3, $4, $5);",
+                            "INSERT INTO container_registries (id, url, registry_name, type, username) VALUES ($1, $2, $3, $4, $5);",
                             "abc42a05-4471-41fa-8772-10bf6452c7d1",
                             "https://registry-1.docker.io",
                             "index.docker.io",

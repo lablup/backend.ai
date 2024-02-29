@@ -782,12 +782,15 @@ class Queries(graphene.ObjectType):
     container_registry = graphene.Field(ContainerRegistry, id=graphene.UUID(required=True))
 
     container_registries = graphene.List(
-        ContainerRegistry, hostname=graphene.String(required=True), description="Added in 24.03.0."
+        ContainerRegistry,
+        registry_name=graphene.String(required=True),
+        description="Added in 24.03.0.",
     )
 
     container_registry_node = graphene.Field(
         ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
     )
+
     container_registry_nodes = PaginatedConnectionField(
         ContainerRegistryConnection, description="Added in 24.03.0."
     )
@@ -2333,11 +2336,10 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
-        hostname: graphene.String,
+        registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        res = await ContainerRegistry.list_by_hostname(ctx, hostname)
-        return res
+        return await ContainerRegistry.list_by_registry_name(ctx, registry_name)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

@@ -133,7 +133,7 @@ async def rescan_images(
     else:
         async with db.begin_readonly_session() as session:
             result = await session.execute(sa.select(ContainerRegistryRow))
-            latest_registry_config = {row.hostname: row for row in result.scalars().all()}
+            latest_registry_config = {row.registry_name: row for row in result.scalars().all()}
 
         # TODO: delete images from registries removed from the previous config?
         if registry_or_image is None:
