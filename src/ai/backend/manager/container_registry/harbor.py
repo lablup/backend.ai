@@ -188,7 +188,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     ContainerRegistryRow.hostname == self.registry_info.hostname
                 )
             )
-            registry_projects = [res[0] for res in result.fetchall()]
+            registry_projects = result.scalars().all()
 
         rqst_args = {}
         if self.credentials:
