@@ -998,9 +998,9 @@ class ModifyImage(graphene.Mutation):
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}
-                if limit_option.min is not None and len(limit_option.min) > 0:
+                if limit_option.min and len(limit_option.min) > 0:
                     limit_data["min"] = limit_option.min
-                if limit_option.max is not None and len(limit_option.max) > 0:
+                if limit_option.max and len(limit_option.max) > 0:
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
             data["resources"] = resources_data
