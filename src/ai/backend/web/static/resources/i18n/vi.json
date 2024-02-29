@@ -232,7 +232,24 @@
       "PreOpenPortPanelTitle": "Mở trước các cổng để đặt (tùy chọn)",
       "PortsTitleWithRange": "Giá trị cổng (trong khoảng 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mọi cổng mở trước chưa được lưu sẽ biến mất.",
-      "StartModelServing": "Bắt đầu phân phối mẫu"
+      "StartModelServing": "Bắt đầu phân phối mẫu",
+      "PreOpenPortRangeGuide": "Nhập nhiều giá trị được phân tách bằng dấu phẩy (,) hoặc dấu cách.",
+      "preopen": "mở trước",
+      "Network": "Mạng",
+      "Enable": "Cho phép",
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
+      "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Phân bổ tài nguyên trên mỗi vùng chứa",
+      "NumberOfContainer": "Số lượng thùng chứa",
+      "EnterEnvironmentVariable": "Nhập tên biến",
+      "EnvironmentVariableNamePatternError": "Tên biến phải bắt đầu bằng một chữ cái hoặc dấu gạch dưới và chỉ có thể chứa các chữ cái, số và dấu gạch dưới.",
+      "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -288,7 +305,9 @@
       "EnterValidSessionName": "Nhập tên phiên hợp lệ",
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
-      "SessionNameAlreadyExist": "Tên phiên đã tồn tại"
+      "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
+      "SessionNameTooLong64": "Vui lòng nhập 64 ký tự trở xuống.",
+      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 4 chữ cái, số, '.', '_' và '-'."
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -369,7 +388,6 @@
     "DeleteAll": "Xóa hết",
     "Update": "Cập nhật",
     "Delete": "Xóa bỏ",
-    "Dismiss": "Bỏ qua",
     "DismissAndProceed": "Loại bỏ và tiếp tục",
     "Close": "Đóng",
     "Confirm": "Xác nhận",
@@ -422,7 +440,9 @@
     "Control": "Điều khiển",
     "NewPassword": "mật khẩu mới",
     "Enabled": "Đã bật",
-    "StorageProxies": "Kho lưu trữ"
+    "StorageProxies": "Kho lưu trữ",
+    "None": "Không có",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -499,7 +519,8 @@
     "KeypairDetail": "Chi tiết bàn phím",
     "SignoutSeccessfullyFinished": "Đăng xuất đã hoàn tất thành công",
     "Status": "Trạng thái",
-    "NoUserToDisplay": "Không có người dùng để hiển thị"
+    "NoUserToDisplay": "Không có người dùng để hiển thị",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Thư mục",
@@ -664,7 +685,8 @@
     },
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
-    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình."
+    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình.",
+    "SearchByName": "Tìm kiếm theo tên"
   },
   "dialog": {
     "warning": {
@@ -755,7 +777,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
-    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công."
+    "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
+    "SHMEMShouldBeSmallerThanMemory": "__NOT_TRANSLATED__"
   },
   "usersettings": {
     "General": "Chung",
@@ -891,7 +914,8 @@
     "PleaseSelectOption": "Làm ơn chọn một giải pháp.",
     "RegistrySuccessfullyModified": "Đã sửa đổi sổ đăng ký thành công.",
     "NoRegistryToDisplay": "Không có đăng ký để hiển thị",
-    "ModifyRegistry": "Sửa đổi sổ đăng ký"
+    "ModifyRegistry": "Sửa đổi sổ đăng ký",
+    "ConfirmNoUserName": "__NOT_TRANSLATED__"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
@@ -1369,7 +1393,7 @@
     "FormValidationFailed": "Xác thực biểu mẫu không thành công",
     "StartNewServing": "Bắt đầu phân phát mới",
     "ServiceName": "Tên dịch vụ",
-    "ServiceNameRule": "Chỉ cho phép 4 đến 64 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
+    "ServiceNameRule": "Chỉ cho phép 4 đến 24 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
     "OpenToPublic": "Mở cửa cho công chúng",
     "DesiredRoutingCount": "Số lượng định tuyến mong muốn",
     "ServingRouteErrorModalTitle": "Lỗi tuyến đường phục vụ",

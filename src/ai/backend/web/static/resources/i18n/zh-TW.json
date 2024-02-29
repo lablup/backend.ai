@@ -232,7 +232,25 @@
       "PortsTitleWithRange": "端口值（1024 ~ 65535 之间）",
       "PrePortConfigWillDisappear": "任何未保存的预打开端口都将消失。",
       "StartModelServing": "开始模型服务",
-      "ModelStorage": "模型存储"
+      "ModelStorage": "模型存储",
+      "PreOpenPortRangeGuide": "您可以輸入多個值，以逗號（,）或空格分隔。",
+      "preopen": "預開放埠",
+      "Network": "網路",
+      "Enable": "啟用",
+      "FolderAliasInvalid": "只能輸入大小寫字母、數字、底線 (_)、斜線 (/) 和破折號 (-)。",
+      "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
+      "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "每个集装箱的资源分配",
+      "NumberOfContainer": "集装箱数量",
+      "EnterEnvironmentVariable": "输入变量名称",
+      "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
+      "EnvironmentVariableDuplicateName": "已经存在的变量名。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -288,7 +306,9 @@
       "EnterValidSessionName": "输入有效的会话名称",
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
-      "SessionNameAlreadyExist": "会话名称已存在"
+      "SessionNameAlreadyExist": "会话名称已存在",
+      "SessionNameTooLong64": "請輸入不超過 64 個字元。",
+      "PleaseFollowSessionNameRule": "請輸入至少 4 個字母、數字、「.」、「_」和「-」的組合字元。"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -369,7 +389,6 @@
     "DeleteAll": "刪除所有",
     "Update": "更新",
     "Delete": "刪除",
-    "Dismiss": "解僱",
     "DismissAndProceed": "解僱並繼續",
     "Close": "關閉",
     "Confirm": "確認",
@@ -422,7 +441,9 @@
     "Control": "控制",
     "NewPassword": "新密碼",
     "Enabled": "啟用",
-    "StorageProxies": "存儲"
+    "StorageProxies": "存儲",
+    "None": "无",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "允許",
@@ -499,7 +520,8 @@
     "KeypairDetail": "配对密钥详情",
     "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
-    "NoUserToDisplay": "无用户显示"
+    "NoUserToDisplay": "无用户显示",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "文件夾",
@@ -664,7 +686,8 @@
     },
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
-    "DialogModelFolder": "您可以服务和管理模型。"
+    "DialogModelFolder": "您可以服务和管理模型。",
+    "SearchByName": "按名稱搜尋"
   },
   "dialog": {
     "warning": {
@@ -755,7 +778,8 @@
     "RAM": "內存 (GB)",
     "SharedMemory": "共享內存 (GB)",
     "NoResourcePresetToDisplay": "无资源预置显示",
-    "Deleted": "资源预置已成功删除。"
+    "Deleted": "资源预置已成功删除。",
+    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存"
   },
   "usersettings": {
     "General": "一般的",
@@ -891,7 +915,8 @@
     "PleaseSelectOption": "請選擇一個選項。",
     "RegistrySuccessfullyModified": "注册表已成功修改。",
     "NoRegistryToDisplay": "无注册表显示",
-    "ModifyRegistry": "修改注册表"
+    "ModifyRegistry": "修改注册表",
+    "ConfirmNoUserName": "未指定用户和密码，要保存吗？"
   },
   "resourceGroup": {
     "ResourceGroups": "資源組",
@@ -1369,7 +1394,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 64 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",

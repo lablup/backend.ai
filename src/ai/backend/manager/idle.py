@@ -33,7 +33,7 @@ import sqlalchemy as sa
 import trafaret as t
 from aiotools import TaskGroupError
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
@@ -67,8 +67,8 @@ from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import KernelRow, get_remaining_connection
-from .models.keypair import KeyPairRow
-from .models.resource_policy import KeyPairResourcePolicyRow
+from .models.keypair import keypairs
+from .models.resource_policy import KeyPairResourcePolicyRow, keypair_resource_policies
 from .models.session import SessionRow, SessionStatus
 from .models.user import UserRow
 from .models.utils import get_db_now
@@ -170,7 +170,7 @@ class ThresholdOperator(enum.Enum):
     OR = "or"
 
 
-class RemainingTimeType(str, enum.Enum):
+class RemainingTimeType(enum.StrEnum):
     GRACE_PERIOD = "grace_period"
     EXPIRE_AFTER = "expire_after"
 
@@ -263,8 +263,8 @@ class IdleCheckerHost:
         event: DoIdleCheckEvent,
     ) -> None:
         log.debug("do_idle_check(): triggered")
-        policy_cache: dict[AccessKey, KeyPairResourcePolicyRow] = {}
-        query = (
+        policy_cache: dict[AccessKey, Row] = {}
+        select_session = (
             sa.select(SessionRow)
             .select_from(SessionRow)
             .where(
@@ -282,12 +282,13 @@ class IdleCheckerHost:
                     SessionRow.user_uuid,
                 ),
                 selectinload(SessionRow.kernels).options(
-                    noload("*"), load_only(KernelRow.id, KernelRow.cluster_role)
+                    noload("*"),
+                    load_only(KernelRow.id, KernelRow.cluster_role),
                 ),
             )
         )
         async with self._db.begin_readonly_session() as db_session:
-            session_rows: list[SessionRow] = (await db_session.scalars(query)).all()
+            session_rows: list[SessionRow] = (await db_session.scalars(select_session)).all()
             for session in session_rows:
                 if session.user_uuid not in self.user_created_cache:
                     user_created_query = (
@@ -304,20 +305,17 @@ class IdleCheckerHost:
                 )
 
                 if session.access_key not in policy_cache:
-                    query = (
-                        sa.select(KeyPairRow)
-                        .where(KeyPairRow.access_key.is_(session.access_key))
-                        .options(
-                            noload("*"),
-                            joinedload(KeyPairRow.resource_policy_row).options(
-                                load_only(
-                                    KeyPairResourcePolicyRow.max_session_lifetime,
-                                    KeyPairResourcePolicyRow.idle_timeout,
-                                )
-                            ),
-                        )
+                    select_kp_resource = sa.select([
+                        keypair_resource_policies.c.max_session_lifetime,
+                        keypair_resource_policies.c.idle_timeout,
+                    ]).select_from(
+                        sa.join(
+                            keypairs,
+                            keypair_resource_policies,
+                            keypair_resource_policies.c.name == keypairs.c.resource_policy,
+                        ),
                     )
-                    _policy: KeyPairResourcePolicyRow = (await db_session.scalars()).first()
+                    _policy: KeyPairResourcePolicyRow = await db_session.scalar(select_kp_resource)
                     assert _policy is not None
                     policy_cache[session.access_key] = _policy
                 policy = policy_cache[session.access_key]
@@ -570,7 +568,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
-        d.consume(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
+        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
         self._evhandlers = [
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
@@ -809,7 +807,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds", default=None): t.Null | t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -826,7 +825,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
-    slot_resource_map: Mapping[str, Set[str]] = {
+    slot_prefix_to_utilization_metric_map: Mapping[str, Set[str]] = {
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
@@ -842,16 +841,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
             }
         else:
             resources: list[str] = []
-            for r in self.slot_resource_map.values():
+            for r in self.slot_prefix_to_utilization_metric_map.values():
                 resources = [*resources, *r]
             self.resource_thresholds = {r: None for r in resources}
         self.thresholds_check_operator: ThresholdOperator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join(
-            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
-        )
+        thresholds_log = " ".join([
+            f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()
+        ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '
@@ -942,16 +941,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
         # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
-        unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
-        for k, v in occupied_slots.items():
-            unique_key = k.split(".")[0]
-            unique_res_map[unique_key] += v
+        unique_res_map: DefaultDict[str, Decimal] = defaultdict(Decimal)
+        for slot_name, alloc in occupied_slots.items():
+            unique_key = slot_name.split(".")[0]
+            unique_res_map[unique_key] += alloc
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for slot in unique_res_map:
-            if unique_res_map[slot] == 0:
-                unavailable_resources.update(self.slot_resource_map[slot])
+        for slot_prefix, util_metric in self.slot_prefix_to_utilization_metric_map.items():
+            if unique_res_map.get(slot_prefix, 0) == 0:
+                unavailable_resources.update(util_metric)
 
         # Get current utilization data from all containers of the session.
         kernel_ids = [k.id for k in session.kernels]

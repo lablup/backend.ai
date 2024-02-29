@@ -6,7 +6,16 @@ import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+    Tuple,
+    TypeVar,
+)
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
@@ -48,6 +57,9 @@ class ExtendedAsyncSAEngine(SAEngine):
 
     def __init__(self, *args, **kwargs) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
+        self.lock_conn_timeout: float | None = (
+            kwargs.pop("_lock_conn_timeout", 0) or None
+        )  # Convert 0 to `None`
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
@@ -131,9 +143,12 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # but in this case:
                 #  - The lock ID is only given from trusted codes.
                 #  - asyncpg does not support parameter interpolation with raw SQL statements.
-                await lock_conn.exec_driver_sql(
-                    f"SELECT pg_advisory_lock({lock_id:d});",
-                )
+                async with asyncio.timeout(self.lock_conn_timeout):
+                    await lock_conn.exec_driver_sql(
+                        f"SELECT pg_advisory_lock({lock_id:d});",
+                    )
+                    lock_acquired = True
+                    yield
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
@@ -141,19 +156,22 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise
             except asyncio.CancelledError:
                 raise
-            else:
-                lock_acquired = True
-                yield
             finally:
                 if lock_acquired and not lock_conn.closed:
-                    await lock_conn.exec_driver_sql(
-                        f"SELECT pg_advisory_unlock({lock_id:d})",
-                    )
+                    try:
+                        await lock_conn.exec_driver_sql(
+                            f"SELECT pg_advisory_unlock({lock_id:d})",
+                        )
+                    except sa.exc.InterfaceError:
+                        log.warning(
+                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                        )
 
 
 def create_async_engine(
     *args,
     _txn_concurrency_threshold: int = 0,
+    _lock_conn_timeout: int = 0,
     **kwargs,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
@@ -161,6 +179,7 @@ def create_async_engine(
     return ExtendedAsyncSAEngine(
         sync_engine,
         _txn_concurrency_threshold=_txn_concurrency_threshold,
+        _lock_conn_timeout=_lock_conn_timeout,
     )
 
 
@@ -190,6 +209,7 @@ async def connect_database(
         url,
         connect_args=pgsql_connect_opts,
         pool_size=local_config["db"]["pool-size"],
+        pool_recycle=local_config["db"]["pool-recycle"],
         max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
@@ -198,6 +218,7 @@ async def connect_database(
             int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
             2,
         ),
+        _lock_conn_timeout=local_config["db"]["lock-conn-timeout"],
     )
     yield db
     await db.dispose()
@@ -254,7 +275,7 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                 try:
                     result = await txn_func()
                 except DBAPIError as e:
-                    if getattr(e.orig, "pgcode", None) == "40001":
+                    if is_db_retry_error(e):
                         raise TryAgain
                     raise
     except RetryError:
@@ -363,3 +384,7 @@ def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
 
 async def get_db_now(db_session: SASession) -> datetime:
     return await db_session.scalar(sa.select(sa.func.now()))
+
+
+def is_db_retry_error(e: Exception) -> bool:
+    return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"

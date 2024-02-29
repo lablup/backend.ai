@@ -2,10 +2,11 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
-from ai.backend.client.output.fields import keypair_fields
-from ai.backend.client.session import Session
+from ai.backend.cli.params import BoolExprType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 
+from ...output.fields import keypair_fields
+from ...session import Session
 from ..extensions import pass_ctx_obj
 from ..types import CLIContext
 from . import admin
@@ -56,7 +57,12 @@ def info(ctx: CLIContext) -> None:
     default=None,
     help="Show keypairs of this given user. [default: show all]",
 )
-@click.option("--is-active", type=bool, default=None, help="Filter keypairs by activation.")
+@click.option(
+    "--is-active",
+    type=OptionalType(BoolExprType),
+    default=None,
+    help="Filter keypairs by activation.",
+)
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
@@ -107,10 +113,33 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
 @pass_ctx_obj
 @click.argument("user-id", type=str, default=None, metavar="USERID")
 @click.argument("resource-policy", type=str, default=None, metavar="RESOURCE_POLICY")
-@click.option("-a", "--admin", is_flag=True, help="Give the admin privilege to the new keypair.")
-@click.option("-i", "--inactive", is_flag=True, help="Create the new keypair in inactive state.")
-@click.option("-r", "--rate-limit", type=int, default=5000, help="Set the API query rate limit.")
-def add(ctx: CLIContext, user_id, resource_policy, admin, inactive, rate_limit):
+@click.option(
+    "-a",
+    "--admin",
+    is_flag=True,
+    help="Give the admin privilege to the new keypair.",
+)
+@click.option(
+    "-i",
+    "--inactive",
+    is_flag=True,
+    help="Create the new keypair in inactive state.",
+)
+@click.option(
+    "-r",
+    "--rate-limit",
+    type=int,
+    default=5000,
+    help="Set the API query rate limit.",
+)
+def add(
+    ctx: CLIContext,
+    user_id: str,
+    resource_policy: str,
+    admin: bool,
+    inactive: bool,
+    rate_limit: int,
+) -> None:
     """
     Add a new keypair.
 
@@ -152,12 +181,40 @@ def add(ctx: CLIContext, user_id, resource_policy, admin, inactive, rate_limit):
 
 @keypair.command()
 @pass_ctx_obj
-@click.argument("access_key", type=str, default=None, metavar="ACCESSKEY")
-@click.option("--resource-policy", type=str, help="Resource policy for the keypair.")
-@click.option("--is-admin", type=bool, help="Set admin privilege.")
-@click.option("--is-active", type=bool, help="Set key pair active or not.")
-@click.option("-r", "--rate-limit", type=int, help="Set the API query rate limit.")
-def update(ctx: CLIContext, access_key, resource_policy, is_admin, is_active, rate_limit):
+@click.argument("access_key", type=str, metavar="ACCESSKEY")
+@click.option(
+    "--resource-policy",
+    type=OptionalType(str),
+    default=undefined,
+    help="Resource policy for the keypair.",
+)
+@click.option(
+    "--is-admin",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Set admin privilege.",
+)
+@click.option(
+    "--is-active",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help="Set key pair active or not.",
+)
+@click.option(
+    "-r",
+    "--rate-limit",
+    type=OptionalType(int),
+    default=undefined,
+    help="Set the API query rate limit.",
+)
+def update(
+    ctx: CLIContext,
+    access_key: str,
+    resource_policy: str | Undefined,
+    is_admin: bool | Undefined,
+    is_active: bool | Undefined,
+    rate_limit: int | Undefined,
+) -> None:
     """
     Update an existing keypair.
 
@@ -197,7 +254,7 @@ def update(ctx: CLIContext, access_key, resource_policy, is_admin, is_active, ra
 @keypair.command()
 @pass_ctx_obj
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
-def delete(ctx: CLIContext, access_key):
+def delete(ctx: CLIContext, access_key: str) -> None:
     """
     Delete an existing keypair.
 
@@ -231,7 +288,7 @@ def delete(ctx: CLIContext, access_key):
 @keypair.command()
 @pass_ctx_obj
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
-def activate(ctx: CLIContext, access_key):
+def activate(ctx: CLIContext, access_key: str) -> None:
     """
     Activate an inactivated keypair.
 
@@ -265,7 +322,7 @@ def activate(ctx: CLIContext, access_key):
 @keypair.command()
 @pass_ctx_obj
 @click.argument("access-key", type=str, metavar="ACCESSKEY")
-def deactivate(ctx: CLIContext, access_key):
+def deactivate(ctx: CLIContext, access_key: str) -> None:
     """
     Deactivate an active keypair.
 

@@ -27,7 +27,7 @@ python_distribution(
 )
 
 resource(name="version", source="VERSION")
-
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[

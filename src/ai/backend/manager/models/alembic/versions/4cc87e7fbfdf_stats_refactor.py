@@ -5,6 +5,7 @@ Revises: e18ed5fcfedf
 Create Date: 2019-05-30 18:40:17.669756
 
 """
+
 import math
 from datetime import timedelta
 from decimal import Decimal
@@ -62,22 +63,20 @@ def upgrade():
 
     connection = op.get_bind()
     query = (
-        sa.select(
-            [
-                kernels.c.id,
-                kernels.c.created_at,
-                kernels.c.terminated_at,
-                kernels.c.occupied_slots,
-                kernels.c.occupied_shares,
-                kernels.c.cpu_used,
-                kernels.c.mem_max_bytes,
-                kernels.c.net_rx_bytes,
-                kernels.c.net_tx_bytes,
-                kernels.c.io_read_bytes,
-                kernels.c.io_write_bytes,
-                kernels.c.io_max_scratch_size,
-            ]
-        )
+        sa.select([
+            kernels.c.id,
+            kernels.c.created_at,
+            kernels.c.terminated_at,
+            kernels.c.occupied_slots,
+            kernels.c.occupied_shares,
+            kernels.c.cpu_used,
+            kernels.c.mem_max_bytes,
+            kernels.c.net_rx_bytes,
+            kernels.c.net_tx_bytes,
+            kernels.c.io_read_bytes,
+            kernels.c.io_write_bytes,
+            kernels.c.io_max_scratch_size,
+        ])
         .select_from(kernels)
         .order_by(kernels.c.created_at)
     )
@@ -223,30 +222,26 @@ def downgrade():
     updates = []
     for row in results:
         last_stat = row["last_stat"]
-        updates.append(
-            {
-                "row_id": row["id"],
-                "cpu_used": Decimal(last_stat["cpu_used"]["current"]),
-                "io_read_bytes": int(last_stat["io_read"]["current"]),
-                "io_write_bytes": int(last_stat["io_write"]["current"]),
-                "mem_max_bytes": int(last_stat["mem"]["stats.max"]),
-                "io_max_scratch_size": int(last_stat["io_scratch_size"]["stats.max"]),
-            }
-        )
+        updates.append({
+            "row_id": row["id"],
+            "cpu_used": Decimal(last_stat["cpu_used"]["current"]),
+            "io_read_bytes": int(last_stat["io_read"]["current"]),
+            "io_write_bytes": int(last_stat["io_write"]["current"]),
+            "mem_max_bytes": int(last_stat["mem"]["stats.max"]),
+            "io_max_scratch_size": int(last_stat["io_scratch_size"]["stats.max"]),
+        })
     if updates:
         query = (
             sa.update(kernels)
-            .values(
-                {
-                    "cpu_used": bindparam("cpu_used"),
-                    "io_read_bytes": bindparam("io_read_bytes"),
-                    "io_write_bytes": bindparam("io_write_bytes"),
-                    "mem_max_bytes": bindparam("mem_max_bytes"),
-                    "net_tx_bytes": 0,
-                    "net_rx_bytes": 0,
-                    "io_max_scratch_size": bindparam("io_max_scratch_size"),
-                }
-            )
+            .values({
+                "cpu_used": bindparam("cpu_used"),
+                "io_read_bytes": bindparam("io_read_bytes"),
+                "io_write_bytes": bindparam("io_write_bytes"),
+                "mem_max_bytes": bindparam("mem_max_bytes"),
+                "net_tx_bytes": 0,
+                "net_rx_bytes": 0,
+                "io_max_scratch_size": bindparam("io_max_scratch_size"),
+            })
             .where(kernels.c.id == bindparam("row_id"))
         )
         connection.execute(query, updates)

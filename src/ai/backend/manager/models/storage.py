@@ -191,7 +191,10 @@ class StorageSessionManager:
                         extra_data=None,
                     )
                 except VFolderOperationFailed as e:
-                    raise InvalidAPIParameters(e.extra_msg, e.extra_data)
+                    if client_resp.status // 100 == 5:
+                        raise InvalidAPIParameters(e.extra_msg, e.extra_data)
+                    # Raise as-is for semantic failures, not server errors.
+                    raise
             yield proxy_info.client_api_url, client_resp
 
 
@@ -207,6 +210,10 @@ class StorageVolume(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     performance_metric = graphene.JSONString()
     usage = graphene.JSONString()
+    proxy = graphene.String(
+        description="Added since 24.03.0. Name of the proxy which this volume belongs to."
+    )
+    name = graphene.String(description="Added since 24.03.0. Name of the storage.")
 
     async def resolve_hardware_metadata(self, info: graphene.ResolveInfo) -> HardwareMetadata:
         ctx: GraphQueryContext = info.context
@@ -260,6 +267,8 @@ class StorageVolume(graphene.ObjectType):
             path=volume_info["path"],
             fsprefix=volume_info["fsprefix"],
             capabilities=volume_info["capabilities"],
+            name=volume_info["name"],
+            proxy=proxy_name,
         )
 
     @classmethod

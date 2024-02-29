@@ -116,14 +116,16 @@ ENV/
 /env-*.sh
 /agent.dummy.toml
 
-# Local temp
+# Local temp and installer-generated directories
 /.tmp/
 /tmp/
 /volumes/
 /vfroot/
-/*.pid
+/var/
+/ipc/
 /scratches/
 logs/
+/*.pid
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -137,3 +139,6 @@ logs/
 
 # Generated files
 docs/manager/rest-reference/openapi.json
+
+/DIST-INFO
+/INSTALL-INFO

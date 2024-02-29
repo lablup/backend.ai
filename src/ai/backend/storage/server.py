@@ -9,7 +9,7 @@ import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -232,26 +232,32 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
+    """Start the storage-proxy service as a foreground process."""
     try:
         local_config = load_local_config(config_path, debug=debug)
-    except ConfigurationError:
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     if debug:
-        log_level = "DEBUG"
-    override_key(local_config, ("debug", "enabled"), log_level == "DEBUG")
-    override_key(local_config, ("logging", "level"), log_level.upper())
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        log_level = LogSeverity.DEBUG
+    override_key(local_config, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    override_key(local_config, ("logging", "level"), log_level)
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     multiprocessing.set_start_method("spawn")
 

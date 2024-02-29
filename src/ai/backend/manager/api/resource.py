@@ -1,6 +1,7 @@
 """
 Resource preset APIs.
 """
+
 from __future__ import annotations
 
 import copy
@@ -86,25 +87,21 @@ async def list_presets(request: web.Request) -> web.Response:
         resp: MutableMapping[str, Any] = {"presets": []}
         async for row in await conn.stream(query):
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
-            resp["presets"].append(
-                {
-                    "name": row["name"],
-                    "shared_memory": str(row["shared_memory"]) if row["shared_memory"] else None,
-                    "resource_slots": preset_slots.to_json(),
-                }
-            )
+            resp["presets"].append({
+                "name": row["name"],
+                "shared_memory": str(row["shared_memory"]) if row["shared_memory"] else None,
+                "resource_slots": preset_slots.to_json(),
+            })
         return web.json_response(resp, status=200)
 
 
 @server_status_required(READ_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("scaling_group", default=None): t.Null | t.String,
-            t.Key("group", default="default"): t.String,
-        }
-    )
+    t.Dict({
+        t.Key("scaling_group", default=None): t.Null | t.String,
+        t.Key("group", default="default"): t.String,
+    })
 )
 async def check_presets(request: web.Request, params: Any) -> web.Response:
     """
@@ -266,16 +263,14 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 if agent_slot >= preset_slots and keypair_remaining >= preset_slots:
                     allocatable = True
                     break
-            resp["presets"].append(
-                {
-                    "name": row["name"],
-                    "resource_slots": preset_slots.to_json(),
-                    "shared_memory": (
-                        str(row["shared_memory"]) if row["shared_memory"] is not None else None
-                    ),
-                    "allocatable": allocatable,
-                }
-            )
+            resp["presets"].append({
+                "name": row["name"],
+                "resource_slots": preset_slots.to_json(),
+                "shared_memory": (
+                    str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                ),
+                "allocatable": allocatable,
+            })
 
         # Return group resource status as NaN if not allowed.
         group_resource_visibility = await root_ctx.shared_config.get_raw(
@@ -317,9 +312,9 @@ async def get_project_stats_for_period(
     root_ctx: RootContext,
     start_date: datetime,
     end_date: datetime,
-    group_ids: Optional[Sequence[UUID]] = None,
+    project_ids: Optional[Sequence[UUID]] = None,
 ) -> dict[UUID, ProjectResourceUsage]:
-    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, group_ids)
+    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, project_ids=project_ids)
     local_tz = root_ctx.shared_config["system"]["timezone"]
     usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
     total_groups, _ = parse_total_resource_group(usage_groups)
@@ -338,35 +333,33 @@ async def get_container_stats_for_period(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select(
-                [
-                    kernels.c.id,
-                    kernels.c.container_id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.agent,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.attached_devices,
-                    kernels.c.occupied_slots,
-                    kernels.c.resource_opts,
-                    kernels.c.vfolder_mounts,
-                    kernels.c.mounts,
-                    kernels.c.image,
-                    kernels.c.status,
-                    kernels.c.status_info,
-                    kernels.c.status_changed,
-                    kernels.c.last_stat,
-                    kernels.c.status_history,
-                    kernels.c.created_at,
-                    kernels.c.terminated_at,
-                    kernels.c.cluster_mode,
-                    groups.c.name,
-                    users.c.email,
-                    users.c.full_name,
-                ]
-            )
+            sa.select([
+                kernels.c.id,
+                kernels.c.container_id,
+                kernels.c.session_id,
+                kernels.c.session_name,
+                kernels.c.access_key,
+                kernels.c.agent,
+                kernels.c.domain_name,
+                kernels.c.group_id,
+                kernels.c.attached_devices,
+                kernels.c.occupied_slots,
+                kernels.c.resource_opts,
+                kernels.c.vfolder_mounts,
+                kernels.c.mounts,
+                kernels.c.image,
+                kernels.c.status,
+                kernels.c.status_info,
+                kernels.c.status_changed,
+                kernels.c.last_stat,
+                kernels.c.status_history,
+                kernels.c.created_at,
+                kernels.c.terminated_at,
+                kernels.c.cluster_mode,
+                groups.c.name,
+                users.c.email,
+                users.c.full_name,
+            ])
             .select_from(j)
             .where(
                 # Filter sessions which existence period overlaps with requested period
@@ -402,7 +395,7 @@ async def get_container_stats_for_period(
         last_stat = row["last_stat"]
         if not last_stat:
             if raw_stat is None:
-                log.warn("stat object for {} not found on redis, skipping", str(row["id"]))
+                log.warning("stat object for {} not found on redis, skipping", str(row["id"]))
                 continue
             last_stat = msgpack.unpackb(raw_stat)
         nfs = None
@@ -518,12 +511,10 @@ async def get_container_stats_for_period(
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
-            t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
-        }
-    ),
+    t.Dict({
+        tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
+        t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
+    }),
     loads=_json_loads,
 )
 async def usage_per_month(request: web.Request, params: Any) -> web.Response:
@@ -550,13 +541,11 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            t.Key("group_id", default=None): t.String | t.Null,
-            t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
-            t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
-        }
-    ),
+    t.Dict({
+        tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
+        t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
+        t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
+    }),
     loads=_json_loads,
 )
 async def usage_per_period(request: web.Request, params: Any) -> web.Response:
@@ -565,12 +554,12 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     period in dates.
     The date/time comparison is done using the configured timezone.
 
-    :param group_id: If not None, query containers only in the group.
+    :param project_id: If not None, query containers only in the project.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
+    project_id = params["project_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
@@ -582,10 +571,10 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
     if end_date <= start_date:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
-    log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", group_id, start_date, end_date)
-    group_ids = [group_id] if group_id is not None else None
+    log.info("USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
+    project_ids = [project_id] if project_id is not None else None
     usage_map = await get_project_stats_for_period(
-        root_ctx, start_date, end_date, group_ids=group_ids
+        root_ctx, start_date, end_date, project_ids=project_ids
     )
     resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
@@ -617,14 +606,12 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select(
-                [
-                    kernels.c.id,
-                    kernels.c.created_at,
-                    kernels.c.terminated_at,
-                    kernels.c.occupied_slots,
-                ]
-            )
+            sa.select([
+                kernels.c.id,
+                kernels.c.created_at,
+                kernels.c.terminated_at,
+                kernels.c.occupied_slots,
+            ])
             .select_from(kernels)
             .where(
                 (kernels.c.terminated_at >= start_date)
@@ -774,11 +761,9 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["agent_id", "agent"]): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["agent_id", "agent"]): t.String,
+    })
 )
 async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
     log.info("GET_WATCHER_STATUS (ag:{})", params["agent_id"])
@@ -799,11 +784,9 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["agent_id", "agent"]): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["agent_id", "agent"]): t.String,
+    })
 )
 async def watcher_agent_start(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_START (ag:{})", params["agent_id"])
@@ -825,11 +808,9 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["agent_id", "agent"]): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["agent_id", "agent"]): t.String,
+    })
 )
 async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_STOP (ag:{})", params["agent_id"])
@@ -851,11 +832,9 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["agent_id", "agent"]): t.String,
-        }
-    )
+    t.Dict({
+        tx.AliasedKey(["agent_id", "agent"]): t.String,
+    })
 )
 async def watcher_agent_restart(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_RESTART (ag:{})", params["agent_id"])

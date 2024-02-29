@@ -8,11 +8,10 @@ import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import BinarySize, ResourceSlot
 
 from .base import (
     BigInt,
-    BinarySize,
     ResourceSlotColumn,
     batch_result,
     metadata,
