@@ -53,5 +53,5 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
