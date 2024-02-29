@@ -35,10 +35,10 @@ class HarborRegistry_v1(BaseContainerRegistry):
         async with self.db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ContainerRegistryRow.project).where(
-                    ContainerRegistryRow.hostname == self.registry_info.hostname
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
                 )
             )
-            registry_projects = result.fetchall()
+            registry_projects = result.scalars().all()
 
         rqst_args = {}
         if self.credentials:
@@ -185,7 +185,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         async with self.db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ContainerRegistryRow.project).where(
-                    ContainerRegistryRow.hostname == self.registry_info.hostname
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
                 )
             )
             registry_projects = result.scalars().all()

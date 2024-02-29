@@ -10,7 +10,7 @@ CONTAINER_REGISTRY_FIELDS = """
     container_registry {
         id
         config {
-            hostname
+            registry_name
             url
             type
             project
@@ -22,10 +22,10 @@ CONTAINER_REGISTRY_FIELDS = """
 """
 
 CONTAINER_REGISTRIES_FIELDS = """
-    container_registries(hostname: $hostname) {
+    container_registries(registry_name: $registry_name) {
         id
         config {
-            hostname
+            registry_name
             url
             type
             project
@@ -79,7 +79,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 
     variables = {
         "props": {
-            "hostname": "cr.example.com",
+            "registry_name": "cr.example.com",
             "url": "http://cr.example.com",
             "type": "docker",
             "project": "default",
@@ -97,7 +97,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     assert id is not None
 
     assert container_registry["config"] == {
-        "hostname": "cr.example.com",
+        "registry_name": "cr.example.com",
         "url": "http://cr.example.com",
         "type": "docker",
         "project": "default",
@@ -116,13 +116,13 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     get_query = """
-        query ContainerRegistries($hostname: String!) {
+        query ContainerRegistries($registry_name: String!) {
             $CONTAINER_REGISTRIES_FIELDS
         }
         """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
 
     variables: dict[str, dict | str] = {
-        "hostname": "cr.example.com",
+        "registry_name": "cr.example.com",
     }
 
     response = await client.execute_async(get_query, variables=variables, context_value=context)
@@ -147,7 +147,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     variables = {
         "id": target_container_registry["id"],
         "props": {
-            "hostname": "cr.example.com",
+            "registry_name": "cr.example.com",
             "username": "username2",
         },
     }
@@ -155,7 +155,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     response = await client.execute_async(query, variables=variables, context_value=context)
 
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
-    assert container_registry["config"]["hostname"] == "cr.example.com"
+    assert container_registry["config"]["registry_name"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "docker"
     assert container_registry["config"]["project"] == "default"
@@ -165,7 +165,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     variables = {
         "id": target_container_registry["id"],
         "props": {
-            "hostname": "cr.example.com",
+            "registry_name": "cr.example.com",
             "url": "http://cr2.example.com",
             "type": "harbor2",
             "project": "example",
@@ -175,7 +175,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
 
-    assert container_registry["config"]["hostname"] == "cr.example.com"
+    assert container_registry["config"]["registry_name"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == "example"
@@ -191,13 +191,13 @@ async def test_modify_container_registry_allows_empty_string(
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistries($hostname: String!) {
+        query ContainerRegistries($registry_name: String!) {
             $CONTAINER_REGISTRIES_FIELDS
         }
         """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
 
     variables: dict[str, dict | str] = {
-        "hostname": "cr.example.com",
+        "registry_name": "cr.example.com",
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -223,7 +223,7 @@ async def test_modify_container_registry_allows_empty_string(
     variables = {
         "id": target_container_registry["id"],
         "props": {
-            "hostname": "cr.example.com",
+            "registry_name": "cr.example.com",
             "password": "",
         },
     }
@@ -231,7 +231,7 @@ async def test_modify_container_registry_allows_empty_string(
     # Then password is set to empty string
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
-    assert container_registry["config"]["hostname"] == "cr.example.com"
+    assert container_registry["config"]["registry_name"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == "example"
@@ -248,13 +248,13 @@ async def test_modify_container_registry_allows_null_for_unset(
     context = get_graphquery_context(database_engine)
 
     get_query = """
-        query ContainerRegistries($hostname: String!) {
+        query ContainerRegistries($registry_name: String!) {
             $CONTAINER_REGISTRIES_FIELDS
         }
         """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
 
     variables: dict[str, dict | str] = {
-        "hostname": "cr.example.com",
+        "registry_name": "cr.example.com",
     }
 
     response = await client.execute_async(get_query, variables=variables, context_value=context)
@@ -280,7 +280,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     variables = {
         "id": target_container_registry["id"],
         "props": {
-            "hostname": "cr.example.com",
+            "registry_name": "cr.example.com",
             "password": None,
         },
     }
@@ -288,7 +288,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     # Then password is unset
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
-    assert container_registry["config"]["hostname"] == "cr.example.com"
+    assert container_registry["config"]["registry_name"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == "example"
@@ -303,13 +303,13 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     get_query = """
-        query ContainerRegistries($hostname: String!) {
+        query ContainerRegistries($registry_name: String!) {
             $CONTAINER_REGISTRIES_FIELDS
         }
         """.replace("$CONTAINER_REGISTRIES_FIELDS", CONTAINER_REGISTRIES_FIELDS)
 
     variables = {
-        "hostname": "cr.example.com",
+        "registry_name": "cr.example.com",
     }
 
     response = await client.execute_async(get_query, variables=variables, context_value=context)
@@ -337,7 +337,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["delete_container_registry"]["container_registry"]
-    assert container_registry["config"]["hostname"] == "cr.example.com"
+    assert container_registry["config"]["registry_name"] == "cr.example.com"
 
     query = """
             query ContainerRegistry($id: String!) {
