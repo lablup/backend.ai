@@ -499,6 +499,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        root_ctx.raft_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,

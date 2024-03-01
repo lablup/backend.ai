@@ -42,6 +42,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from raftify import RaftNode
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -109,6 +110,8 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.api.context import RaftClusterContext
+from ai.backend.manager.raft.state_machine import Event, EventKind, KernelStateType
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -223,6 +226,7 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        raft_cluster_ctx: RaftClusterContext,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -241,6 +245,7 @@ class AgentRegistry:
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.raft_cluster_ctx = raft_cluster_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
         self.rpc_keepalive_timeout = int(
@@ -3325,6 +3330,8 @@ async def handle_kernel_creation_lifecycle(
     but distinguish which one to process using a unique creation_id
     generated when initiating the create_kernels() agent RPC call.
     """
+    raft_node: RaftNode = context.raft_cluster_ctx.cluster.get_raft_node()
+
     log.debug(
         "handle_kernel_creation_lifecycle: ev:{} k:{}",
         event.name,
@@ -3332,21 +3339,81 @@ async def handle_kernel_creation_lifecycle(
     )
     if isinstance(event, KernelPreparingEvent):
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
+
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelPreparing,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
         pass
     elif isinstance(event, KernelPullingEvent):
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
         )
+
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelPulling,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
         await SessionRow.set_session_status(context.db, event.session_id, SessionStatus.PULLING)
+
     elif isinstance(event, KernelCreatingEvent):
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
+
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelPreparing,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
     elif isinstance(event, KernelStartedEvent):
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelStarted,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
         session_id = event.session_id
         await context.finalize_running(event.kernel_id, session_id, event.creation_info)
+
     elif isinstance(event, KernelCancelledEvent):
         log.warning(f"Kernel cancelled, {event.reason = }")
+
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelCancelled,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
 
 
 async def handle_kernel_termination_lifecycle(
@@ -3354,10 +3421,36 @@ async def handle_kernel_termination_lifecycle(
     source: AgentId,
     event: KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
+    raft_node: RaftNode = context.raft_cluster_ctx.cluster.get_raft_node()
+
     if isinstance(event, KernelTerminatingEvent):
         # The destroy_kernel() API handler will set the "TERMINATING" status.
+
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelTerminating,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
         pass
+
     elif isinstance(event, KernelTerminatedEvent):
+        try:
+            await raft_node.propose(
+                Event(
+                    kind=EventKind.SET_KERNEL_STATE,
+                    next_state=KernelStateType.KernelTerminated,
+                    arg=(event.kernel_id,),
+                ).encode()
+            )
+        except Exception as e:
+            print("Failed to propose SET_KERNEL_STATE event: {}", e)
+
         await context.mark_kernel_terminated(event.kernel_id, event.reason, event.exit_code)
         session_id = event.session_id
         await context.check_session_terminated(session_id, event.reason)
