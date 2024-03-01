@@ -15,6 +15,7 @@ from typing import (
     Mapping,
     Tuple,
     TypeVar,
+    overload,
 )
 from urllib.parse import quote_plus as urlquote
 
@@ -245,13 +246,30 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
 
 
-# Mypy does not recognize any types from `sqlalchemy`, it just assume all sqlalchemy's types are `Any`
-# including `SASession` and `SAConnection` etc.
-# TODO: Allow only `SASession` parameter and remove `begin_trx` after migrate all remaining SQLAlchemy Core APIs to ORM.
+@overload
+async def execute_with_txn_retry(
+    txn_func: Callable[[SASession], Awaitable[TQueryResult]],
+    begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    connection: SAConnection,
+) -> TQueryResult: ...
+
+
+# Setting "type ignore" here becuase Mypy does not recognize any types from `sqlalchemy`
+# it just assume all sqlalchemy's types are `Any` including `SASession` and `SAConnection`.
+@overload
+async def execute_with_txn_retry(  # type: ignore[misc]
+    txn_func: Callable[[SAConnection], Awaitable[TQueryResult]],
+    begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
+    connection: SAConnection,
+) -> TQueryResult: ...
+
+
+# TODO: Allow only `SASession` parameter, remove type overloading and remove `begin_trx` after migrate Core APIs to ORM.
 async def execute_with_txn_retry(
     txn_func: Callable[[SASession], Awaitable[TQueryResult]]
     | Callable[[SAConnection], Awaitable[TQueryResult]],
-    begin_trx: Callable[..., AbstractAsyncCtxMgr],
+    begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]]
+    | Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
 ) -> TQueryResult:
     """
