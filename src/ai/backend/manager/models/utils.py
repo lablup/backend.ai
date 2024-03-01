@@ -247,6 +247,7 @@ class ExtendedAsyncSAEngine(SAEngine):
 
 # Mypy does not recognize any types from `sqlalchemy`, it just assume all sqlalchemy's types are `Any`
 # including `SASession` and `SAConnection` etc.
+# TODO: Allow only `SASession` parameter and remove `begin_trx` after migrate all remaining SQLAlchemy Core APIs to ORM.
 async def execute_with_txn_retry(
     txn_func: Callable[[SASession], Awaitable[TQueryResult]]
     | Callable[[SAConnection], Awaitable[TQueryResult]],
@@ -259,6 +260,7 @@ async def execute_with_txn_retry(
     Used to resolve Postgres Serialization error that require transaction retry.
     Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
     """
+
     result: TQueryResult | Sentinel = Sentinel.token
     max_attempts = 10
     try:
