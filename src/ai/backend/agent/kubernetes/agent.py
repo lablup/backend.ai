@@ -35,7 +35,7 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -381,7 +381,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     ),
                 )
             else:
-                log.warn(
+                log.warning(
                     "Mount {}:{} -> Mount type {} it not supported on K8s Agent. Skipping mount",
                     mount.source,
                     mount.target,

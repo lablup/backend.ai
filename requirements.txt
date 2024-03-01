@@ -1,11 +1,11 @@
 aiodataloader-ng~=0.2.1
 aiodocker~=0.21.0
 aiofiles~=0.8.0
-aiohttp~=3.8.1
+aiohttp~=3.9.1
 aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
-aiomonitor~=0.6.0
+aiomonitor~=0.7.0
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
 aiotools~=1.7.0
@@ -17,6 +17,7 @@ asyncpg>=0.27.0
 asynctest>=0.13.0
 asyncudp>=0.4
 attrs>=20.3
+bcrypt>=4.1.2
 boto3~=1.26
 cachetools~=5.2.0
 callosum~=1.0.1
@@ -26,9 +27,9 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
-etcetra==0.1.17
 faker~=13.12.0
 graphene~=3.3.0
+graypy==2.1.0
 humanize>=3.1.0
 ifaddr~=0.2
 inquirer~=2.9.2
@@ -43,11 +44,9 @@ msgpack>=1.0.5rc1
 multidict>=6.0
 namedlist~=1.8
 networkx~=2.8.7
-passlib[bcrypt]>=1.7.4
 pexpect~=4.8
 psutil~=5.9.1
 pycryptodome>=3.14.1
-pydantic~=2.1.0
 python-dateutil>=2.8
 python-dotenv~=0.20.0
 python-json-logger>=2.0.1
@@ -93,4 +92,6 @@ types-redis
 types-tabulate
 
 backend.ai-krunner-alpine==5.1.0
-backend.ai-krunner-static-gnu==4.1.0
+backend.ai-krunner-static-gnu==4.1.1
+
+etcd-client-py==0.2.4

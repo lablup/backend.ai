@@ -510,7 +510,7 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
-class SessionOp(str, enum.Enum):
+class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
     RESTART = "restart_session"
@@ -554,7 +554,7 @@ def parse_data_to_update_status(
     return data
 
 
-class KernelLoadingStrategy(str, enum.Enum):
+class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
     NONE = "none"

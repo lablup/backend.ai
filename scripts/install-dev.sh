@@ -576,8 +576,8 @@ bootstrap_pants() {
       curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
       bash /tmp/get-pants.sh
       if ! command -v pants &> /dev/null ; then
-        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
-        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+        $sudo ln -s $HOME/.local/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/.local/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
       fi
       ;;
     esac
@@ -881,7 +881,7 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
 
   # configure backend mode
-  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then 
+  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
     sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
     sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
   elif [ $AGENT_BACKEND = "docker" ]; then
@@ -955,7 +955,9 @@ configure_backendai() {
   # initialize the DB schema
   show_info "Setting up databases..."
   ./backend.ai mgr schema oneshot
+  ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
 
   # Docker registry setup

@@ -1,5 +1,9 @@
+import asyncio
+import json
 import logging
+import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
@@ -26,11 +30,23 @@ from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventHandler,
+    KernelLifecycleEventReason,
+    ModelServiceStatusEvent,
+    SessionCancelledEvent,
+    SessionEnqueuedEvent,
+    SessionPreparingEvent,
+    SessionStartedEvent,
+    SessionTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
     ClusterMode,
     ImageAlias,
     SessionTypes,
@@ -45,8 +61,11 @@ from ..models import (
     EndpointRow,
     EndpointTokenRow,
     ImageRow,
+    KernelLoadingStrategy,
+    KeyPairRow,
     RouteStatus,
     RoutingRow,
+    SessionRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
@@ -60,9 +79,11 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    check_api_params_v2,
+    BaseResponseModel,
     get_access_key_scopes,
     get_user_uuid_scopes,
+    pydantic_params_api_handler,
+    pydantic_response_api_handler,
     undefined,
 )
 
@@ -92,7 +113,7 @@ class ListServeRequestModel(BaseModel):
     name: str | None = Field(default=None)
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
 
 
@@ -125,7 +146,7 @@ class CompactServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(ListServeRequestModel)
+@pydantic_params_api_handler(ListServeRequestModel)
 async def list_serve(
     request: web.Request, params: ListServeRequestModel
 ) -> list[CompactServeInfoModel]:
@@ -172,7 +193,7 @@ class RouteInfoModel(BaseModel):
     traffic_ratio: NonNegativeFloat
 
 
-class ServeInfoModel(BaseModel):
+class ServeInfoModel(BaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
     desired_session_count: NonNegativeInt = Field(
@@ -199,6 +220,7 @@ class ServeInfoModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def get_info(request: web.Request) -> ServeInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -253,8 +275,8 @@ class ServiceConfigModel(BaseModel):
         description="Name of the resource group to spawn inference sessions",
         examples=["nvidia-H100"],
     )
-    resources: dict[str, str] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
-    resource_opts: dict[str, str] = Field(examples=[{"shmem": "2g"}], default={})
+    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
 
 class NewServiceRequestModel(BaseModel):
@@ -320,20 +342,25 @@ class NewServiceRequestModel(BaseModel):
     config: ServiceConfigModel
 
 
-@auth_required
-@server_status_required(ALL_ALLOWED)
-@check_api_params_v2(NewServiceRequestModel)
-async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
-    """
-    Creates a new model service. If `desired_session_count` is greater than zero,
-    then inference sessions will be automatically scheduled upon successful creation of model service.
-    """
+@dataclass
+class ValidationResult:
+    model_id: uuid.UUID
+    requester_access_key: AccessKey
+    owner_access_key: AccessKey
+    owner_uuid: uuid.UUID
+    group_id: uuid.UUID
+    resource_policy: dict
+    scaling_group: str
+
+
+async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
         "owner_access_key": (
             None if params.owner_access_key is undefined else params.owner_access_key
         ),
     }
+
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -455,6 +482,29 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
     except yaml.error.YAMLError as e:
         raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
+    return ValidationResult(
+        model_id,
+        requester_access_key,
+        owner_access_key,
+        owner_uuid,
+        group_id,
+        resource_policy,
+        checked_scaling_group,
+    )
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(NewServiceRequestModel)
+async def create(request: web.Request, params: NewServiceRequestModel) -> SuccessResponseModel:
+    """
+    Creates a new model service. If `desired_session_count` is greater than zero,
+    then inference sessions will be automatically scheduled upon successful creation of model service.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+
+    validation_result = await _validate(request, params)
+
     async with root_ctx.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
             session,
@@ -465,7 +515,9 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
         )
 
     creation_config = params.config.model_dump()
-    creation_config["mount_map"] = {model_id: params.config.model_mount_destination}
+    creation_config["mount_map"] = {
+        validation_result.model_id: params.config.model_mount_destination
+    }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
@@ -475,12 +527,12 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
         params.architecture,
         UserScope(
             domain_name=params.domain,
-            group_id=group_id,
+            group_id=validation_result.group_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),
-        owner_access_key,
-        resource_policy,
+        validation_result.owner_access_key,
+        validation_result.resource_policy,
         SessionTypes.INFERENCE,
         creation_config,
         params.cluster_mode,
@@ -511,13 +563,13 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
         endpoint = EndpointRow(
             params.service_name,
             request["user"]["uuid"],
-            owner_uuid,
+            validation_result.owner_uuid,
             params.desired_session_count,
             image_row,
-            model_id,
+            validation_result.model_id,
             params.domain,
             project_id,
-            checked_scaling_group,
+            validation_result.scaling_group,
             params.config.resources,
             params.cluster_mode,
             params.cluster_size,
@@ -536,8 +588,164 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
     return SuccessResponseModel()
 
 
+class TryStartResponseModel(BaseModel):
+    task_id: str
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(NewServiceRequestModel)
+async def try_start(request: web.Request, params: NewServiceRequestModel) -> TryStartResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    background_task_manager = root_ctx.background_task_manager
+
+    validation_result = await _validate(request, params)
+
+    async with root_ctx.db.begin_readonly_session() as session:
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageRef(params.image, ["*"], params.architecture),
+                ImageAlias(params.image),
+            ],
+        )
+        query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
+            UserRow.uuid == request["user"]["uuid"]
+        )
+        created_user = (await session.execute(query)).fetchone()
+
+    creation_config = params.config.model_dump()
+    creation_config["mount_map"] = {
+        validation_result.model_id: params.config.model_mount_destination
+    }
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
+    async def _task(reporter: ProgressReporter) -> None:
+        terminated_event = asyncio.Event()
+
+        result = await root_ctx.registry.create_session(
+            f"model-eval-{secrets.token_urlsafe(16)}",
+            image_row.name,
+            image_row.architecture,
+            UserScope(
+                domain_name=params.domain,
+                group_id=validation_result.group_id,
+                user_uuid=created_user.uuid,
+                user_role=created_user.role,
+            ),
+            validation_result.owner_access_key,
+            validation_result.resource_policy,
+            SessionTypes.INFERENCE,
+            {
+                "mounts": [validation_result.model_id],
+                "mount_map": {
+                    validation_result.model_id: creation_config["model_mount_destination"]
+                },
+                "environ": creation_config["environ"],
+                "scaling_group": validation_result.scaling_group,
+                "resources": creation_config["resources"],
+                "resource_opts": creation_config["resource_opts"],
+                "preopen_ports": None,
+                "agent_list": None,
+            },
+            params.cluster_mode,
+            params.cluster_size,
+            bootstrap_script=params.bootstrap_script,
+            startup_command=params.startup_command,
+            tag=params.tag,
+            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
+            enqueue_only=True,
+            sudo_session_enabled=sudo_session_enabled,
+        )
+
+        await reporter.update(
+            message=json.dumps({
+                "event": "session_enqueued",
+                "session_id": str(result["sessionId"]),
+            })
+        )
+
+        async def _handle_event(
+            context: None,
+            source: AgentId,
+            event: SessionEnqueuedEvent
+            | SessionPreparingEvent
+            | SessionStartedEvent
+            | SessionCancelledEvent
+            | SessionTerminatedEvent
+            | ModelServiceStatusEvent,
+        ) -> None:
+            task_message = {"event": event.name, "session_id": str(event.session_id)}
+            match event:
+                case ModelServiceStatusEvent():
+                    task_message["is_healthy"] = event.new_status.value
+            await reporter.update(message=json.dumps(task_message))
+
+            match event:
+                case SessionTerminatedEvent() | SessionCancelledEvent():
+                    terminated_event.set()
+                case ModelServiceStatusEvent():
+                    async with root_ctx.db.begin_readonly_session() as db_sess:
+                        session = await SessionRow.get_session(
+                            db_sess,
+                            result["sessionId"],
+                            None,
+                            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                        )
+                        await root_ctx.registry.destroy_session(
+                            session,
+                            forced=True,
+                        )
+
+        session_event_matcher = lambda args: args[0] == str(result["sessionId"])
+        model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
+
+        handlers: list[EventHandler] = [
+            root_ctx.event_dispatcher.subscribe(
+                SessionPreparingEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionStartedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionCancelledEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionTerminatedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                ModelServiceStatusEvent,
+                None,
+                _handle_event,
+                args_matcher=model_service_event_matcher,
+            ),
+        ]
+
+        try:
+            await terminated_event.wait()
+        finally:
+            for handler in handlers:
+                root_ctx.event_dispatcher.unsubscribe(handler)
+
+    task_id = await background_task_manager.start(_task)
+    return TryStartResponseModel(task_id=str(task_id))
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def delete(request: web.Request) -> SuccessResponseModel:
     """
     Removes model service (and inference sessions for the service also).
@@ -579,6 +787,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def sync(request: web.Request) -> SuccessResponseModel:
     """
     Force syncs up-to-date model service information with AppProxy.
@@ -609,14 +818,14 @@ class ScaleRequestModel(BaseModel):
     to: int = Field(description="Ideal number of inference sessions")
 
 
-class ScaleResponseModel(BaseModel):
+class ScaleResponseModel(BaseResponseModel):
     current_route_count: int
     target_count: int
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(ScaleRequestModel)
+@pydantic_params_api_handler(ScaleRequestModel)
 async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
     """
     Updates ideal inference session count manually. Based on the difference of this number,
@@ -658,7 +867,7 @@ class UpdateRouteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(UpdateRouteRequestModel)
+@pydantic_params_api_handler(UpdateRouteRequestModel)
 async def update_route(
     request: web.Request, params: UpdateRouteRequestModel
 ) -> SuccessResponseModel:
@@ -699,12 +908,13 @@ async def update_route(
                 db_sess, endpoint, [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY]
             )
         except aiohttp.ClientError as e:
-            log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+            log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
         return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def delete_route(request: web.Request) -> SuccessResponseModel:
     """
     Scales down the service by removing specific inference session.
@@ -754,13 +964,13 @@ class TokenRequestModel(BaseModel):
     )
 
 
-class TokenResponseModel(BaseModel):
+class TokenResponseModel(BaseResponseModel):
     token: str
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params_v2(TokenRequestModel)
+@pydantic_params_api_handler(TokenRequestModel)
 async def generate_token(request: web.Request, params: TokenRequestModel) -> TokenResponseModel:
     """
     Generates a token which acts as an API key to authenticate when calling model service endpoint.
@@ -835,13 +1045,14 @@ class ErrorInfoModel(BaseModel):
     error: dict[str, Any]
 
 
-class ErrorListResponseModel(BaseModel):
+class ErrorListResponseModel(BaseResponseModel):
     errors: list[ErrorInfoModel]
     retries: int
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
 async def list_errors(request: web.Request) -> ErrorListResponseModel:
     """
     List errors raised while trying to create the inference sessions. Backend.AI will
@@ -941,6 +1152,7 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))
