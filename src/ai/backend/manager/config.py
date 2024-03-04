@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Configuration Schema on etcd
 ----------------------------
@@ -172,8 +174,6 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -217,6 +217,7 @@ from ai.backend.common.types import (
     SlotTypes,
     current_resource_slots,
 )
+from ai.backend.manager.types import RaftNodeInitialRole
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -301,10 +302,58 @@ manager_local_config_iv = (
             t.Key("log-scheduler-ticks", default=False): t.ToBool,
             t.Key("periodic-sync-stats", default=False): t.ToBool,
         }).allow_extra("*"),
+        t.Key("raft", default=None): t.Null
+        | t.Dict({
+            # Storage configurations
+            t.Key("log-dir"): t.String,
+            # Raft core configurations
+            # TODO: Decide proper default values for these configs.
+            t.Key("heartbeat-tick", default=None): t.Int | t.Null,
+            t.Key("election-tick", default=None): t.Int | t.Null,
+            t.Key("min-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-committed-size-per-ready", default=None): t.Int | t.Null,
+            t.Key("max-size-per-msg", default=None): t.Int | t.Null,
+            t.Key("max-inflight-msgs", default=None): t.Int | t.Null,
+            t.Key("check-quorum", default=None): t.ToBool | t.Null,
+            t.Key("batch-append", default=None): t.ToBool | t.Null,
+            t.Key("max-uncommitted-size", default=None): t.Int | t.Null,
+            t.Key("skip-bcast-commit", default=None): t.ToBool | t.Null,
+            t.Key("pre-vote", default=None): t.ToBool | t.Null,
+            t.Key("priority", default=None): t.Int | t.Null,
+        }).allow_extra("*"),
     })
     .merge(config.etcd_config_iv)
     .allow_extra("*")
 )
+
+manager_raft_cluster_config_iv = t.Dict({
+    t.Key("bootstrap-done", default=False): t.ToBool,
+    t.Key("raft-debug-webserver-enabled", default=False): t.ToBool,
+    t.Key("restore-wal-from", default=None): t.Int | t.Null,
+    t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
+    t.Key("peers"): t.Dict({
+        t.Key("myself"): t.List(
+            t.Dict({
+                t.Key("node-id"): t.Int,
+                t.Key("host"): t.String,
+                t.Key("port"): t.Int,
+                t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+            })
+        ),
+        t.Key("other", default=[]): (
+            t.List(
+                t.Dict({
+                    t.Key("node-id"): t.Int,
+                    t.Key("host"): t.String,
+                    t.Key("port"): t.Int,
+                    t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+                })
+            )
+            | t.Null
+        ),
+    }),
+}).allow_extra("*")
 
 _config_defaults: Mapping[str, Any] = {
     "system": {
@@ -344,6 +393,7 @@ _config_defaults: Mapping[str, Any] = {
             "threshold": {},
         },
     },
+    "raft": None,
 }
 
 container_registry_iv = t.Dict({
@@ -557,6 +607,31 @@ def load(
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the manager local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+    else:
+        return LocalConfig(cfg)
+
+
+def load_raft_cluster_config(
+    debug_enabled: bool = False,
+    raft_cluster_config_path: Optional[Path] = None,
+) -> Optional[LocalConfig]:
+    try:
+        raw_cfg, _ = config.read_from_file(raft_cluster_config_path, "raft-cluster-config")
+    except config.ConfigurationError:
+        return None
+
+    try:
+        cfg = config.check(raw_cfg, manager_raft_cluster_config_iv)
+        if debug_enabled:
+            print("== Raft cluster configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the raft cluster config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

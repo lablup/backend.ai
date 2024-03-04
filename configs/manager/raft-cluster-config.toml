@@ -1,0 +1,20 @@
+#restore-wal-from = 1
+#restore-wal-snapshot-from = 1
+
+[[peers.myself]]
+host = "192.168.0.37"
+port = 60151
+node-id = 1
+role = "voter"
+
+[[peers.myself]]
+host = "192.168.0.37"
+port = 60152
+node-id = 2
+role = "voter"
+
+[[peers.myself]]
+host = "192.168.0.37"
+port = 60153
+node-id = 3
+role = "voter"
