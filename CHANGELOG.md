@@ -16,6 +16,37 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.10rc1 (2024-03-05)
+
+### Features
+* Implement async compatible graphql relay node object and implement group/user graphql relay nodes. ([#1719](https://github.com/lablup/backend.ai/issues/1719))
+* Add the "update" mode for fixtures (specified as the `__mode` key in fixture JSON files) to update existing tables by matching primary keys and setting other columns as bulk-update values, allowing seamless installation with the new `users.main_access_key` column with split insert and update fixtures on the `users` table ([#1785](https://github.com/lablup/backend.ai/issues/1785))
+* Add GraphQL mutations to allow altering model service (endpoint) specs, especially for resource allocation and image enviroment setups ([#1859](https://github.com/lablup/backend.ai/issues/1859))
+* Implement customization of name displayed in the Graylog source field through the config file. ([#1866](https://github.com/lablup/backend.ai/issues/1866))
+* Add `pool-recycle` config to drop and replace timed-out connections. ([#1877](https://github.com/lablup/backend.ai/issues/1877))
+* Enhance logging by adding more detailed exceptions when scheduling sessions, such as conditions like missing kernels or no agents available at all for the selected pending session ([#1887](https://github.com/lablup/backend.ai/issues/1887))
+* Add new `user_resource_policies.max_session_count_per_model_session` column to limit number of maximum available sessions per each model service created by user ([#1948](https://github.com/lablup/backend.ai/issues/1948))
+
+### Fixes
+* Add a missing resource availability check when manually assigning the agent for a new session ([#1401](https://github.com/lablup/backend.ai/issues/1401))
+* Write graphene field's deprecation/description message string directly instead of using message generation functions. ([#1734](https://github.com/lablup/backend.ai/issues/1734))
+* Fix inconsistent event names reported when making event source channels for already-completed bgtasks (background tasks), which has caused a stale progress bar UI lingering for bgtask operations that finished too quickly ([#1886](https://github.com/lablup/backend.ai/issues/1886))
+* Fix malfunctioning CLI command `session create-from-template` by reorganizing `click.option` decorators ([#1890](https://github.com/lablup/backend.ai/issues/1890))
+* Fix the potential missing resource slots when checking the remaining resources lots in the job scheduler ([#1928](https://github.com/lablup/backend.ai/issues/1928))
+* Fix inability to download beyond 500 MB via SFTP by preventing dropbear from decreasing the trasnfer window size indefinitely, which happens with non-retrying psftp-based SFTP client implementations ([#1930](https://github.com/lablup/backend.ai/issues/1930))
+* Change `endpoints.model` and `endpoint_tokens.endpoint` to nullable and set `ondelete="SET NULL"`. ([#1935](https://github.com/lablup/backend.ai/issues/1935))
+
+### Documentation Updates
+* Update Backend.AI Installation & error guide for Pants version 2.18 and later ([#1904](https://github.com/lablup/backend.ai/issues/1904))
+
+### External Dependency Updates
+* Replace `passlib[bcrypt]` to `bcrypt` which is better maintained ([#1932](https://github.com/lablup/backend.ai/issues/1932))
+* Upgrade pyzmq and callosum version to improve malformed packet handling in manager-to-agent RPC channels ([#1939](https://github.com/lablup/backend.ai/issues/1939))
+
+### Miscellaneous
+* Upgrade pantsbuild to 2.19.0 release ([#1882](https://github.com/lablup/backend.ai/issues/1882))
+
+
 ## 23.09.9rc1 (2024-02-04)
 
 ### Breaking Changes
