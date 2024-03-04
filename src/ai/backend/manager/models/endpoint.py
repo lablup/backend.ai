@@ -285,6 +285,47 @@ class EndpointRow(Base):
         result = await session.execute(query)
         return result.scalars().all()
 
+    @classmethod
+    async def list_by_model(
+        cls,
+        session: AsyncSession,
+        model_id: uuid.UUID,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_routes=False,
+        load_image=False,
+        load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
+        status_filter=[EndpointLifecycle.CREATED],
+    ) -> List["EndpointRow"]:
+        query = (
+            sa.select(EndpointRow)
+            .order_by(sa.desc(EndpointRow.created_at))
+            .filter(
+                EndpointRow.lifecycle_stage.in_(status_filter) & (EndpointRow.model == model_id)
+            )
+        )
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if project:
+            query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        return result.scalars().all()
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
