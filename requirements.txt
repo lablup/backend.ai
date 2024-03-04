@@ -73,7 +73,7 @@ typeguard~=2.10
 typing_extensions~=4.3
 textual~=0.41
 uvloop~=0.17.0; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
-yarl~=1.9.4
+yarl>=1.8.2,<2.0,!=1.9.0,!=1.9.1,!=1.9.2
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
