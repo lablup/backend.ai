@@ -110,25 +110,31 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
+    async def _begin_session(
+        self, conn: SAConnection, expire_on_commit=False
+    ) -> AsyncIterator[SASession]:
+        self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+        session = self._sess_factory()
+        yield session
+
+    @actxmgr
     async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            try:
-                yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise e
+            async with self._begin_session(conn, expire_on_commit=expire_on_commit) as session:
+                try:
+                    yield session
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    raise e
 
     @actxmgr
     async def begin_readonly_session(
         self, deferrable: bool = False, expire_on_commit=False
     ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            yield session
+            async with self._begin_session(conn, expire_on_commit=expire_on_commit) as session:
+                yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
