@@ -1,7 +1,7 @@
 """add user_resource_policies.max_session_count_per_model_session
 
 Revision ID: 75ea2b136830
-Revises: 3f47af213b05
+Revises: 589c764a18f1
 Create Date: 2024-03-04 22:21:49.888739
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "75ea2b136830"
-down_revision = "3f47af213b05"
+down_revision = "589c764a18f1"
 branch_labels = None
 depends_on = None
 
