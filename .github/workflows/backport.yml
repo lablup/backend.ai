@@ -84,8 +84,11 @@ jobs:
             --trailer "Backported-from=main($latest_release)" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
+      - name: When cherry-pick is failed
+        if: failure()
+        run: |
+          gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Cherry-pick failed. Please backport manually."
       - name: Create Bakport PR
-        id: pr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -96,7 +99,6 @@ jobs:
           labels: backport
           assignees: ${{ github.actor }}
       - name: Enable auto-merge
-        if: ${{ steps.pr.outputs.pull-request-number }}
-        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --auto --squash
+        run: gh pr merge ${{ needs.backport-target-branch.outputs.pr_number }} --auto
         env:
           GH_TOKEN: ${{ github.token }}
