@@ -54,6 +54,7 @@ class ContainerRegistryRow(Base):
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
     ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
+    is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
 
     def __init__(
         self,
@@ -61,6 +62,7 @@ class ContainerRegistryRow(Base):
         registry_name: str,
         type: str,
         ssl_verify: bool,
+        is_global: bool,
         project: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
@@ -72,6 +74,7 @@ class ContainerRegistryRow(Base):
         self.username = username
         self.password = password
         self.ssl_verify = ssl_verify
+        self.is_global = is_global
 
     @classmethod
     async def get(
@@ -110,6 +113,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean()
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
@@ -120,6 +124,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean()
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
@@ -130,6 +135,7 @@ class ContainerRegistryConfig(graphene.ObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean()
 
 
 class ContainerRegistry(graphene.ObjectType):
@@ -223,6 +229,7 @@ class ContainerRegistry(graphene.ObjectType):
                 username=row.username,
                 password=PASSWORD_PLACEHOLDER if row.password is not None else None,
                 ssl_verify=row.ssl_verify,
+                is_global=row.is_global,
             ),
         )
 
@@ -290,6 +297,7 @@ class CreateContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as session:
             result = await session.execute(
@@ -338,6 +346,7 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as session:
             _, reg_id = AsyncNode.resolve_global_id(info, id)

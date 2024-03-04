@@ -16,6 +16,7 @@ CONTAINER_REGISTRY_FIELDS = """
         username
         password
         ssl_verify
+        is_global
     }
 """
 
@@ -71,6 +72,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
             "username": "username",
             "password": "password",
             "ssl_verify": False,
+            "is_global": False,
         },
     }
 
@@ -89,6 +91,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         "username": "username",
         "password": PASSWORD_PLACEHOLDER,
         "ssl_verify": False,
+        "is_global": False,
     }
 
     variables["props"]["project"] = "default2"
@@ -150,6 +153,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     assert container_registry["config"]["project"] == "default"
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["ssl_verify"] is False
+    assert container_registry["config"]["is_global"] is False
 
     variables = {
         "id": target_container_registry["id"],
@@ -170,6 +174,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     assert container_registry["config"]["project"] == "example"
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["ssl_verify"] is False
+    assert container_registry["config"]["is_global"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
@@ -231,6 +236,7 @@ async def test_modify_container_registry_allows_empty_string(
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["password"] == PASSWORD_PLACEHOLDER
     assert container_registry["config"]["ssl_verify"] is False
+    assert container_registry["config"]["is_global"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
@@ -292,6 +298,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["password"] is None
     assert container_registry["config"]["ssl_verify"] is False
+    assert container_registry["config"]["is_global"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
