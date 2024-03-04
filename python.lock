@@ -37,7 +37,7 @@
 //     "bcrypt>=4.1.2",
 //     "boto3~=1.26",
 //     "cachetools~=5.2.0",
-//     "callosum~=1.0.2",
+//     "callosum~=1.0.3",
 //     "cattrs~=22.2.0",
 //     "click~=8.1.7",
 //     "colorama>=0.4.4",
@@ -1001,13 +1001,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "da6588d1e4b317976a32fba698eb030a84660123bf5bf847e1d1e227a8d0b070",
-              "url": "https://files.pythonhosted.org/packages/d6/8a/694e4dc2a05cf54c271191e07e0ab57aa609e8955041e299ae6d743961cd/callosum-1.0.2-py3-none-any.whl"
+              "hash": "2dd92ab8d86408df943510539f64d40844d755dc53799ed6a16b2312a77b9557",
+              "url": "https://files.pythonhosted.org/packages/d7/34/be5c545880a3fb21c74a828dde06c9c281a8769902a4f1bed373816f772d/callosum-1.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "611578efe2944e1e05ea462e074ea71ee072dae56085dc0b8f56ad4225f39bc5",
-              "url": "https://files.pythonhosted.org/packages/05/88/550e7e669a97cb8921cd5e6309936320d3588a4c25995310cfc02e2e749c/callosum-1.0.2.tar.gz"
+              "hash": "381b62718accbc777c05eb8d6ae2fd98ab68fca2b5842de7ef94fdf7d8de5a38",
+              "url": "https://files.pythonhosted.org/packages/c6/87/af504e56c3f43d73e22385fd9b05f3c63ac08885f3958ecd03443a17761f/callosum-1.0.3.tar.gz"
             }
           ],
           "project_name": "callosum",
@@ -1037,10 +1037,10 @@
             "twine~=4.0; extra == \"build\"",
             "types-python-dateutil; extra == \"typecheck\"",
             "wheel>=0.41.0; extra == \"build\"",
-            "yarl>=1.9.4"
+            "yarl!=1.9.0,!=1.9.1,!=1.9.2,>=1.8.2"
           ],
           "requires_python": ">=3.11",
-          "version": "1.0.2"
+          "version": "1.0.3"
         },
         {
           "artifacts": [
@@ -4608,7 +4608,7 @@
     "bcrypt>=4.1.2",
     "boto3~=1.26",
     "cachetools~=5.2.0",
-    "callosum~=1.0.2",
+    "callosum~=1.0.3",
     "cattrs~=22.2.0",
     "click~=8.1.7",
     "colorama>=0.4.4",
