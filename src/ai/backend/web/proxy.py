@@ -163,6 +163,13 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
         endpoint = pipeline_config["endpoint"]
         log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_api_session(request, endpoint))
+    elif proxy_path == "statistics":
+        statistics_config = config["statistics"]
+        if not statistics_config:
+            raise RuntimeError("'statistics' config must be set to handle statistics requests.")
+        endpoint = statistics_config["endpoint"]
+        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:

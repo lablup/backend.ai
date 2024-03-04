@@ -14,6 +14,7 @@ from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncIterator, MutableMapping, Tuple
 
+import aiohttp
 import aiohttp_cors
 import aiotools
 import click
@@ -128,6 +129,14 @@ async def config_toml_handler(request: web.Request) -> web.Response:
         "config": config,
     })
     return web.Response(text=config_content, content_type="text/plain")
+
+
+async def statistics_handler(request: web.Request) -> web.Response:
+    async with aiohttp.ClientSession() as session:
+        response = await session.get(
+            url="http://localhost:9090/api/v1/query?query=max_over_time((100 - (avg (rate(node_cpu_seconds_total{mode='idle', job='node-exporter'}[2m])) * 100))[1d:])&step=1h"
+        )
+        return response
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
@@ -662,6 +671,7 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("GET", "/statistics/{path:.*$}", web_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
