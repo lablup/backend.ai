@@ -362,8 +362,10 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    if params.desired_session_count > 10:
-        raise InvalidAPIParameters("Cannot spawn more than 10 sessions for a single service")
+    if params.desired_session_count > (
+        _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
+    ):
+        raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_readonly() as conn:
         checked_scaling_group = await check_scaling_group(
@@ -850,8 +852,10 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
 
     if params.to < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
-    elif params.to > 10:
-        raise InvalidAPIParameters("Cannot spawn more than 10 sessions for a single service")
+    elif params.to > (
+        _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
+    ):
+        raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
