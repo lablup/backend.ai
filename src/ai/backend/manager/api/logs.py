@@ -69,7 +69,7 @@ async def append(request: web.Request, params: Any) -> web.Response:
             "success": True,
         }
         query = error_logs.insert().values({
-            "severity": params["severity"],
+            "severity": params["severity"].lower(),
             "source": params["source"],
             "user": requester_uuid,
             "message": params["message"],
