@@ -15,7 +15,8 @@
     "user_resource_policies": [
         {
             "name": "default",
-            "max_vfolder_size": -1
+            "max_vfolder_size": -1,
+            "max_session_count_per_model_session": 10
         }
     ],
     "project_resource_policies": [
