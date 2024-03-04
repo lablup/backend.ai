@@ -87,7 +87,9 @@ jobs:
       - name: When cherry-pick is failed
         if: failure()
         run: |
-          gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Cherry-pick failed. Please backport manually."
+          gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Backport to ${{ matrix.milestone }} is failed. Please backport manually."
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Create Bakport PR
         id: pr
         uses: peter-evans/create-pull-request@v6
