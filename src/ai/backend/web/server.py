@@ -133,10 +133,18 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 
 async def statistics_handler(request: web.Request) -> web.Response:
     async with aiohttp.ClientSession() as session:
-        response = await session.get(
-            url="http://localhost:9090/api/v1/query?query=max_over_time((100 - (avg (rate(node_cpu_seconds_total{mode='idle', job='node-exporter'}[2m])) * 100))[1d:])&step=1h"
-        )
-        return response
+        proxy_path, _, params = request.raw_path.lstrip("/").partition("/")
+        config = request.app["config"]
+        endpoint = config["statistics"]["endpoint"]
+        if endpoint:
+            # FIXME: need to set a single url not split query params from url
+            async with session.get(
+                url=f"{endpoint}/{params}",
+            ) as resp:
+                data = await resp.json()
+                return web.json_response(data, status=200)
+        else:
+            raise RuntimeError("'statistics' config must be set to handle statistics requests.")
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
@@ -671,7 +679,7 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("GET", "/statistics/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("GET", "/statistics/{path:.*$}", statistics_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
