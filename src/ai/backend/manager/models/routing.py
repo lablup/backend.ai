@@ -18,7 +18,7 @@ from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, It
 
 if TYPE_CHECKING:
     # from .gql import GraphQueryContext
-    pass
+    from .endpoint import EndpointRow
 
 
 __all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
@@ -217,10 +217,11 @@ class Routing(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: RoutingRow,
+        endpoint: Optional["EndpointRow"] = None,
     ) -> "Routing":
         return cls(
             routing_id=row.id,
-            endpoint=row.endpoint_row.url,
+            endpoint=(endpoint or row.endpoint_row).url,
             session=row.session,
             status=row.status.name,
             traffic_ratio=row.traffic_ratio,
