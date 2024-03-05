@@ -508,18 +508,7 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[
-                Routing(
-                    routing_id=r.id,
-                    endpoint=row.url,
-                    session=r.session,
-                    status=r.session,
-                    traffic_ratio=r.traffic_ratio,
-                    created_at=r.created_at,
-                    error_data=r.error_data,
-                )
-                for r in row.routings
-            ],
+            routings=[await Routing.from_row(None, r) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
         )
 
@@ -653,15 +642,21 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
             return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
-        if (
-            len([r for r in self.routings if r.status == RouteStatus.HEALTHY.name])
-            == self.desired_session_count
-        ):
-            return "HEALTHY"
+        if (spawned_service_count := len([r for r in self.routings])) > 0:
+            healthy_service_count = len([
+                r for r in self.routings if r.status == RouteStatus.HEALTHY.name
+            ])
+            if healthy_service_count == spawned_service_count:
+                return "HEALTHY"
+            unhealthy_service_count = len([
+                r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
+            ])
+            if unhealthy_service_count > 0:
+                return "DEGRADED"
         return "PROVISIONING"
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
@@ -873,13 +868,6 @@ class EndpointToken(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> Sequence["EndpointToken"]:
-        log.debug(
-            "Endpoint: {}, project: {}, domain: {}, user: {}",
-            endpoint_id,
-            project,
-            domain_name,
-            user_uuid,
-        )
         query = (
             sa.select(EndpointTokenRow)
             .limit(limit)
