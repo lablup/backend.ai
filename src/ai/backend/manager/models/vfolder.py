@@ -164,7 +164,7 @@ class VFolderOperationStatus(enum.StrEnum):
 
     DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
 
@@ -1673,33 +1673,41 @@ async def delete_vfolders(
             except (VFolderOperationFailed, InvalidAPIParameters) as e:
                 if e.status == 404:
                     row_deletion_infos.append(vfolder_info)
-                    progress_msg = f"VFolder not found, delete DB record (id: {folder_id})"
+                    progress_msg = (
+                        f"VFolder not found, transit status to DELETE_COMPLETE (id: {folder_id})"
+                    )
                 else:
                     err_str = repr(e)
                     failed_deletion.append((vfolder_info, err_str))
-                    progress_msg = f"Purge fail due to error, (id: {folder_id}, status: {e.status}, e: {err_str})"
+                    progress_msg = f"Delete fail due to error, (id: {folder_id}, status: {e.status}, e: {err_str})"
                     log_type = LogType.ERROR
             except Exception as e:
                 err_str = repr(e)
                 failed_deletion.append((vfolder_info, err_str))
-                progress_msg = f"Purge fail due to error, (id: {folder_id}, e: {err_str})"
+                progress_msg = f"Delete fail due to error, (id: {folder_id}, e: {err_str})"
                 log_type = LogType.ERROR
             else:
                 row_deletion_infos.append(vfolder_info)
-                progress_msg = f"Purge successs (id: {folder_id})"
+                progress_msg = f"Delete successs (id: {folder_id})"
             if reporter is not None:
                 await reporter.update(1, message=progress_msg, log_type=log_type)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+        log.debug("Successfully delete vfolder {}", [str(x) for x in vfolder_ids])
+
         if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
-
-            async def _delete_row() -> None:
-                async with db.begin_session() as db_session:
-                    await db_session.execute(
-                        sa.delete(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-                    )
-
-            await execute_with_retry(_delete_row)
-            log.debug("Successfully remove vfolder {}", [str(x) for x in vfolder_ids])
+            await update_vfolder_status(
+                db,
+                vfolder_ids,
+                VFolderOperationStatus.DELETE_COMPLETE,
+                do_log=False,
+            )
+        if failed_deletion:
+            await update_vfolder_status(
+                db,
+                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
+                VFolderOperationStatus.DELETE_ERROR,
+                do_log=False,
+            )
 
     async with aiotools.TaskGroup() as tg:
         tg.create_task(_task(reporter))
