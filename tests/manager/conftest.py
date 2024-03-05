@@ -857,7 +857,10 @@ async def session_info(database_engine):
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_session_count_per_model_session=10,
         )
         db_sess.add(user_resource_policy)
 
