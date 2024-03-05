@@ -66,6 +66,7 @@ class ExtendedAsyncSAEngine(SAEngine):
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
         self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
+        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -94,49 +95,64 @@ class ExtendedAsyncSAEngine(SAEngine):
             )
 
     @actxmgr
-    async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
-        @actxmgr
-        async def _begin(connection: SAConnection) -> SAConnection:
-            async with connection.begin():
-                self._generic_txn_count += 1
-                self._check_generic_txn_cnt()
-                try:
+    async def _begin(self, connection: SAConnection) -> AsyncIterator[SAConnection]:
+        """
+        Begin generic transaction within the given connection.
+        """
+        async with connection.begin():
+            self._generic_txn_count += 1
+            self._check_generic_txn_cnt()
+            try:
+                async with asyncio.timeout(self.conn_timeout):
                     yield connection
-                finally:
-                    self._generic_txn_count -= 1
+            except asyncio.TimeoutError:
+                log.exception("DB Connection timeout")
+            finally:
+                self._generic_txn_count -= 1
 
+    @actxmgr
+    async def _begin_readonly(
+        self, connection: SAConnection, deferrable: bool = False
+    ) -> AsyncIterator[SAConnection]:
+        """
+        Begin read-only transaction within the given connection.
+        """
+        conn_with_exec_opts = await connection.execution_options(
+            postgresql_readonly=True,
+            postgresql_deferrable=deferrable,
+        )
+        async with conn_with_exec_opts.begin():
+            self._readonly_txn_count += 1
+            self._check_readonly_txn_cnt()
+            try:
+                async with asyncio.timeout(self.conn_timeout):
+                    yield conn_with_exec_opts
+            except asyncio.TimeoutError:
+                log.exception("DB Connection timeout")
+                raise
+            finally:
+                self._readonly_txn_count -= 1
+
+    @actxmgr
+    async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind:
-                async with _begin(_bind) as conn:
+                async with self._begin(_bind) as conn:
                     yield conn
         else:
-            async with _begin(bind) as conn:
+            async with self._begin(bind) as conn:
                 yield conn
 
     @actxmgr
     async def begin_readonly(
         self, bind: SAConnection | None = None, deferrable: bool = False
     ) -> AsyncIterator[SAConnection]:
-        @actxmgr
-        async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
-            conn_with_exec_opts = await connection.execution_options(
-                postgresql_readonly=True,
-                postgresql_deferrable=deferrable,
-            )
-            async with conn_with_exec_opts.begin():
-                self._readonly_txn_count += 1
-                self._check_readonly_txn_cnt()
-                try:
-                    yield conn_with_exec_opts
-                finally:
-                    self._readonly_txn_count -= 1
-
         if bind is None:
             async with self.connect() as _bind:
-                async with _begin(_bind) as conn:
+                async with self._begin_readonly(_bind, deferrable) as conn:
                     yield conn
         else:
-            async with _begin(bind) as conn:
+            async with self._begin_readonly(bind, deferrable) as conn:
                 yield conn
 
     @actxmgr
@@ -147,30 +163,20 @@ class ExtendedAsyncSAEngine(SAEngine):
         commit_on_end: bool = True,
     ) -> AsyncIterator[SASession]:
         @actxmgr
-        async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
-            async with connection.begin():
-                self._sess_factory.configure(bind=connection, expire_on_commit=expire_on_commit)
+        async def _begin_session(connection: SAConnection) -> AsyncIterator[SASession]:
+            async with self._begin(connection) as conn:
+                self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
                 session = self._sess_factory()
-
-                self._generic_txn_count += 1
-                self._check_generic_txn_cnt()
-                try:
-                    async with asyncio.timeout(self.conn_timeout):
-                        yield session
-                        if commit_on_end:
-                            await session.commit()
-                except asyncio.TimeoutError:
-                    log.exception("DB Connection timeout in generic session")
-                    raise
-                finally:
-                    self._generic_txn_count -= 1
+                yield session
+                if commit_on_end:
+                    await session.commit()
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin(_conn) as sess:
+            async with self.connect() as _bind:
+                async with _begin_session(_bind) as sess:
                     yield sess
         else:
-            async with _begin(bind) as sess:
+            async with _begin_session(bind) as sess:
                 yield sess
 
     @actxmgr
@@ -180,33 +186,18 @@ class ExtendedAsyncSAEngine(SAEngine):
         deferrable: bool = False,
     ) -> AsyncIterator[SASession]:
         @actxmgr
-        async def _begin(connection: SAConnection) -> AsyncIterator[SASession]:
-            conn_with_exec_opts = await connection.execution_options(
-                postgresql_readonly=True,
-                postgresql_deferrable=deferrable,
-            )
-
-            async with conn_with_exec_opts.begin():
-                self._sess_factory.configure(bind=conn_with_exec_opts)
-                session = self._sess_factory()
-
-                self._readonly_txn_count += 1
-                self._check_readonly_txn_cnt()
-                try:
-                    async with asyncio.timeout(self.conn_timeout):
-                        yield session
-                except asyncio.TimeoutError:
-                    log.exception("DB Connection timeout in read-only session")
-                    raise
-                finally:
-                    self._readonly_txn_count -= 1
+        async def _begin_session(connection: SAConnection) -> AsyncIterator[SASession]:
+            async with self._begin_readonly(connection, deferrable) as conn:
+                self._readonly_sess_factory.configure(bind=conn)
+                session = self._readonly_sess_factory()
+                yield session
 
         if bind is None:
             async with self.connect() as _conn:
-                async with _begin(_conn) as sess:
+                async with _begin_session(_conn) as sess:
                     yield sess
         else:
-            async with _begin(bind) as sess:
+            async with _begin_session(bind) as sess:
                 yield sess
 
     @actxmgr
