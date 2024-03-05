@@ -11,7 +11,7 @@ from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
 
 
-class AgentBackend(enum.Enum):
+class AgentBackend(enum.StrEnum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
@@ -45,7 +45,7 @@ class AgentEventData:
     data: dict[str, Any]
 
 
-class ContainerStatus(str, enum.Enum):
+class ContainerStatus(enum.StrEnum):
     RUNNING = "running"
     RESTARTING = "restarting"
     PAUSED = "paused"
@@ -64,7 +64,7 @@ class Container:
     backend_obj: Any  # used to keep the backend-specific data
 
 
-class LifecycleEvent(int, enum.Enum):
+class LifecycleEvent(enum.IntEnum):
     DESTROY = 0
     CLEAN = 1
     START = 2

@@ -4,9 +4,11 @@ import decimal
 import json
 import textwrap
 from collections import defaultdict
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 import humanize
+
+from ai.backend.common.types import MetricValue
 
 from .types import AbstractOutputFormatter, FieldSpec
 
@@ -174,10 +176,15 @@ class AgentStatFormatter(OutputFormatter):
         except TypeError:
             return ""
 
-        value_formatters = {
+        percent_formatter = lambda metric, _: "{} %".format(metric["pct"])
+        value_formatters: Mapping[str, Callable[[MetricValue, bool], str]] = {
             "bytes": lambda metric, binary: "{} / {}".format(
-                humanize.naturalsize(int(metric["current"]), binary, gnu=binary),
-                humanize.naturalsize(int(metric["capacity"]), binary, gnu=binary),
+                humanize.naturalsize(int(metric["current"]), binary=binary, gnu=binary),
+                (
+                    humanize.naturalsize(int(metric["capacity"]), binary=binary, gnu=binary)
+                    if metric["capacity"] is not None
+                    else "(unknown)"
+                ),
             ),
             "Celsius": lambda metric, _: "{:,} C".format(
                 float(metric["current"]),
@@ -185,18 +192,20 @@ class AgentStatFormatter(OutputFormatter):
             "bps": lambda metric, _: "{}/s".format(
                 humanize.naturalsize(float(metric["current"])),
             ),
-            "pct": lambda metric, _: "{} %".format(
-                metric["pct"],
-            ),
+            "pct": percent_formatter,
+            "percent": percent_formatter,
+            "%": percent_formatter,
         }
 
-        def format_value(metric, binary):
+        def format_value(metric: MetricValue, binary: bool) -> str:
+            unit_hint = metric["unit_hint"]
             formatter = value_formatters.get(
-                metric["unit_hint"],
-                lambda m: "{} / {} {}".format(
+                unit_hint,
+                # a fallback implementation
+                lambda m, _: "{} / {} {}".format(
                     m["current"],
-                    m["capacity"],
-                    m["unit_hint"],
+                    "(unknown)" if m["capacity"] is None else m["capacity"],
+                    "" if unit_hint == "count" else unit_hint,
                 ),
             )
             return formatter(metric, binary)

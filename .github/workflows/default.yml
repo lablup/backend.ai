@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -76,13 +76,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.lint.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -139,7 +139,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.check.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -212,7 +212,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -319,7 +319,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -398,7 +398,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
   build-sbom:

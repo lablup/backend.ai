@@ -728,15 +728,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Path | None,
-    log_level: str,
+    config_path: Path,
+    log_level: LogSeverity,
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
@@ -745,10 +745,10 @@ def main(
         # NOTE: For legacy reasons, webserver uses ".conf" instead of ".toml".
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "webserver", ".conf")
         if debug:
-            log_level = "DEBUG"
-        config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+            log_level = LogSeverity.DEBUG
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
         cfg = config.check(raw_cfg, config_iv)
     except config.ConfigurationError as e:
         print(

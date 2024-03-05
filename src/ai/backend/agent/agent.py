@@ -1395,7 +1395,7 @@ class AbstractAgent(
                         "status_info": str(result),
                         "metadata": {},
                     }
-                case HardwareMetadata():
+                case dict():  # HardwareMetadata
                     hwinfo[device_name] = result
         return hwinfo
 

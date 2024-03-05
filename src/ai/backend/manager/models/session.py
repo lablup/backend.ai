@@ -510,7 +510,7 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
-class SessionOp(str, enum.Enum):
+class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
     RESTART = "restart_session"
@@ -523,7 +523,7 @@ class SessionOp(str, enum.Enum):
     GET_AGENT_LOGS = "get_logs_from_agent"
 
 
-class KernelLoadingStrategy(str, enum.Enum):
+class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
     NONE = "none"
