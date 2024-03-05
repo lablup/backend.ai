@@ -206,7 +206,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         ),
     }
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    if params.desired_session_count > (
+    if params["desired_session_count"] > (
         _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
@@ -494,7 +494,7 @@ async def scale(request: web.Request, params: Any) -> web.Response:
 
     if params["to"] < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
-    elif params.to > (
+    elif params["to"] > (
         _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
