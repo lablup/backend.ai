@@ -5,8 +5,8 @@ from abc import ABCMeta, abstractmethod
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, AbstractWebappPlugin, BasePluginContext
-from ai.backend.watcher.base import BaseWatcher, BaseWatcherConfig
 
+from .base import BaseWatcher, BaseWatcherConfig
 from .defs import CORSOptions, WebMiddleware
 
 

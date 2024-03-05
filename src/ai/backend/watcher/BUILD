@@ -11,8 +11,6 @@ visibility_private_component(
         "//src/ai/backend/watcher/storage/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/watcher/agent/**",
-        "//src/ai/backend/watcher/storage/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/plugin/**",
         "//src/ai/backend/cli/**",
@@ -46,11 +44,6 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
-        # Bundle agent and storage watcher plugins
-        "//src/ai/backend/watcher/agent:src",
-        "//src/ai/backend/watcher/agent:buildscript",
-        "//src/ai/backend/watcher/storage:src",
-        "//src/ai/backend/watcher/storage:buildscript",
         "!!stubs/trafaret:stubs",
     ],
 )
