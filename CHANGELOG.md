@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.10rc2 (2024-03-05)
+
+### Fixes
+* Use `buildDate` instead of `build` to retrieve web static version to follow lablup/backend.ai-webui#2072 ([#1950](https://github.com/lablup/backend.ai/issues/1950))
+* Fix `endpoint.routings` GQL field showing routing ID instead of status enum ([#1952](https://github.com/lablup/backend.ai/issues/1952))
+
+
 ## 23.09.10rc1 (2024-03-05)
 
 ### Features
