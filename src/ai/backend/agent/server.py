@@ -998,7 +998,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if log_level == "DEBUG":
+                if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":

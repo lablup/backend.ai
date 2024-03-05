@@ -257,9 +257,9 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    type=click.Choice([*LogSeverity], case_sensitive=False),
     default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False):
@@ -282,9 +282,9 @@ def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debu
             if (uid := os.geteuid()) != 0:
                 raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
         config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
         cfg = config.check(raw_cfg, watcher_config_iv)
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Watcher configuration ==")
