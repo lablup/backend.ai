@@ -256,7 +256,10 @@
       "Template": "Mẫu phiên",
       "EnableAutomaticShmem": "Bộ nhớ chia sẻ tự động",
       "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Chỉ cho phép số nguyên khi kích thước cụm không nhỏ hơn 2.",
+      "StartAfter": "Bắt đầu sau:",
+      "StartTimeDoesNotApply": "Nếu thời gian bắt đầu không được đặt, nó sẽ không được áp dụng."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -407,7 +410,8 @@
     "Commit": "Làm",
     "EnterManually": "Nhập thủ công",
     "Download": "Tải xuống",
-    "Clone": "Dòng vô tính"
+    "Clone": "Dòng vô tính",
+    "Config": "Cấu hình"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -451,7 +455,10 @@
     "Enabled": "Đã bật",
     "StorageProxies": "Kho lưu trữ",
     "None": "Không có",
-    "Image": "Hình ảnh"
+    "Image": "Hình ảnh",
+    "All": "toàn bộ",
+    "InProgress": "Đang tiến hành",
+    "Session": "Phiên họp"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "Tập lệnh Bootstrap sẽ chỉ được thực thi một lần sau khi tạo phiên",
     "SSHKeypairEnterManually": "Cặp khóa SSH",
     "MyKeypairInfo": "Thông tin về cặp khóa của tôi",
-    "DescMyKeypairInfo": "Xem thông tin cặp khóa của tôi"
+    "DescMyKeypairInfo": "Xem thông tin cặp khóa của tôi",
+    "DarkMode": "Chế độ tối",
+    "LightMode": "Chế độ sáng",
+    "UseSystemSetting": "Sử dụng cài đặt hệ thống",
+    "DescThemeMode": "Tùy chỉnh giao diện Backend.AI WebUI trên thiết bị của bạn.",
+    "ThemeMode": "Chế độ chủ đề"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Đã sửa đổi sổ đăng ký thành công.",
     "NoRegistryToDisplay": "Không có đăng ký để hiển thị",
     "ModifyRegistry": "Sửa đổi sổ đăng ký",
-    "ConfirmNoUserName": "Người dùng và mật khẩu không được chỉ định, bạn có muốn lưu không?"
+    "ConfirmNoUserName": "Người dùng và mật khẩu không được chỉ định, bạn có muốn lưu không?",
+    "DescURLFormat": "Loại URL không hợp lệ"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "Đơn vị truyền tối đa, kích thước của gói lớn nhất mà giao thức mạng có thể truyền.",
     "OutOfRange": "Ngoài phạm vi.",
     "Plugins": "bổ sung",
-    "OpenSourceCUDAGPUsupport": "Hỗ trợ GPU CUDA mã nguồn mở"
+    "OpenSourceCUDAGPUsupport": "Hỗ trợ GPU CUDA mã nguồn mở",
+    "ShowOnlyChanged": "Chỉ hiển thị các thay đổi"
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
     "Visit": "Chuyến thăm",
     "SeeDetail": "Xem chi tiết",
-    "Initializing": "Đang khởi tạo ..."
+    "Initializing": "Đang khởi tạo ...",
+    "NoNotification": "Không có thông báo.",
+    "Notifications": "Thông báo",
+    "ClearNotifications": "Xóa thông báo",
+    "AreYouSureToClearAllNotifications": "Bạn có chắc chắn xóa tất cả thông báo không?"
   },
   "information": {
     "Core": "Cốt lõi",
@@ -1442,7 +1460,11 @@
     "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
     "Owner": "Người sở hữu",
     "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}",
-    "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công."
+    "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công.",
+    "FailedToUpdateService": "Không thể cập nhật dịch vụ.",
+    "ServiceCreated": "Dịch vụ mẫu {{ name }} đã được tạo thành công.",
+    "ServiceUpdated": "Dịch vụ mẫu {{ name }} đã được cập nhật thành công.",
+    "ServiceTerminated": "Dịch vụ mẫu {{ name }} đã được chấm dứt thành công."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1453,7 +1475,9 @@
     "TurnOffTotp": "Tắt xác thực hai yếu tố",
     "ConfirmTotpRemovalBody": "Bạn có chắc chắn chọn không sử dụng xác thực hai yếu tố không?",
     "RemoveTotpSetupCompleted": "2FA bị vô hiệu hóa",
-    "OTP": "Mật khẩu một lần"
+    "OTP": "Mật khẩu một lần",
+    "EnterConfirmationCode": "Bây giờ hãy nhập OTP do trình xác thực tạo ra để xác minh.",
+    "RequireOTP": "Viết OTP."
   },
   "OpenVSCodeRemote": "Mở mã Visual Studio cục bộ",
   "inputLimit": {
@@ -1491,5 +1515,8 @@
     "SettingTable": "Cài đặt bảng",
     "SelectColumnToDisplay": "Chọn các cột để hiển thị",
     "SearchTableColumn": "Tìm kiếm các cột trong bảng"
+  },
+  "setting": {
+    "SearchPlaceholder": "Nhập cụm từ tìm kiếm"
   }
 }

@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente.",
       "Template": "Modello di sessione",
       "EnableAutomaticShmem": "Memoria condivisa automatica",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "È consentito solo un numero intero quando la dimensione del cluster non è inferiore a 2.",
+      "StartAfter": "Inizia dopo:",
+      "StartTimeDoesNotApply": "Se l'ora di inizio non è impostata, non si applica."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -407,7 +410,8 @@
     "Commit": "Impegno",
     "EnterManually": "Inserire manualmente",
     "Download": "Scarica",
-    "Clone": "Clone"
+    "Clone": "Clone",
+    "Config": "Configurazione"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -451,7 +455,10 @@
     "Enabled": "Abilitato",
     "StorageProxies": "Depositi",
     "None": "Nessuno",
-    "Image": "Immagine"
+    "Image": "Immagine",
+    "All": "Tutti",
+    "InProgress": "In corso",
+    "Session": "Sessione"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "Lo script Bootstrap verrà eseguito solo una volta dopo la creazione della sessione.",
     "SSHKeypairEnterManually": "Coppia di chiavi SSH",
     "MyKeypairInfo": "Informazioni sulla mia coppia di chiavi",
-    "DescMyKeypairInfo": "Vedi le informazioni sulla mia coppia di chiavi"
+    "DescMyKeypairInfo": "Vedi le informazioni sulla mia coppia di chiavi",
+    "DarkMode": "Modalità scura",
+    "LightMode": "Modalità luce",
+    "UseSystemSetting": "Utilizza Impostazioni di sistema",
+    "DescThemeMode": "Personalizza l'aspetto di Backend.AI WebUI sul tuo dispositivo.",
+    "ThemeMode": "Modalità tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilizzo avanzato del terminale Web: copia il contenuto del terminale",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registro modificato con successo.",
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
     "ModifyRegistry": "Modificare il registro",
-    "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?"
+    "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?",
+    "DescURLFormat": "Tipo di URL non valido"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "Unità di trasmissione massima, la dimensione del pacchetto più grande che un protocollo di rete può trasmettere.",
     "OutOfRange": "Fuori portata.",
     "Plugins": "Plugin",
-    "OpenSourceCUDAGPUsupport": "Supporto GPU CUDA open source"
+    "OpenSourceCUDAGPUsupport": "Supporto GPU CUDA open source",
+    "ShowOnlyChanged": "Visualizza solo modifiche"
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
     "Visit": "Visitare",
     "SeeDetail": "Vedi dettaglio",
-    "Initializing": "Inizializzazione in corso..."
+    "Initializing": "Inizializzazione in corso...",
+    "NoNotification": "Nessuna notifica.",
+    "Notifications": "Notifiche",
+    "ClearNotifications": "Notifiche chiare",
+    "AreYouSureToClearAllNotifications": "Sei sicuro di cancellare tutte le notifiche?"
   },
   "information": {
     "Core": "Nucleo",
@@ -1402,7 +1420,11 @@
     "YouAreAboutToTerminate": "State per terminare",
     "Owner": "Proprietario",
     "ServiceDelegatedFrom": "Il servizio modello è creato da {{ createdUser }}, ma la proprietà della sessione sarà delegata a {{ sessionOwner }}.",
-    "FailedToTerminateService": "La richiesta di terminare il servizio è fallita."
+    "FailedToTerminateService": "La richiesta di terminare il servizio è fallita.",
+    "FailedToUpdateService": "Impossibile aggiornare il servizio.",
+    "ServiceCreated": "Il servizio modello {{ name }} è stato creato correttamente.",
+    "ServiceUpdated": "Il servizio modello {{ name }} è stato aggiornato correttamente.",
+    "ServiceTerminated": "Il servizio modello {{ name }} è stato terminato correttamente."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1453,7 +1475,9 @@
     "TurnOffTotp": "Disattivare l'autenticazione a due fattori",
     "ConfirmTotpRemovalBody": "Siete sicuri di non voler utilizzare l'autenticazione a due fattori?",
     "RemoveTotpSetupCompleted": "2FA disabilitato",
-    "OTP": "Password unica"
+    "OTP": "Password unica",
+    "EnterConfirmationCode": "Ora inserisci l'OTP generato dall'autenticatore per verificare.",
+    "RequireOTP": "Scrivi OTP."
   },
   "OpenVSCodeRemote": "Aprire il codice locale di Visual Studio",
   "inputLimit": {
@@ -1491,5 +1515,8 @@
     "SettingTable": "Impostazione della tabella",
     "SelectColumnToDisplay": "Seleziona le colonne da visualizzare",
     "SearchTableColumn": "Cerca colonne della tabella"
+  },
+  "setting": {
+    "SearchPlaceholder": "Inserisci il termine di ricerca"
   }
 }

@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "已经存在的变量名。",
       "Template": "会议模板",
       "EnableAutomaticShmem": "自动共享内存",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "當簇大小不小於 2 時，只允許使用整數。",
+      "StartAfter": "之後開始：",
+      "StartTimeDoesNotApply": "如果未設定開始時間，則不適用。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -407,7 +410,8 @@
     "Commit": "承诺",
     "EnterManually": "手动输入",
     "Download": "下载",
-    "Clone": "克隆"
+    "Clone": "克隆",
+    "Config": "配置"
   },
   "agent": {
     "Endpoint": "端點",
@@ -451,7 +455,10 @@
     "Enabled": "啟用",
     "StorageProxies": "存儲",
     "None": "无",
-    "Image": "影像"
+    "Image": "影像",
+    "All": "全部",
+    "InProgress": "进行中",
+    "Session": "會話"
   },
   "credential": {
     "Permission": "允許",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
     "SSHKeypairEnterManually": "SSH 密钥对",
     "MyKeypairInfo": "我的密鑰對訊息",
-    "DescMyKeypairInfo": "查看我的密鑰對訊息"
+    "DescMyKeypairInfo": "查看我的密鑰對訊息",
+    "DarkMode": "深色模式",
+    "LightMode": "燈光模式",
+    "UseSystemSetting": "使用系統設定",
+    "DescThemeMode": "自訂 Backend.AI WebUI 在您裝置上的外觀。",
+    "ThemeMode": "主題模式"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高級 Web 終端使用：複製終端內容",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "注册表已成功修改。",
     "NoRegistryToDisplay": "无注册表显示",
     "ModifyRegistry": "修改注册表",
-    "ConfirmNoUserName": "未指定用户和密码，要保存吗？"
+    "ConfirmNoUserName": "未指定用户和密码，要保存吗？",
+    "DescURLFormat": "無效的 URL 類型"
   },
   "resourceGroup": {
     "ResourceGroups": "資源組",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "最大传输单位，网络协议可传输的最大数据包的大小。",
     "OutOfRange": "超出范围。",
     "Plugins": "外掛",
-    "OpenSourceCUDAGPUsupport": "開源 CUDA GPU 支援"
+    "OpenSourceCUDAGPUsupport": "開源 CUDA GPU 支援",
+    "ShowOnlyChanged": "僅顯示更改"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
     "Visit": "訪問",
     "SeeDetail": "查看詳情",
-    "Initializing": "正在初始化..."
+    "Initializing": "正在初始化...",
+    "NoNotification": "無通知。",
+    "Notifications": "通知",
+    "ClearNotifications": "清除通知",
+    "AreYouSureToClearAllNotifications": "您確定清除所有通知嗎？"
   },
   "information": {
     "Core": "核",
@@ -1442,7 +1460,11 @@
     "Image": "图片",
     "Owner": "擁有者",
     "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}",
-    "FailedToTerminateService": "终止服务的请求失败。"
+    "FailedToTerminateService": "终止服务的请求失败。",
+    "FailedToUpdateService": "更新服務失敗。",
+    "ServiceCreated": "模型服務 {{ name }} 已成功建立。",
+    "ServiceUpdated": "模型服務 {{ name }} 已成功更新。",
+    "ServiceTerminated": "模型服務 {{ name }} 已成功終止。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1453,7 +1475,9 @@
     "TurnOffTotp": "关闭双因素身份验证",
     "ConfirmTotpRemovalBody": "您确定不使用双因素身份验证吗？",
     "RemoveTotpSetupCompleted": "禁用 2FA",
-    "OTP": "一次性密码"
+    "OTP": "一次性密码",
+    "EnterConfirmationCode": "現在輸入驗證器產生的 OTP 進行驗證。",
+    "RequireOTP": "寫入一次性密碼。"
   },
   "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
   "inputLimit": {
@@ -1491,5 +1515,8 @@
     "SettingTable": "桌面設定",
     "SelectColumnToDisplay": "選擇要顯示的列",
     "SearchTableColumn": "搜尋表格列"
+  },
+  "setting": {
+    "SearchPlaceholder": "輸入搜尋詞"
   }
 }

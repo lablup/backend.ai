@@ -256,7 +256,10 @@
       "Template": "Templat Sesi",
       "EnableAutomaticShmem": "Memori dikongsi automatik",
       "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Hanya integer dibenarkan apabila saiz kelompok tidak kurang daripada 2.",
+      "StartAfter": "Mulakan selepas:",
+      "StartTimeDoesNotApply": "Jika masa mula tidak ditetapkan, ia tidak terpakai."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -407,7 +410,8 @@
     "Commit": "komited",
     "EnterManually": "Masukkan Secara Manual",
     "Download": "Muat turun",
-    "Clone": "Klon"
+    "Clone": "Klon",
+    "Config": "Konfigurasi"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -451,7 +455,10 @@
     "Enabled": "Diaktifkan",
     "StorageProxies": "Stor",
     "None": "tiada",
-    "Image": "Gambar"
+    "Image": "Gambar",
+    "All": "keseluruhan",
+    "InProgress": "Prosiding",
+    "Session": "Sesi"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
     "SSHKeypairEnterManually": "SSH Keypair",
     "MyKeypairInfo": "Maklumat Pasangan Kunci Saya",
-    "DescMyKeypairInfo": "Lihat maklumat pasangan kunci saya"
+    "DescMyKeypairInfo": "Lihat maklumat pasangan kunci saya",
+    "DarkMode": "Mod Gelap",
+    "LightMode": "Mod Cahaya",
+    "UseSystemSetting": "Gunakan Tetapan Sistem",
+    "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
+    "ThemeMode": "Mod Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Pendaftaran berjaya diubah suai.",
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
     "ModifyRegistry": "Ubah suai Pendaftaran",
-    "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?"
+    "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?",
+    "DescURLFormat": "Jenis URL tidak sah"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "Unit penghantaran maksimum, saiz paket terbesar yang boleh dihantar oleh protokol rangkaian.",
     "OutOfRange": "Luar kawasan.",
     "Plugins": "Pemalam",
-    "OpenSourceCUDAGPUsupport": "Sokongan GPU CUDA Sumber Terbuka"
+    "OpenSourceCUDAGPUsupport": "Sokongan GPU CUDA Sumber Terbuka",
+    "ShowOnlyChanged": "Paparkan Perubahan Sahaja"
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
     "Visit": "Lawati",
     "SeeDetail": "Lihat Perincian",
-    "Initializing": "Memulakan ..."
+    "Initializing": "Memulakan ...",
+    "NoNotification": "Tiada Pemberitahuan.",
+    "Notifications": "Pemberitahuan",
+    "ClearNotifications": "Kosongkan Pemberitahuan",
+    "AreYouSureToClearAllNotifications": "Adakah anda pasti mengosongkan semua pemberitahuan?"
   },
   "information": {
     "Core": "Teras",
@@ -1442,7 +1460,11 @@
     "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
     "Owner": "Pemilik",
     "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
-    "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal."
+    "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal.",
+    "FailedToUpdateService": "Gagal mengemas kini perkhidmatan.",
+    "ServiceCreated": "Perkhidmatan model {{ name }} telah berjaya dibuat.",
+    "ServiceUpdated": "Perkhidmatan model {{ name }} telah berjaya dikemas kini.",
+    "ServiceTerminated": "Perkhidmatan model {{ name }} telah berjaya ditamatkan."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1453,7 +1475,9 @@
     "TurnOffTotp": "Matikan pengesahan dua faktor",
     "ConfirmTotpRemovalBody": "Adakah anda pasti untuk menarik diri daripada menggunakan pengesahan dua faktor?",
     "RemoveTotpSetupCompleted": "Dilumpuhkan 2FA",
-    "OTP": "Kata laluan sekali sahaja"
+    "OTP": "Kata laluan sekali sahaja",
+    "EnterConfirmationCode": "Sekarang masukkan OTP yang dijana oleh pengesah untuk mengesahkan.",
+    "RequireOTP": "Tulis OTP."
   },
   "OpenVSCodeRemote": "Buka Kod Visual Studio tempatan",
   "inputLimit": {
@@ -1491,5 +1515,8 @@
     "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
     "SettingTable": "Tetapan Meja",
     "SearchTableColumn": "Cari lajur jadual"
+  },
+  "setting": {
+    "SearchPlaceholder": "Masukkan Istilah Carian"
   }
 }

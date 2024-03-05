@@ -258,7 +258,10 @@
       "EnableAutomaticShmem": "Automatyczna pamięć współdzielona",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Jeśli rozmiar klastra jest nie mniejszy niż 2, dozwolona jest tylko liczba całkowita.",
+      "StartAfter": "Rozpocznij po:",
+      "StartTimeDoesNotApply": "Jeśli godzina rozpoczęcia nie jest ustawiona, nie ma ona zastosowania."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -409,7 +412,8 @@
     "Commit": "Zobowiązanie",
     "EnterManually": "Wprowadź ręcznie",
     "Download": "Pobierz",
-    "Clone": "Klon"
+    "Clone": "Klon",
+    "Config": "Konfiguracja"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -453,7 +457,10 @@
     "Enabled": "Włączone",
     "StorageProxies": "Magazyny",
     "None": "Brak",
-    "Image": "Obraz"
+    "Image": "Obraz",
+    "All": "Wszystkie",
+    "InProgress": "W toku",
+    "Session": "Sesja"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -849,7 +856,12 @@
     "BootstrapScriptDescription": "Skrypt Bootstrap zostanie wykonany tylko raz po utworzeniu sesji.",
     "SSHKeypairEnterManually": "Para kluczy SSH",
     "MyKeypairInfo": "Informacje o mojej parze kluczy",
-    "DescMyKeypairInfo": "Zobacz informacje o mojej parze kluczy"
+    "DescMyKeypairInfo": "Zobacz informacje o mojej parze kluczy",
+    "DarkMode": "Tryb ciemny",
+    "LightMode": "Tryb światła",
+    "UseSystemSetting": "Użyj ustawień systemowych",
+    "DescThemeMode": "Dostosuj wygląd Backend.AI WebUI na swoim urządzeniu.",
+    "ThemeMode": "Tryb tematyczny"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -935,7 +947,8 @@
     "RegistrySuccessfullyModified": "Rejestr został pomyślnie zmodyfikowany.",
     "NoRegistryToDisplay": "Brak rejestrów do wyświetlenia",
     "ModifyRegistry": "Modyfikacja rejestru",
-    "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?"
+    "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?",
+    "DescURLFormat": "Nieprawidłowy typ adresu URL"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",
@@ -1126,13 +1139,18 @@
     "MTUDescription": "Maksymalna jednostka transmisji, rozmiar największego pakietu, jaki może przesłać protokół sieciowy.",
     "OutOfRange": "Poza zasięgiem.",
     "Plugins": "Wtyczki",
-    "OpenSourceCUDAGPUsupport": "Obsługa procesorów graficznych Open Source CUDA"
+    "OpenSourceCUDAGPUsupport": "Obsługa procesorów graficznych Open Source CUDA",
+    "ShowOnlyChanged": "Wyświetl tylko zmiany"
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
     "Visit": "Wizyta",
     "SeeDetail": "Zobacz detale",
-    "Initializing": "Inicjowanie..."
+    "Initializing": "Inicjowanie...",
+    "NoNotification": "Brak powiadomienia.",
+    "Notifications": "Powiadomienia",
+    "ClearNotifications": "Wyczyść powiadomienia",
+    "AreYouSureToClearAllNotifications": "Czy na pewno wyczyścić wszystkie powiadomienia?"
   },
   "information": {
     "Core": "Rdzeń",
@@ -1404,7 +1422,11 @@
     "YouAreAboutToTerminate": "Zamierzasz zakończyć",
     "Owner": "Właściciel",
     "ServiceDelegatedFrom": "Usługa modelu jest tworzona przez {{ createdUser }}, ale własność sesji będzie delegowana do {{ sessionOwner }}.",
-    "FailedToTerminateService": "Żądanie zakończenia usługi nie powiodło się."
+    "FailedToTerminateService": "Żądanie zakończenia usługi nie powiodło się.",
+    "FailedToUpdateService": "Nie udało się zaktualizować usługi.",
+    "ServiceCreated": "Usługa modelowa {{ name }} została pomyślnie utworzona.",
+    "ServiceUpdated": "Usługa modelowa {{ name }} została pomyślnie zaktualizowana.",
+    "ServiceTerminated": "Usługa modelowa {{ name }} została pomyślnie zakończona."
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1455,7 +1477,9 @@
     "TurnOffTotp": "Wyłącz uwierzytelnianie dwuskładnikowe",
     "ConfirmTotpRemovalBody": "Czy na pewno chcesz zrezygnować z uwierzytelniania dwuskładnikowego?",
     "RemoveTotpSetupCompleted": "Wyłączone 2FA",
-    "OTP": "Hasło jednorazowe"
+    "OTP": "Hasło jednorazowe",
+    "EnterConfirmationCode": "Teraz wprowadź hasło jednorazowe wygenerowane przez moduł uwierzytelniający w celu weryfikacji.",
+    "RequireOTP": "Napisz OTP."
   },
   "OpenVSCodeRemote": "Otwórz lokalny kod Visual Studio",
   "inputLimit": {
@@ -1493,5 +1517,8 @@
     "SettingTable": "Nakrycie stołu",
     "SelectColumnToDisplay": "Wybierz, które kolumny mają być wyświetlane",
     "SearchTableColumn": "Przeszukaj kolumny tabeli"
+  },
+  "setting": {
+    "SearchPlaceholder": "Wprowadź wyszukiwane hasło"
   }
 }

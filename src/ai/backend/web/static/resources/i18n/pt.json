@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "Um nome de variável que já existe.",
       "Template": "Modelo de sessão",
       "EnableAutomaticShmem": "Memória partilhada automática",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Somente números inteiros são permitidos quando o tamanho do cluster não é menor que 2.",
+      "StartAfter": "Comece depois:",
+      "StartTimeDoesNotApply": "Se a hora de início não estiver definida, ela não se aplica."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -407,7 +410,8 @@
     "Commit": "Compromisso",
     "EnterManually": "Introduzir manualmente",
     "Download": "Descarregar",
-    "Clone": "Clone"
+    "Clone": "Clone",
+    "Config": "Configuração"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -451,7 +455,10 @@
     "Enabled": "Habilitado",
     "StorageProxies": "Armazéns",
     "None": "Nenhum",
-    "Image": "Imagem"
+    "Image": "Imagem",
+    "All": "Todos",
+    "InProgress": "Em curso",
+    "Session": "Sessão"
   },
   "credential": {
     "Permission": "Permissão",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "O script bootstrap será executado apenas uma vez após a criação da sessão",
     "SSHKeypairEnterManually": "Par de chaves SSH",
     "MyKeypairInfo": "Minhas informações de par de chaves",
-    "DescMyKeypairInfo": "Ver as informações do meu par de chaves"
+    "DescMyKeypairInfo": "Ver as informações do meu par de chaves",
+    "DarkMode": "Modo escuro",
+    "LightMode": "Modo claro",
+    "UseSystemSetting": "Usar configuração do sistema",
+    "DescThemeMode": "Personalize a aparência do Backend.AI WebUI em seu dispositivo.",
+    "ThemeMode": "Modo Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registo modificado com sucesso.",
     "NoRegistryToDisplay": "Não há registos a apresentar",
     "ModifyRegistry": "Modificar o registo",
-    "ConfirmNoUserName": "Utilizador e palavra-passe não especificados, pretende guardar?"
+    "ConfirmNoUserName": "Utilizador e palavra-passe não especificados, pretende guardar?",
+    "DescURLFormat": "Tipo de URL inválido"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupos de Recursos",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "Unidade máxima de transmissão, o tamanho do maior pacote que um protocolo de rede pode transmitir.",
     "OutOfRange": "Fora de alcance.",
     "Plugins": "Plug-ins",
-    "OpenSourceCUDAGPUsupport": "Suporte para GPU CUDA de código aberto"
+    "OpenSourceCUDAGPUsupport": "Suporte para GPU CUDA de código aberto",
+    "ShowOnlyChanged": "Exibir apenas alterações"
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
     "Visit": "Visita",
     "SeeDetail": "Veja detalhes",
-    "Initializing": "Inicializando ..."
+    "Initializing": "Inicializando ...",
+    "NoNotification": "Nenhuma notificação.",
+    "Notifications": "Notificações",
+    "ClearNotifications": "Limpar notificações",
+    "AreYouSureToClearAllNotifications": "Tem certeza de que deseja limpar todas as notificações?"
   },
   "information": {
     "Core": "Testemunho",
@@ -1442,7 +1460,11 @@
     "Image": "Imagem",
     "Owner": "Proprietário",
     "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}",
-    "FailedToTerminateService": "O pedido para terminar o serviço falhou."
+    "FailedToTerminateService": "O pedido para terminar o serviço falhou.",
+    "FailedToUpdateService": "Falha ao atualizar o serviço.",
+    "ServiceCreated": "O serviço de modelo {{ name }} foi criado com sucesso.",
+    "ServiceUpdated": "O serviço de modelo {{ name }} foi atualizado com sucesso.",
+    "ServiceTerminated": "O serviço de modelo {{ name }} foi encerrado com sucesso."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1453,7 +1475,9 @@
     "TurnOffTotp": "Desativar a autenticação de dois factores",
     "ConfirmTotpRemovalBody": "Tem a certeza de que não quer utilizar a autenticação de dois factores?",
     "RemoveTotpSetupCompleted": "2FA desactivada",
-    "OTP": "Palavra-passe única"
+    "OTP": "Palavra-passe única",
+    "EnterConfirmationCode": "Agora insira o OTP gerado pelo autenticador para verificar.",
+    "RequireOTP": "Escreva OTP."
   },
   "OpenVSCodeRemote": "Abrir o código local do Visual Studio",
   "inputLimit": {
@@ -1491,5 +1515,8 @@
     "SettingTable": "Configuração de mesa",
     "SelectColumnToDisplay": "Selecione as colunas a serem exibidas",
     "SearchTableColumn": "Pesquisar colunas da tabela"
+  },
+  "setting": {
+    "SearchPlaceholder": "Insira o termo de pesquisa"
   }
 }

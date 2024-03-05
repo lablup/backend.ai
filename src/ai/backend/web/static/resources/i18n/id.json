@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
       "Template": "Templat Sesi",
       "EnableAutomaticShmem": "Memori bersama otomatis",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Hanya bilangan bulat yang diperbolehkan jika ukuran cluster tidak kurang dari 2.",
+      "StartAfter": "Mulai setelah:",
+      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -407,7 +410,8 @@
     "Unset": "Tidak diatur",
     "OK": "BAIKLAH.",
     "Download": "Unduh",
-    "Clone": "Clone"
+    "Clone": "Clone",
+    "Config": "Konfigurasi"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -451,7 +455,10 @@
     "Enabled": "Diaktifkan",
     "StorageProxies": "Penyimpanan",
     "None": "Tidak ada",
-    "Image": "Gambar"
+    "Image": "Gambar",
+    "All": "Semua",
+    "InProgress": "Sedang Berlangsung",
+    "Session": "Sesi"
   },
   "credential": {
     "Permission": "Izin",
@@ -847,7 +854,12 @@
     "SSHKeypairEnterManually": "SSH Keypair",
     "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berhasil didaftarkan.",
     "MyKeypairInfo": "Informasi Pasangan Kunci Saya",
-    "DescMyKeypairInfo": "Lihat informasi keypair saya"
+    "DescMyKeypairInfo": "Lihat informasi keypair saya",
+    "DarkMode": "Mode Gelap",
+    "LightMode": "Modus Cahaya",
+    "UseSystemSetting": "Gunakan Pengaturan Sistem",
+    "DescThemeMode": "Sesuaikan tampilan Backend.AI WebUI di perangkat Anda.",
+    "ThemeMode": "Modus Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registry berhasil dimodifikasi.",
     "ModifyRegistry": "Memodifikasi Registri",
     "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
-    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?"
+    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?",
+    "DescURLFormat": "Jenis URL tidak valid"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -1124,13 +1137,18 @@
     "DescWarboysupport": "Gunakan dukungan Furiosa Warboy",
     "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy.",
     "Plugins": "Plugin",
-    "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka"
+    "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka",
+    "ShowOnlyChanged": "Hanya Tampilan yang Berubah"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
     "Visit": "Kunjungi",
     "SeeDetail": "Lihat Detail",
-    "Initializing": "Inisialisasi..."
+    "Initializing": "Inisialisasi...",
+    "NoNotification": "Tidak Ada Pemberitahuan.",
+    "Notifications": "Pemberitahuan",
+    "ClearNotifications": "Hapus Notifikasi",
+    "AreYouSureToClearAllNotifications": "Apakah Anda yakin untuk menghapus semua notifikasi?"
   },
   "information": {
     "Core": "Core",
@@ -1364,7 +1382,9 @@
     "ConfirmTotpRemovalBody": "Apakah Anda yakin untuk tidak menggunakan autentikasi dua faktor?",
     "TotpSetupNotAvailable": "Autentikasi dua faktor tidak dapat diatur.",
     "TurnOffTotp": "Menonaktifkan autentikasi dua faktor",
-    "RemoveTotpSetupCompleted": "Menonaktifkan 2FA"
+    "RemoveTotpSetupCompleted": "Menonaktifkan 2FA",
+    "EnterConfirmationCode": "Sekarang masukkan OTP yang dihasilkan oleh autentikator untuk memverifikasi.",
+    "RequireOTP": "Tulis OTP."
   },
   "inputLimit": {
     "4to64chars": "(4 ~ 64 karakter)"
@@ -1451,7 +1471,11 @@
     "Image": "Gambar",
     "Owner": "Pemilik",
     "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
-    "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal."
+    "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
+    "FailedToUpdateService": "Gagal memperbarui layanan.",
+    "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
+    "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
+    "ServiceTerminated": "Layanan model {{ name }} telah berhasil dihentikan."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1491,5 +1515,8 @@
     "SettingTable": "Penataan meja",
     "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
     "SearchTableColumn": "Cari kolom tabel"
+  },
+  "setting": {
+    "SearchPlaceholder": "Masukkan Istilah Pencarian"
   }
 }

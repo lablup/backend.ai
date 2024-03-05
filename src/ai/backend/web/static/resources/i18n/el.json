@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "Ένα όνομα μεταβλητής που υπάρχει ήδη.",
       "Template": "Πρότυπο συνεδρίας",
       "EnableAutomaticShmem": "Αυτόματη κοινή μνήμη",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "StartAfter": "Έναρξη μετά:",
+      "StartTimeDoesNotApply": "Εάν δεν έχει οριστεί η ώρα έναρξης, δεν ισχύει.",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Μόνο ακέραιος επιτρέπεται όταν το μέγεθος του συμπλέγματος δεν είναι μικρότερο από 2."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -407,7 +410,8 @@
     "Commit": "Δέσμευση",
     "EnterManually": "Εισάγετε χειροκίνητα",
     "Download": "Λήψη",
-    "Clone": "Κλώνος"
+    "Clone": "Κλώνος",
+    "Config": "Διαμόρφωση"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -451,7 +455,10 @@
     "Enabled": "Ενεργοποιήθηκε",
     "StorageProxies": "Αποθήκες",
     "None": "Κανένα",
-    "Image": "Εικόνα"
+    "Image": "Εικόνα",
+    "All": "Όλα",
+    "InProgress": "Σε εξέλιξη",
+    "Session": "Σύνοδος"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -847,7 +854,12 @@
     "BootstrapScriptDescription": "Το σενάριο Bootstrap θα εκτελεστεί μόνο μία φορά μετά τη δημιουργία συνεδρίας",
     "SSHKeypairEnterManually": "Ζεύγος κλειδιών SSH",
     "MyKeypairInfo": "Πληροφορίες για το ζεύγος κλειδιών μου",
-    "DescMyKeypairInfo": "Δείτε τις πληροφορίες του ζεύγους κλειδιών μου"
+    "DescMyKeypairInfo": "Δείτε τις πληροφορίες του ζεύγους κλειδιών μου",
+    "DarkMode": "Σκοτεινή λειτουργία",
+    "LightMode": "Λειτουργία φωτός",
+    "UseSystemSetting": "Χρησιμοποιήστε τη ρύθμιση συστήματος",
+    "DescThemeMode": "Προσαρμόστε την εμφάνιση του Backend.AI WebUI στη συσκευή σας.",
+    "ThemeMode": "Λειτουργία θέματος"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Το μητρώο τροποποιήθηκε επιτυχώς.",
     "NoRegistryToDisplay": "Δεν εμφανίζονται μητρώα",
     "ModifyRegistry": "Τροποποίηση μητρώου",
-    "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;"
+    "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;",
+    "DescURLFormat": "Μη έγκυρος τύπος URL"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
@@ -1124,13 +1137,18 @@
     "MTUDescription": "Μέγιστη μονάδα μετάδοσης, το μέγεθος του μεγαλύτερου πακέτου που μπορεί να μεταδώσει ένα πρωτόκολλο δικτύου.",
     "OutOfRange": "Εκτός εμβέλειας.",
     "Plugins": "Πρόσθετα",
-    "OpenSourceCUDAGPUsupport": "Υποστήριξη ανοιχτού κώδικα CUDA GPU"
+    "OpenSourceCUDAGPUsupport": "Υποστήριξη ανοιχτού κώδικα CUDA GPU",
+    "ShowOnlyChanged": "Εμφάνιση μόνο αλλαγών"
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
     "Visit": "Επίσκεψη",
     "SeeDetail": "Δείτε Λεπτομέρεια",
-    "Initializing": "Αρχικοποίηση ..."
+    "Initializing": "Αρχικοποίηση ...",
+    "NoNotification": "Καμία ειδοποίηση.",
+    "Notifications": "Ειδοποιήσεις",
+    "ClearNotifications": "Εκκαθάριση ειδοποιήσεων",
+    "AreYouSureToClearAllNotifications": "Είστε βέβαιοι ότι θα διαγράψετε όλες τις ειδοποιήσεις;"
   },
   "information": {
     "Core": "Πυρήνας",
@@ -1453,7 +1471,9 @@
     "TurnOffTotp": "Απενεργοποιήστε τον έλεγχο ταυτότητας δύο παραγόντων",
     "ConfirmTotpRemovalBody": "Είστε σίγουροι ότι δεν θέλετε να χρησιμοποιείτε έλεγχο ταυτότητας δύο παραγόντων;",
     "RemoveTotpSetupCompleted": "Απενεργοποιημένο 2FA",
-    "OTP": "Κωδικός πρόσβασης μίας χρήσης"
+    "OTP": "Κωδικός πρόσβασης μίας χρήσης",
+    "EnterConfirmationCode": "Τώρα εισαγάγετε το OTP που δημιουργήθηκε από τον έλεγχο ταυτότητας για επαλήθευση.",
+    "RequireOTP": "Γράψτε OTP."
   },
   "OpenVSCodeRemote": "Ανοίξτε τον τοπικό κώδικα του Visual Studio",
   "inputLimit": {
@@ -1491,5 +1511,8 @@
     "SettingTable": "Ρύθμιση πίνακα",
     "SelectColumnToDisplay": "Επιλέξτε για εμφάνιση στηλών",
     "SearchTableColumn": "Αναζήτηση στηλών πίνακα"
+  },
+  "setting": {
+    "SearchPlaceholder": "Εισαγάγετε τον όρο αναζήτησης"
   }
 }

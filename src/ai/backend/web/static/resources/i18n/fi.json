@@ -129,7 +129,8 @@
     "Update": "Päivitys",
     "Yes": "Kyllä",
     "Clone": "Klooni",
-    "Download": "ladata"
+    "Download": "ladata",
+    "Config": "Config"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -483,7 +484,10 @@
     "Username": "Käyttäjätunnus",
     "cores": "ytimet",
     "None": "Ei ole",
-    "Image": "Kuva"
+    "Image": "Kuva",
+    "All": "Kaikki",
+    "InProgress": "Käynnissä",
+    "Session": "Istunto"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -721,13 +725,21 @@
     "resources": "Resurssit",
     "Owner": "Omistaja",
     "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle.",
-    "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui."
+    "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui.",
+    "FailedToUpdateService": "Palvelun päivittäminen epäonnistui.",
+    "ServiceCreated": "Mallipalvelun {{ name }} luominen onnistui.",
+    "ServiceUpdated": "Mallipalvelun {{ name }} päivitys onnistui.",
+    "ServiceTerminated": "Mallipalvelu {{ name }} on lopetettu onnistuneesti."
   },
   "notification": {
     "Initializing": "Aloitetaan...",
     "SeeDetail": "Katso lisätietoja",
     "SuccessfullyUpdated": "Päivitetty onnistuneesti",
-    "Visit": "Käy osoitteessa"
+    "Visit": "Käy osoitteessa",
+    "NoNotification": "Ei ilmoitusta.",
+    "Notifications": "Ilmoitukset",
+    "ClearNotifications": "Tyhjennä ilmoitukset",
+    "AreYouSureToClearAllNotifications": "Oletko varma, että tyhjennät kaikki ilmoitukset?"
   },
   "pipeline": {
     "Component": {
@@ -799,7 +811,8 @@
     "UpdatingRegistryInfo": "Rekisteritietojen päivittäminen...",
     "Username": "Käyttäjätunnus",
     "UsernameOptional": "Käyttäjätunnus (valinnainen)",
-    "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?"
+    "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?",
+    "DescURLFormat": "Virheellinen URL-tyyppi"
   },
   "resourceGroup": {
     "Active": "Aktiivinen",
@@ -1137,7 +1150,10 @@
       "ErrorCanNotExceedRemaining": "Ei voida asettaa suuremmaksi kuin jäljellä olevat resurssit ({{amount}}).",
       "EnableAutomaticShmem": "Automaattinen jaettu muisti",
       "Template": "Istuntomalli",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Vain kokonaisluku on sallittu, kun klusterin koko on vähintään 2.",
+      "StartAfter": "Aloita sen jälkeen:",
+      "StartTimeDoesNotApply": "Jos aloitusaikaa ei ole asetettu, se ei ole voimassa."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1207,7 +1223,8 @@
       "none": "Ei ole",
       "tag": "Tag"
     },
-    "OpenSourceCUDAGPUsupport": "Avoimen lähdekoodin CUDA GPU-tuki"
+    "OpenSourceCUDAGPUsupport": "Avoimen lähdekoodin CUDA GPU-tuki",
+    "ShowOnlyChanged": "Vain näyttö muuttuu"
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1306,7 +1323,9 @@
     "TotpSetupCompleted": "Käytössä 2FA",
     "TotpSetupNotAvailable": "Kaksitekijätodennusta ei voi ottaa käyttöön.",
     "TurnOffTotp": "Ota kaksitekijätodennus pois käytöstä",
-    "TypeInAuthKey": "Vaihtoehtoisesti voit kirjoittaa alla olevan todennuskoodin manuaalisesti."
+    "TypeInAuthKey": "Vaihtoehtoisesti voit kirjoittaa alla olevan todennuskoodin manuaalisesti.",
+    "EnterConfirmationCode": "Anna nyt autentikaattorin luoma OTP vahvistaaksesi.",
+    "RequireOTP": "Kirjoita OTP."
   },
   "update": {
     "NewWebUIVersionAvailable": "Uusi versio on saatavilla:"
@@ -1373,7 +1392,12 @@
     "ShellEnvironments": "Shell-ympäristöt",
     "UseCompactSidebar": "Käytä kompakti sivupalkki oletusarvoisesti",
     "DescMyKeypairInfo": "Katso avainparini tiedot",
-    "MyKeypairInfo": "Avainparini tiedot"
+    "MyKeypairInfo": "Avainparini tiedot",
+    "DarkMode": "Tumma tila",
+    "LightMode": "Valotila",
+    "UseSystemSetting": "Käytä järjestelmäasetuksia",
+    "DescThemeMode": "Mukauta miltä Backend.AI WebUI näyttää laitteessasi.",
+    "ThemeMode": "Teematila"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -1491,5 +1515,8 @@
     "SettingTable": "Kattaus",
     "SelectColumnToDisplay": "Valitse näytettävät sarakkeet",
     "SearchTableColumn": "Hae taulukon sarakkeita"
+  },
+  "setting": {
+    "SearchPlaceholder": "Kirjoita hakutermi"
   }
 }

@@ -256,7 +256,10 @@
       "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна.",
       "Template": "Сеанс загвар",
       "EnableAutomaticShmem": "Автомат хуваалцсан санах ой",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__"
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Кластерын хэмжээ 2-оос багагүй тохиолдолд зөвхөн бүхэл тоог зөвшөөрнө.",
+      "StartAfter": "Дараа нь эхлэх:",
+      "StartTimeDoesNotApply": "Хэрэв эхлэх цагийг тохируулаагүй бол энэ нь хамаарахгүй."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -407,7 +410,8 @@
     "Unset": "Тохируулаагүй",
     "OK": "БОЛЖ БАЙНА УУ",
     "Download": "Татаж авах",
-    "Clone": "Клон"
+    "Clone": "Клон",
+    "Config": "Тохиргоо"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -451,7 +455,10 @@
     "Enabled": "Идэвхжсэн",
     "StorageProxies": "Хадгалах сан",
     "None": "Байхгүй",
-    "Image": "Зураг"
+    "Image": "Зураг",
+    "All": "бүхэлд нь",
+    "InProgress": "Ажиллаж байна",
+    "Session": "Сессия"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -847,7 +854,12 @@
     "SSHKeypairEnterManually": "SSH товчлуурын хослол",
     "SSHKeypairEnterManuallyFinished": "SSH Keypair амжилттай бүртгэгдлээ.",
     "MyKeypairInfo": "Миний товчлуурын мэдээлэл",
-    "DescMyKeypairInfo": "Миний товчлуурын мэдээллийг харна уу"
+    "DescMyKeypairInfo": "Миний товчлуурын мэдээллийг харна уу",
+    "DarkMode": "Харанхуй горим",
+    "LightMode": "Гэрэл горим",
+    "UseSystemSetting": "Системийн тохиргоог ашиглана уу",
+    "DescThemeMode": "Backend.AI WebUI төхөөрөмж дээрээ хэрхэн харагдахыг тохируулна уу.",
+    "ThemeMode": "Загварын горим"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -933,7 +945,8 @@
     "RegistrySuccessfullyModified": "Бүртгэл амжилттай өөрчлөгдсөн.",
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
     "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
-    "ConfirmNoUserName": "Хэрэглэгч болон нууц үгийг заагаагүй тул хадгалах уу?"
+    "ConfirmNoUserName": "Хэрэглэгч болон нууц үгийг заагаагүй тул хадгалах уу?",
+    "DescURLFormat": "Хүчингүй URL төрөл"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -1124,13 +1137,18 @@
     "DescWarboysupport": "Furiosa Warboy дэмжлэгийг ашигла",
     "RequireWarboyPlugin": "Backend.AI Warboy Plugin шаардлагатай.",
     "Plugins": "Plugins",
-    "OpenSourceCUDAGPUsupport": "Нээлттэй эхийн CUDA GPU дэмжлэг"
+    "OpenSourceCUDAGPUsupport": "Нээлттэй эхийн CUDA GPU дэмжлэг",
+    "ShowOnlyChanged": "Зөвхөн өөрчлөлтүүдийг харуулах"
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
     "Visit": "Айлчлах",
     "SeeDetail": "Дэлгэрэнгүйг үзнэ үү",
-    "Initializing": "Эхлүүлж байна ..."
+    "Initializing": "Эхлүүлж байна ...",
+    "NoNotification": "Мэдэгдэл байхгүй.",
+    "Notifications": "Мэдэгдэл",
+    "ClearNotifications": "Мэдэгдлийг арилгах",
+    "AreYouSureToClearAllNotifications": "Та бүх мэдэгдлийг арилгахдаа итгэлтэй байна уу?"
   },
   "information": {
     "Core": "Гол",
@@ -1364,7 +1382,9 @@
     "ConfirmTotpRemovalBody": "Та хоёр хүчин зүйлийн баталгаажуулалтыг ашиглахаас татгалзахдаа итгэлтэй байна уу?",
     "TotpSetupNotAvailable": "Хоёр хүчин зүйлийн баталгаажуулалтыг тохируулах боломжгүй.",
     "TurnOffTotp": "Хоёр хүчин зүйлийн баталгаажуулалтыг унтраа",
-    "RemoveTotpSetupCompleted": "2FA-г идэвхгүй болгосон"
+    "RemoveTotpSetupCompleted": "2FA-г идэвхгүй болгосон",
+    "EnterConfirmationCode": "Одоо баталгаажуулахын тулд баталгаажуулагчийн үүсгэсэн OTP-г оруулна уу.",
+    "RequireOTP": "OTP бичнэ үү."
   },
   "inputLimit": {
     "4to64chars": "(4~64 тэмдэгт)"
@@ -1451,7 +1471,11 @@
     "Image": "Зураг",
     "Owner": "Эзэмшигч",
     "ServiceDelegatedFrom": "Загвар үйлчилгээг {{ createdUser }} үүсгэсэн боловч сессийн эрхийг {{ sessionOwner }}-д шилжүүлнэ.",
-    "FailedToTerminateService": "Үйлчилгээг цуцлах хүсэлт амжилтгүй боллоо."
+    "FailedToTerminateService": "Үйлчилгээг цуцлах хүсэлт амжилтгүй боллоо.",
+    "FailedToUpdateService": "Үйлчилгээг шинэчилж чадсангүй.",
+    "ServiceCreated": "Загвар үйлчилгээ {{ name }} амжилттай үүсгэгдсэн.",
+    "ServiceUpdated": "Загвар үйлчилгээ {{ name }} амжилттай шинэчлэгдсэн.",
+    "ServiceTerminated": "Загварын үйлчилгээ {{ name }} амжилттай хаагдсан."
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",
@@ -1491,5 +1515,8 @@
     "SettingTable": "Хүснэгтийн тохиргоо",
     "SelectColumnToDisplay": "Харуулах багануудыг сонгоно уу",
     "SearchTableColumn": "Хүснэгтийн багануудыг хайх"
+  },
+  "setting": {
+    "SearchPlaceholder": "Хайлтын нэр томъёог оруулна уу"
   }
 }
