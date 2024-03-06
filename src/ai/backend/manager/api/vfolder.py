@@ -3395,7 +3395,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(default_cors_options):
     app = web.Application()
-    app["prefix"] = "vfolders"
+    app["prefix"] = "vfolder"
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
