@@ -122,7 +122,7 @@ def revert_data_psql_to_etcd():
         item = {
             "": url,
             "type": type,
-            "hostname": registry_name,  # registry_name is changed to hostname,
+            "hostname": registry_name,  # registry_name should be reverted to hostname,
         }
 
         if project is not None:
@@ -136,8 +136,8 @@ def revert_data_psql_to_etcd():
 
         items.append(item)
 
-    # Records with the same registry_name are grouped together.
-    # In this case, if there are columns other than the project column that have different values between records,
+    # Records with the same hostname should be grouped together.
+    # Note that if there are columns other than the project column that have different values between records,
     # information loss can occur.
     grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
 
