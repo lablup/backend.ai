@@ -1715,9 +1715,8 @@ class MoveToTrashVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     vfolders = graphene.List(VFolderNode, required=False)
+    failed = graphene.List(graphene.UUID, required=False)
 
     @classmethod
     async def mutate(
@@ -1727,25 +1726,37 @@ class MoveToTrashVFolder(graphene.Mutation):
         vfolder_ids: list[uuid.UUID],
     ) -> MoveToTrashVFolder:
         graph_ctx: GraphQueryContext = info.context
+        now = datetime.now(tzutc())
 
-        await update_vfolder_status(
-            graph_ctx.db, vfolder_ids, VFolderOperationStatus.DELETE_PENDING, do_log=False
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+        vfolder_nodes = []
+        failed = []
+        async with graph_ctx.db.begin_session() as db_session:
             stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-            vfolder_rows = (await db_session.scalars(stmt)).all()
-            vfolder_nodes = [VFolderNode.from_row(graph_ctx, row) for row in vfolder_rows]
+            for row in await db_session.scalars(stmt):
+                if row.status == VFolderOperationStatus.READY:
+                    row.status = VFolderOperationStatus.DELETE_PENDING
+                    row.status_changed = now
+                    row.status_history = sql_json_merge(
+                        VFolderRow.status_history,
+                        (),
+                        {
+                            VFolderOperationStatus.DELETE_PENDING.name: now.isoformat(),
+                        },
+                    )
+                    vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
+                else:
+                    failed.append(row.id)
+            await db_session.commit()
 
-        return MoveToTrashVFolder(ok=True, msg="", vfolders=vfolder_nodes)
+        return MoveToTrashVFolder(vfolders=vfolder_nodes, failed=failed)
 
 
 class RestoreVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     vfolders = graphene.List(VFolderNode, required=False)
+    failed = graphene.List(graphene.UUID, required=False)
 
     @classmethod
     async def mutate(
@@ -1755,24 +1766,35 @@ class RestoreVFolder(graphene.Mutation):
         vfolder_ids: list[uuid.UUID],
     ) -> RestoreVFolder:
         graph_ctx: GraphQueryContext = info.context
+        now = datetime.now(tzutc())
 
-        await update_vfolder_status(
-            graph_ctx.db, vfolder_ids, VFolderOperationStatus.READY, do_log=False
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+        vfolder_nodes = []
+        failed = []
+        async with graph_ctx.db.begin_session() as db_session:
             stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-            vfolder_rows = (await db_session.scalars(stmt)).all()
-            vfolder_nodes = [VFolderNode.from_row(graph_ctx, row) for row in vfolder_rows]
+            for row in await db_session.scalars(stmt):
+                if row.status == VFolderOperationStatus.DELETE_PENDING:
+                    row.status = VFolderOperationStatus.READY
+                    row.status_changed = now
+                    row.status_history = sql_json_merge(
+                        VFolderRow.status_history,
+                        (),
+                        {
+                            VFolderOperationStatus.READY.name: now.isoformat(),
+                        },
+                    )
+                    vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
+                else:
+                    failed.append(row.id)
+            await db_session.commit()
 
-        return RestoreVFolder(ok=True, msg="", vfolders=vfolder_nodes)
+        return RestoreVFolder(vfolders=vfolder_nodes, failed=failed)
 
 
 class DeleteForeverVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     task_id = graphene.UUID(required=False)
     vfolders = graphene.List(VFolderNode, required=False)
 
@@ -1795,7 +1817,7 @@ class DeleteForeverVFolder(graphene.Mutation):
             stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
             vfolder_rows = (await db_session.scalars(stmt)).all()
             if not vfolder_rows:
-                return DeleteForeverVFolder(ok=True, msg="")
+                return DeleteForeverVFolder()
             for row in vfolder_rows:
                 vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
                 vfolder_infos.append(VFolderDeletionInfo(VFolderID.from_row(row), row.host))
@@ -1811,7 +1833,7 @@ class DeleteForeverVFolder(graphene.Mutation):
         task_id = await graph_ctx.background_task_manager.start(
             _delete_task, total_progress=len(vfolder_infos)
         )
-        return DeleteForeverVFolder(ok=True, msg="", task_id=task_id, vfolders=vfolder_nodes)
+        return DeleteForeverVFolder(task_id=task_id, vfolders=vfolder_nodes)
 
 
 class PurgeVFolder(graphene.Mutation):
@@ -1820,9 +1842,8 @@ class PurgeVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     vfolders = graphene.List(VFolderNode, required=False)
+    failed = graphene.List(graphene.UUID, required=False)
 
     @classmethod
     async def mutate(
@@ -1835,21 +1856,25 @@ class PurgeVFolder(graphene.Mutation):
 
         vfolder_nodes = []
         vfolder_infos = []
+        failed = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-            vfolder_rows = (await db_session.scalars(stmt)).all()
-            for row in vfolder_rows:
-                vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
-                vfolder_infos.append(VFolderDeletionInfo(VFolderID.from_row(row), row.host))
+            for row in await db_session.scalars(stmt):
+                if row.status == VFolderOperationStatus.DELETE_COMPLETE:
+                    vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
+                    vfolder_infos.append(VFolderDeletionInfo(VFolderID.from_row(row), row.host))
+                else:
+                    failed.append(row.id)
+        to_be_purged = set(vfolder_ids) - set(failed)
 
         async def _purge() -> None:
-            delete_stmt = sa.delete(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+            delete_stmt = sa.delete(VFolderRow).where(VFolderRow.id.in_(to_be_purged))
             async with graph_ctx.db.begin_session() as db_session:
                 await db_session.execute(delete_stmt)
 
         await execute_with_retry(_purge)
 
-        return PurgeVFolder(ok=True, msg="", vfolders=vfolder_nodes)
+        return PurgeVFolder(vfolders=vfolder_nodes, failed=failed)
 
 
 class VirtualFolderPermission(graphene.ObjectType):
