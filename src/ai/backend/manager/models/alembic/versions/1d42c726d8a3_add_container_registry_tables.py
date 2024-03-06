@@ -7,9 +7,11 @@ Create Date: 2024-03-05 10:36:24.197922
 """
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from itertools import groupby
 from typing import Any, Final
 
-import asyncpg
+import janus
 import sqlalchemy as sa
 import trafaret as t
 from alembic import op
@@ -41,11 +43,10 @@ container_registry_iv = t.Dict({
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 
 
-def migrate_data_etcd_to_psql():
+def get_async_etcd() -> AsyncEtcd:
     local_config = load()
     etcd_config = local_config.get("etcd", None)
     assert etcd_config is not None, "etcd configuration is not found"
-
     etcd_credentials = None
     if local_config["etcd"]["user"]:
         etcd_credentials = {
@@ -55,30 +56,42 @@ def migrate_data_etcd_to_psql():
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
     }
-    etcd = AsyncEtcd(
+    return AsyncEtcd(
         local_config["etcd"]["addr"],
         local_config["etcd"]["namespace"],
         scope_prefix_map,
         credentials=etcd_credentials,
     )
 
-    async def get_prefix_coroutine():
-        return await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
 
-    loop = asyncio.get_event_loop()
-    registries = loop.run_until_complete(get_prefix_coroutine())
+def migrate_data_etcd_to_psql():
+    queue = janus.Queue()
 
-    print("registries", registries)
-    items = {
+    with ThreadPoolExecutor() as executor:
+
+        def get_etcd_container_registries(queue: janus.Queue):
+            async def _migrate(etcd: AsyncEtcd):
+                result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
+                await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
+                return result
+
+            etcd = get_async_etcd()
+            queue.sync_q.put(asyncio.run(_migrate(etcd)))
+
+        executor.submit(get_etcd_container_registries, queue)
+
+    registries = queue.sync_q.get()
+
+    old_format_container_registries = {
         hostname: container_registry_iv.check(item)
         for hostname, item in registries.items()
         # type: ignore
     }
 
     input_configs = []
-    for hostname, registry_info in items.items():
-        input_config: dict[str, Any] = {
-            "registry_name": hostname,  # hostname to registry_name,
+    for hostname, registry_info in old_format_container_registries.items():
+        input_config_template: dict[str, Any] = {
+            "registry_name": hostname,  # hostname is changed to registry_name,
             "url": str(registry_info[""]),
             "type": registry_info["type"],
             "username": registry_info.get("username", None),
@@ -87,28 +100,72 @@ def migrate_data_etcd_to_psql():
             "is_global": True,
         }
 
+        # Comma-separated projects are divided into multiple ContainerRegistry rows
         if "project" in registry_info:
             for project in registry_info["project"]:
-                input_config_t = input_config.copy()
-                input_config_t["project"] = project
-                input_configs.append(input_config_t)
+                input_config = input_config_template.copy()
+                input_config["project"] = project
+                input_configs.append(input_config)
         else:
-            input_configs.append(input_config)
+            input_configs.append(input_config_template)
 
-    try:
-        connection = op.get_bind()
-        connection.execute(sa.insert(ContainerRegistryRow).values(input_config))
+    connection = op.get_bind()
+    connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
-    except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
-        print("ConnectionError")
 
-    except Exception as e:
-        print("e", e)
-        raise
+def revert_data_psql_to_etcd():
+    connection = op.get_bind()
+    rows = connection.execute(sa.select(ContainerRegistryRow)).fetchall()
+    items = []
 
-    except BaseException:
-        print("Base Error")
-        raise
+    for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
+        item = {
+            "": url,
+            "url": url,
+            "type": type,
+            "hostname": registry_name,  # registry_name is changed to hostname,
+        }
+
+        if project is not None:
+            item["project"] = project
+        if username is not None:
+            item["username"] = username
+        if password is not None:
+            item["password"] = password
+        if ssl_verify is not None:
+            item["ssl_verify"] = ssl_verify
+
+        items.append(item)
+
+    # Records with the same registry_name are grouped together.
+    # In this case, if there are columns other than the project column that have different values between records,
+    # information loss can occur.
+    grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
+
+    def merge_items(items):
+        projects = [item["project"] for item in items]
+        merged_projects = ",".join(projects)
+
+        merged_item = items[0].copy()
+        merged_item["project"] = merged_projects
+
+        return merged_item
+
+    merged_items = [merge_items(items) for items in grouped_items.values()]
+
+    def put_etcd_container_registries(merged_items: list[Any], queue: janus.Queue):
+        etcd = get_async_etcd()
+        for item in merged_items:
+            asyncio.run(etcd.put_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{item['hostname']}", item))
+
+        queue.sync_q.put(True)
+
+    queue = janus.Queue()
+
+    with ThreadPoolExecutor() as executor:
+        executor.submit(put_etcd_container_registries, merged_items, queue)
+
+    queue.sync_q.get()
 
 
 def upgrade():
@@ -141,5 +198,7 @@ def upgrade():
 
 
 def downgrade():
+    revert_data_psql_to_etcd()
+
     op.drop_table("container_registries")
     op.execute(text("DROP TYPE container_registry_type"))
