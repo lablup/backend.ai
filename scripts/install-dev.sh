@@ -936,7 +936,7 @@ configure_backendai() {
     install_editable_webui
     sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
   else
-    webui_version=$(jq -r '.package + " (built at " + .build + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
+    webui_version=$(jq -r '.package + " (built at " + .buildDate + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
     show_note "The currently embedded webui version: $webui_version"
   fi
 
