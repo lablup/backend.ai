@@ -447,8 +447,9 @@ def cp(filenames):
 
 
 @vfolder.command()
+@pass_ctx_obj
 @click.argument("name", type=str)
-@click.argument("path", type=str)
+@click.argument("paths", type=str, nargs=-1)
 @click.option(
     "-p",
     "--parents",
@@ -461,22 +462,30 @@ def cp(filenames):
     "--exist-ok",
     default=False,
     is_flag=True,
-    help="Skip an error caused by file not found",
+    help="Allow specifying already existing directories",
 )
-def mkdir(name, path, parents, exist_ok):
+def mkdir(
+    ctx: CLIContext,
+    name: str,
+    paths: list[str],
+    parents: bool,
+    exist_ok: bool,
+) -> None:
     """Create an empty directory in the virtual folder.
 
     \b
     NAME: Name of a virtual folder.
-    PATH: The name or path of directory. Parent directories are created automatically
-          if they do not exist.
+    PATHS: Relative directory paths to create in the vfolder.
+          Use '-p' option to auto-create parent directories.
+
+    Example: backend.ai vfolder mkdir my_vfolder "dir1" "dir2" "dir3"
     """
     with Session() as session:
         try:
-            session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
-            print_done("Done.")
+            results = session.VFolder(name).mkdir(paths, parents=parents, exist_ok=exist_ok)
+            ctx.output.print_result_set(results)
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 

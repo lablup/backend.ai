@@ -31,7 +31,7 @@ Base = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """
     User's role.
     """

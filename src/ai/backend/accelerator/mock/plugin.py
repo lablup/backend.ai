@@ -412,7 +412,7 @@ class MockPlugin(AbstractComputePlugin):
         return [
             NodeMeasurement(
                 MetricKey(f"{self.key}_mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_node=Measurement(Decimal(mem_used_total), Decimal(mem_avail_total)),
@@ -420,7 +420,7 @@ class MockPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey(f"{self.key}_util"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="percent",
                 stats_filter=frozenset({"avg", "max"}),
                 per_node=Measurement(Decimal(util_total), Decimal(dev_count * 100)),
@@ -428,7 +428,7 @@ class MockPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey(f"{self.key}_power"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="Watts",
                 stats_filter=frozenset({"avg", "max"}),
                 per_node=Measurement(Decimal(power_usage_total), Decimal(power_max_total)),
@@ -436,7 +436,7 @@ class MockPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey(f"{self.key}_temperature"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="Celsius",
                 stats_filter=frozenset({"avg", "max"}),
                 per_node=Measurement(
@@ -508,7 +508,7 @@ class MockPlugin(AbstractComputePlugin):
         return [
             ContainerMeasurement(
                 MetricKey(f"{self.key}_mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container={
@@ -521,7 +521,7 @@ class MockPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey(f"{self.key}_util"),
-                MetricTypes.USAGE,
+                MetricTypes.UTILIZATION,
                 unit_hint="percent",
                 stats_filter=frozenset({"avg", "max"}),
                 per_container={

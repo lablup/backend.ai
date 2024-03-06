@@ -216,7 +216,7 @@ async def download(request: web.Request) -> web.StreamResponse:
 async def download_directory_as_archive(
     request: web.Request,
     file_path: Path,
-    zip_filename: str = None,
+    zip_filename: str | None = None,
 ) -> web.StreamResponse:
     """
     Serve a directory as a zip archive on the fly.

@@ -57,6 +57,8 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
+    EndpointLifecycle,
+    EndpointRow,
     GroupRow,
     KernelStatus,
     ProjectResourcePolicyRow,
@@ -102,6 +104,7 @@ from .exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
+    ModelServiceDependencyNotCleared,
     ObjectNotFound,
     TooManyVFoldersFound,
     VFolderAlreadyExists,
@@ -114,7 +117,10 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
+    BaseResponseModel,
     get_user_scopes_by_email,
+    # check_api_params,
+    # get_user_scopes,
     pydantic_api_params_handler,
 )
 
@@ -127,9 +133,8 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
-    status: int = Field(default=200)
 
 
 async def ensure_vfolder_status(
@@ -1105,7 +1110,7 @@ async def update_vfolder_options(
 
 
 class MkdirRequestModel(IDBasedRequestModel):
-    path: str = Field(description="Target path to make")
+    path: list[str] = Field(description="Target path to make")
     parents: bool = Field(default=True, description="Make parent's directory if not exists")
     exist_ok: bool = Field(
         default=False, description="Skip error if the target path already exsits."
@@ -1117,12 +1122,14 @@ class MkdirRequestModel(IDBasedRequestModel):
 @pydantic_api_params_handler(MkdirRequestModel)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 async def mkdir(request: web.Request, params: MkdirRequestModel, row: VFolderRow) -> web.Response:
+    if len(params.path) > 50:
+        raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
-        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, path:{})",
+        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, paths:{})",
         request["user"]["email"],
         access_key,
         folder_name,
@@ -1140,9 +1147,14 @@ async def mkdir(request: web.Request, params: MkdirRequestModel, row: VFolderRow
             "parents": params.parents,
             "exist_ok": params.exist_ok,
         },
-    ):
-        pass
-    return web.Response(status=201)
+    ) as (_, storage_resp):
+        storage_reply = await storage_resp.json()
+        match storage_resp.status:
+            case 200 | 207:
+                return web.json_response(storage_reply, status=storage_resp.status)
+            # 422 will be wrapped as VFolderOperationFailed by storage_manager
+            case _:
+                raise RuntimeError("should not reach here")
 
 
 class CreateDownloadSessionRequestModel(IDBasedRequestModel):
@@ -2107,6 +2119,17 @@ async def _delete(
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        # perform extra check to make sure records of alive model service not removed by foreign key rule
+        if entry["usage_mode"] == VFolderUsageMode.MODEL:
+            async with root_ctx.db._begin_session(conn) as sess:
+                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
+                if (
+                    len([
+                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
+                    ])
+                    > 0
+                ):
+                    raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
             conn,
@@ -2180,7 +2203,7 @@ class IDRequestModel(BaseModel):
     )
 
 
-class CompactVFolderInfoModel(BaseModel):
+class CompactVFolderInfoModel(BaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 

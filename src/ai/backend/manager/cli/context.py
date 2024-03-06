@@ -15,7 +15,7 @@ from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB,
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import LogSeverity, RedisConnectionInfo
 
 from ..config import LocalConfig, SharedConfig
 from ..config import load as load_config
@@ -25,7 +25,7 @@ class CLIContext:
     _local_config: LocalConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: str) -> None:
+    def __init__(self, config_path: Path, log_level: LogSeverity) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None
