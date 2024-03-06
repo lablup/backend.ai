@@ -22,8 +22,10 @@ jobs:
           latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
           echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
           commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
-          echo "commit_message=$commit_message" >> $GITHUB_OUTPUT
-          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)$" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_message" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
           latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
           echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
@@ -81,7 +83,7 @@ jobs:
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
             --amend -m "${{ needs.backport-target-branch.outputs.commit_message }}" \
-            --trailer "Backported-from=main(${{ needs.backport-target-branch.outputs.latest_release }})" \
+            --trailer "Backported-from=main($latest_release)" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
       - name: When cherry-pick is failed
@@ -90,12 +92,16 @@ jobs:
           gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Backport to ${{ matrix.milestone }} is failed. Please backport manually."
         env:
           GH_TOKEN: ${{ github.token }}
+      - id: pr_title
+        run: |
+          commit_message_without_description=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | head -n 1)
+          echo "commit_message_without_description=$commit_message_without_description" >> $GITHUB_OUTPUT
       - name: Create Bakport PR
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: "${{ needs.backport-target-branch.outputs.commit_message }}"
+          title: "${{ steps.pr_title.outputs.commit_message_without_description }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
