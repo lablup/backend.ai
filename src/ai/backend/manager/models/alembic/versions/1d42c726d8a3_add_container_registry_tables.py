@@ -69,16 +69,16 @@ def migrate_data_etcd_to_psql():
 
     with ThreadPoolExecutor() as executor:
 
-        def migrate_etcd_container_registries(queue: janus.Queue):
-            async def _migrate(etcd: AsyncEtcd):
+        def take_etcd_container_registries(queue: janus.Queue):
+            async def _take_container_registries(etcd: AsyncEtcd):
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 return result
 
             etcd = get_async_etcd()
-            queue.sync_q.put(asyncio.run(_migrate(etcd)))
+            queue.sync_q.put(asyncio.run(_take_container_registries(etcd)))
 
-        executor.submit(migrate_etcd_container_registries, queue)
+        executor.submit(take_etcd_container_registries, queue)
 
     registries = queue.sync_q.get()
 
