@@ -1530,9 +1530,9 @@ class VFolderNode(graphene.ObjectType):
     quota_scope_id = graphene.String()
     name = graphene.String()
     user = graphene.UUID()  # User.id (current owner, null in project vfolders)
-    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
+    # user_email = graphene.String()  # User.email (current owner, null in project vfolders)
     group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
-    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
+    # group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
     creator = graphene.String()  # User.email (always set)
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
@@ -1556,9 +1556,7 @@ class VFolderNode(graphene.ObjectType):
             quota_scope_id=row.quota_scope_id,
             name=row.name,
             user=row.user,
-            user_email=row.users_email,
             group=row.group,
-            group_name=row.groups_name,
             creator=row.creator,
             unmanaged_path=row.unmanaged_path,
             usage_mode=row.usage_mode,
@@ -1739,6 +1737,34 @@ class DeleteVFolder(graphene.Mutation):
             vfolder_nodes = [VFolderNode.from_row(graph_ctx, row) for row in vfolder_rows]
 
         return DeleteVFolder(ok=True, msg="", vfolders=vfolder_nodes)
+
+
+class RestoreVFolder(graphene.Mutation):
+    class Arguments:
+        vfolder_ids = graphene.List(graphene.UUID, required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    vfolders = graphene.List(VFolderNode, required=False)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root: Any,
+        info: graphene.ResolveInfo,
+        vfolder_ids: list[uuid.UUID],
+    ) -> RestoreVFolder:
+        graph_ctx: GraphQueryContext = info.context
+
+        await update_vfolder_status(
+            graph_ctx.db, vfolder_ids, VFolderOperationStatus.READY, do_log=False
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+            vfolder_rows = (await db_session.scalars(stmt)).all()
+            vfolder_nodes = [VFolderNode.from_row(graph_ctx, row) for row in vfolder_rows]
+
+        return RestoreVFolder(ok=True, msg="", vfolders=vfolder_nodes)
 
 
 class DeleteVFolderInTrash(graphene.Mutation):

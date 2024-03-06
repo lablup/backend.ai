@@ -131,9 +131,13 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
+    DeleteVFolder,
+    DeleteVFolderInTrash,
     ModelCard,
     ModelCardConnection,
+    PurgeVFolder,
     QuotaScope,
+    RestoreVFolder,
     SetQuotaScope,
     UnsetQuotaScope,
     VirtualFolder,
@@ -241,6 +245,13 @@ class Mutations(graphene.ObjectType):
 
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
+
+    delete_vfolder = DeleteVFolder.Field()
+    restore_vfolder = RestoreVFolder.Field()
+    delete_vfolder_in_trash = DeleteVFolderInTrash.Field()
+
+    # super-admin only
+    purge_vfolder = PurgeVFolder.Field()
 
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
