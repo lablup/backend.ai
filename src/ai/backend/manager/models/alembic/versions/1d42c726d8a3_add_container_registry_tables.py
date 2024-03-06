@@ -121,7 +121,6 @@ def revert_data_psql_to_etcd():
     for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
         item = {
             "": url,
-            "url": url,
             "type": type,
             "hostname": registry_name,  # registry_name is changed to hostname,
         }
@@ -156,7 +155,8 @@ def revert_data_psql_to_etcd():
     def put_etcd_container_registries(merged_items: list[Any], queue: janus.Queue):
         etcd = get_async_etcd()
         for item in merged_items:
-            asyncio.run(etcd.put_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{item['hostname']}", item))
+            hostname = item.pop("hostname")
+            asyncio.run(etcd.put_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}", item))
 
         queue.sync_q.put(True)
 
