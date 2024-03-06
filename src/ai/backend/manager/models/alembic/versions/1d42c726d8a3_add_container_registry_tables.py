@@ -109,13 +109,13 @@ def migrate_data_etcd_to_psql():
         else:
             input_configs.append(input_config_template)
 
-    connection = op.get_bind()
-    connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
+    db_connection = op.get_bind()
+    db_connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
 
 def revert_data_psql_to_etcd():
-    connection = op.get_bind()
-    rows = connection.execute(sa.select(ContainerRegistryRow)).fetchall()
+    db_connection = op.get_bind()
+    rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
     items = []
 
     for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
