@@ -9,6 +9,7 @@ Create Date: 2024-03-05 10:36:24.197922
 import asyncio
 from typing import Any, Final
 
+import asyncpg
 import sqlalchemy as sa
 import trafaret as t
 from alembic import op
@@ -40,40 +41,7 @@ container_registry_iv = t.Dict({
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 
 
-async def migrate_data_etcd_to_psql(etcd: AsyncEtcd):
-    registries = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
-    items = {
-        hostname: container_registry_iv.check(item)
-        for hostname, item in registries.items()
-        # type: ignore
-    }
-
-    for hostname, registry_info in items.items():
-        input_configs = []
-        input_config: dict[str, Any] = {
-            "registry_name": hostname,  # hostname to registry_name,
-            "url": registry_info[""],
-            "type": registry_info["type"],
-            "username": registry_info.get("username", None),
-            "password": registry_info.get("password", None),
-            "ssl_verify": registry_info.get("ssl_verify", None),
-            "is_global": True,
-        }
-
-        if "project" in registry_info:
-            for project in registry_info["project"]:
-                input_config_t = input_config.copy()
-                input_config_t["project"] = project
-                input_configs.append(input_config_t)
-        else:
-            input_configs = [input_config]
-
-        for input_config in input_configs:
-            print("failed here")
-            op.execute(sa.insert(ContainerRegistryRow).values(input_config))
-
-
-def upgrade():
+def migrate_data_etcd_to_psql():
     local_config = load()
     etcd_config = local_config.get("etcd", None)
     assert etcd_config is not None, "etcd configuration is not found"
@@ -94,9 +62,56 @@ def upgrade():
         credentials=etcd_credentials,
     )
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(migrate_data_etcd_to_psql(etcd))
+    async def get_prefix_coroutine():
+        return await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
 
+    loop = asyncio.get_event_loop()
+    registries = loop.run_until_complete(get_prefix_coroutine())
+
+    print("registries", registries)
+    items = {
+        hostname: container_registry_iv.check(item)
+        for hostname, item in registries.items()
+        # type: ignore
+    }
+
+    input_configs = []
+    for hostname, registry_info in items.items():
+        input_config: dict[str, Any] = {
+            "registry_name": hostname,  # hostname to registry_name,
+            "url": str(registry_info[""]),
+            "type": registry_info["type"],
+            "username": registry_info.get("username", None),
+            "password": registry_info.get("password", None),
+            "ssl_verify": registry_info.get("ssl_verify", None),
+            "is_global": True,
+        }
+
+        if "project" in registry_info:
+            for project in registry_info["project"]:
+                input_config_t = input_config.copy()
+                input_config_t["project"] = project
+                input_configs.append(input_config_t)
+        else:
+            input_configs.append(input_config)
+
+    try:
+        connection = op.get_bind()
+        connection.execute(sa.insert(ContainerRegistryRow).values(input_config))
+
+    except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
+        print("ConnectionError")
+
+    except Exception as e:
+        print("e", e)
+        raise
+
+    except BaseException:
+        print("Base Error")
+        raise
+
+
+def upgrade():
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
         "container_registries",
@@ -121,6 +136,8 @@ def upgrade():
             "is_global", sa.Boolean(), server_default=sa.text("true"), nullable=True, index=True
         ),
     )
+
+    migrate_data_etcd_to_psql()
 
 
 def downgrade():
