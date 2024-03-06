@@ -1711,7 +1711,7 @@ async def delete_vfolders(
         tg.create_task(_task(reporter))
 
 
-class DeleteVFolder(graphene.Mutation):
+class MoveToTrashVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
@@ -1725,7 +1725,7 @@ class DeleteVFolder(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         vfolder_ids: list[uuid.UUID],
-    ) -> DeleteVFolder:
+    ) -> MoveToTrashVFolder:
         graph_ctx: GraphQueryContext = info.context
 
         await update_vfolder_status(
@@ -1736,7 +1736,7 @@ class DeleteVFolder(graphene.Mutation):
             vfolder_rows = (await db_session.scalars(stmt)).all()
             vfolder_nodes = [VFolderNode.from_row(graph_ctx, row) for row in vfolder_rows]
 
-        return DeleteVFolder(ok=True, msg="", vfolders=vfolder_nodes)
+        return MoveToTrashVFolder(ok=True, msg="", vfolders=vfolder_nodes)
 
 
 class RestoreVFolder(graphene.Mutation):
@@ -1767,7 +1767,7 @@ class RestoreVFolder(graphene.Mutation):
         return RestoreVFolder(ok=True, msg="", vfolders=vfolder_nodes)
 
 
-class DeleteVFolderInTrash(graphene.Mutation):
+class DeleteForeverVFolder(graphene.Mutation):
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
@@ -1782,7 +1782,7 @@ class DeleteVFolderInTrash(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         vfolder_ids: list[uuid.UUID],
-    ) -> DeleteVFolderInTrash:
+    ) -> DeleteForeverVFolder:
         graph_ctx: GraphQueryContext = info.context
 
         await update_vfolder_status(
@@ -1795,7 +1795,7 @@ class DeleteVFolderInTrash(graphene.Mutation):
             stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
             vfolder_rows = (await db_session.scalars(stmt)).all()
             if not vfolder_rows:
-                return DeleteVFolderInTrash(ok=True, msg="")
+                return DeleteForeverVFolder(ok=True, msg="")
             for row in vfolder_rows:
                 vfolder_nodes.append(VFolderNode.from_row(graph_ctx, row))
                 vfolder_infos.append(VFolderDeletionInfo(VFolderID.from_row(row), row.host))
@@ -1811,7 +1811,7 @@ class DeleteVFolderInTrash(graphene.Mutation):
         task_id = await graph_ctx.background_task_manager.start(
             _delete_task, total_progress=len(vfolder_infos)
         )
-        return DeleteVFolderInTrash(ok=True, msg="", task_id=task_id, vfolders=vfolder_nodes)
+        return DeleteForeverVFolder(ok=True, msg="", task_id=task_id, vfolders=vfolder_nodes)
 
 
 class PurgeVFolder(graphene.Mutation):
