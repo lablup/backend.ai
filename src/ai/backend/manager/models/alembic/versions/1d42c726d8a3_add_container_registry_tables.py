@@ -47,6 +47,30 @@ ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
 
 
+def get_container_registry_row_schema(base):
+    class ContainerRegistryRow(base):
+        __tablename__ = "container_registries"
+        __table_args__ = {"extend_existing": True}
+        id = IDColumn()
+        url = sa.Column("url", sa.String(length=512), index=True)
+        registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
+        type = sa.Column(
+            "type",
+            StrEnumType(ContainerRegistryType),
+            default=ContainerRegistryType.DOCKER,
+            server_default=ContainerRegistryType.DOCKER,
+            nullable=False,
+            index=True,
+        )
+        project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
+        username = sa.Column("username", sa.String(length=255), nullable=True)
+        password = sa.Column("password", sa.String(length=255), nullable=True)
+        ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
+        is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+
+    return ContainerRegistryRow
+
+
 def get_async_etcd() -> AsyncEtcd:
     local_config = load()
     etcd_config = local_config.get("etcd", None)
@@ -142,50 +166,14 @@ def migrate_data_etcd_to_psql() -> None:
         print("There is no container registries data to migrate in etcd.")
         return
 
-    class ContainerRegistryRow(Base):
-        __tablename__ = "container_registries"
-        __table_args__ = {"extend_existing": True}
-        id = IDColumn()
-        url = sa.Column("url", sa.String(length=512), index=True)
-        registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
-            "type",
-            StrEnumType(ContainerRegistryType),
-            default=ContainerRegistryType.DOCKER,
-            server_default=ContainerRegistryType.DOCKER,
-            nullable=False,
-            index=True,
-        )
-        project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
-        username = sa.Column("username", sa.String(length=255), nullable=True)
-        password = sa.Column("password", sa.String(length=255), nullable=True)
-        ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
-        is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+    ContainerRegistryRow = get_container_registry_row_schema(Base)
 
     db_connection = op.get_bind()
     db_connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
 
 def revert_data_psql_to_etcd() -> None:
-    class ContainerRegistryRow(Base):
-        __tablename__ = "container_registries"
-        __table_args__ = {"extend_existing": True}
-        id = IDColumn()
-        url = sa.Column("url", sa.String(length=512), index=True)
-        registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
-            "type",
-            StrEnumType(ContainerRegistryType),
-            default=ContainerRegistryType.DOCKER,
-            server_default=ContainerRegistryType.DOCKER,
-            nullable=False,
-            index=True,
-        )
-        project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
-        username = sa.Column("username", sa.String(length=255), nullable=True)
-        password = sa.Column("password", sa.String(length=255), nullable=True)
-        ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
-        is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+    ContainerRegistryRow = get_container_registry_row_schema(Base)
 
     db_connection = op.get_bind()
     rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
