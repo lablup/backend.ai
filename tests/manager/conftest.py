@@ -70,10 +70,12 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import (
+    metadata,
     pgsql_connect_opts,
     populate_fixture,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistry
+
+# from ai.backend.manager.models.container_registry import ContainerRegistry
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -474,7 +476,8 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
-                await conn.execute((ContainerRegistry.__table__.delete()))
+                # await conn.execute(((await load_table(engine, "container_registries")).delete()))
+                await conn.execute((metadata.tables.get("container_registries")))
         finally:
             await engine.dispose()
 
