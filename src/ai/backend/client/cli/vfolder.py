@@ -200,26 +200,10 @@ def delete_forever(name):
             sys.exit(ExitCode.FAILURE)
 
 
-@vfolder.command()
-@click.argument("name", type=str)
-def recover(name):
-    """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
-
-    NAME: Name of a virtual folder.
-    """
-    with Session() as session:
-        try:
-            session.VFolder(name).restore()
-            print_done("Restored.")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
-
-
-@vfolder.command()
+@vfolder.command(aliases=["recover"])
 @click.argument("name", type=str)
 def restore(name):
-    """Restore the given virtual folder from deleted status, from trash bin.
+    """Restore the given virtual folder from `delete-pending` status(trash-bin) to `ready`.
 
     NAME: Name of a virtual folder.
     """
