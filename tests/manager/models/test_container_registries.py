@@ -76,11 +76,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         },
     }
 
-    try:
-        response = await client.execute_async(query, variables=variables, context_value=context)
-        print("response!", response)
-    except Exception as e:
-        print(e)
+    response = await client.execute_async(query, variables=variables, context_value=context)
 
     container_registry = response["data"]["create_container_registry"]["container_registry"]
 
