@@ -122,7 +122,7 @@ def migrate_data_etcd_to_psql():
         input_config_template: dict[str, Any] = {
             "registry_name": hostname,  # hostname is changed to registry_name,
             "url": str(registry_info[""]),
-            "type": ContainerRegistryType[registry_info["type"].upper()],
+            "type": ContainerRegistryType(registry_info["type"]),
             "username": registry_info.get("username", None),
             "password": registry_info.get("password", None),
             "ssl_verify": registry_info.get("ssl_verify", None),
