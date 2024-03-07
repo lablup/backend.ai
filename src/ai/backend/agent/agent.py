@@ -1720,6 +1720,7 @@ class AbstractAgent(
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
             if do_pull:
+
                 async def _task(reporter: ProgressReporter) -> None:
                     pass
 
