@@ -52,6 +52,8 @@ class ContainerRegistryType(enum.StrEnum):
 
 
 class ContainerRegistryTypeField(Scalar):
+    allowed_values = tuple(t.value for t in ContainerRegistryType)
+
     @staticmethod
     def serialize(val: ContainerRegistryType) -> str:
         return val.value
@@ -116,7 +118,10 @@ class ContainerRegistryRow(Base):
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
-    type = ContainerRegistryTypeField(required=True)
+    type = ContainerRegistryTypeField(
+        required=True,
+        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
+    )
     registry_name = graphene.String(required=True)
     is_global = graphene.Boolean()
     project = graphene.String()
@@ -126,9 +131,13 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
-    id = graphene.String(required=True)
+    id = graphene.String(
+        required=True, description="Object id. Can be either global id or object id"
+    )
     url = graphene.String()
-    type = ContainerRegistryTypeField()
+    type = ContainerRegistryTypeField(
+        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}."
+    )
     registry_name = graphene.String()
     is_global = graphene.Boolean()
     project = graphene.String()
@@ -138,7 +147,9 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 
 class DeleteContainerRegistryInput(graphene.InputObjectType):
-    id = graphene.String(required=True)
+    id = graphene.String(
+        required=True, description="Object id. Can be either global id or object id"
+    )
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
