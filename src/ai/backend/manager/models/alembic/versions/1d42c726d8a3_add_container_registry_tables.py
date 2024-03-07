@@ -68,7 +68,7 @@ def get_async_etcd() -> AsyncEtcd:
     )
 
 
-def migrate_data_etcd_to_psql():
+def migrate_data_etcd_to_psql() -> None:
     queue = Queue()
 
     with ThreadPoolExecutor() as executor:
@@ -146,7 +146,7 @@ def migrate_data_etcd_to_psql():
     db_connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
 
-def revert_data_psql_to_etcd():
+def revert_data_psql_to_etcd() -> None:
     db_connection = op.get_bind()
     rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
     items = []
