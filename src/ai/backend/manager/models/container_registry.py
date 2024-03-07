@@ -301,7 +301,7 @@ class CreateContainerRegistry(graphene.Mutation):
         input_config: dict[str, Any] = {
             "registry_name": props.registry_name,
             "url": props.url,
-            "type": props.type,
+            "type": ContainerRegistryType(props.type),
         }
 
         set_if_set(props, input_config, "project")
@@ -316,6 +316,7 @@ class CreateContainerRegistry(graphene.Mutation):
                 .values(input_config)
                 .returning(ContainerRegistryRow.id)
             )
+
             inserted_item_id = result.scalar()
 
             return cls(
