@@ -69,7 +69,7 @@ def get_async_etcd() -> AsyncEtcd:
 
 
 def migrate_data_etcd_to_psql() -> None:
-    queue = Queue()
+    queue: Queue = Queue()
 
     with ThreadPoolExecutor() as executor:
 
@@ -109,7 +109,7 @@ def migrate_data_etcd_to_psql() -> None:
         )
         raise RuntimeError(err_msg) from maybe_registries
     else:
-        registries = cast(list[Any], maybe_registries)
+        registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
         hostname: etcd_container_registry_iv.check(item)
@@ -197,7 +197,7 @@ def revert_data_psql_to_etcd() -> None:
 
         queue.put(True)
 
-    queue = Queue()
+    queue: Queue = Queue()
 
     with ThreadPoolExecutor() as executor:
         executor.submit(put_etcd_container_registries, merged_items, queue)
