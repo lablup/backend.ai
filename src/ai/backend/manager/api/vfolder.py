@@ -136,7 +136,7 @@ class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
 
 
-class BackgroundTaskResponseModel(BaseModel):
+class BackgroundTaskResponseModel(BaseResponseModel):
     task_id: uuid.UUID | None = Field(
         description="Background task id. `None` when there is no vfolders to delete."
     )
