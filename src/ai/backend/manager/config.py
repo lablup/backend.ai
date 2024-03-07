@@ -50,16 +50,6 @@ Alias keys are also URL-quoted in the same way.
      + docker
        + image
          - auto_pull: "digest" (default) | "tag" | "none"
-       + registry
-         + "index.docker.io": "https://registry-1.docker.io"
-           - username: "lablup"
-         + {registry-name}: {registry-URL}  # {registry-name} is url-quoted
-           - username: {username}
-           - password: {password}
-           - type: "docker" | "harbor" | "harbor2"
-           - project: "project1-name,project2-name,..."  # harbor only
-           - ssl-verify: "yes" | "no"
-         ...
      + redis
        - addr: "{redis-host}:{redis-port}"
        - password: {password}
