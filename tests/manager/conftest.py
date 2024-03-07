@@ -473,7 +473,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
-                await conn.execute(await conn.execute((ContainerRegistryRow.__table__.delete())))
+                await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()
 
