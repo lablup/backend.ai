@@ -194,7 +194,7 @@ def delete_forever(name):
     with Session() as session:
         try:
             session.VFolder(name).delete_forever()
-            print_done("Delete completed.")
+            print_done("Delete task started.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
