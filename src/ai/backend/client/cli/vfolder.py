@@ -148,9 +148,9 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
             sys.exit(ExitCode.FAILURE)
 
 
-@vfolder.command()
+@vfolder.command(aliases=["move-to-trash"])
 @click.argument("name", type=str)
-def move_to_trash(name):
+def trash(name):
     """Move the given virtual folder to trash-bin. The virtual folder will be under `delete-pending` status.
     This operation can be retracted by
     calling `restore()`.
