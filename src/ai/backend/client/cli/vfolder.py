@@ -150,8 +150,8 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete(name):
-    """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
+def move_to_trash(name):
+    """Move the given virtual folder to trash-bin. The virtual folder will be under `delete-pending` status.
     This operation can be retracted by
     calling `restore()`.
 
@@ -160,7 +160,7 @@ def delete(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete()
+            session.VFolder(name).move_to_trash()
             print_done("Deleted.")
         except Exception as e:
             print_error(e)
@@ -185,7 +185,7 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete_trash(name):
+def delete_forever(name):
     """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
 
@@ -193,7 +193,7 @@ def delete_trash(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete_trash()
+            session.VFolder(name).delete_forever()
             print_done("Delete completed.")
         except Exception as e:
             print_error(e)

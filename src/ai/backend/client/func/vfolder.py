@@ -247,7 +247,7 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def delete(self):
+    async def move_to_trash(self):
         rqst = Request("DELETE", "/folders/{0}".format(self.name))
         async with rqst.fetch():
             return {}
@@ -268,7 +268,7 @@ class VFolder(BaseFunction):
         if self.id is None:
             vfolder_id = await self._get_id_by_name()
             self.id = vfolder_id
-        rqst = Request("POST", "/folders/restore-from-trash-bin")
+        rqst = Request("POST", "/folders/restore")
         rqst.set_json({
             "id": self.id.hex,
         })
@@ -284,11 +284,11 @@ class VFolder(BaseFunction):
         return await self._restore()
 
     @api_function
-    async def delete_trash(self) -> Mapping[str, Any]:
+    async def delete_forever(self) -> Mapping[str, Any]:
         if self.id is None:
             vfolder_id = await self._get_id_by_name()
             self.id = vfolder_id
-        rqst = Request("POST", "/folders/delete-from-trash-bin")
+        rqst = Request("POST", "/folders/delete-forever")
         rqst.set_json({
             "id": self.id.hex,
         })

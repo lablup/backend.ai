@@ -2403,7 +2403,7 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 @auth_required
 @pydantic_params_api_handler(DeleteFromTrashRequestModel)
-async def delete_from_trash_bin(
+async def delete_forever(
     request: web.Request, params: DeleteFromTrashRequestModel
 ) -> BackgroundTaskResponseModel:
     """
@@ -3493,7 +3493,9 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/clone", clone))
     cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
-    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
+    cors.add(add_route("POST", r"/restore", restore))
+    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_forever))
+    cors.add(add_route("POST", r"/delete-forever", delete_forever))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
