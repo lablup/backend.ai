@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 
@@ -16,6 +17,7 @@ from .base import (
     FilterExprArg,
     IDColumn,
     OrderExprArg,
+    StrEnumType,
     generate_sql_info_for_gql_connection,
     privileged_mutation,
     set_if_set,
@@ -39,15 +41,24 @@ __all__: Sequence[str] = (
 )
 
 
+class ContainerRegistryType(enum.StrEnum):
+    DOCKER = "docker"
+    HARBOR = "harbor"
+    HARBOR2 = "harbor2"
+    LOCAL = "local"
+
+
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
-    url = sa.Column("url", sa.String(length=255), index=True)
+    url = sa.Column("url", sa.String(length=512), index=True)
     registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
     type = sa.Column(
         "type",
-        sa.Enum("docker", "harbor", "harbor2", name="container_registry_type"),
-        default="docker",
+        StrEnumType(ContainerRegistryType),
+        default=ContainerRegistryType.DOCKER,
+        server_default=ContainerRegistryType.DOCKER,
+        nullable=False,
         index=True,
     )
     project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
@@ -59,22 +70,22 @@ class ContainerRegistryRow(Base):
     def __init__(
         self,
         url: str,
-        registry_name: str,
         type: str,
-        ssl_verify: bool,
+        registry_name: str,
         is_global: bool,
-        project: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        project: Optional[str] = None,
+        ssl_verify: Optional[bool] = None,
     ) -> None:
-        self.registry_name = registry_name
         self.url = url
         self.type = type
-        self.project = project
+        self.registry_name = registry_name
+        self.is_global = is_global
         self.username = username
         self.password = password
+        self.project = project
         self.ssl_verify = ssl_verify
-        self.is_global = is_global
 
     @classmethod
     async def get(
@@ -109,33 +120,33 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     registry_name = graphene.String(required=True)
+    is_global = graphene.Boolean()
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
-    is_global = graphene.Boolean()
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String()
     type = graphene.String()
     registry_name = graphene.String()
+    is_global = graphene.Boolean()
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
-    is_global = graphene.Boolean()
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     registry_name = graphene.String(required=True)
+    is_global = graphene.Boolean()
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
-    is_global = graphene.Boolean()
 
 
 class ContainerRegistry(graphene.ObjectType):
@@ -342,11 +353,11 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "url")
         set_if_set(props, input_config, "type")
         set_if_set(props, input_config, "registry_name")
-        set_if_set(props, input_config, "project")
+        set_if_set(props, input_config, "is_global")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "ssl_verify")
-        set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as session:
             _, reg_id = AsyncNode.resolve_global_id(info, id)

@@ -12,19 +12,18 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from itertools import groupby
-from typing import Any, Final, Mapping
+from typing import Any, Final, Mapping, cast
 
 import janus
 import sqlalchemy as sa
 import trafaret as t
 from alembic import op
-from sqlalchemy.sql import text
 
 from ai.backend.common import validators as tx
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, GetPrefixValue
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
-from ai.backend.manager.models.base import IDColumn, convention
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.base import IDColumn, StrEnumType, convention
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
@@ -32,7 +31,7 @@ down_revision = "75ea2b136830"
 branch_labels = None
 depends_on = None
 
-container_registry_iv = t.Dict({
+etcd_container_registry_iv = t.Dict({
     t.Key(""): tx.URL,
     t.Key("type", default="docker"): t.String,
     t.Key("username", default=None): t.Null | t.String,
@@ -45,7 +44,6 @@ container_registry_iv = t.Dict({
 
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 
-ETCD_CONTAINER_REGISTRIES_BACKUP_PATH_ENVVAR: Final = "ETCD_CONTAINER_REGISTRIES_BACKUP_PATH"
 ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
 
 
@@ -75,8 +73,8 @@ def migrate_data_etcd_to_psql():
 
     with ThreadPoolExecutor() as executor:
 
-        def backup(etcd_container_registries: Mapping[str, GetPrefixValue | str | None]):
-            backup_path = os.getenv(ETCD_CONTAINER_REGISTRIES_BACKUP_PATH_ENVVAR, ".")
+        def backup(etcd_container_registries: Mapping[str, Any]):
+            backup_path = os.getenv("BACKEND_ETCD_BACKUP_PATH", ".")
             with open(
                 os.path.join(backup_path, ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME), "w"
             ) as f:
@@ -99,19 +97,22 @@ def migrate_data_etcd_to_psql():
 
         executor.submit(take_etcd_container_registries, queue)
 
-    registries = queue.sync_q.get()
+    maybe_registries = queue.sync_q.get()
 
-    if isinstance(registries, Exception):
+    if isinstance(maybe_registries, Exception):
+        err_msg = (
+            f"Failed to save etcd container registries backup file., Cause: {maybe_registries}"
+        )
         print(
-            f"Failed to save etcd container registries backup file., cause: {registries}",
+            err_msg,
             file=sys.stderr,
         )
-        db_connection = op.get_bind()
-        db_connection.execute(sa.text("ROLLBACK"))
-        return
+        raise RuntimeError(err_msg) from maybe_registries
+    else:
+        registries = cast(list[Any], maybe_registries)
 
     old_format_container_registries = {
-        hostname: container_registry_iv.check(item)
+        hostname: etcd_container_registry_iv.check(item)
         for hostname, item in registries.items()
         # type: ignore
     }
@@ -121,7 +122,7 @@ def migrate_data_etcd_to_psql():
         input_config_template: dict[str, Any] = {
             "registry_name": hostname,  # hostname is changed to registry_name,
             "url": str(registry_info[""]),
-            "type": registry_info["type"],
+            "type": ContainerRegistryType[registry_info["type"].upper()],
             "username": registry_info.get("username", None),
             "password": registry_info.get("password", None),
             "ssl_verify": registry_info.get("ssl_verify", None),
@@ -153,7 +154,7 @@ def revert_data_psql_to_etcd():
     for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
         item = {
             "": url,
-            "type": type,
+            "type": str(type),
             "hostname": registry_name,  # registry_name should be reverted to hostname,
         }
 
@@ -210,14 +211,15 @@ def upgrade():
         "container_registries",
         metadata,
         IDColumn("id"),
-        sa.Column("url", sa.String(length=255), nullable=True, index=True),
+        sa.Column("url", sa.String(length=512), nullable=True, index=True),
         sa.Column("registry_name", sa.String(length=50), nullable=True, index=True),
         sa.Column(
             "type",
-            sa.Enum("docker", "harbor", "harbor2", name="container_registry_type"),
-            default="docker",
-            index=True,
+            StrEnumType(ContainerRegistryType),
+            default=ContainerRegistryType.DOCKER,
+            server_default=ContainerRegistryType.DOCKER,
             nullable=False,
+            index=True,
         ),
         sa.Column("project", sa.String(length=255), nullable=True),
         sa.Column("username", sa.String(length=255), nullable=True),
@@ -237,4 +239,3 @@ def downgrade():
     revert_data_psql_to_etcd()
 
     op.drop_table("container_registries")
-    op.execute(text("DROP TYPE container_registry_type"))

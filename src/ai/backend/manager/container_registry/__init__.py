@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Type
 
 import yarl
 
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 if TYPE_CHECKING:
     from .base import BaseContainerRegistry
@@ -18,19 +18,19 @@ def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[Base
         from .docker import DockerHubRegistry
 
         cr_cls = DockerHubRegistry
-    elif registry_type == "docker":
+    elif registry_type == ContainerRegistryType.DOCKER:
         from .docker import DockerRegistry_v2
 
         cr_cls = DockerRegistry_v2
-    elif registry_type == "harbor":
+    elif registry_type == ContainerRegistryType.HARBOR:
         from .harbor import HarborRegistry_v1
 
         cr_cls = HarborRegistry_v1
-    elif registry_type == "harbor2":
+    elif registry_type == ContainerRegistryType.HARBOR2:
         from .harbor import HarborRegistry_v2
 
         cr_cls = HarborRegistry_v2
-    elif registry_type == "local":
+    elif registry_type == ContainerRegistryType.LOCAL:
         from .local import LocalRegistry
 
         cr_cls = LocalRegistry
