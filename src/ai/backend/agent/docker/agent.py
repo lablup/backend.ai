@@ -1270,7 +1270,54 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config)
+            # await docker.images.pull(image_ref.canonical, auth=auth_config)
+            async for event in docker.images.pull(
+                image_ref.canonical, auth=auth_config, stream=True
+            ):
+                event_id = event.get("id", None)
+                event_status = event.get("status", None)
+                match event_status:
+                    case "Pulling fs layer":
+                        pass
+                    case "Waiting":
+                        pass
+                    case "Downloading":
+                        current_progress = event.get("progressDetail", {}).get("current", 0)
+                        total_progress = event.get("progressDetail", {}).get("total", 0)
+                    case "Verifying Checksum":
+                        pass
+                    case "Download complete":
+                        pass
+                    case "Extracting":
+                        current_progress = event.get("progressDetail", {}).get("current", 0)
+                        total_progress = event.get("progressDetail", {}).get("total", 0)
+                    case "Pull complete":
+                        pass
+                    case x if x.startswith("Digest: "):
+                        # Digest: sha256:26d4127a64d6afcff8c1682f351339862318fe219ea8f4cee8cb572584e8aec1
+                        pass
+                    case x if x.startswith("Status: "):
+                        # Status: Downloaded newer image for cr.backend.ai/multiarch/python:3.9-ubuntu20.04
+                        pass
+                    case _:
+                        pass
+                current_progress = event.get("progressDetail", {}).get("current", 0)
+                total_progress = event.get("progressDetail", {}).get("total", 0)
+                # log.info(
+                #     "IMAGE.PULL (image_ref:{}, registry_conf:{}) event:{}",
+                #     image_ref,
+                #     registry_conf,
+                #     event,
+                # )
+                log.info(
+                    "IMAGE.PULL (image_ref:{}) (event:{}, status:{}, progress:{}%({}/{}))",
+                    image_ref,
+                    event_id,
+                    event_status,
+                    round(current_progress / (total_progress + 1) * 100, ndigits=2),
+                    current_progress,
+                    total_progress,
+                )
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1401,6 +1448,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         await self.collect_logs(kernel_id, container_id, log_iter())
                 except DockerError as e:
                     if e.status == 404:
+                        # /Users/rapsealk/Desktop/git/backend.ai-dev2/src/ai/backend/agent/docker/agent.py:1451: RuntimeWarning: coroutine 'Docker._do_query' was never awaited
+                        #   log.warning(
+                        # RuntimeWarning: Enable tracemalloc to get the object allocation traceback
                         log.warning(
                             "container is already cleaned or missing (k:{}, cid:{})",
                             kernel_id,

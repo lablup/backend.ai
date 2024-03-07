@@ -154,6 +154,7 @@ from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
+    from ai.backend.common.bgtask import ProgressReporter
     from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -1719,6 +1720,12 @@ class AbstractAgent(
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
             if do_pull:
+                async def _task(reporter: ProgressReporter) -> None:
+                    pass
+
+                task_id: UUID = await self.local_config["background_task_manager"].start(_task)
+                log.warning("CREATE_KERNEL background_task_manager.start(t:{})", task_id)
+
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
