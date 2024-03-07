@@ -1,3 +1,4 @@
+import uuid
 from unittest import mock
 
 import pytest
@@ -74,7 +75,13 @@ def test_list_vfolders():
 def test_delete_vfolder():
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
-        m.delete(build_url(session.config, "/folders/{}".format(vfolder_name)), status=204)
+        vfolder_id = uuid.uuid4()
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": str(vfolder_id)},
+        )
+        m.delete(build_url(session.config, "/folders"), status=204)
         resp = session.VFolder(vfolder_name).delete()
         assert resp == {}
 
