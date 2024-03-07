@@ -1264,11 +1264,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
         if reg_user and reg_passwd:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8"))
             auth_config = {
-                "auth": encoded_creds,
+                "auth": encoded_creds.decode("ascii"),
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
