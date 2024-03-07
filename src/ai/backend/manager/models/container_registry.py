@@ -126,6 +126,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
+    id = graphene.String(required=True)
     url = graphene.String()
     type = ContainerRegistryTypeField()
     registry_name = graphene.String()
@@ -134,6 +135,10 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+
+
+class DeleteContainerRegistryInput(graphene.InputObjectType):
+    id = graphene.String(required=True)
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
@@ -325,7 +330,6 @@ class ModifyContainerRegistry(graphene.Mutation):
     container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        id = graphene.UUID(required=True)
         props = ModifyContainerRegistryInput(required=True)
 
     @classmethod
@@ -337,7 +341,6 @@ class ModifyContainerRegistry(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        id: uuid.UUID,
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
@@ -353,11 +356,14 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "ssl_verify")
 
+        _, _id = AsyncNode.resolve_global_id(info, props.id)
+        reg_id = uuid.UUID(_id) if _id else uuid.UUID(props.id)
+
         async with ctx.db.begin_session() as session:
-            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == id)
+            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
             reg_row = await session.scalar(stmt)
             if reg_row is None:
-                raise ValueError(f"ContainerRegistry not found (id: {id})")
+                raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
             for field, val in input_config.items():
                 setattr(reg_row, field, val)
 
@@ -369,7 +375,7 @@ class DeleteContainerRegistry(graphene.Mutation):
     container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        id = graphene.UUID(required=True)
+        props = DeleteContainerRegistryInput(required=True)
 
     @classmethod
     @privileged_mutation(
@@ -380,13 +386,16 @@ class DeleteContainerRegistry(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        id: uuid.UUID,
+        props: DeleteContainerRegistryInput,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        container_registry = await ContainerRegistry.load(ctx, id)
+
+        _, _id = AsyncNode.resolve_global_id(info, props.id)
+        reg_id = uuid.UUID(_id) if _id else uuid.UUID(props.id)
+        container_registry = await ContainerRegistry.load(ctx, reg_id)
         async with ctx.db.begin_session() as session:
             await session.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == id)
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
             )
 
         return cls(container_registry=container_registry)
