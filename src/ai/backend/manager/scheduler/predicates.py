@@ -4,6 +4,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
@@ -293,4 +294,128 @@ async def check_domain_resource_limit(
                 )
             ),
         )
+    return PredicateResult(True)
+
+
+async def check_pending_session_count_limit(
+    db_sess: SASession,
+    sched_ctx: SchedulingContext,
+    sess_ctx: SessionRow,
+) -> PredicateResult:
+    result = True
+    failure_msgs = []
+
+    query = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.access_key == sess_ctx.access_key)
+            & (SessionRow.status == SessionStatus.PENDING)
+        )
+        .options(noload("*"), load_only(SessionRow.requested_slots))
+    )
+    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+
+    # TODO: replace keypair resource policies with user resource policies
+    j = sa.join(
+        KeyPairResourcePolicyRow,
+        KeyPairRow,
+        KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+    )
+    policy_stmt = (
+        sa.select(KeyPairResourcePolicyRow)
+        .select_from(j)
+        .where(KeyPairRow.access_key == sess_ctx.access_key)
+        .options(
+            noload("*"),
+            load_only(
+                KeyPairResourcePolicyRow.max_pending_session_count,
+            ),
+        )
+    )
+    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+
+    pending_count_limit: int | None = policy.max_pending_session_count
+    if pending_count_limit is not None:
+        if len(pending_sessions) >= pending_count_limit:
+            result = False
+            failure_msgs.append(
+                f"You cannot create more than {pending_count_limit} pending session(s)."
+            )
+
+    log.debug(
+        "access key:{} number of pending sessions: {} / {}",
+        sess_ctx.access_key,
+        len(pending_sessions),
+        pending_count_limit,
+    )
+    if not result:
+        return PredicateResult(False, "\n".join(failure_msgs))
+    return PredicateResult(True)
+
+
+async def check_pending_session_resource_limit(
+    db_sess: SASession,
+    sched_ctx: SchedulingContext,
+    sess_ctx: SessionRow,
+) -> PredicateResult:
+    result = True
+    failure_msgs = []
+
+    query = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.access_key == sess_ctx.access_key)
+            & (SessionRow.status == SessionStatus.PENDING)
+        )
+        .options(noload("*"), load_only(SessionRow.requested_slots))
+    )
+    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+
+    # TODO: replace keypair resource policies with user resource policies
+    j = sa.join(
+        KeyPairResourcePolicyRow,
+        KeyPairRow,
+        KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+    )
+    policy_stmt = (
+        sa.select(KeyPairResourcePolicyRow)
+        .select_from(j)
+        .where(KeyPairRow.access_key == sess_ctx.access_key)
+        .options(
+            noload("*"),
+            load_only(
+                KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+            ),
+        )
+    )
+    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+
+    pending_resource_limit: ResourceSlot | None = policy.max_pending_session_resource_slots
+    if pending_resource_limit is not None and pending_resource_limit:
+        current_pending_session_slots: ResourceSlot = sum(
+            [session.requested_slots for session in pending_sessions], start=ResourceSlot()
+        )
+        if current_pending_session_slots >= pending_resource_limit:
+            result = False
+            msg = "Your pending session quota is exceeded. ({})".format(
+                " ".join(
+                    f"{k}={v}"
+                    for k, v in current_pending_session_slots.to_humanized(
+                        sched_ctx.known_slot_types
+                    ).items()
+                )
+            )
+            failure_msgs.append(msg)
+        log.debug(
+            "access key:{} current-occupancy of pending sessions: {}",
+            sess_ctx.access_key,
+            current_pending_session_slots,
+        )
+        log.debug(
+            "access key:{} total-allowed of pending sessions: {}",
+            sess_ctx.access_key,
+            pending_resource_limit,
+        )
+    if not result:
+        return PredicateResult(False, "\n".join(failure_msgs))
     return PredicateResult(True)

@@ -20,7 +20,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import MountExpression
+from ai.backend.common.types import ClusterMode, MountExpression
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
@@ -192,20 +192,20 @@ def format_stats(stats):
         max_fraction_len = 0
         for key, metric in stats.items():
             unit = metric["unit_hint"]
-            if unit == "bytes":
-                val = metric.get("stats.max", metric["current"])
-                val = naturalsize(val, binary=True)
-                val, unit = val.rsplit(" ", maxsplit=1)
-                val = "{:,}".format(Decimal(val))
-            elif unit == "msec":
-                val = "{:,}".format(Decimal(metric["current"]))
-                unit = "msec"
-            elif unit == "percent":
-                val = metric["pct"]
-                unit = "%"
-            else:
-                val = metric["current"]
-                unit = ""
+            match unit:
+                case "bytes":
+                    val = metric.get("stats.max", metric["current"])
+                    val = naturalsize(val, binary=True)
+                    val, unit = val.rsplit(" ", maxsplit=1)
+                    val = "{:,}".format(Decimal(val))
+                case "msec" | "usec" | "sec":
+                    val = "{:,}".format(Decimal(metric["current"]))
+                case "percent" | "pct" | "%":
+                    val = metric["pct"]
+                    unit = "%"
+                case _:
+                    val = metric["current"]
+                    unit = ""
             if val is None:
                 continue
             ip, _, fp = val.partition(".")
@@ -386,8 +386,8 @@ def prepare_mount_arg_v2(
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option(
@@ -449,7 +449,7 @@ def run(
     scaling_group,  # click_start_option
     resources,  # click_start_option
     cluster_size,  # click_start_option
-    cluster_mode,
+    cluster_mode: ClusterMode,
     resource_opts,  # click_start_option
     architecture,
     domain,  # click_start_option
