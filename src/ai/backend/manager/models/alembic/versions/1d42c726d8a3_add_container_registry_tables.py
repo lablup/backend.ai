@@ -7,9 +7,12 @@ Create Date: 2024-03-05 10:36:24.197922
 """
 
 import asyncio
+import json
+import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from itertools import groupby
-from typing import Any, Final
+from typing import Any, Final, Mapping
 
 import janus
 import sqlalchemy as sa
@@ -18,7 +21,7 @@ from alembic import op
 from sqlalchemy.sql import text
 
 from ai.backend.common import validators as tx
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, GetPrefixValue
 from ai.backend.manager.config import load
 from ai.backend.manager.models.base import IDColumn, convention
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -41,6 +44,9 @@ container_registry_iv = t.Dict({
 }).allow_extra("*")
 
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
+
+ETCD_CONTAINER_REGISTRIES_BACKUP_PATH_ENVVAR: Final = "ETCD_CONTAINER_REGISTRIES_BACKUP_PATH"
+ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
 
 
 def get_async_etcd() -> AsyncEtcd:
@@ -69,9 +75,22 @@ def migrate_data_etcd_to_psql():
 
     with ThreadPoolExecutor() as executor:
 
+        def backup(etcd_container_registries: Mapping[str, GetPrefixValue | str | None]):
+            backup_path = os.getenv(ETCD_CONTAINER_REGISTRIES_BACKUP_PATH_ENVVAR, ".")
+            with open(
+                os.path.join(backup_path, ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME), "w"
+            ) as f:
+                json.dump(dict(etcd_container_registries), f, indent=4)
+
+        # If there are no container registries, it returns an empty list.
+        # If an error occurs while saving backup, it returns error.
         def take_etcd_container_registries(queue: janus.Queue):
             async def _take_container_registries(etcd: AsyncEtcd):
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
+                try:
+                    backup(result)
+                except Exception as e:
+                    return e
                 await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 return result
 
@@ -81,6 +100,15 @@ def migrate_data_etcd_to_psql():
         executor.submit(take_etcd_container_registries, queue)
 
     registries = queue.sync_q.get()
+
+    if isinstance(registries, Exception):
+        print(
+            f"Failed to save etcd container registries backup file., cause: {registries}",
+            file=sys.stderr,
+        )
+        db_connection = op.get_bind()
+        db_connection.execute(sa.text("ROLLBACK"))
+        return
 
     old_format_container_registries = {
         hostname: container_registry_iv.check(item)
@@ -110,6 +138,7 @@ def migrate_data_etcd_to_psql():
             input_configs.append(input_config_template)
 
     if not input_configs:
+        print("There is no container registries data to migrate in etcd.")
         return
 
     db_connection = op.get_bind()
@@ -147,7 +176,7 @@ def revert_data_psql_to_etcd():
     def merge_items(items):
         for item in items:
             if "project" not in item:
-                return items
+                return items[0]
 
         projects = [item["project"] for item in items]
         merged_projects = ",".join(projects)
