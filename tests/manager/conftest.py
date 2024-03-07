@@ -67,12 +67,10 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import (
-    metadata,
+    load_table,
     pgsql_connect_opts,
     populate_fixture,
 )
-
-# from ai.backend.manager.models.container_registry import ContainerRegistry
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -418,7 +416,6 @@ def database_fixture(local_config, test_db, database):
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    print("database_fixture!!!ewodkpw")
     db_addr = local_config["db"]["addr"]
     db_user = local_config["db"]["user"]
     db_pass = local_config["db"]["password"]
@@ -468,8 +465,7 @@ def database_fixture(local_config, test_db, database):
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
-                # await conn.execute(((await load_table(engine, "container_registries")).delete()))
-                await conn.execute((metadata.tables.get("container_registries")))
+                await conn.execute(((await load_table(engine, "container_registries")).delete()))
         finally:
             await engine.dispose()
 
