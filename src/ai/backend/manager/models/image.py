@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
     overload,
 )
 from uuid import UUID
@@ -40,7 +41,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
@@ -122,18 +123,19 @@ async def rescan_images(
 ) -> None:
     if local:
         registries = {
-            "local": {
-                "": "http://localhost",
-                "type": "local",
-                "username": None,
-                "password": None,
-                "project": None,
-            },
+            "local": ContainerRegistryRow(
+                registry_name="local",
+                url="http://localhost",
+                type=ContainerRegistryType.LOCAL,
+            )
         }
     else:
         async with db.begin_readonly_session() as session:
             result = await session.execute(sa.select(ContainerRegistryRow))
-            latest_registry_config = {row.registry_name: row for row in result.scalars().all()}
+            latest_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {row.registry_name: row for row in result.scalars().all()},
+            )
 
         # TODO: delete images from registries removed from the previous config?
         if registry_or_image is None:
