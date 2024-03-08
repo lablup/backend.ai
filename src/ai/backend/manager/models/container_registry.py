@@ -71,8 +71,8 @@ class ContainerRegistryTypeField(Scalar):
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
-    url = sa.Column("url", sa.String(length=512), index=True)
-    registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
+    url = sa.Column("url", sa.String(length=512), index=True, nullable=False)
+    registry_name = sa.Column("registry_name", sa.String(length=50), index=True, nullable=False)
     type = sa.Column(
         "type",
         StrEnumType(ContainerRegistryType),
@@ -84,8 +84,12 @@ class ContainerRegistryRow(Base):
     project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
-    ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
-    is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+    ssl_verify = sa.Column(
+        "ssl_verify", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
+    )
+    is_global = sa.Column(
+        "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
+    )
 
     @classmethod
     async def get(
