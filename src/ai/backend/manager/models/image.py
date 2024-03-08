@@ -768,13 +768,17 @@ class AgentTask(graphene.ObjectType):
     task_id = graphene.UUID()
 
 
+class PreloadImageInput(graphene.InputObjectType):
+    references = graphene.List(graphene.String, required=True)
+    target_agents = graphene.List(graphene.String, required=True)
+    force = graphene.Boolean(default_value=False)
+
+
 class PreloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
-        force = graphene.Boolean(required=False, default_value=False)
+        props = PreloadImageInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -784,20 +788,18 @@ class PreloadImage(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
-        force: bool,
+        props: PreloadImageInput,
     ) -> PreloadImage:
         log.info(
             "preloading images ({0}) to agents ({1}) by API request",
-            ", ".join([img for img in references]),
-            ", ".join(target_agents),
+            ", ".join([img for img in props.references]),
+            ", ".join(props.target_agents),
         )
         ctx: GraphQueryContext = info.context
 
         select_ag = (
             sa.select(AgentRow)
-            .where(AgentRow.id.in_(target_agents))
+            .where(AgentRow.id.in_(props.target_agents))
             .options(load_only(AgentRow.id, AgentRow.addr))
         )
         async with ctx.db.begin_readonly_session() as db_sess:
@@ -813,12 +815,12 @@ class PreloadImage(graphene.Mutation):
                         ],
                     )
                 )
-                for ref in references
+                for ref in props.references
             ]
 
         tasks: list[dict[str, Any]] = []
         for agent in agents:
-            task_id = await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
+            task_id = await ctx.registry.pull_image(agent.id, agent.addr, images, force=props.force)
             tasks.append({
                 "agent_id": agent.id,
                 "task_id": task_id,
@@ -827,12 +829,16 @@ class PreloadImage(graphene.Mutation):
         return PreloadImage(ok=True, msg="", tasks=tasks)
 
 
+class UnloadImageInput(graphene.InputObjectType):
+    references = graphene.List(graphene.String, required=True)
+    target_agents = graphene.List(graphene.String, required=True)
+
+
 class UnloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
+        props = UnloadImageInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -842,18 +848,17 @@ class UnloadImage(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
+        props: UnloadImageInput,
     ) -> UnloadImage:
         log.info(
             "unloading images ({0}) to agents ({1}) by API request",
-            ", ".join([img for img in references]),
-            ", ".join(target_agents),
+            ", ".join([img for img in props.references]),
+            ", ".join(props.target_agents),
         )
         ctx: GraphQueryContext = info.context
         select_ag = (
             sa.select(AgentRow)
-            .where(AgentRow.id.in_(target_agents))
+            .where(AgentRow.id.in_(props.target_agents))
             .options(load_only(AgentRow.id, AgentRow.addr))
         )
         async with ctx.db.begin_readonly_session() as db_sess:
@@ -869,7 +874,7 @@ class UnloadImage(graphene.Mutation):
                         ],
                     )
                 )
-                for ref in references
+                for ref in props.references
             ]
 
         tasks: list[dict[str, Any]] = []
