@@ -40,7 +40,7 @@ from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
-from etcetra.types import WatchEventType
+from etcd_client import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
@@ -947,15 +947,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
@@ -986,10 +986,10 @@ def main(
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
     if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        log_level = LogSeverity.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

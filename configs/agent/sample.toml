@@ -267,6 +267,10 @@ ca-certs = ""
 keyfile = ""
 certfile = ""
 
+# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
+# fqdn = false
+# localname = "agent"
+
 
 # Specify additional package namespaces to include in the logs
 # and their individual log levels.

@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 # NOTE: VFolderPermission is EnumValueType
-vfperm_choices = list(map(lambda v: v.value, VFolderPermission))
+vfperm_choices = list(map(str, VFolderPermission))
 vfolderpermission = postgresql.ENUM(
     *vfperm_choices,
     name="vfolderpermission",

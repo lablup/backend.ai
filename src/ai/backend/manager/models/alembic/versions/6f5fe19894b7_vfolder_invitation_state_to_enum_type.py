@@ -18,7 +18,7 @@ down_revision = "48ab2dfefba9"
 branch_labels = None
 depends_on = None
 
-vfinvs_choices = list(map(lambda v: v.value, VFolderInvitationState))
+vfinvs_choices = list(map(str, VFolderInvitationState))
 vfolderinvitationstate = postgresql.ENUM(
     *vfinvs_choices,
     name="vfolderinvitationstate",
