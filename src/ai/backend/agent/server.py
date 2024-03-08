@@ -80,7 +80,7 @@ from .config import (
     container_etcd_config_iv,
     docker_extra_config_iv,
 )
-from .exception import ResourceError
+from .exception import AgentError, ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_arch_name, get_subnet_ip
@@ -403,74 +403,61 @@ class AgentRPCServer(aobject):
         log.debug("rpc::pull_image({0})", raw_images)
         bgtask_mgr: BackgroundTaskManager = self.local_config["background_task_manager"]
 
-        response: dict[str, Any] = {}
-        for raw_img in raw_images:
-            img = ImageRef(
-                raw_img["canonical"],
-                known_registries=[raw_img["registry"]["name"]],
-                is_local=raw_img["is_local"],
-                architecture=get_arch_name(),
-            )
-            registry = ImageRegistry({
-                "name": raw_img["registry"]["name"],
-                "url": raw_img["registry"]["url"],
-                "username": raw_img["registry"]["username"],
-                "password": raw_img["registry"]["password"],
-            })
-            if self.agent.get_ongoing_pulling(img) is not None:
-                response[img.canonical] = {
-                    "bgtask_id": None,
-                    "image_ref": img.canonical,
-                    "architecture": img.architecture,
-                }
-                continue
+        async def _pull_image(reporter: ProgressReporter) -> None:
+            for raw_img in raw_images:
+                img = ImageRef(
+                    raw_img["canonical"],
+                    known_registries=[raw_img["registry"]["name"]],
+                    is_local=raw_img["is_local"],
+                    architecture=get_arch_name(),
+                )
+                registry = ImageRegistry({
+                    "name": raw_img["registry"]["name"],
+                    "url": raw_img["registry"]["url"],
+                    "username": raw_img["registry"]["username"],
+                    "password": raw_img["registry"]["password"],
+                })
+                if self.agent.get_ongoing_pulling(img) is not None:
+                    await reporter.update(message=f"Already pulling {img.canonical}, Skip.")
+                    continue
 
-            if not force:
-                await self.agent.check_free_image_disk(img)
+                if not force:
+                    try:
+                        await self.agent.check_free_image_disk(img)
+                    except AgentError as e:
+                        await reporter.update(
+                            message=f"Unable to pull image. Skip pulling {img.canonical}. (e: {e})"
+                        )
+                        continue
 
-            async def _pull_image(
-                reporter: ProgressReporter,
-            ) -> None:
                 await self.agent.pull_image(img, registry)
+                await reporter.update(1)
 
-            task_id = await bgtask_mgr.start(
-                _pull_image,
-            )
-            response[img.canonical] = {
-                "bgtask_id": str(task_id),
-                "image_ref": img.canonical,
-                "architecture": img.architecture,
-            }
-        return response
+        task_id = await bgtask_mgr.start(_pull_image)
+        return str(task_id)
 
     @rpc_function
     @collect_error
     async def remove_image(self, raw_images: list[dict[str, Any]]):
         log.debug("rpc::remove_image({0})", raw_images)
         bgtask_mgr: BackgroundTaskManager = self.local_config["background_task_manager"]
-        response: dict[str, Any] = {}
-        for raw_img in raw_images:
-            img = ImageRef(
-                raw_img["canonical"],
-                known_registries=[raw_img["registry"]["name"]],
-                is_local=raw_img["is_local"],
-                architecture=get_arch_name(),
-            )
 
-            async def _remove_image(
-                reporter: ProgressReporter,
-            ) -> None:
+        async def _remove_image(reporter: ProgressReporter) -> None:
+            for raw_img in raw_images:
+                img = ImageRef(
+                    raw_img["canonical"],
+                    known_registries=[raw_img["registry"]["name"]],
+                    is_local=raw_img["is_local"],
+                    architecture=get_arch_name(),
+                )
+                if self.agent.get_ongoing_pulling(img) is not None:
+                    await reporter.update(message=f"Image is being pulling {img.canonical}, Skip.")
+                    continue
                 await self.agent.remove_image(img)
+                await reporter.update(1)
 
-            task_id = await bgtask_mgr.start(
-                _remove_image,
-            )
-            response[img.canonical] = {
-                "bgtask_id": str(task_id),
-                "image_ref": img.canonical,
-                "architecture": img.architecture,
-            }
-        return response
+        task_id = await bgtask_mgr.start(_remove_image)
+        return str(task_id)
 
     @rpc_function
     @collect_error

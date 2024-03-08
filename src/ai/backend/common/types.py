@@ -1004,10 +1004,6 @@ class ImageMutationTaskResponse(TypedDict):
     architecture: str
 
 
-# key: image canonical, value: image mutation response
-ImageTaskResponse: TypeAlias = dict[str, ImageMutationTaskResponse]
-
-
 class ServicePort(TypedDict):
     name: str
     protocol: ServicePortProtocols

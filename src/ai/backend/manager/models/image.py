@@ -26,14 +26,14 @@ import trafaret as t
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef, get_registry_info
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, ImageAlias, ImageTaskResponse, ResourceSlot
+from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -763,6 +763,11 @@ class ImageNode(graphene.ObjectType):
             return cls.from_row(image_row)
 
 
+class AgentTask(graphene.ObjectType):
+    agent_id = graphene.String()
+    task_id = graphene.UUID()
+
+
 class PreloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -773,7 +778,7 @@ class PreloadImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    tasks = graphene.JSONString()
+    tasks = graphene.List(AgentTask, required=True)
 
     @staticmethod
     async def mutate(
@@ -789,12 +794,14 @@ class PreloadImage(graphene.Mutation):
             ", ".join(target_agents),
         )
         ctx: GraphQueryContext = info.context
+
+        select_ag = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(target_agents))
+            .options(load_only(AgentRow.id, AgentRow.addr))
+        )
         async with ctx.db.begin_readonly_session() as db_sess:
-            agents = (
-                await db_sess.scalars(
-                    sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
-                )
-            ).all()
+            agents = cast(list[AgentRow], (await db_sess.scalars(select_ag)).all())
             images = [
                 (
                     await ImageRow.get_serialized(
@@ -809,14 +816,13 @@ class PreloadImage(graphene.Mutation):
                 for ref in references
             ]
 
-        async def _preload_task(reporter: ProgressReporter) -> None:
-            for agent in agents:
-                await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
-
-        tasks: ImageTaskResponse = {}
+        tasks: list[dict[str, Any]] = []
         for agent in agents:
-            results = await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
-            tasks.update(results)
+            task_id = await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
+            tasks.append({
+                "agent_id": agent.id,
+                "task_id": task_id,
+            })
 
         return PreloadImage(ok=True, msg="", tasks=tasks)
 
@@ -830,7 +836,7 @@ class UnloadImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    tasks = graphene.JSONString()
+    tasks = graphene.List(AgentTask, required=True)
 
     @staticmethod
     async def mutate(
@@ -845,12 +851,13 @@ class UnloadImage(graphene.Mutation):
             ", ".join(target_agents),
         )
         ctx: GraphQueryContext = info.context
+        select_ag = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(target_agents))
+            .options(load_only(AgentRow.id, AgentRow.addr))
+        )
         async with ctx.db.begin_readonly_session() as db_sess:
-            agents = (
-                await db_sess.scalars(
-                    sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
-                )
-            ).all()
+            agents = cast(list[AgentRow], (await db_sess.scalars(select_ag)).all())
             images = [
                 (
                     await ImageRow.get_serialized(
@@ -865,10 +872,13 @@ class UnloadImage(graphene.Mutation):
                 for ref in references
             ]
 
-        tasks: ImageTaskResponse = {}
+        tasks: list[dict[str, Any]] = []
         for agent in agents:
-            results = await ctx.registry.remove_image(agent.id, agent.addr, images)
-            tasks.update(results)
+            task_id = await ctx.registry.remove_image(agent.id, agent.addr, images)
+            tasks.append({
+                "agent_id": agent.id,
+                "task_id": task_id,
+            })
 
         return UnloadImage(ok=True, msg="", tasks=tasks)
 
