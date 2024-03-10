@@ -12,6 +12,7 @@ import click
 from more_itertools import chunked
 from setproctitle import setproctitle
 
+from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
@@ -19,7 +20,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
-from ..config import load as load_config
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -46,23 +46,22 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: pathlib.Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool,
 ) -> None:
     """
     Manager Administration CLI
     """
-    local_config = load_config(config_path, "DEBUG" if debug else log_level)
-    setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
-    ctx.obj = ctx.with_resource(CLIContext(local_config=local_config))
+    setproctitle("backend.ai: manager.cli")
+    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
 @main.command(
@@ -209,7 +208,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.option(
     "-v",
     "--vacuum-full",
-    type=bool,
+    type=OptionalType(BoolExprType),
     default=False,
     help=(
         "Reclaim storage occupied by dead tuples."
@@ -342,9 +341,15 @@ def fixture():
     """Command set for managing fixtures."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
+def api():
+    """Command set for API schema inspection and manipulation."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
 def gql():
     """Command set for GraphQL schema."""
+    # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")

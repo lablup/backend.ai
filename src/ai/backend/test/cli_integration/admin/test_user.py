@@ -6,7 +6,7 @@ from ...utils.cli import EOF, ClientRunnerFunc
 from ..conftest import User
 
 
-def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     Testcase for user addition.
     """
@@ -33,13 +33,13 @@ def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
         ]
         if user.need_password_change:
             add_arguments.append("--need-password-change")
-        with closing(run(add_arguments)) as p:
+        with closing(run_admin(add_arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
             assert response.get("ok") is True, f"Account creation failed: Account#{i+1}"
 
     # Check if user is added
-    with closing(run(["--output=json", "admin", "user", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
@@ -60,7 +60,7 @@ def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
 
 
 def test_update_user(
-    run: ClientRunnerFunc,
+    run_admin: ClientRunnerFunc,
     users: Tuple[User, ...],
     gen_username: Callable[[], str],
     gen_fullname: Callable[[], str],
@@ -108,11 +108,11 @@ def test_update_user(
         ]
         if updated_user.need_password_change:
             update_arguments.append("--need-password-change")
-        with closing(run(update_arguments)) as p:
+        with closing(run_admin(update_arguments)) as p:
             p.expect(EOF)
 
     # Check if user is updated correctly
-    with closing(run(["--output=json", "admin", "user", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
         after_update_decoded = p.before.decode()
         after_update_loaded = json.loads(after_update_decoded)
@@ -137,7 +137,7 @@ def test_update_user(
         ), f"Domain mismatch: Account#{i+1}"
 
 
-def test_delete_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.
@@ -145,7 +145,7 @@ def test_delete_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
     print("[ Delete user ]")
 
     for i, fake_user in enumerate(users):
-        with closing(run(["--output=json", "admin", "user", "purge", fake_user.email])) as p:
+        with closing(run_admin(["--output=json", "admin", "user", "purge", fake_user.email])) as p:
             p.sendline("y")
             p.expect(EOF)
             before = p.before.decode()
@@ -153,11 +153,11 @@ def test_delete_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
             assert response.get("ok") is True, f"Account deletion failed: Account#{i+1}"
 
 
-def test_list_user(run: ClientRunnerFunc):
+def test_list_user(run_admin: ClientRunnerFunc):
     """
     Testcase for user listing.
     """
-    with closing(run(["--output=json", "admin", "user", "list"])) as p:
+    with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)

@@ -122,13 +122,11 @@ async def test_select_queries(virtual_grid_db) -> None:
 
 async def test_column_map(virtual_grid_db) -> None:
     conn, grid, _ = virtual_grid_db
-    parser = QueryOrderParser(
-        {
-            "v1": ("data1", None),
-            "v2": ("data2", None),
-            "v3": ("data3", None),
-        }
-    )
+    parser = QueryOrderParser({
+        "v1": ("data1", None),
+        "v2": ("data2", None),
+        "v3": ("data3", None),
+    })
 
     sa_query = parser.append_ordering(
         sa.select([grid.c.id]).select_from(grid),
@@ -148,19 +146,15 @@ async def test_column_map(virtual_grid_db) -> None:
 
 async def test_aggregated_foreign_fields(virtual_grid_db) -> None:
     conn, grid, foreign_grid = virtual_grid_db
-    parser = QueryOrderParser(
-        {
-            "dogs_name": ("test_query_order_dogs_name", agg_to_array),
-        }
-    )
+    parser = QueryOrderParser({
+        "dogs_name": ("test_query_order_dogs_name", agg_to_array),
+    })
 
     orig_query = (
-        sa.select(
-            [
-                grid.c.id,
-                agg_to_array(foreign_grid.c.name).label("dogs_name"),
-            ]
-        )
+        sa.select([
+            grid.c.id,
+            agg_to_array(foreign_grid.c.name).label("dogs_name"),
+        ])
         .select_from(sa.join(grid, foreign_grid, grid.c.id == foreign_grid.c.user_id))
         .group_by(grid)
     )

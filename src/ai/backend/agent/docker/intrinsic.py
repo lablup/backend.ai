@@ -27,7 +27,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop, nmget
 
-from .. import __version__
+from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
@@ -270,7 +270,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
             ),
@@ -295,12 +295,12 @@ class CPUPlugin(AbstractComputePlugin):
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: List[Decimal]
+        results: List[Decimal | None] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks = []
+                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
                 # group by container ID
                 cid_pids_map: Dict[str, List[int]] = {}
                 for pid, cid in pid_map_list:
@@ -310,7 +310,6 @@ class CPUPlugin(AbstractComputePlugin):
                 for cid, pids in cid_pids_map.items():
                     api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
-                results = []
                 for chunk in chunked_results:
                     results.extend(chunk)
             case _:
@@ -337,7 +336,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ProcessMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_process=per_process_cpu_used,
             ),
@@ -386,11 +385,9 @@ class CPUPlugin(AbstractComputePlugin):
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
         if resource_spec is None:
             return
-        alloc_map.apply_allocation(
-            {
-                SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
-            }
-        )
+        alloc_map.apply_allocation({
+            SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
+        })
 
     async def get_attached_devices(
         self,
@@ -401,13 +398,11 @@ class CPUPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {"cores": len(device_ids)},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {"cores": len(device_ids)},
+                })
         return attached_devices
 
     async def get_docker_networks(
@@ -517,7 +512,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             NodeMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_node=Measurement(total_mem_used_bytes, total_mem_capacity_bytes),
@@ -527,7 +522,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey("disk"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 per_node=Measurement(total_disk_usage, total_disk_capacity),
                 per_device=per_disk_stat,
@@ -719,21 +714,21 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_mem_used_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_read_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
@@ -754,7 +749,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_io_scratch_size,
@@ -822,21 +817,21 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             ProcessMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_process=per_process_mem_used_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_read_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_write_bytes,
@@ -878,11 +873,9 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> None:
         assert isinstance(alloc_map, DiscretePropertyAllocMap)
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
-        alloc_map.apply_allocation(
-            {
-                SlotName("mem"): {DeviceId("root"): memory_limit},
-            }
-        )
+        alloc_map.apply_allocation({
+            SlotName("mem"): {DeviceId("root"): memory_limit},
+        })
 
     async def get_attached_devices(
         self,
@@ -893,13 +886,11 @@ class MemoryPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {},
+                })
         return attached_devices
 
     async def get_docker_networks(

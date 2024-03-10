@@ -12,41 +12,37 @@ import ai.backend.common.identity
 
 def test_is_containerized():
     mocked_path = MagicMock()
-    mocked_path.read_text.return_value = "\n".join(
-        [
-            "13:name=systemd:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "12:pids:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "11:hugetlb:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "10:net_prio:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "9:perf_event:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "8:net_cls:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "7:freezer:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "6:devices:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "5:memory:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "4:blkio:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "3:cpuacct:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "2:cpu:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-            "1:cpuset:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
-        ]
-    )
+    mocked_path.read_text.return_value = "\n".join([
+        "13:name=systemd:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "12:pids:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "11:hugetlb:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "10:net_prio:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "9:perf_event:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "8:net_cls:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "7:freezer:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "6:devices:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "5:memory:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "4:blkio:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "3:cpuacct:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "2:cpu:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+        "1:cpuset:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
+    ])
     with patch("ai.backend.common.identity.Path", return_value=mocked_path):
         assert ai.backend.common.identity.is_containerized()
     mocked_path = MagicMock()
-    mocked_path.read_text.return_value = "\n".join(
-        [
-            "11:devices:/user.slice",
-            "10:pids:/user.slice/user-1000.slice",
-            "9:hugetlb:/",
-            "8:cpuset:/",
-            "7:blkio:/user.slice",
-            "6:memory:/user.slice",
-            "5:cpu,cpuacct:/user.slice",
-            "4:freezer:/",
-            "3:net_cls,net_prio:/",
-            "2:perf_event:/",
-            "1:name=systemd:/user.slice/user-1000.slice/session-3.scope",
-        ]
-    )
+    mocked_path.read_text.return_value = "\n".join([
+        "11:devices:/user.slice",
+        "10:pids:/user.slice/user-1000.slice",
+        "9:hugetlb:/",
+        "8:cpuset:/",
+        "7:blkio:/user.slice",
+        "6:memory:/user.slice",
+        "5:cpu,cpuacct:/user.slice",
+        "4:freezer:/",
+        "3:net_cls,net_prio:/",
+        "2:perf_event:/",
+        "1:name=systemd:/user.slice/user-1000.slice/session-3.scope",
+    ])
     with patch("ai.backend.common.identity.Path", return_value=mocked_path):
         assert not ai.backend.common.identity.is_containerized()
     mocked_path = MagicMock()
@@ -153,8 +149,9 @@ async def test_get_instance_ip(mocker, provider):
                 return mocked_ares_host_result
 
             mocked_resolver.gethostbyname = coro_return_mocked_result
-            with patch("aiodns.DNSResolver", return_value=mocked_resolver), patch(
-                "socket.gethostname", return_value="myname"
+            with (
+                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip()
                 assert ret == "10.1.2.3"
@@ -164,8 +161,9 @@ async def test_get_instance_ip(mocker, provider):
 
             mocked_resolver = MagicMock()
             mocked_resolver.gethostbyname = coro_raise_error
-            with patch("aiodns.DNSResolver", return_value=mocked_resolver), patch(
-                "socket.gethostname", return_value="myname"
+            with (
+                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip()
                 assert ret == "127.0.0.1"

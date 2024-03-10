@@ -5,6 +5,7 @@ Revises: 360af8f33d4e
 Create Date: 2022-10-13 18:35:21.955941
 
 """
+
 from typing import Dict, List
 
 import sqlalchemy as sa
@@ -49,9 +50,10 @@ def upgrade() -> None:
     )
     domain_query = sa.select([domains.c.name, domains.c.allowed_vfolder_hosts])
     group_query = sa.select([groups.c.id, groups.c.allowed_vfolder_hosts])
-    keypair_resource_policies_query = sa.select(
-        [keypair_resource_policies.c.name, keypair_resource_policies.c.allowed_vfolder_hosts]
-    )
+    keypair_resource_policies_query = sa.select([
+        keypair_resource_policies.c.name,
+        keypair_resource_policies.c.allowed_vfolder_hosts,
+    ])
 
     connection = op.get_bind()
     bind_param_pk = "bind_param_pk"
@@ -173,16 +175,18 @@ def downgrade() -> None:
         rows = connection.execute(query).fetchall()
         for row in rows:
             hosts: Dict[str, List[str]] = row["allowed_vfolder_hosts"]
-            map_list.append(
-                {bind_param_pk: row[pk_name], "allowed_vfolder_hosts": list(hosts.keys())}
-            )
+            map_list.append({
+                bind_param_pk: row[pk_name],
+                "allowed_vfolder_hosts": list(hosts.keys()),
+            })
         return map_list
 
     domain_query = sa.select([domains.c.name, domains.c.allowed_vfolder_hosts])
     group_query = sa.select([groups.c.id, groups.c.allowed_vfolder_hosts])
-    keypair_resource_policies_query = sa.select(
-        [keypair_resource_policies.c.name, keypair_resource_policies.c.allowed_vfolder_hosts]
-    )
+    keypair_resource_policies_query = sa.select([
+        keypair_resource_policies.c.name,
+        keypair_resource_policies.c.allowed_vfolder_hosts,
+    ])
 
     domain_list = get_pk_vfolder_host_maps(domain_query, "name")
     group_list = get_pk_vfolder_host_maps(group_query, "id")

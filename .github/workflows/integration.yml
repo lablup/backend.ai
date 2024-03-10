@@ -17,7 +17,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -30,7 +30,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
@@ -53,5 +53,5 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.

@@ -1,6 +1,7 @@
 """
 This module defines a series of Backend.AI's plugin-specific errors.
 """
+
 from aiohttp import web
 
 from ai.backend.manager.api.exceptions import BackendError

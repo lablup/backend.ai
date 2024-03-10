@@ -5,6 +5,7 @@ Revises: 8c74e7df26f8
 Create Date: 2023-10-23 16:56:21.612202
 
 """
+
 import enum
 import textwrap
 
@@ -77,10 +78,12 @@ def downgrade():
         if result.rowcount < PAGE_SIZE:
             break
 
-    sql = textwrap.dedent(f"""DELETE FROM pg_enum
+    sql = textwrap.dedent(
+        f"""DELETE FROM pg_enum
         WHERE enumlabel = '{enum_val}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )""")
+        )"""
+    )
     op.execute(text(sql))
     # ### end Alembic commands ###

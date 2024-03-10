@@ -212,10 +212,11 @@ class XCPFSOpModel(BaseFSOpModel):
 
     def scan_tree(
         self,
-        target_path: Path,
-        recursive=False,
+        path: Path,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
-        target_relpath = target_path.relative_to(self.mount_path)
+        target_relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         # Use a custom formatting
         scan_cmd = [
@@ -261,12 +262,13 @@ class XCPFSOpModel(BaseFSOpModel):
                             entry_type = DirEntryType.FILE
                     symlink_target = ""
                     if entry_type == DirEntryType.SYMLINK:
-                        symlink_dst = Path(item_abspath).resolve()
                         try:
-                            symlink_dst = symlink_dst.relative_to(target_path)
-                        except ValueError:
+                            symlink_dst = Path(item_abspath).resolve()
+                            symlink_dst = symlink_dst.relative_to(path)
+                        except (ValueError, RuntimeError):
                             pass
-                        symlink_target = os.fsdecode(symlink_dst)
+                        else:
+                            symlink_target = os.fsdecode(symlink_dst)
                     await entry_queue.put(
                         DirEntry(
                             name=item_path.name,
@@ -318,9 +320,9 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def scan_tree_usage(
         self,
-        target_path: Path,
+        path: Path,
     ) -> TreeUsage:
-        target_relpath = target_path.relative_to(self.mount_path)
+        target_relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         total_size = 0
         total_count = 0
@@ -366,9 +368,9 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def scan_tree_size(
         self,
-        target_path: Path,
+        path: Path,
     ) -> BinarySize:
-        usage = await self.scan_tree_usage(target_path)
+        usage = await self.scan_tree_usage(path)
         return BinarySize(usage.used_bytes)
 
 

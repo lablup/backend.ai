@@ -573,13 +573,11 @@ def allocate(
                     hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
                 affinity_hint = AffinityHint(hint_devices, affinity_map, affinity_hint.policy)
             except ResourceError as e:  # including InsufficientResource
-                alloc_failure_log_fmt = "\n".join(
-                    [
-                        "resource allocation failed: {0}",
-                        "(before allocation) device-specific slots ({1}):\n{2}",
-                        "(before allocation) allocation map ({1}):\n{3}",
-                    ]
-                )
+                alloc_failure_log_fmt = "\n".join([
+                    "resource allocation failed: {0}",
+                    "(before allocation) device-specific slots ({1}):\n{2}",
+                    "(before allocation) allocation map ({1}):\n{3}",
+                ])
                 log.info(
                     alloc_failure_log_fmt,
                     e,

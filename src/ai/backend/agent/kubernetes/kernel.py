@@ -181,10 +181,7 @@ class KubernetesKernel(AbstractKernel):
 
     async def start_service(
         self,
-        service: str,
-        opts: Mapping[str, Any],
-        local_config: Mapping[str, Any],
-        mount_path: Optional[Mapping[str, Any]] = None,
+        service,
     ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
@@ -197,27 +194,12 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        if mount_path is None:
-            result = await self.runner.feed_start_service(
-                {
-                    "name": service,
-                    "port": sport["container_ports"][0],  # primary port
-                    "ports": sport["container_ports"],
-                    "protocol": sport["protocol"],
-                    "options": opts,
-                }
-            )
-        else:
-            result = await self.runner.feed_start_mounted_service(
-                {
-                    "name": service,
-                    "port": sport["container_ports"][0],  # primary port
-                    "ports": sport["container_ports"],
-                    "protocol": sport["protocol"],
-                    "options": opts,
-                    "mount_path": mount_path,
-                }
-            )
+        result = await self.runner.feed_start_service({
+            "name": service,
+            "port": sport["container_ports"][0],  # primary port
+            "ports": sport["container_ports"],
+            "protocol": sport["protocol"],
+        })
         return result
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
@@ -310,7 +292,8 @@ class KubernetesKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
         import json
         import os
         import stat
@@ -318,7 +301,8 @@ class KubernetesKernel(AbstractKernel):
 
         files = []
         for f in os.scandir(sys.argv[1]):
-            fstat = f.stat()
+            fstat = f.stat(follow_symlinks=False)
+
             ctime = fstat.st_ctime  # TODO: way to get concrete create time?
             mtime = fstat.st_mtime
             atime = fstat.st_atime
@@ -331,7 +315,8 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """)
+        """
+        )
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(
@@ -439,28 +424,7 @@ async def prepare_krunner_env_impl(
 
             log.debug(
                 "Executing {}",
-                " ".join(
-                    [
-                        "docker",
-                        "run",
-                        "--rm",
-                        "-i",
-                        "-v",
-                        f"{archive_path}:/root/archive.tar.xz",
-                        "-v",
-                        f"{extractor_path}:/root/krunner-extractor.sh",
-                        "-v",
-                        f"{target_path.absolute().as_posix()}:/root/volume",
-                        "-e",
-                        f"KRUNNER_VERSION={current_version}",
-                        extractor_image,
-                        "/root/krunner-extractor.sh",
-                    ]
-                ),
-            )
-
-            proc = await asyncio.create_subprocess_exec(
-                *[
+                " ".join([
                     "docker",
                     "run",
                     "--rm",
@@ -475,8 +439,25 @@ async def prepare_krunner_env_impl(
                     f"KRUNNER_VERSION={current_version}",
                     extractor_image,
                     "/root/krunner-extractor.sh",
-                ]
+                ]),
             )
+
+            proc = await asyncio.create_subprocess_exec(*[
+                "docker",
+                "run",
+                "--rm",
+                "-i",
+                "-v",
+                f"{archive_path}:/root/archive.tar.xz",
+                "-v",
+                f"{extractor_path}:/root/krunner-extractor.sh",
+                "-v",
+                f"{target_path.absolute().as_posix()}:/root/volume",
+                "-e",
+                f"KRUNNER_VERSION={current_version}",
+                extractor_image,
+                "/root/krunner-extractor.sh",
+            ])
             if await proc.wait() != 0:
                 raise RuntimeError("extracting krunner environment has failed!")
     except Exception:
