@@ -679,7 +679,7 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("GET", "/statistics/{path:.*$}", statistics_handler))
+    cors.add(app.router.add_route("POST", "/statistics/{path:.*$}", statistics_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
