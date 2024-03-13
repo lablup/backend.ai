@@ -104,6 +104,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
+    async def get_registry_id(self, registry_name: str, project: str) -> Optional[str]:
+        async with self.db.begin_readonly() as db_session:
+            return (
+                await db_session.execute(
+                    sa.select(ContainerRegistryRow.id)
+                    .where(ContainerRegistryRow.registry_name == registry_name)
+                    .where(ContainerRegistryRow.project == project)
+                )
+            ).scalar()
+
     async def commit_rescan_result(self) -> None:
         _all_updates = all_updates.get()
         if not _all_updates:
@@ -133,11 +143,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                 session.add_all([
                     ImageRow(
-                        name=k.canonical,
-                        registry=k.registry,
-                        image=k.name,
-                        tag=k.tag,
-                        architecture=k.architecture,
+                        name=image_ref.canonical,
+                        registry=image_ref.registry,
+                        registry_id=await self.get_registry_id(
+                            image_ref.registry, image_ref.name.split("/")[0]
+                        ),
+                        image=image_ref.name,
+                        tag=image_ref.tag,
+                        architecture=image_ref.architecture,
                         is_local=is_local,
                         config_digest=v["config_digest"],
                         size_bytes=v["size_bytes"],
@@ -146,7 +159,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         labels=v["labels"],
                         resources=v["resources"],
                     )
-                    for k, v in _all_updates.items()
+                    for image_ref, v in _all_updates.items()
                 ])
                 await session.flush()
 

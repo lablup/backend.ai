@@ -2854,7 +2854,7 @@ class AgentRegistry:
                         ContainerRegistryRow.password,
                     ]).where(ContainerRegistryRow.id == registry_id)
                 )
-            ).scalar()
+            ).fetchall()[0]
 
             if not result:
                 raise UnknownImageRegistry(registry_id)
