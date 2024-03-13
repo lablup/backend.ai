@@ -292,9 +292,7 @@ def upgrade():
 
     migrate_data_etcd_to_psql()
 
-    op.add_column(
-        "images", sa.Column("registry_id", sa.String(length=255), default=None, nullable=True)
-    )
+    op.add_column("images", sa.Column("registry_id", sa.String, default=None, nullable=True))
 
     insert_registry_id_to_images()
 
