@@ -552,8 +552,6 @@ def load(
 
 
 class SharedConfig(AbstractConfig):
-    ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
-
     def __init__(
         self,
         etcd_addr: HostPortPair,
