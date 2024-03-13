@@ -533,6 +533,12 @@ class InstallerApp(App):
     default=False,
     help="Show the post-install guide using INSTALL-INFO if present.",
 )
+@click.option(
+    "--headless",
+    is_flag=True,
+    default=False,
+    help="Run the installer as headless mode.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -541,6 +547,7 @@ def main(
     target_path: str,
     show_guide: bool,
     non_interactive: bool,
+    headless: bool,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -559,4 +566,4 @@ def main(
         non_interactive=non_interactive,
     )
     app = InstallerApp(args)
-    app.run()
+    app.run(headless=headless)
