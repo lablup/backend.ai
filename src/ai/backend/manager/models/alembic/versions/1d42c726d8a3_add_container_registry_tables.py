@@ -24,6 +24,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
 from ai.backend.manager.models.base import Base, IDColumn, StrEnumType, convention
 from ai.backend.manager.models.container_registry import ContainerRegistryType
+from ai.backend.manager.models.image import ImageRow
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
@@ -47,8 +48,8 @@ ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
 
 
-def get_container_registry_row_schema(base):
-    class ContainerRegistryRow(base):
+def get_container_registry_row_schema():
+    class ContainerRegistryRow(Base):
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
@@ -166,14 +167,14 @@ def migrate_data_etcd_to_psql() -> None:
         print("There is no container registries data to migrate in etcd.")
         return
 
-    ContainerRegistryRow = get_container_registry_row_schema(Base)
+    ContainerRegistryRow = get_container_registry_row_schema()
 
     db_connection = op.get_bind()
     db_connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
 
 def revert_data_psql_to_etcd() -> None:
-    ContainerRegistryRow = get_container_registry_row_schema(Base)
+    ContainerRegistryRow = get_container_registry_row_schema()
 
     db_connection = op.get_bind()
     rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
@@ -233,6 +234,35 @@ def revert_data_psql_to_etcd() -> None:
     queue.get()
 
 
+def insert_registry_id_to_images() -> None:
+    db_connection = op.get_bind()
+    ContainerRegistry = get_container_registry_row_schema()
+
+    image_infos = db_connection.execute(sa.select([ImageRow.id, ImageRow.name])).fetchall()
+
+    for image_info in image_infos:
+        image_id, image_name = image_info
+
+        parts = image_name.split("/")
+        registry_name = parts[0]
+        project = parts[1]
+
+        registry_id = db_connection.execute(
+            sa.select(ContainerRegistry.id)
+            .where(ContainerRegistry.registry_name == registry_name)
+            .where(ContainerRegistry.project == project)
+        ).scalar()
+
+        if registry_id is not None:
+            db_connection.execute(
+                sa.update(ImageRow)
+                .values(registry_id=str(registry_id))
+                .where(ImageRow.id == image_id)
+            )
+        else:
+            print(f"ContainerRegistry row not found for image {image_name}", file=sys.stderr)
+
+
 def upgrade():
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
@@ -262,8 +292,15 @@ def upgrade():
 
     migrate_data_etcd_to_psql()
 
+    op.add_column(
+        "images", sa.Column("registry_id", sa.String(length=255), default=None, nullable=True)
+    )
+
+    insert_registry_id_to_images()
+
 
 def downgrade():
     revert_data_psql_to_etcd()
 
     op.drop_table("container_registries")
+    op.drop_column("images", "registry_id")
