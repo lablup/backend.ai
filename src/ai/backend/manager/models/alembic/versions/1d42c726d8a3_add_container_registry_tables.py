@@ -22,7 +22,7 @@ from alembic import op
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
-from ai.backend.manager.models.base import Base, IDColumn, StrEnumType, convention
+from ai.backend.manager.models.base import GUID, Base, IDColumn, StrEnumType, convention
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.image import ImageRow
 
@@ -255,9 +255,7 @@ def insert_registry_id_to_images() -> None:
 
         if registry_id is not None:
             db_connection.execute(
-                sa.update(ImageRow)
-                .values(registry_id=str(registry_id))
-                .where(ImageRow.id == image_id)
+                sa.update(ImageRow).values(registry_id=registry_id).where(ImageRow.id == image_id)
             )
         else:
             print(f"ContainerRegistry row not found for image {image_name}", file=sys.stderr)
@@ -292,7 +290,7 @@ def upgrade():
 
     migrate_data_etcd_to_psql()
 
-    op.add_column("images", sa.Column("registry_id", sa.String, default=None, nullable=True))
+    op.add_column("images", sa.Column("registry_id", GUID, default=None, nullable=True))
 
     insert_registry_id_to_images()
 
