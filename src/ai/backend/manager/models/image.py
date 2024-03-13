@@ -224,6 +224,7 @@ class ImageRow(Base):
         architecture,
         is_local=False,
         registry=None,
+        registry_id=None,
         image=None,
         tag=None,
         config_digest=None,
@@ -235,6 +236,7 @@ class ImageRow(Base):
     ) -> None:
         self.name = name
         self.registry = registry
+        self.registry_id = registry_id
         self.image = image
         self.tag = tag
         self.architecture = architecture

@@ -238,27 +238,31 @@ def insert_registry_id_to_images() -> None:
     db_connection = op.get_bind()
     ContainerRegistry = get_container_registry_row_schema()
 
-    image_infos = db_connection.execute(sa.select([ImageRow.id, ImageRow.name])).fetchall()
+    registry_infos = db_connection.execute(
+        sa.select([
+            ContainerRegistry.id,
+            ContainerRegistry.registry_name,
+            ContainerRegistry.project,
+        ])
+    ).fetchall()
 
-    for image_info in image_infos:
-        image_id, image_name = image_info
+    if registry_infos:
+        query = (
+            sa.update(ImageRow)
+            .values(registry_id=sa.bindparam("registry_id"))
+            .where(ImageRow.name.startswith(sa.bindparam("registry_name_and_project")))
+        )
 
-        parts = image_name.split("/")
-        registry_name = parts[0]
-        project = parts[1]
-
-        registry_id = db_connection.execute(
-            sa.select(ContainerRegistry.id)
-            .where(ContainerRegistry.registry_name == registry_name)
-            .where(ContainerRegistry.project == project)
-        ).scalar()
-
-        if registry_id is not None:
-            db_connection.execute(
-                sa.update(ImageRow).values(registry_id=registry_id).where(ImageRow.id == image_id)
-            )
-        else:
-            print(f"ContainerRegistry row not found for image {image_name}", file=sys.stderr)
+        db_connection.execute(
+            query,
+            [
+                {
+                    "registry_id": registry_info[0],
+                    "registry_name_and_project": f"{registry_info[1]}/{registry_info[2]}",
+                }
+                for registry_info in registry_infos
+            ],
+        )
 
 
 def upgrade():
