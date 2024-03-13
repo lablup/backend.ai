@@ -17,9 +17,10 @@ asyncpg>=0.27.0
 asynctest>=0.13.0
 asyncudp>=0.4
 attrs>=20.3
+bcrypt>=4.1.2
 boto3~=1.26
 cachetools~=5.2.0
-callosum~=1.0.1
+callosum~=1.0.3
 cattrs~=22.2.0
 click~=8.1.7
 coloredlogs~=15.0
@@ -43,14 +44,13 @@ msgpack>=1.0.5rc1
 multidict>=6.0
 namedlist~=1.8
 networkx~=2.8.7
-passlib[bcrypt]>=1.7.4
 pexpect~=4.8
 psutil~=5.9.1
 pycryptodome>=3.14.1
 python-dateutil>=2.8
 python-dotenv~=0.20.0
 python-json-logger>=2.0.1
-pyzmq~=24.0.1
+pyzmq~=25.1.2
 PyJWT~=2.0
 PyYAML~=6.0
 pydantic~=2.4.2
@@ -73,7 +73,7 @@ typeguard~=2.10
 typing_extensions~=4.3
 textual~=0.52.1
 uvloop~=0.17.0; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
-yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
+yarl>=1.8.2,<2.0,!=1.9.0,!=1.9.1,!=1.9.2
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
