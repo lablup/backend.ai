@@ -22,14 +22,14 @@ async def test_handle_heartbeat(
     ],
     mocker,
 ) -> None:
-    # mock_get_known_registries = AsyncMock(
-    #     return_value=[
-    #         {
-    #             "": {"index.docker.io": "https://registry-1.docker.io"},
-    #         }
-    #     ]
-    # )
-    # mocker.patch("ai.backend.manager.registry.get_known_registries", mock_get_known_registries)
+    mock_get_known_registries = AsyncMock(
+        return_value=[
+            {
+                "": {"index.docker.io": "https://registry-1.docker.io"},
+            }
+        ]
+    )
+    mocker.patch("ai.backend.manager.registry.get_known_registries", mock_get_known_registries)
     mock_redis_wrapper = MagicMock()
     mock_redis_wrapper.execute = AsyncMock()
     mocker.patch("ai.backend.manager.registry.redis_helper", mock_redis_wrapper)

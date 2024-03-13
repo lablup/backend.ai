@@ -520,7 +520,7 @@ class ImageRef:
 
     @property
     def name(self) -> str:
-        # e.g., python
+        # e.g., python, stable/python
         return self._name
 
     @property
