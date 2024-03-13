@@ -1434,14 +1434,11 @@ class AgentRegistry:
                 if not resolved_image_info.image_ref.is_local:
                     is_local_image = False
 
-                    print("resolved_image_info.image_ref", resolved_image_info.image_ref)
-                    # How can we handle it?
-                    if resolved_image_info.registry_id is None:
-                        pass
+                    if resolved_image_info.registry_id:
+                        registry_url, registry_creds = await get_registry_info(
+                            self.db, cast(GUID, resolved_image_info.registry_id)
+                        )
 
-                    registry_url, registry_creds = await get_registry_info(
-                        self.db, cast(GUID, resolved_image_info.registry_id)
-                    )
         image_info = {
             "image_infos": image_infos,
             "registry_url": registry_url,
