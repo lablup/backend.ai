@@ -104,15 +104,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
-    async def get_registry_id(self, registry_name: str, project: str) -> Optional[str]:
+    async def get_registry_id(self, registry_name: str, project: Optional[str]) -> Optional[str]:
         async with self.db.begin_readonly() as db_session:
-            return (
-                await db_session.execute(
-                    sa.select(ContainerRegistryRow.id)
-                    .where(ContainerRegistryRow.registry_name == registry_name)
-                    .where(ContainerRegistryRow.project == project)
-                )
-            ).scalar()
+            query = sa.select(ContainerRegistryRow.id).where(
+                ContainerRegistryRow.registry_name == registry_name
+            )
+
+            if project:
+                query = query.where(ContainerRegistryRow.project == project)
+
+            return (await db_session.execute(query)).scalar()
 
     async def commit_rescan_result(self) -> None:
         _all_updates = all_updates.get()
@@ -146,7 +147,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         name=image_ref.canonical,
                         registry=image_ref.registry,
                         registry_id=await self.get_registry_id(
-                            image_ref.registry, image_ref.name.split("/")[0]
+                            image_ref.registry,
+                            image_ref.name.split("/")[0] if "/" in image_ref.name else None,
                         ),
                         image=image_ref.name,
                         tag=image_ref.tag,
