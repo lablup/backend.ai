@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.10rc5 (2024-03-13)
+
+### Features
+* Add the `--non-interactive` flag to the TUI installer ([#1922](https://github.com/lablup/backend.ai/issues/1922))
+
+### Fixes
+* Fix graylog log backend not working when `localname` config is set ([#1951](https://github.com/lablup/backend.ai/issues/1951))
+
+
 ## 23.09.10rc4 (2024-03-06)
 No significant changes.
 
