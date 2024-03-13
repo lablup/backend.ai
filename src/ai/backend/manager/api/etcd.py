@@ -18,7 +18,6 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import get_known_registries
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
 
@@ -149,19 +148,6 @@ async def get_vfolder_types(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     return web.json_response(vfolder_types, status=200)
-
-
-@superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
-    """
-    Returns the list of all registered docker registries.
-    """
-    log.info("ETCD.GET_DOCKER_REGISTRIES ()")
-    root_ctx: RootContext = request.app["_root.context"]
-    _registries = await get_known_registries(root_ctx.shared_config.etcd)
-    # ``yarl.URL`` is not JSON-serializable, so we need to represent it as string.
-    known_registries: Mapping[str, str] = {k: v.human_repr() for k, v in _registries.items()}
-    return web.json_response(known_registries, status=200)
 
 
 @superadmin_required
@@ -315,7 +301,6 @@ def create_app(
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))
     cors.add(app.router.add_route("GET", r"/resource-slots/details", get_resource_metadata))
     cors.add(app.router.add_route("GET", r"/vfolder-types", get_vfolder_types))
-    cors.add(app.router.add_route("GET", r"/docker-registries", get_docker_registries))
     cors.add(app.router.add_route("POST", r"/get", get_config))
     cors.add(app.router.add_route("POST", r"/set", set_config))
     cors.add(app.router.add_route("POST", r"/delete", delete_config))

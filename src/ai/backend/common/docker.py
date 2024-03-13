@@ -17,11 +17,8 @@ from typing import (
     Final,
     Iterable,
     Mapping,
-    MutableMapping,
     Optional,
     Sequence,
-    Union,
-    cast,
 )
 
 import aiohttp
@@ -33,14 +30,12 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import validators as tx
 from .arch import arch_name_aliases
-from .etcd import AsyncEtcd
-from .etcd import quote as etcd_quote
-from .etcd import unquote as etcd_unquote
-from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
+from .exception import InvalidImageName, InvalidImageTag
+from .logging import BraceStyleAdapter
 from .service_ports import parse_service_ports
 
 if TYPE_CHECKING:
-    from .types import ImageConfig, ImageRegistry
+    from .types import ImageConfig
 
 __all__ = (
     "arch_name_aliases",
@@ -51,9 +46,7 @@ __all__ = (
     "inference_image_label_schema",
     "validate_image_labels",
     "login",
-    "get_known_registries",
     "is_known_registry",
-    "get_registry_info",
     "MIN_KERNELSPEC",
     "MAX_KERNELSPEC",
     "ImageRef",
@@ -285,53 +278,33 @@ async def login(
     raise RuntimeError(f"authentication for docker registry {registry_url} failed")
 
 
-async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
-    data = await etcd.get_prefix("config/docker/registry/")
-    results: MutableMapping[str, yarl.URL] = {}
-    for key, value in data.items():
-        name = etcd_unquote(key)
-        if isinstance(value, str):
-            results[name] = yarl.URL(value)
-        elif isinstance(value, Mapping):
-            assert isinstance(value[""], str)
-            results[name] = yarl.URL(value[""])
-    return results
-
-
 def is_known_registry(
-    val: str,
-    known_registries: Union[Mapping[str, Any], Sequence[str]] | None = None,
+    registry_name: str,
+    project: str,
+    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
 ):
-    if val == default_registry:
+    if project == "" and registry_name == default_registry:
         return True
-    if known_registries is not None and val in known_registries:
+
+    if (
+        isinstance(known_registries, Mapping)
+        and known_registries is not None
+        and project in known_registries.keys()
+        and registry_name in known_registries[project]
+    ):
         return True
+
+    if isinstance(known_registries, list):
+        if registry_name in known_registries:
+            return True
+
     try:
-        url = yarl.URL("//" + val)
+        url = yarl.URL("//" + registry_name)
         if url.host and ipaddress.ip_address(url.host):
             return True
     except ValueError:
         pass
     return False
-
-
-async def get_registry_info(etcd: AsyncEtcd, name: str) -> ImageRegistry:
-    reg_path = f"config/docker/registry/{etcd_quote(name)}"
-    item = await etcd.get_prefix(reg_path)
-    if not item:
-        raise UnknownImageRegistry(name)
-    registry_addr = item[""]
-    if not registry_addr:
-        raise UnknownImageRegistry(name)
-    assert isinstance(registry_addr, str)
-    username = cast(str | None, item.get("username"))
-    password = cast(str | None, item.get("password"))
-    return {
-        "name": name,
-        "url": registry_addr,
-        "username": username,
-        "password": password,
-    }
 
 
 def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
@@ -424,7 +397,7 @@ class ImageRef:
     def __init__(
         self,
         value: str,
-        known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
+        known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
         architecture: str = "x86_64",
         is_local: bool = False,
     ) -> None:
@@ -434,21 +407,23 @@ class ImageRef:
         rx_slug = type(self)._rx_slug
         if "://" in self._value or self._value.startswith("//"):
             raise InvalidImageName(self._value)
-        parts = self._value.split("/", maxsplit=1)
+        parts = self._value.split("/")
         if len(parts) == 1:
             self._registry = default_registry
             self._name, self._tag = ImageRef._parse_image_tag(self._value, True)
             if not rx_slug.search(self._tag):
                 raise InvalidImageTag(self._tag, self._value)
         else:
-            if is_known_registry(parts[0], known_registries):
+            # add ['*'] as magic keyword to accept any repository as valid repo
+            if known_registries == ["*"]:
+                self._registry = parts[0]
+                self._name, self._tag = ImageRef._parse_image_tag("/".join(parts[1:]), False)
+            elif is_known_registry(parts[0], parts[1], known_registries):
                 self._registry = parts[0]
                 using_default = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
-                self._name, self._tag = ImageRef._parse_image_tag(parts[1], using_default)
-            # add ['*'] as magic keyword to accept any repository as valid repo
-            elif known_registries == ["*"]:
-                self._registry = parts[0]
-                self._name, self._tag = ImageRef._parse_image_tag(parts[1], False)
+                self._name, self._tag = ImageRef._parse_image_tag(
+                    "/".join(parts[1:]), using_default
+                )
             else:
                 self._registry = default_registry
                 self._name, self._tag = ImageRef._parse_image_tag(self._value, True)

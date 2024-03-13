@@ -47,6 +47,7 @@ from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
 from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
+    GUID,
     Base,
     BigInt,
     ForeignKeyIDColumn,
@@ -191,7 +192,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
-    registry_id = sa.Column("registry_id", sa.String, nullable=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )

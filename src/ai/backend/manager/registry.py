@@ -55,7 +55,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef, get_known_registries
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -83,7 +83,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, UnknownImageRegistry
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -115,6 +115,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -510,6 +511,8 @@ class AgentRegistry:
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
+
+            # sess.main_kernel.registry: ["cr.backend.ai", ...]
             running_image_ref = ImageRef(
                 sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
             )
@@ -2813,6 +2816,54 @@ class AgentRegistry:
             )
         await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def _get_known_registries(
+        self, db: ExtendedAsyncSAEngine
+    ) -> Mapping[str, Mapping[str, yarl.URL]]:
+        async with db.begin_readonly_session() as db_session:
+            registries: list[tuple[str, str, str]] = (
+                await db_session.execute(
+                    sa.select([
+                        ContainerRegistryRow.project,
+                        ContainerRegistryRow.registry_name,
+                        ContainerRegistryRow.url,
+                    ])
+                )
+            ).fetchall()
+
+            result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
+
+            for item in registries:
+                project, registry_name, url = item
+
+                if project not in result:
+                    result[item[0]] = {}
+
+                result[project][registry_name] = yarl.URL(url)
+
+            return result
+
+    async def _get_registry_info(
+        self, db: ExtendedAsyncSAEngine, registry_id: str
+    ) -> tuple[yarl.URL, dict]:
+        async with db.begin_readonly_session() as db_session:
+            result: tuple[str, Optional[str], Optional[str]] = (
+                await db_session.execute(
+                    sa.select([
+                        ContainerRegistryRow.url,
+                        ContainerRegistryRow.username,
+                        ContainerRegistryRow.password,
+                    ]).where(ContainerRegistryRow.id == registry_id)
+                )
+            ).scalar()
+
+            if not result:
+                raise UnknownImageRegistry(registry_id)
+
+            url, username, password = result
+            creds = {"username": username, "password": password}
+
+            return yarl.URL(url), creds
+
     async def handle_heartbeat(self, agent_id, agent_info):
         now = datetime.now(tzutc())
         slot_key_and_units = {
@@ -2964,7 +3015,7 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            known_registries = await get_known_registries(self.shared_config.etcd)
+            known_registries = await self._get_known_registries(self.db)
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
