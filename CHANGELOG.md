@@ -16,7 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 23.09.10rc5 (2024-03-14)
+## 23.09.10rc6 (2024-03-14)
 
 ### Features
 * Add the --headless flag that run install as headless mode, skips terminal I/O ([#1958](https://github.com/lablup/backend.ai/issues/1958))
