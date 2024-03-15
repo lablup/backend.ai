@@ -144,18 +144,26 @@ def migrate_data_etcd_to_psql() -> None:
 
     input_configs = []
     for hostname, registry_info in old_format_container_registries.items():
+        type_ = ContainerRegistryType(registry_info["type"])
+
         input_config_template: dict[str, Any] = {
             "registry_name": hostname,  # hostname is changed to registry_name,
             "url": str(registry_info[""]),
-            "type": ContainerRegistryType(registry_info["type"]),
+            "type": type_,
             "username": registry_info.get("username", None),
             "password": registry_info.get("password", None),
             "ssl_verify": registry_info.get("ssl_verify", None),
             "is_global": True,
         }
 
+        if type_ == ContainerRegistryType.DOCKER and not registry_info.get("project"):
+            if hostname == "index.docker.io":
+                input_config_template["project"] = "library"
+            else:
+                input_config_template["project"] = ""
+
         # Comma-separated projects are divided into multiple ContainerRegistry rows
-        if "project" in registry_info:
+        if registry_info.get("project"):
             for project in registry_info["project"]:
                 input_config = input_config_template.copy()
                 input_config["project"] = project
