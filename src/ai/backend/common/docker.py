@@ -278,33 +278,63 @@ async def login(
     raise RuntimeError(f"authentication for docker registry {registry_url} failed")
 
 
-def is_known_registry(
+def is_default_registry(registry_name: str, project: str) -> bool:
+    return project == "" and registry_name == default_registry
+
+
+def is_dockerhub_library_registry(
+    project: str,
+    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]],
+) -> bool:
+    if project == "":
+        if isinstance(known_registries, list) and "index.docker.io" in known_registries:
+            return True
+        if isinstance(known_registries, Mapping):
+            return "index.docker.io" in known_registries["library"]
+
+    return False
+
+
+def is_in_known_library_list(
+    registry_name: str, known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]]
+) -> bool:
+    return isinstance(known_registries, list) and registry_name in known_registries
+
+
+def is_in_known_library_dict(
     registry_name: str,
     project: str,
-    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
-):
-    if project == "" and registry_name == default_registry:
-        return True
-
-    if (
+    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]],
+) -> bool:
+    return (
         isinstance(known_registries, Mapping)
-        and known_registries is not None
         and project in known_registries.keys()
         and registry_name in known_registries[project]
-    ):
-        return True
+    )
 
-    if isinstance(known_registries, list):
-        if registry_name in known_registries:
-            return True
 
+def is_ip_address_format(registry_name: str) -> bool:
     try:
         url = yarl.URL("//" + registry_name)
         if url.host and ipaddress.ip_address(url.host):
             return True
+        return False
     except ValueError:
-        pass
-    return False
+        return False
+
+
+def is_known_registry(
+    registry_name: str,
+    project: str,
+    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
+) -> bool:
+    return any([
+        is_default_registry(registry_name, project),
+        is_dockerhub_library_registry(project, known_registries),
+        is_in_known_library_list(registry_name, known_registries),
+        is_in_known_library_dict(registry_name, project, known_registries),
+        is_ip_address_format(registry_name),
+    ])
 
 
 def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
