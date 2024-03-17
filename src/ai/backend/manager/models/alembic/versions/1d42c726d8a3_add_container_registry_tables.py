@@ -109,6 +109,9 @@ def migrate_data_etcd_to_psql():
         else:
             input_configs.append(input_config_template)
 
+    if not input_configs:
+        return
+
     db_connection = op.get_bind()
     db_connection.execute(sa.insert(ContainerRegistryRow).values(input_configs))
 
@@ -142,6 +145,10 @@ def revert_data_psql_to_etcd():
     grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
 
     def merge_items(items):
+        for item in items:
+            if "project" not in item:
+                return items
+
         projects = [item["project"] for item in items]
         merged_projects = ",".join(projects)
 
