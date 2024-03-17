@@ -29,7 +29,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
-        registry_projects = self.registry_info["project"]
+        registry_projects = cast(str, self.registry_info.project).split(",")
         rqst_args = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -171,7 +171,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
-        registry_projects = self.registry_info["project"]
+        registry_projects = cast(str, self.registry_info.project).split(",")
         rqst_args = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(

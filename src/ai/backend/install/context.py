@@ -282,10 +282,23 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
+    def get_container_registry_fixture_filename(self) -> str:
+        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+            return "example-container-registries-backendai-multiarch.json"
+        else:
+            return "example-container-registries-backendai.json"
+
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+        with self.resource_path(
+            "ai.backend.install.fixtures", self.get_container_registry_fixture_filename()
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
@@ -727,6 +740,8 @@ class Context(metaclass=ABCMeta):
         ])
 
     async def populate_images(self) -> None:
+        halfstack = self.install_info.halfstack_config
+
         data: Any
         for image_source in self.dist_info.image_sources:
             match image_source:
@@ -734,25 +749,39 @@ class Context(metaclass=ABCMeta):
                     self.log_header(
                         "Scanning and pulling configured Backend.AI container images..."
                     )
-                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                        project = "stable,community,multiarch"
-                    else:
-                        project = "stable,community"
+
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "cr.backend.ai": {
-                                    "": "https://cr.backend.ai",
-                                    "type": "harbor2",
-                                    "project": project,
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
+                    async with aiotools.closing_async(
+                        await asyncpg.connect(
+                            host=halfstack.postgres_addr.face.host,
+                            port=halfstack.postgres_addr.face.port,
+                            user=halfstack.postgres_user,
+                            password=halfstack.postgres_password,
+                            database="backend",
+                        )
+                    ) as conn:
+                        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+                            project = "stable,community,multiarch"
+                        else:
+                            project = "stable,community"
+
+                        await conn.execute(
+                            "INSERT INTO container_registries (id, url, hostname, type, project) VALUES ($1, $2, $3, $4, $5);",
+                            "fe878f09-06cc-4b91-9242-4c71015cce04",
+                            "https://cr.backend.ai",
+                            "cr.backend.ai",
+                            "harbor2",
+                            project,
+                        )
+
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
@@ -773,18 +802,30 @@ class Context(metaclass=ABCMeta):
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "index.docker.io": {
-                                    "": "https://registry-1.docker.io",
-                                    "type": "docker",
-                                    "username": "lablup",
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
+                    async with aiotools.closing_async(
+                        await asyncpg.connect(
+                            host=halfstack.postgres_addr.face.host,
+                            port=halfstack.postgres_addr.face.port,
+                            user=halfstack.postgres_user,
+                            password=halfstack.postgres_password,
+                            database="backend",
+                        )
+                    ) as conn:
+                        await conn.execute(
+                            "INSERT INTO container_registries (id, url, hostname, type, username) VALUES ($1, $2, $3, $4, $5);",
+                            "abc42a05-4471-41fa-8772-10bf6452c7d1",
+                            "https://registry-1.docker.io",
+                            "index.docker.io",
+                            "docker",
+                            "lablup",
+                        )
+
                     for ref in self.dist_info.image_refs:
                         await self.run_manager_cli(["mgr", "image", "rescan", ref])
                         await self.run_exec([*self.docker_sudo, "docker", "pull", ref])

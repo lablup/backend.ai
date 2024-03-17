@@ -16,7 +16,7 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,
