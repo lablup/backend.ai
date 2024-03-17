@@ -18,7 +18,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
 )
 
 import aiohttp
@@ -284,19 +283,19 @@ def is_default_registry(registry_name: str, project: str) -> bool:
 
 def is_dockerhub_library_registry(
     project: str,
-    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]],
+    known_registries: dict[str, dict[str, Any]] | list[str] | None,
 ) -> bool:
     if project == "":
-        if isinstance(known_registries, list) and "index.docker.io" in known_registries:
-            return True
-        if isinstance(known_registries, Mapping):
-            return "index.docker.io" in known_registries["library"]
+        if isinstance(known_registries, list):
+            return "index.docker.io" in known_registries
+        if isinstance(known_registries, dict):
+            return "index.docker.io" in known_registries.get("library", [])
 
     return False
 
 
 def is_in_known_library_list(
-    registry_name: str, known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]]
+    registry_name: str, known_registries: dict[str, dict[str, Any]] | list[str] | None
 ) -> bool:
     return isinstance(known_registries, list) and registry_name in known_registries
 
@@ -304,11 +303,11 @@ def is_in_known_library_list(
 def is_in_known_library_dict(
     registry_name: str,
     project: str,
-    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]],
+    known_registries: dict[str, dict[str, Any]] | list[str] | None,
 ) -> bool:
     return (
-        isinstance(known_registries, Mapping)
-        and project in known_registries.keys()
+        isinstance(known_registries, dict)
+        and project in known_registries
         and registry_name in known_registries[project]
     )
 
@@ -326,7 +325,7 @@ def is_ip_address_format(registry_name: str) -> bool:
 def is_known_registry(
     registry_name: str,
     project: str,
-    known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
+    known_registries: dict[str, dict[str, Any]] | list[str] | None,
 ) -> bool:
     return any([
         is_default_registry(registry_name, project),
@@ -427,7 +426,7 @@ class ImageRef:
     def __init__(
         self,
         value: str,
-        known_registries: Optional[Mapping[str, Mapping[str, Any]] | Sequence[str]] = None,
+        known_registries: dict[str, dict[str, Any]] | list[str] | None = None,
         architecture: str = "x86_64",
         is_local: bool = False,
     ) -> None:
