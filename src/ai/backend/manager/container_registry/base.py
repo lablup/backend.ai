@@ -6,7 +6,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Dict, Final, Optional, cast
 
 import aiohttp
 import aiotools
@@ -20,6 +20,7 @@ from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageRow, ImageType
@@ -36,7 +37,7 @@ all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]] = ContextVar("all_update
 class BaseContainerRegistry(metaclass=ABCMeta):
     db: ExtendedAsyncSAEngine
     registry_name: str
-    registry_info: Mapping[str, Any]
+    registry_info: ContainerRegistryRow
     registry_url: yarl.URL
     max_concurrency_per_registry: int
     base_hdrs: Dict[str, str]
@@ -54,7 +55,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         db: ExtendedAsyncSAEngine,
         registry_name: str,
-        registry_info: Mapping[str, Any],
+        registry_info: ContainerRegistryRow,
         *,
         max_concurrency_per_registry: int = 4,
         ssl_verify: bool = True,
@@ -62,7 +63,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.db = db
         self.registry_name = registry_name
         self.registry_info = registry_info
-        self.registry_url = registry_info[""]
+        self.registry_url = yarl.URL(registry_info.url)
         self.max_concurrency_per_registry = max_concurrency_per_registry
         self.base_hdrs = {
             "Accept": "application/vnd.docker.distribution.manifest.v2+json",
@@ -73,7 +74,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         ssl_ctx: SSLContextType = True  # default
-        if not self.registry_info["ssl_verify"]:
+        if not self.registry_info.ssl_verify:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -88,10 +89,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
         try:
-            username = self.registry_info["username"]
+            username = self.registry_info.username
             if username is not None:
                 self.credentials["username"] = username
-            password = self.registry_info["password"]
+            password = self.registry_info.password
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, client_session):

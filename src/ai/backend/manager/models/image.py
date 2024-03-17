@@ -13,7 +13,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    cast,
     overload,
 )
 from uuid import UUID
@@ -41,6 +40,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
@@ -114,16 +114,12 @@ class ImageLoadFilter(enum.StrEnum):
 
 
 async def rescan_images(
-    etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
     *,
     local: bool | None = False,
     reporter: ProgressReporter | None = None,
 ) -> None:
-    # cannot import ai.backend.manager.config at start due to circular import
-    from ..config import container_registry_iv
-
     if local:
         registries = {
             "local": {
@@ -135,13 +131,10 @@ async def rescan_images(
             },
         }
     else:
-        registry_config_iv = t.Mapping(t.String, container_registry_iv)
-        latest_registry_config = cast(
-            dict[str, Any],
-            registry_config_iv.check(
-                await etcd.get_prefix("config/docker/registry"),
-            ),
-        )
+        async with db.begin_readonly_session() as session:
+            result = await session.execute(sa.select(ContainerRegistryRow))
+            latest_registry_config = {row.hostname: row for row in result.scalars().all()}
+
         # TODO: delete images from registries removed from the previous config?
         if registry_or_image is None:
             # scan all configured registries
@@ -958,7 +951,7 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
+            await rescan_images(ctx.db, registry, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)

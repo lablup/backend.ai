@@ -22,7 +22,7 @@ from ai.backend.manager.models.gql_relay import (
     ResolvedGlobalID,
 )
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,

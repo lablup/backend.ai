@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Type
+from typing import TYPE_CHECKING, Type
 
 import yarl
+
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 if TYPE_CHECKING:
     from .base import BaseContainerRegistry
 
 
-def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
-    registry_url = yarl.URL(registry_info[""])
-    registry_type = registry_info.get("type", "docker")
+def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[BaseContainerRegistry]:
+    registry_url = yarl.URL(registry_info.url)
+    registry_type = registry_info.type
     cr_cls: Type[BaseContainerRegistry]
     if registry_url.host is not None and registry_url.host.endswith(".docker.io"):
         from .docker import DockerHubRegistry

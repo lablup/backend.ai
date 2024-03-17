@@ -18,7 +18,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ..models.image import ImageAliasRow, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
-from .context import CLIContext, etcd_ctx, redis_ctx
+from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -155,10 +155,9 @@ async def rescan_images(cli_ctx: CLIContext, registry_or_image: str, local: bool
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
-        etcd_ctx(cli_ctx) as etcd,
     ):
         try:
-            await rescan_images_func(etcd, db, registry_or_image, local=local)
+            await rescan_images_func(db, registry_or_image, local=local)
         except Exception:
             log.exception("An error occurred.")
 

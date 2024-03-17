@@ -259,15 +259,7 @@ def etcd_fixture(
             },
             "nodes": {},
             "config": {
-                "docker": {
-                    "registry": {
-                        "cr.backend.ai": {
-                            "": "https://cr.backend.ai",
-                            "type": "harbor2",
-                            "project": "stable",
-                        },
-                    },
-                },
+                "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
                 },

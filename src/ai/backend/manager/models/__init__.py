@@ -1,5 +1,6 @@
 from . import acl as _acl
 from . import agent as _agent
+from . import container_registry as _container_registry
 from . import domain as _domain
 from . import dotfile as _dotfile
 from . import endpoint as _endpoint
@@ -27,6 +28,7 @@ __all__ = (
     "metadata",
     *_acl.__all__,
     *_agent.__all__,
+    *_container_registry.__all__,
     *_domain.__all__,
     *_endpoint.__all__,
     *_group.__all__,
@@ -52,6 +54,7 @@ __all__ = (
 
 from .acl import *  # noqa
 from .agent import *  # noqa
+from .container_registry import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .endpoint import *  # noqa

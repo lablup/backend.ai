@@ -965,6 +965,13 @@ configure_backendai() {
   # initialize the DB schema
   show_info "Setting up databases..."
   ./backend.ai mgr schema oneshot
+
+  if [[ "$(uname -m)" == "aarch64" ]] then
+    ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-backendai-multiarch.json
+  else
+    ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-backendai.json
+  fi
+
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
