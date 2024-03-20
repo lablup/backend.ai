@@ -210,7 +210,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 SESSION_NAME_LEN_LIMIT = 10
 
 
-async def get_known_registries(
+async def get_known_container_registries(
     db: ExtendedAsyncSAEngine,
 ) -> Mapping[str, Mapping[str, yarl.URL]]:
     async with db.begin_readonly_session() as db_session:
@@ -237,7 +237,9 @@ async def get_known_registries(
         return result
 
 
-async def get_registry_info(db: ExtendedAsyncSAEngine, registry_id: str) -> tuple[yarl.URL, dict]:
+async def get_container_registry_info(
+    db: ExtendedAsyncSAEngine, registry_id: str
+) -> tuple[yarl.URL, dict]:
     async with db.begin_readonly_session() as db_session:
         result: tuple[str, Optional[str], Optional[str]] = (
             await db_session.execute(
@@ -3015,7 +3017,7 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            known_registries = await get_known_registries(self.db)
+            known_registries = await get_known_container_registries(self.db)
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
