@@ -261,15 +261,21 @@ def insert_registry_id_to_images() -> None:
             .where(ImageRow.name.startswith(sa.bindparam("registry_name_and_project")))
         )
 
+        query_args = []
+        for registry_info in registry_infos:
+            registry_id, registry_name, project = registry_info
+
+            if registry_name == "index.docker.io" and project is None:
+                project = "library"
+
+            query_args.append({
+                "registry_id": registry_id,
+                "registry_name_and_project": f"{registry_name}/{project}",
+            })
+
         db_connection.execute(
             query,
-            [
-                {
-                    "registry_id": registry_info[0],
-                    "registry_name_and_project": f"{registry_info[1]}/{registry_info[2]}",
-                }
-                for registry_info in registry_infos
-            ],
+            query_args,
         )
 
 
