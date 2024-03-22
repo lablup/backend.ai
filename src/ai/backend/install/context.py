@@ -289,7 +289,7 @@ class Context(metaclass=ABCMeta):
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
         with self.resource_path(
-            "ai.backend.install.fixtures", "example-container-registries-backendai.json"
+            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
