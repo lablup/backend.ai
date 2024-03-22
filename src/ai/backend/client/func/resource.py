@@ -40,11 +40,11 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_docker_registries(cls):
+    async def get_container_registries(cls):
         """
-        Lists all registered docker registries.
+        Lists all registered container registries.
         """
-        rqst = Request("GET", "/resource/docker-registries")
+        rqst = Request("GET", "/resource/container-registries")
         async with rqst.fetch() as resp:
             return await resp.json()
 
