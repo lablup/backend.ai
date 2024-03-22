@@ -307,6 +307,7 @@ common_image = ImageRow(
     image=common_image_ref.name,
     tag=common_image_ref.tag,
     registry=common_image_ref.registry,
+    registry_id=UUID("3b241101-e2bb-4255-8caf-4136c566a964"),
     architecture=ARCH_FOR_TEST,
 )
 
