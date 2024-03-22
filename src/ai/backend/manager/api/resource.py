@@ -33,6 +33,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.registry import get_known_container_registries
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -855,6 +856,23 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
                     return web.Response(text=data, status=resp.status)
 
 
+@superadmin_required
+async def get_docker_registries(request: web.Request) -> web.Response:
+    """
+    Returns the list of all registered docker registries.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    _registries = await get_known_container_registries(root_ctx.db)
+
+    known_registries = {}
+    for project, registries in _registries.items():
+        for registry_name, url in registries.items():
+            if project not in known_registries:
+                known_registries[f"{project}/{registry_name}"] = url.human_repr()
+
+    return web.json_response(known_registries, status=200)
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
@@ -864,6 +882,7 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
+    cors.add(add_route("GET", "/docker-registries", get_docker_registries))
     cors.add(add_route("POST", "/check-presets", check_presets))
     cors.add(add_route("POST", "/recalculate-usage", recalculate_usage))
     cors.add(add_route("GET", "/usage/month", usage_per_month))
