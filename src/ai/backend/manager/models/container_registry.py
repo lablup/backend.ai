@@ -81,7 +81,7 @@ class ContainerRegistryRow(Base):
         nullable=False,
         index=True,
     )
-    project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
+    project = sa.Column("project", sa.String(length=255), nullable=True)
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String(length=255), nullable=True)
     ssl_verify = sa.Column(
