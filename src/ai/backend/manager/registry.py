@@ -1251,12 +1251,23 @@ class AgentRegistry:
                 if tpu is not None:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
-            # Shared memory.
-            # The minimum-required/maximum-limited resource size(=MM) for images excludes the shared memory size(=S).
-            # However, MOST client's session creation requests set S by default and
-            # our scheduler allocates the sum of the requested main memory size(=M) and S.
-            # That's why we should compare MM to the sum of M and S,
-            # which is the same as comparing MM minus S to M.
+            # Check if the user has allocated an "imbalanced" shared memory amount.
+            if shmem >= requested_slots["mem"]:
+                raise InvalidAPIParameters(
+                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
+                        str(shmem), str(BinarySize(requested_slots["mem"]))
+                    ),
+                )
+
+            # Include the shared memory as a part of the requested memory.
+            # When checking the min/max range limits of memory size (=MM) specified as image
+            # metadata, we should take the share memory (=S) into account as well as the requested
+            # memory size (=M).
+            # Most client's session creation requests set S as the implicit default and the passed requested
+            # memory size is M - S, so this may break up the min/max check in the minimum edge.
+            # (e.g., MM.min = 256MiB, M = 256MiB, S = 64MiB -> intuitively this should work but if
+            # we compare MM.min with the passed value M - S (192MiB) only, it will prevent the session
+            # creation.)
             total_mem = requested_slots["mem"] + shmem
             log.debug(
                 f"Total memory size ({str(total_mem)}) is allocated to requested main memory size. (original memory: {str(requested_slots['mem'])}, shared memory: {str(shmem)})",
@@ -1293,14 +1304,6 @@ class AgentRegistry:
                             for k, v in image_max_slots.to_humanized(known_slot_types).items()
                         )
                     )
-                )
-
-            # Check if: shmem < memory
-            if shmem >= requested_slots["mem"]:
-                raise InvalidAPIParameters(
-                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
-                    ),
                 )
 
             # Add requested resource slot data to session
