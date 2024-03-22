@@ -1,4 +1,4 @@
-"""Migrate container registry schema from `etcd` to `postgreSQL`
+"""Migrate container registries from `etcd` to `postgreSQL`
 
 Revision ID: 1d42c726d8a3
 Revises: 75ea2b136830
@@ -63,7 +63,7 @@ def get_container_registry_row_schema():
             nullable=False,
             index=True,
         )
-        project = sa.Column("project", sa.String(length=255), nullable=True)  # harbor only
+        project = sa.Column("project", sa.String(length=255), nullable=False)
         username = sa.Column("username", sa.String(length=255), nullable=True)
         password = sa.Column("password", sa.String(length=255), nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
@@ -93,6 +93,21 @@ def get_async_etcd() -> AsyncEtcd:
     )
 
 
+def delete_old_etcd_container_registries() -> None:
+    queue: Queue = Queue()
+
+    with ThreadPoolExecutor() as executor:
+
+        def delete_etcd_container_registries():
+            async def _delete_container_registries():
+                etcd = get_async_etcd()
+                await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
+
+            queue.put(asyncio.run(_delete_container_registries()))
+
+        executor.submit(delete_etcd_container_registries)
+
+
 def migrate_data_etcd_to_psql() -> None:
     queue: Queue = Queue()
 
@@ -107,20 +122,19 @@ def migrate_data_etcd_to_psql() -> None:
 
         # If there are no container registries, it returns an empty list.
         # If an error occurs while saving backup, it returns error.
-        def take_etcd_container_registries(queue: Queue):
-            async def _take_container_registries():
+        def get_etcd_container_registries(queue: Queue):
+            async def _get_container_registries():
                 etcd = get_async_etcd()
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 try:
                     backup(result)
                 except Exception as e:
                     return e
-                await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 return result
 
-            queue.put(asyncio.run(_take_container_registries()))
+            queue.put(asyncio.run(_get_container_registries()))
 
-        executor.submit(take_etcd_container_registries, queue)
+        executor.submit(get_etcd_container_registries, queue)
 
     maybe_registries = queue.get()
 
@@ -144,31 +158,32 @@ def migrate_data_etcd_to_psql() -> None:
 
     input_configs = []
     for hostname, registry_info in old_format_container_registries.items():
-        type_ = ContainerRegistryType(registry_info["type"])
+        registry_type = ContainerRegistryType(registry_info["type"])
 
         input_config_template: dict[str, Any] = {
             "registry_name": hostname,  # hostname is changed to registry_name,
             "url": str(registry_info[""]),
-            "type": type_,
+            "type": registry_type,
             "username": registry_info.get("username", None),
             "password": registry_info.get("password", None),
             "ssl_verify": registry_info.get("ssl_verify", None),
             "is_global": True,
         }
 
-        if type_ == ContainerRegistryType.DOCKER and not registry_info.get("project"):
-            if hostname == "index.docker.io":
-                input_config_template["project"] = "library"
-            else:
-                input_config_template["project"] = ""
-
-        # Comma-separated projects are divided into multiple ContainerRegistry rows
-        if registry_info.get("project"):
-            for project in registry_info["project"]:
+        # Comma-separated projects should be divided into multiple ContainerRegistryRows.
+        if projects := registry_info.get("project"):
+            for project in projects:
                 input_config = input_config_template.copy()
                 input_config["project"] = project
                 input_configs.append(input_config)
         else:
+            if registry_type == ContainerRegistryType.DOCKER and hostname == "index.docker.io":
+                input_config_template["project"] = "library"
+            else:
+                raise Exception(
+                    f'ContainerRegistryRow.project is required! Please put the value to "{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/project" before migration.'
+                )
+
             input_configs.append(input_config_template)
 
     if not input_configs:
@@ -208,7 +223,7 @@ def revert_data_psql_to_etcd() -> None:
 
     # Records with the same hostname should be grouped together.
     # Note that if there are columns other than the project column that have different values between records,
-    # information loss can occur.
+    # information loss can occur while the reverting process.
     grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
 
     def merge_items(items):
@@ -255,27 +270,27 @@ def insert_registry_id_to_images() -> None:
     ).fetchall()
 
     if registry_infos:
-        query = (
+        insert_registry_id_query = (
             sa.update(ImageRow)
             .values(registry_id=sa.bindparam("registry_id"))
             .where(ImageRow.name.startswith(sa.bindparam("registry_name_and_project")))
         )
 
-        query_args = []
+        query_params = []
         for registry_info in registry_infos:
             registry_id, registry_name, project = registry_info
 
             if registry_name == "index.docker.io" and project is None:
                 project = "library"
 
-            query_args.append({
+            query_params.append({
                 "registry_id": registry_id,
                 "registry_name_and_project": f"{registry_name}/{project}",
             })
 
         db_connection.execute(
-            query,
-            query_args,
+            insert_registry_id_query,
+            query_params,
         )
 
 
@@ -295,7 +310,7 @@ def upgrade():
             nullable=False,
             index=True,
         ),
-        sa.Column("project", sa.String(length=255), nullable=True),
+        sa.Column("project", sa.String(length=255), nullable=False, index=True),
         sa.Column("username", sa.String(length=255), nullable=True),
         sa.Column("password", sa.String(length=255), nullable=True),
         sa.Column(
@@ -308,9 +323,14 @@ def upgrade():
 
     migrate_data_etcd_to_psql()
 
-    op.add_column("images", sa.Column("registry_id", GUID, default=None, nullable=True))
+    op.add_column(
+        # ImageRow.registry_id should be non-nullable, but it should be nullable before the migration.
+        "images",
+        sa.Column("registry_id", GUID, default=None, nullable=True, index=True),
+    )
 
     insert_registry_id_to_images()
+    delete_old_etcd_container_registries()
 
 
 def downgrade():
