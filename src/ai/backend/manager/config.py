@@ -531,7 +531,7 @@ def load(
         config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
-    # (allow_extra will make configs to be forward-copmatible)
+    # (allow_extra will make configs to be forward-compatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
         if cfg["debug"]["enabled"]:
