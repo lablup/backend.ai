@@ -192,7 +192,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
-    registry_id = sa.Column("registry_id", GUID, nullable=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -228,9 +228,9 @@ class ImageRow(Base):
         self,
         name,
         architecture,
+        registry_id,
         is_local=False,
         registry=None,
-        registry_id=None,
         image=None,
         tag=None,
         config_digest=None,

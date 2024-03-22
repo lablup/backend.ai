@@ -241,7 +241,7 @@ async def get_container_registry_info(
     db: ExtendedAsyncSAEngine, registry_id: str
 ) -> tuple[yarl.URL, dict]:
     async with db.begin_readonly_session() as db_session:
-        result: tuple[str, Optional[str], Optional[str]] = (
+        results = (
             await db_session.execute(
                 sa.select([
                     ContainerRegistryRow.url,
@@ -249,10 +249,12 @@ async def get_container_registry_info(
                     ContainerRegistryRow.password,
                 ]).where(ContainerRegistryRow.id == registry_id)
             )
-        ).fetchall()[0]
+        ).fetchall()
 
-        if not result:
+        if not results:
             raise UnknownImageRegistry(registry_id)
+
+        result: tuple[str, Optional[str], Optional[str]] = results[0]
 
         url, username, password = result
         creds = {"username": username, "password": password}
@@ -561,8 +563,6 @@ class AgentRegistry:
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
-
-            # sess.main_kernel.registry: ["cr.backend.ai", ...]
             running_image_ref = ImageRef(
                 sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
             )
