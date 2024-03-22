@@ -427,7 +427,7 @@ def database_fixture(local_config, test_db, database):
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
-        build_root / "fixtures" / "manager" / "example-container-registries-backendai.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
     ]
 
     async def init_fixture():
