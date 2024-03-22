@@ -147,8 +147,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         name=image_ref.canonical,
                         registry=image_ref.registry,
                         registry_id=await self.get_registry_id(
-                            image_ref.registry,
-                            image_ref.name.split("/")[0] if "/" in image_ref.name else None,
+                            registry_name=image_ref.registry,
+                            project=image_ref.name.split("/")[0] if "/" in image_ref.name else None,
                         ),
                         image=image_ref.name,
                         tag=image_ref.tag,
