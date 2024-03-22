@@ -676,7 +676,7 @@ class Context(metaclass=ABCMeta):
             Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
-    async def get_db_connection(self):
+    async def get_db_connection(self) -> asyncpg.Connection:
         halfstack = self.install_info.halfstack_config
         return await asyncpg.connect(
             host=halfstack.postgres_addr.face.host,
