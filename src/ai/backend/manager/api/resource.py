@@ -857,9 +857,9 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
 
 
 @superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
+async def get_container_registries(request: web.Request) -> web.Response:
     """
-    Returns the list of all registered docker registries.
+    Returns the list of all registered container registries.
     """
     root_ctx: RootContext = request.app["_root.context"]
     _registries = await get_known_container_registries(root_ctx.db)
@@ -882,7 +882,7 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
-    cors.add(add_route("GET", "/docker-registries", get_docker_registries))
+    cors.add(add_route("GET", "/container-registries", get_container_registries))
     cors.add(add_route("POST", "/check-presets", check_presets))
     cors.add(add_route("POST", "/recalculate-usage", recalculate_usage))
     cors.add(add_route("GET", "/usage/month", usage_per_month))
