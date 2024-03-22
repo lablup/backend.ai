@@ -23,6 +23,7 @@ async def test_handle_heartbeat(
     mocker,
 ) -> None:
     mock_get_known_container_registries = AsyncMock(
+        # Hint: [{"project": {"registry_name": "url"}, ...}]
         return_value=[
             {
                 "": {"index.docker.io": "https://registry-1.docker.io"},
