@@ -1922,6 +1922,7 @@ class AbstractAgent(
                     krunner_opts.append("--debug")
                 cmdargs += [
                     "/opt/backend.ai/bin/python",
+                    "-s",
                     "-m",
                     "ai.backend.kernel",
                     *krunner_opts,
