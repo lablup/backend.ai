@@ -44,7 +44,7 @@ class Resource(BaseFunction):
         """
         Lists all registered docker registries.
         """
-        rqst = Request("GET", "/config/docker-registries")
+        rqst = Request("GET", "/resource/docker-registries")
         async with rqst.fetch() as resp:
             return await resp.json()
 
