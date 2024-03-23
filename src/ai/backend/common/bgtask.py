@@ -8,6 +8,8 @@ import uuid
 import weakref
 from collections import defaultdict
 from typing import (
+    Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     DefaultDict,
@@ -144,6 +146,38 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
+        async with sse_response(request) as resp:
+            try:
+                async for event, extra_data in self.poll_bgtask_event(task_id):
+                    body: dict[str, Any] = {
+                        "task_id": event.task_id,
+                        "message": event.message,
+                    }
+                    match event:
+                        case BgtaskUpdatedEvent():
+                            body["current_progress"] = event.current_progress
+                            body["total_progress"] = event.total_progress
+                            await resp.send(json.dumps(body), event=event.name, retry=5)
+                        case BgtaskDoneEvent():
+                            if extra_data:
+                                body.update(extra_data)
+                                await resp.send(
+                                    json.dumps(body), event="bgtask_" + extra_data["status"]
+                                )
+                            await resp.send("{}", event="server_close")
+                        case BgtaskCancelledEvent() | BgtaskFailedEvent():
+                            await resp.send("{}", event="server_close")
+            finally:
+                return resp
+
+    async def poll_bgtask_event(
+        self,
+        task_id: uuid.UUID,
+    ) -> AsyncIterator[tuple[BgtaskEvents, dict]]:
+        """
+        RHS of return tuple will be filled with extra informations when needed
+        (e.g. progress information of task when callee is trying to poll information of already completed one)
+        """
         tracker_key = f"bgtask.{task_id}"
         redis_producer = self.event_producer.redis_client
         task_info = await redis_helper.execute(
@@ -159,53 +193,31 @@ class BackgroundTaskManager:
 
         if task_info["status"] != "started":
             # It is an already finished task!
-            async with sse_response(request) as resp:
-                try:
-                    body = {
-                        "task_id": str(task_id),
-                        "status": task_info["status"],
-                        "current_progress": task_info["current"],
-                        "total_progress": task_info["total"],
-                        "message": task_info["msg"],
-                    }
-                    await resp.send(json.dumps(body), event="bgtask_" + task_info["status"])
-                finally:
-                    await resp.send("{}", event="server_close")
-            return resp
+            yield (
+                BgtaskDoneEvent(task_id, message=task_info["msg"]),
+                {
+                    "status": task_info["status"],
+                    "current_progress": task_info["current"],
+                    "total_progress": task_info["total"],
+                },
+            )
+            return
 
         # It is an ongoing task.
         my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
         async with self.dict_lock:
             self.task_update_queues[task_id].add(my_queue)
         try:
-            async with sse_response(request) as resp:
+            while True:
+                event = await my_queue.get()
                 try:
-                    while True:
-                        event = await my_queue.get()
-                        try:
-                            if event is sentinel:
-                                break
-                            if task_id != event.task_id:
-                                continue
-                            body = {
-                                "task_id": str(task_id),
-                                "message": event.message,
-                            }
-                            if isinstance(event, BgtaskUpdatedEvent):
-                                body["current_progress"] = event.current_progress
-                                body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
-                            if (
-                                isinstance(event, BgtaskDoneEvent)
-                                or isinstance(event, BgtaskFailedEvent)
-                                or isinstance(event, BgtaskCancelledEvent)
-                            ):
-                                await resp.send("{}", event="server_close")
-                                break
-                        finally:
-                            my_queue.task_done()
+                    if event is sentinel:
+                        break
+                    if task_id != event.task_id:
+                        continue
+                    yield event, {}
                 finally:
-                    return resp
+                    my_queue.task_done()
         finally:
             self.task_update_queues[task_id].remove(my_queue)
             async with self.dict_lock:

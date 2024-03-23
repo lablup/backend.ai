@@ -20,6 +20,7 @@ from typing import (
 import aiotools
 import graphene
 import sqlalchemy as sa
+import trafaret as t
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
@@ -41,6 +42,7 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
+    StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
@@ -111,6 +113,11 @@ association_groups_users = sa.Table(
     sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
 
+per_user_image_storage_registry_iv = t.Dict({
+    t.Key("registry"): t.String(),
+    t.Key("project"): t.String(),
+})
+
 
 class AssocGroupUserRow(Base):
     __table__ = association_groups_users
@@ -169,6 +176,11 @@ groups = sa.Table(
         EnumValueType(ProjectType),
         nullable=False,
         default=ProjectType.GENERAL,
+    ),
+    sa.Column(
+        "per_user_image_storage_registry",
+        StructuredJSONColumn(per_user_image_storage_registry_iv),
+        nullable=True,
     ),
     sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
 )

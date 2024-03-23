@@ -662,19 +662,31 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
-        items = [item for item in items if item.registry in allowed_docker_registries]
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
+        def _filter_operation(item):
+            for label in item.labels:
+                if label.key == "ai.backend.features" and "operation" in label.value:
+                    return not is_operation
+            return not is_operation
 
-            items = [*filter(_filter_operation, items)]
-        return items
+        filtered_items: list[Image] = []
+        for item in items:
+            if item.registry not in allowed_docker_registries:
+                continue
+            if is_installed and not item.installed:
+                continue
+            if is_operation and not _filter_operation(item):
+                continue
+            if _committed_user := item.labels.get("ai.backend.image-owner"):
+                if _committed_user != str(ctx.user["uuid"]):
+                    continue
+                filtered_tag = "-".join([
+                    t for t in item.tag.split("-") if not t.startswith("peruser_")
+                ])
+                item.tag = filtered_tag
+            filtered_items.append(item)
+
+        return filtered_items
 
 
 class ImageNode(graphene.ObjectType):

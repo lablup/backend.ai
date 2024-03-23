@@ -17,6 +17,7 @@ from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Dict,
     Iterable,
@@ -41,9 +42,15 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
+
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.docker import ImageRef
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -51,11 +58,23 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import AgentTerminatedEvent
+from ai.backend.common.events import (
+    AgentTerminatedEvent,
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+)
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.common.types import AccessKey, AgentId, ClusterMode, SessionTypes, VFolderID
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    ImageRegistry,
+    SessionTypes,
+    VFolderID,
+)
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -98,7 +117,13 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .scaling_group import query_wsproxy_status
 from .types import CORSOptions, WebMiddleware
-from .utils import catch_unexpected, check_api_params, get_access_key_scopes, undefined
+from .utils import (
+    catch_unexpected,
+    check_api_params,
+    get_access_key_scopes,
+    pydantic_params_api_handler,
+    undefined,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -962,13 +987,140 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
 
         resp: Mapping[str, Any] = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session(session, filename=filename),
+                root_ctx.registry.commit_session_to_file(session, filename),
             ),
         )
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
     return web.json_response(resp, status=201)
+
+
+class ConvertSessionToImageRequesteModel(BaseModel):
+    image_name: str
+    login_session_token: Annotated[str | None, Field(default=None)]
+
+
+class ConvertSessionToImageResponseModel(BaseModel):
+    task_id: str
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@pydantic_params_api_handler(ConvertSessionToImageRequesteModel)
+async def convert_session_to_image(
+    request: web.Request, params: ConvertSessionToImageRequesteModel
+) -> ConvertSessionToImageResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    background_task_manager = root_ctx.background_task_manager
+
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    log.info(
+        "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
+        requester_access_key,
+        owner_access_key,
+        session_name,
+    )
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            eager_loading_op=[selectinload(SessionRow.group)],
+        )
+
+    project: GroupRow = session.group
+    if not project.per_user_image_storage_registry:
+        raise InvalidAPIParameters(
+            "Project not ready to convert session image (registry configuration not populated)"
+        )
+
+    registry_hostname = project.per_user_image_storage_registry["registry"]
+    registry_project = project.per_user_image_storage_registry["project"]
+    registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
+    if not registry_conf:
+        raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
+    if registry_project not in registry_conf.get("project", "").split(","):
+        raise InvalidAPIParameters(f"Project {registry_project} not found")
+
+    base_image_ref = session.main_kernel.image_ref
+
+    async def _commit_and_upload(reporter: ProgressReporter) -> None:
+        await reporter.update(message=json.dumps({"status": "started"}))
+        try:
+            new_image_ref: ImageRef = ImageRef(
+                # peruser_* tag will not be exposed to Images list API callee; check Image.filter_allowed() for more
+                f"{registry_hostname}/{registry_project}/{base_image_ref.name}:{base_image_ref.tag}-peruser_{request['user']['uuid']}-imagename_{params.image_name}",
+                architecture=base_image_ref.architecture,
+                known_registries=["*"],
+                is_local=base_image_ref.is_local,
+            )
+            resp = await root_ctx.registry.commit_session(
+                # FIXME: ensure bgtask execution has finished
+                session,
+                new_image_ref,
+                extra_labels={"ai.backend.image-owner": str(request["user"]["uuid"])},
+            )
+            commit_completed = False
+            async for event, _ in background_task_manager.poll_bgtask_event(resp["task_id"]):
+                match event:
+                    case BgtaskDoneEvent():
+                        await reporter.update(
+                            increment=1, message=json.dumps({"status": "committed"})
+                        )
+                        commit_completed = True
+                    case BgtaskFailedEvent():
+                        await reporter.update(
+                            message=json.dumps({"status": "failed", "reason": event.message})
+                        )
+                    case BgtaskCancelledEvent():
+                        await reporter.update(message=json.dumps({"status": "cancelled"}))
+
+            if not commit_completed:
+                return
+
+            if not new_image_ref.is_local:
+                # FIXME: ensure bgtask execution has finished
+                resp = await root_ctx.registry.push_image(
+                    session.main_kernel.agent,
+                    new_image_ref,
+                    cast(ImageRegistry, registry_conf),
+                )
+                push_completed = False
+                async for event, _ in background_task_manager.poll_bgtask_event(resp["task_id"]):
+                    match event:
+                        case BgtaskDoneEvent():
+                            push_completed = True
+                        case BgtaskFailedEvent():
+                            await reporter.update(
+                                message=json.dumps({"status": "failed", "reason": event.message})
+                            )
+                        case BgtaskCancelledEvent():
+                            await reporter.update(message=json.dumps({"status": "cancelled"}))
+
+                if not push_completed:
+                    return
+
+            await reporter.update(increment=1, message=json.dumps({"status": "pushed"}))
+            await rescan_images(
+                root_ctx.shared_config.etcd,
+                root_ctx.db,
+                new_image_ref.canonical,
+                local=new_image_ref.is_local,
+            )
+            await reporter.update(increment=1, message=json.dumps({"status": "completed"}))
+        except BackendError as e:
+            log.exception("CONVERT_SESSION_TO_IMAGE: exception")
+            await reporter.update(message=json.dumps({"status": "failed", "reason": repr(e)}))
+
+    task_id = await background_task_manager.start(_commit_and_upload)
+    return ConvertSessionToImageResponseModel(task_id=str(task_id))
 
 
 @catch_unexpected(log)
@@ -2038,6 +2190,7 @@ def create_app(
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
+    cors.add(app.router.add_route("POST", "/{session_name}/imagify", convert_session_to_image))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))

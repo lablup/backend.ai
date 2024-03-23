@@ -1495,6 +1495,12 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        """
+        Push the given image to the given registry.
+        """
+
+    @abstractmethod
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         """
         Pull the given image from the given registry.
@@ -2343,8 +2349,19 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while shutting down service app ${}", service)
 
-    async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
-        return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
+    async def commit(
+        self,
+        reporter,
+        kernel_id: KernelId,
+        subdir: str,
+        *,
+        canonical: str | None = None,
+        filename: str,
+        extra_labels: dict[str, str] = {},
+    ):
+        return await self.kernel_registry[kernel_id].commit(
+            kernel_id, subdir, canonical=canonical, filename=filename, extra_labels=extra_labels
+        )
 
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)

@@ -403,6 +403,14 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
+    _value: str
+    _is_local: bool
+    _arch: str
+    _registry: str
+
+    _name: str
+    _tag: str
+
     __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local", "_value")
 
     _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
