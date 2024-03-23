@@ -3207,7 +3207,7 @@ class AgentRegistry:
             resp: Mapping[str, Any] = await rpc.call.push_image(
                 image_ref.canonical,
                 image_ref.architecture,
-                registry,
+                {**registry, "url": str(registry["url"])},
                 is_local=image_ref.is_local,
             )
         return resp

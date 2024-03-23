@@ -358,7 +358,7 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 class PlatformTagSet(Mapping):
     __slots__ = ("_data",)
     _data: dict[str, str]
-    _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
+    _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
     def __init__(self, tags: Iterable[str], value: str = None) -> None:
         self._data = dict()

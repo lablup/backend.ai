@@ -118,6 +118,7 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .scaling_group import query_wsproxy_status
 from .types import CORSOptions, WebMiddleware
 from .utils import (
+    BaseResponseModel,
     catch_unexpected,
     check_api_params,
     get_access_key_scopes,
@@ -1001,12 +1002,12 @@ class ConvertSessionToImageRequesteModel(BaseModel):
     login_session_token: Annotated[str | None, Field(default=None)]
 
 
-class ConvertSessionToImageResponseModel(BaseModel):
+class ConvertSessionToImageResponseModel(BaseResponseModel):
     task_id: str
 
 
-@server_status_required(ALL_ALLOWED)
 @auth_required
+@server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(ConvertSessionToImageRequesteModel)
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
@@ -1046,78 +1047,89 @@ async def convert_session_to_image(
     registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
     if not registry_conf:
         raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.get("project", "").split(","):
+    if registry_project not in registry_conf.get("project", ""):
         raise InvalidAPIParameters(f"Project {registry_project} not found")
 
     base_image_ref = session.main_kernel.image_ref
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
-        await reporter.update(message=json.dumps({"status": "started"}))
+        reporter.total_progress = 4
+        await reporter.update(message="Commit started")
         try:
+            log.debug(
+                "registry: {}, project: {}, name: {}",
+                registry_hostname,
+                registry_project,
+                base_image_ref.name,
+            )
+            if "/" in base_image_ref.name:
+                new_name = base_image_ref.name.split("/", maxsplit=1)[1]
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = f"{registry_hostname}/{registry_project}/{new_name}:{base_image_ref.tag}-peruser_{str(request['user']['uuid']).replace('-', '')}-imagename_{params.image_name}"
+            log.debug("new image canonical: {}", new_canonical)
             new_image_ref: ImageRef = ImageRef(
                 # peruser_* tag will not be exposed to Images list API callee; check Image.filter_allowed() for more
-                f"{registry_hostname}/{registry_project}/{base_image_ref.name}:{base_image_ref.tag}-peruser_{request['user']['uuid']}-imagename_{params.image_name}",
+                new_canonical,
                 architecture=base_image_ref.architecture,
                 known_registries=["*"],
                 is_local=base_image_ref.is_local,
             )
             resp = await root_ctx.registry.commit_session(
-                # FIXME: ensure bgtask execution has finished
                 session,
                 new_image_ref,
                 extra_labels={"ai.backend.image-owner": str(request["user"]["uuid"])},
             )
-            commit_completed = False
-            async for event, _ in background_task_manager.poll_bgtask_event(resp["task_id"]):
+            async for event, _ in background_task_manager.poll_bgtask_event(
+                uuid.UUID(resp["bgtask_id"])
+            ):
+                log.debug("new event: {}", repr(event))
                 match event:
                     case BgtaskDoneEvent():
-                        await reporter.update(
-                            increment=1, message=json.dumps({"status": "committed"})
-                        )
-                        commit_completed = True
+                        await reporter.update(increment=1, message="Committed image")
+                        break
                     case BgtaskFailedEvent():
-                        await reporter.update(
-                            message=json.dumps({"status": "failed", "reason": event.message})
-                        )
+                        raise BackendError(extra_msg=event.message)
                     case BgtaskCancelledEvent():
-                        await reporter.update(message=json.dumps({"status": "cancelled"}))
-
-            if not commit_completed:
-                return
+                        raise BackendError(extra_msg="Operation cancelled")
 
             if not new_image_ref.is_local:
-                # FIXME: ensure bgtask execution has finished
+                log.debug("registry config: {}", registry_conf)
+                image_registry = ImageRegistry(
+                    name=registry_hostname,
+                    url=str(registry_conf[""]),
+                    username=registry_conf.get("username"),
+                    password=registry_conf.get("password"),
+                )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
                     new_image_ref,
-                    cast(ImageRegistry, registry_conf),
+                    image_registry,
                 )
-                push_completed = False
-                async for event, _ in background_task_manager.poll_bgtask_event(resp["task_id"]):
+                async for event, _ in background_task_manager.poll_bgtask_event(
+                    uuid.UUID(resp["bgtask_id"])
+                ):
+                    log.debug("new event: {}", repr(event))
                     match event:
                         case BgtaskDoneEvent():
-                            push_completed = True
+                            break
                         case BgtaskFailedEvent():
-                            await reporter.update(
-                                message=json.dumps({"status": "failed", "reason": event.message})
-                            )
+                            raise BackendError(extra_msg=event.message)
                         case BgtaskCancelledEvent():
-                            await reporter.update(message=json.dumps({"status": "cancelled"}))
+                            raise BackendError(extra_msg="Operation cancelled")
 
-                if not push_completed:
-                    return
-
-            await reporter.update(increment=1, message=json.dumps({"status": "pushed"}))
+            await reporter.update(increment=1, message="Pushed image to registry")
             await rescan_images(
                 root_ctx.shared_config.etcd,
                 root_ctx.db,
                 new_image_ref.canonical,
                 local=new_image_ref.is_local,
             )
-            await reporter.update(increment=1, message=json.dumps({"status": "completed"}))
-        except BackendError as e:
+            await reporter.update(increment=1, message="Completed")
+        except BackendError:
             log.exception("CONVERT_SESSION_TO_IMAGE: exception")
-            await reporter.update(message=json.dumps({"status": "failed", "reason": repr(e)}))
+            raise
 
     task_id = await background_task_manager.start(_commit_and_upload)
     return ConvertSessionToImageResponseModel(task_id=str(task_id))
