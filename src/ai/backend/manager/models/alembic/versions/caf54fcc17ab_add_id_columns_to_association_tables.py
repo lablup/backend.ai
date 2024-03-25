@@ -56,7 +56,6 @@ def upgrade():
             sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
         extend_existing=True,
     )
 
@@ -80,7 +79,6 @@ def upgrade():
             index=True,
             nullable=False,
         ),
-        sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
         extend_existing=True,
     )
 
@@ -104,7 +102,6 @@ def upgrade():
             index=True,
             nullable=False,
         ),
-        sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
         extend_existing=True,
     )
 
@@ -128,7 +125,6 @@ def upgrade():
             index=True,
             nullable=False,
         ),
-        sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
         extend_existing=True,
     )
 
