@@ -12,6 +12,7 @@ import click
 from more_itertools import chunked
 from setproctitle import setproctitle
 
+from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
@@ -45,15 +46,15 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: pathlib.Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool,
 ) -> None:
     """
@@ -207,7 +208,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.option(
     "-v",
     "--vacuum-full",
-    type=bool,
+    type=OptionalType(BoolExprType),
     default=False,
     help=(
         "Reclaim storage occupied by dead tuples."

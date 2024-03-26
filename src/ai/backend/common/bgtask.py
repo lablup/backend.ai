@@ -13,7 +13,6 @@ from typing import (
     DefaultDict,
     Final,
     Literal,
-    Optional,
     Set,
     Type,
     TypeAlias,
@@ -39,7 +38,7 @@ from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-TaskResult = Literal["bgtask_done", "bgtask_cancelled", "bgtask_failed"]
+TaskStatus = Literal["bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed"]
 BgtaskEvents: TypeAlias = (
     BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
 )
@@ -65,7 +64,11 @@ class ProgressReporter:
         self.current_progress = current_progress
         self.total_progress = total_progress
 
-    async def update(self, increment: Union[int, float] = 0, message: str = None):
+    async def update(
+        self,
+        increment: Union[int, float] = 0,
+        message: str | None = None,
+    ) -> None:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
         # due to interleaving at await statements below.
@@ -98,7 +101,7 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[[ProgressReporter], Awaitable[Optional[str]]]
+BackgroundTask = Callable[[ProgressReporter], Awaitable[str | None]]
 
 
 class BackgroundTaskManager:
@@ -165,7 +168,7 @@ class BackgroundTaskManager:
                         "total_progress": task_info["total"],
                         "message": task_info["msg"],
                     }
-                    await resp.send(json.dumps(body), event=f"task_{task_info['status']}")
+                    await resp.send(json.dumps(body), event="bgtask_" + task_info["status"])
                 finally:
                     await resp.send("{}", event="server_close")
             return resp
@@ -212,7 +215,7 @@ class BackgroundTaskManager:
     async def start(
         self,
         func: BackgroundTask,
-        name: str = None,
+        name: str | None = None,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -246,23 +249,23 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
-        task_name: Optional[str],
+        task_name: str | None,
         **kwargs,
     ) -> None:
-        task_result: TaskResult
+        task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
-        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[
-            BgtaskFailedEvent
-        ] = BgtaskDoneEvent
+        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
+            BgtaskDoneEvent
+        )
         try:
             message = await func(reporter, **kwargs) or ""
-            task_result = "bgtask_done"
+            task_status = "bgtask_done"
         except asyncio.CancelledError:
-            task_result = "bgtask_cancelled"
+            task_status = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
         except Exception as e:
-            task_result = "bgtask_failed"
+            task_status = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
@@ -275,7 +278,7 @@ class BackgroundTaskManager:
                 await pipe.hset(
                     tracker_key,
                     mapping={
-                        "status": task_result[len("bgtask_") :],  # strip "bgtask_"
+                        "status": task_status.removeprefix("bgtask_"),
                         "msg": message,
                         "last_update": str(time.time()),
                     },
@@ -290,7 +293,7 @@ class BackgroundTaskManager:
                     message=message,
                 ),
             )
-            log.info("Task {} ({}): {}", task_id, task_name or "", task_result)
+            log.info("Task {} ({}): {}", task_id, task_name or "", task_status)
 
     async def shutdown(self) -> None:
         join_tasks = []

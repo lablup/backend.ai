@@ -51,12 +51,10 @@ def test_trafaret_dataerror_pickling():
 
 
 def test_aliased_key():
-    iv = t.Dict(
-        {
-            t.Key("x") >> "z": t.Int,
-            tx.AliasedKey(["y", "Y"]): t.Int,
-        }
-    )
+    iv = t.Dict({
+        t.Key("x") >> "z": t.Int,
+        tx.AliasedKey(["y", "Y"]): t.Int,
+    })
     assert iv.check({"x": 1, "y": 2}) == {"z": 1, "y": 2}
 
     with pytest.raises(t.DataError) as e:
@@ -83,12 +81,10 @@ def test_aliased_key():
     assert "Y" in err_data
     assert "can't be converted to int" in err_data["Y"]
 
-    iv = t.Dict(
-        {
-            t.Key("x", default=0): t.Int,
-            tx.AliasedKey(["y", "Y"], default=1): t.Int,
-        }
-    )
+    iv = t.Dict({
+        t.Key("x", default=0): t.Int,
+        tx.AliasedKey(["y", "Y"], default=1): t.Int,
+    })
     assert iv.check({"x": 5, "Y": 6}) == {"x": 5, "y": 6}
     assert iv.check({"x": 5, "y": 6}) == {"x": 5, "y": 6}
     assert iv.check({"y": 3}) == {"x": 0, "y": 3}
@@ -104,12 +100,10 @@ def test_aliased_key():
 
 
 def test_multikey():
-    iv = t.Dict(
-        {
-            tx.MultiKey("x"): t.List(t.Int),
-            t.Key("y"): t.Int,
-        }
-    )
+    iv = t.Dict({
+        tx.MultiKey("x"): t.List(t.Int),
+        t.Key("y"): t.Int,
+    })
 
     data = multidict.MultiDict()
     data.add("x", 1)
@@ -144,12 +138,10 @@ def test_multikey():
 
 
 def test_multikey_string():
-    iv = t.Dict(
-        {
-            tx.MultiKey("x"): t.List(t.String),
-            t.Key("y"): t.String,
-        }
-    )
+    iv = t.Dict({
+        tx.MultiKey("x"): t.List(t.String),
+        t.Key("y"): t.String,
+    })
 
     plain_data = {
         "x": ["abc"],
@@ -536,7 +528,7 @@ def test_vfolder_id():
         iv.check(":/x")
     with pytest.raises(t.DataError):
         iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
-    with pytest.raises(ValueError, match="Unsupported vFolder quota scope type abc"):
+    with pytest.raises(ValueError, match="Invalid quota scope type"):
         iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")

@@ -16,7 +16,6 @@ import logging
 from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
-    AsyncIterator,
     Callable,
     Iterable,
     List,
@@ -33,12 +32,26 @@ from typing import (
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
 
-import grpc  # pants: no-infer-dep (etcetra)
 import trafaret as t
-from etcetra import EtcdCommunicator, WatchEvent
-from etcetra.client import EtcdClient, EtcdTransactionAction
-from etcetra.types import CompareKey, EtcdCredential
-from etcetra.types import HostPortPair as EtcetraHostPortPair
+from etcd_client import (
+    Client as EtcdClient,
+)
+from etcd_client import (
+    Communicator as EtcdCommunicator,
+)
+from etcd_client import (
+    Compare,
+    CompareOp,
+    CondVar,
+    ConnectOptions,
+    GRpcStatusCode,
+    GRpcStatusError,
+    TxnOp,
+    Watch,
+)
+from etcd_client import (
+    Txn as EtcdTransactionAction,
+)
 
 from .logging_utils import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
@@ -105,12 +118,11 @@ NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
 class AsyncEtcd:
     etcd: EtcdClient
-
-    _creds: Optional[EtcdCredential]
+    _connect_options: Optional[ConnectOptions]
 
     def __init__(
         self,
-        addr: HostPortPair | EtcetraHostPortPair,
+        addr: HostPortPair,
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
@@ -118,26 +130,27 @@ class AsyncEtcd:
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:
-        self.scope_prefix_map = t.Dict(
-            {
-                t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
-                t.Key(ConfigScopes.SGROUP, optional=True): t.String,
-                t.Key(ConfigScopes.NODE, optional=True): t.String,
-            }
-        ).check(scope_prefix_map)
+        self.scope_prefix_map = t.Dict({
+            t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
+            t.Key(ConfigScopes.SGROUP, optional=True): t.String,
+            t.Key(ConfigScopes.NODE, optional=True): t.String,
+        }).check(scope_prefix_map)
+
         if credentials is not None:
-            self._creds = EtcdCredential(credentials["user"], credentials["password"])
+            self._connect_options = ConnectOptions().with_user(
+                credentials["user"], credentials["password"]
+            )
         else:
-            self._creds = None
+            self._connect_options = None
 
         self.ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
+
         self.etcd = EtcdClient(
-            EtcetraHostPortPair(str(addr.host), addr.port),
-            credentials=self._creds,
-            encoding=self.encoding,
+            [f"http://{addr.host}:{addr.port}"],
+            connect_options=self._connect_options,
         )
 
     async def close(self):
@@ -223,12 +236,12 @@ class AsyncEtcd:
 
         _flatten(key, cast(NestedStrKeyedDict, dict_obj))
 
-        def _txn(action: EtcdTransactionAction):
-            for k, v in flattened_dict.items():
-                action.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v))
+        actions = []
+        for k, v in flattened_dict.items():
+            actions.append(TxnOp.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v)))
 
         async with self.etcd.connect() as communicator:
-            await communicator.txn(_txn)
+            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def put_dict(
         self,
@@ -242,19 +255,19 @@ class AsyncEtcd:
         Since the given dict must be a flattened one, its keys must be quoted as needed by the caller.
         For new codes, ``put_prefix()`` is recommended.
 
-        :param dict_obj: Flattened key-value pairs to put.
+        :param flattened_dict_obj: Flattened key-value pairs to put.
         :param scope: The config scope for putting the values.
         :param scope_prefix_map: The scope map used to mangle the prefix for the config scope.
         :return:
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
 
-        def _pipe(txn: EtcdTransactionAction):
-            for k, v in flattened_dict_obj.items():
-                txn.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v))
+        actions = []
+        for k, v in flattened_dict_obj.items():
+            actions.append(TxnOp.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v)))
 
         async with self.etcd.connect() as communicator:
-            await communicator.txn(_pipe)
+            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def get(
         self,
@@ -367,6 +380,8 @@ class AsyncEtcd:
                 values = await communicator.get_prefix(mangled_key_prefix)
                 pair_sets.append([(self._demangle_key(k), v) for k, v in values.items()])
 
+        pair_sets = [sorted(pairs, key=lambda x: x[0]) for pairs in pair_sets]
+
         configs = [
             make_dict_from_pairs(f"{_slash(scope_prefix)}{key_prefix}", pairs, "/")
             for scope_prefix, pairs in zip(scope_prefixes, pair_sets)
@@ -388,17 +403,17 @@ class AsyncEtcd:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        def _txn(success: EtcdTransactionAction, _):
-            success.put(mangled_key, new_val)
-
         async with self.etcd.connect() as communicator:
-            _, success = await communicator.txn_compare(
-                [
-                    CompareKey(mangled_key).value == initial_val,
-                ],
-                _txn,
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when([
+                    Compare.value(mangled_key, CompareOp.EQUAL, initial_val),
+                ])
+                .and_then([TxnOp.put(mangled_key, new_val)])
+                .or_else([])
             )
-            return success
+
+            return result.succeeded()
 
     async def delete(
         self,
@@ -421,12 +436,10 @@ class AsyncEtcd:
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         async with self.etcd.connect() as communicator:
-
-            def _txn(action: EtcdTransactionAction):
-                for k in keys:
-                    action.delete(self._mangle_key(f"{_slash(scope_prefix)}{k}"))
-
-            await communicator.txn(_txn)
+            actions = []
+            for k in keys:
+                actions.append(TxnOp.delete(self._mangle_key(f"{_slash(scope_prefix)}{k}")))
+            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def delete_prefix(
         self,
@@ -442,15 +455,16 @@ class AsyncEtcd:
 
     async def _watch_impl(
         self,
-        iterator_factory: Callable[[EtcdCommunicator], AsyncIterator[WatchEvent]],
+        iterator_factory: Callable[[EtcdCommunicator], Watch],
         scope_prefix_len: int,
         once: bool,
-        cleanup_event: Optional[asyncio.Event] = None,
+        cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         try:
             async with self.etcd.connect() as communicator:
                 iterator = iterator_factory(communicator)
+
                 async for ev in iterator:
                     if wait_timeout is not None:
                         try:
@@ -462,7 +476,7 @@ class AsyncEtcd:
                         return
         finally:
             if cleanup_event:
-                cleanup_event.set()
+                await cleanup_event.notify_waiters()
 
     async def watch(
         self,
@@ -471,8 +485,8 @@ class AsyncEtcd:
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
         once: bool = False,
-        ready_event: asyncio.Event = None,
-        cleanup_event: asyncio.Event = None,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
         wait_timeout: float = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
@@ -494,9 +508,11 @@ class AsyncEtcd:
                 ):
                     yield ev
                 ended_without_error = True
-            except grpc.aio.AioRpcError as e:
-                if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch(): error while connecting to Etcd server, retrying...")
+            except GRpcStatusError as e:
+                err_detail = e.args[0]
+
+                if err_detail["code"] == GRpcStatusCode.Unavailable:
+                    log.warning("watch(): error while connecting to Etcd server, retrying...")
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
@@ -509,8 +525,8 @@ class AsyncEtcd:
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
         once: bool = False,
-        ready_event: asyncio.Event = None,
-        cleanup_event: asyncio.Event = None,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
         wait_timeout: float = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
@@ -532,9 +548,13 @@ class AsyncEtcd:
                 ):
                     yield ev
                 ended_without_error = True
-            except grpc.aio.AioRpcError as e:
-                if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    log.warn("watch_prefix(): error while connecting to Etcd server, retrying...")
+            except GRpcStatusError as e:
+                err_detail = e.args[0]
+
+                if err_detail["code"] == GRpcStatusCode.Unavailable:
+                    log.warning(
+                        "watch_prefix(): error while connecting to Etcd server, retrying..."
+                    )
                     await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:

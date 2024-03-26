@@ -16,6 +16,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    overload,
 )
 
 import aiotools
@@ -49,6 +50,7 @@ from .base import (
     StructuredJSONColumn,
     set_if_set,
 )
+from .gql_relay import AsyncNode
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
 
@@ -178,12 +180,10 @@ class ImageRow(Base):
         StructuredJSONColumn(
             t.Mapping(
                 t.String,
-                t.Dict(
-                    {
-                        t.Key("min"): t.String,
-                        t.Key("max", default=None): t.Null | t.String,
-                    }
-                ),
+                t.Dict({
+                    t.Key("min"): t.String,
+                    t.Key("max", default=None): t.Null | t.String,
+                }),
             ),
         ),
         nullable=False,
@@ -395,13 +395,11 @@ class ImageRow(Base):
             max_value = slot_range.get("max")
             if max_value is None:
                 max_value = Decimal("Infinity")
-            res_limits.append(
-                {
-                    "key": slot_key,
-                    "min": min_value,
-                    "max": max_value,
-                }
-            )
+            res_limits.append({
+                "key": slot_key,
+                "min": min_value,
+                "max": max_value,
+            })
 
         accels = self.accelerators
         if accels is None:
@@ -677,6 +675,69 @@ class Image(graphene.ObjectType):
 
             items = [*filter(_filter_operation, items)]
         return items
+
+
+class ImageNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    name = graphene.String()
+    humanized_name = graphene.String()
+    tag = graphene.String()
+    registry = graphene.String()
+    architecture = graphene.String()
+    is_local = graphene.Boolean()
+    digest = graphene.String()
+    labels = graphene.List(KVPair)
+    size_bytes = BigInt()
+    resource_limits = graphene.List(ResourceLimit)
+    supported_accelerators = graphene.List(graphene.String)
+
+    @overload
+    @classmethod
+    def from_row(cls, row: ImageRow) -> ImageNode: ...
+
+    @overload
+    @classmethod
+    def from_row(cls, row: None) -> None: ...
+
+    @classmethod
+    def from_row(cls, row: ImageRow | None) -> ImageNode | None:
+        if row is None:
+            return None
+        return cls(
+            id=row.id,
+            name=row.image,
+            humanized_name=row.image,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.config_digest,
+            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
+            size_bytes=row.size_bytes,
+            resource_limits=[
+                ResourceLimit(
+                    key=k,
+                    min=v.get("min", Decimal(0)),
+                    max=v.get("max", Decimal("Infinity")),
+                )
+                for k, v in row.resources.items()
+            ],
+            supported_accelerators=(row.accelerators or "").split(","),
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, image_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            image_row = await db_session.scalar(query)
+            if image_row is None:
+                raise ValueError(f"Image not found (id: {image_id})")
+            return cls.from_row(image_row)
 
 
 class PreloadImage(graphene.Mutation):
@@ -956,3 +1017,9 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class ImageRefType(graphene.InputObjectType):
+    name = graphene.String(required=True)
+    registry = graphene.String()
+    architecture = graphene.String()

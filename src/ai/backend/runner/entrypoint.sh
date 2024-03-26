@@ -37,7 +37,7 @@ if [ $USER_ID -eq 0 ]; then
   fi
 
   # Extract dotfiles
-  /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
+  /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py
 
   # Start ssh-agent if it is available
   if command -v ssh-agent > /dev/null; then
@@ -47,7 +47,7 @@ if [ $USER_ID -eq 0 ]; then
 
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
-    /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
+    /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
     echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
@@ -114,7 +114,7 @@ else
   chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
 
   # Extract dotfiles
-  /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
+  /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py
 
   # Start ssh-agent if it is available
   if command -v ssh-agent > /dev/null; then
@@ -129,7 +129,7 @@ else
 
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
-    /opt/kernel/su-exec $USER_ID:$GROUP_ID  /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
+    /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd

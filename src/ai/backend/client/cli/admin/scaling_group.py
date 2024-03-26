@@ -2,14 +2,13 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
-from ..params import BoolExprType, JSONParamType, OptionalType
 from ..types import CLIContext
 from . import admin
 
@@ -99,7 +98,10 @@ def list(ctx: CLIContext) -> None:
     "--scheduler-opts",
     type=JSONParamType(),
     default="{}",
-    help="Set scheduler options as a JSON string.",
+    help="""
+        Set scheduler options as a JSON string.
+        If the 'allowed_session_types' key is not specified, the policy defaults to accept both 'interactive' and 'batch'.
+        """,
 )
 @click.option(
     "--use-host-network",
@@ -208,7 +210,10 @@ def add(
     "--scheduler-opts",
     type=OptionalType(JSONParamType),
     default=undefined,
-    help="Set scheduler options as a JSON string.",
+    help="""
+        Set scheduler options as a JSON string.
+        If the 'allowed_session_types' key is not specified, the policy defaults to accept both 'interactive' and 'batch'.
+        """,
 )
 @click.option(
     "--use-host-network",

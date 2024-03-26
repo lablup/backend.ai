@@ -27,7 +27,7 @@ jobs:
         repository: lablup/backend.ai-webui
         ref: ${{ inputs.branch }}
     - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '20.8.0'
       # For linux-aarch64 runner, we assume that we have the correct NodeJS version already (using asdf).
