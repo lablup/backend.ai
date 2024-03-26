@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Selamat datang,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Selamat datang, {{ userName }}.",
       "Summary": "Ringkasan",
       "Sessions": "Sesi",
       "Import&Run": "Impor & Jalankan",
@@ -61,7 +60,11 @@
       "YouMushChangeYourPassword": "Disarankan untuk mengubah kata sandi Anda secara berkala untuk alasan keamanan. Karena sejumlah waktu telah berlalu sejak terakhir kali Anda mengubah kata sandi, Anda harus mengubahnya agar dapat terus menggunakan layanan ini.",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
       "PleaseConfirmYourPassword": "Harap konfirmasi kata sandi Anda",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Masukkan kata sandi Anda",
+      "InvalidBlankEmail": "Masukkan email Anda",
+      "DisMatchUserEmail": "Email Pengguna tidak cocok"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -240,17 +243,23 @@
       "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
       "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
       "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Jika Anda mengaturnya lebih besar dari sumber daya yang tersedia saat ini, pembuatan sesi akan tertunda dalam antrean hingga tersedia.",
+      "SessionName": "Nama sesi",
+      "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
+      "TemplateAndHistory": "Templat",
+      "ScheduleTimeSimple": "Tetapkan waktu mulai",
       "ResourceAllocationPerContainer": "Alokasi Sumber Daya Per Kontainer",
       "NumberOfContainer": "Jumlah kontainer",
+      "ErrorCanNotExceedRemaining": "Tidak dapat diatur lebih besar dari sumber daya yang tersisa ({{jumlah}}).",
       "EnterEnvironmentVariable": "Masukkan nama variabel",
       "EnvironmentVariableNamePatternError": "Nama variabel harus dimulai dengan huruf atau garis bawah, dan hanya boleh terdiri dari huruf, angka, dan garis bawah.",
-      "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada."
+      "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
+      "Template": "Templat Sesi",
+      "EnableAutomaticShmem": "Memori bersama otomatis",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Hanya bilangan bulat yang diperbolehkan jika ukuran cluster tidak kurang dari 2.",
+      "StartAfter": "Mulai setelah:",
+      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -399,7 +408,10 @@
     "Reset": "Atur Ulang",
     "EnterManually": "Masukkan Secara Manual",
     "Unset": "Tidak diatur",
-    "OK": "BAIKLAH."
+    "OK": "BAIKLAH.",
+    "Download": "Unduh",
+    "Clone": "Clone",
+    "Config": "Konfigurasi"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -443,7 +455,10 @@
     "Enabled": "Diaktifkan",
     "StorageProxies": "Penyimpanan",
     "None": "Tidak ada",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Gambar",
+    "All": "Semua",
+    "InProgress": "Sedang Berlangsung",
+    "Session": "Sesi"
   },
   "credential": {
     "Permission": "Izin",
@@ -521,7 +536,8 @@
     "KeySeccessfullyDeleted": "KeyPair dihapus dengan aman.",
     "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Aktifkan sesi sudo",
+    "MainAccessKey": "Kunci Akses Utama"
   },
   "data": {
     "Folders": "Folder",
@@ -687,7 +703,11 @@
     "Used": "Digunakan",
     "Pipeline": "Folder Pipa",
     "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack.",
-    "SearchByName": "Cari berdasarkan nama"
+    "SearchByName": "Cari berdasarkan nama",
+    "ModelStore": "Toko Model",
+    "New": "Baru",
+    "Add": "Menambahkan",
+    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama."
   },
   "dialog": {
     "warning": {
@@ -832,7 +852,14 @@
     "DescAutoLogout": "Keluar secara otomatis jika semua halaman yang masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Jupyter notebook, terminal web, dll.)",
     "BootstrapScriptDescription": "Skrip bootstrap akan dieksekusi hanya sekali setelah pembuatan sesi",
     "SSHKeypairEnterManually": "SSH Keypair",
-    "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berhasil didaftarkan."
+    "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berhasil didaftarkan.",
+    "MyKeypairInfo": "Informasi Pasangan Kunci Saya",
+    "DescMyKeypairInfo": "Lihat informasi keypair saya",
+    "DarkMode": "Mode Gelap",
+    "LightMode": "Modus Cahaya",
+    "UseSystemSetting": "Gunakan Pengaturan Sistem",
+    "DescThemeMode": "Sesuaikan tampilan Backend.AI WebUI di perangkat Anda.",
+    "ThemeMode": "Modus Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -854,7 +881,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Jenis Galat",
     "LogMessageRemoved": "Pesan Log telah dihapus.",
-    "NoLogToDisplay": "Tidak ada Log untuk ditampilkan"
+    "NoLogToDisplay": "Tidak ada Log untuk ditampilkan",
+    "ShowOnlyError": "Hanya menampilkan kesalahan",
+    "SearchLogs": "Log pencarian"
   },
   "resourcePolicy": {
     "Resources": "Sumber daya",
@@ -916,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registry berhasil dimodifikasi.",
     "ModifyRegistry": "Memodifikasi Registri",
     "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
-    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?"
+    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?",
+    "DescURLFormat": "Jenis URL tidak valid"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -1056,8 +1086,6 @@
     "Scaling": "Penskalaan",
     "AllowAgentSideRegistration": "Izinkan pendaftaran sisi agen",
     "DescAllowAgentSideRegistration": "Izinkan agen untuk mendaftarkan dirinya ke manajer. <br/>Gunakan hanya jika klaster Backend.AI dikelola di lokasi yang aman.",
-    "Plugins": "Plugin",
-    "CUDAGPUsupport": "Dukungan GPU CUDA",
     "DescCUDAGPUsupport": "Dukungan GPU NVIDIA CUDA. <br/>Membutuhkan Plugin CUDA Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Dinonaktifkan karena sistem menggunakan plugin GPU Pecahan",
     "ROCMGPUsupport": "Dukungan GPU ROCm",
@@ -1107,13 +1135,20 @@
     "RequireATOMPlugin": "Membutuhkan Plugin Backend.AI ATOM.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Gunakan dukungan Furiosa Warboy",
-    "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy."
+    "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy.",
+    "Plugins": "Plugin",
+    "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka",
+    "ShowOnlyChanged": "Hanya Tampilan yang Berubah"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
     "Visit": "Kunjungi",
     "SeeDetail": "Lihat Detail",
-    "Initializing": "Inisialisasi..."
+    "Initializing": "Inisialisasi...",
+    "NoNotification": "Tidak Ada Pemberitahuan.",
+    "Notifications": "Pemberitahuan",
+    "ClearNotifications": "Hapus Notifikasi",
+    "AreYouSureToClearAllNotifications": "Apakah Anda yakin untuk menghapus semua notifikasi?"
   },
   "information": {
     "Core": "Core",
@@ -1249,7 +1284,7 @@
     "CouldNotCopyText": "Tidak dapat menyalin teks: ",
     "NotebookBadgeURL": "URL Buku Catatan",
     "GetAndRunNotebook": "Impor & Jalankan",
-    "ImportGithubRepo": "Impor Repositori Github",
+    "ImportGithubRepo": "Impor Repositori GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Masuk ke Folder",
     "RepoWillBeFolder": "Repositori GitHub yang diimpor dikonversi ke folder dan dapat dipasang saat sesi dimulai.",
@@ -1263,13 +1298,13 @@
     "FolderName": "Nama folder yang diimpor:",
     "NotebookBadgeCodeHTML": "Kode Lencana Notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Kode Lencana Notebook (Markdown)",
-    "GithubInternalError": "Kesalahan Internal Github.",
-    "GithubAPILimitError": "Kesalahan Batasan API Github.",
-    "GithubAPIEtcError": "Masalah Server Github.",
-    "ImportGitlabRepo": "Impor Repositori Gitlab",
-    "GitlabRepoWillBeFolder": "Repositori Gitlab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nama Cabang Gitlab"
+    "GithubInternalError": "Kesalahan Internal GitHub.",
+    "GithubAPILimitError": "Kesalahan Batasan API GitHub.",
+    "GithubAPIEtcError": "Masalah Server GitHub.",
+    "ImportGitlabRepo": "Impor Repositori GitLab",
+    "GitlabRepoWillBeFolder": "Repositori GitLab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nama Cabang GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik Bulan Ini",
@@ -1347,7 +1382,9 @@
     "ConfirmTotpRemovalBody": "Apakah Anda yakin untuk tidak menggunakan autentikasi dua faktor?",
     "TotpSetupNotAvailable": "Autentikasi dua faktor tidak dapat diatur.",
     "TurnOffTotp": "Menonaktifkan autentikasi dua faktor",
-    "RemoveTotpSetupCompleted": "Menonaktifkan 2FA"
+    "RemoveTotpSetupCompleted": "Menonaktifkan 2FA",
+    "EnterConfirmationCode": "Sekarang masukkan OTP yang dihasilkan oleh autentikator untuk memverifikasi.",
+    "RequireOTP": "Tulis OTP."
   },
   "inputLimit": {
     "4to64chars": "(4 ~ 64 karakter)"
@@ -1431,12 +1468,55 @@
     "FormValidationFailed": "Validasi formulir gagal",
     "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
-    "Image": "Gambar"
+    "Image": "Gambar",
+    "Owner": "Pemilik",
+    "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
+    "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
+    "FailedToUpdateService": "Gagal memperbarui layanan.",
+    "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
+    "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
+    "ServiceTerminated": "Layanan model {{ name }} telah berhasil dihentikan."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
     "reloadPage": "Muat ulang halaman",
     "resetErrorBoundary": "Setel Ulang Batas Kesalahan",
     "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI."
+  },
+  "modelStore": {
+    "Description": "Keterangan",
+    "Model": "Model",
+    "FilterByName": "Filter Berdasarkan Nama",
+    "ServiceDetails": "Detail Layanan",
+    "Metadata": "Metadata",
+    "ModelPath": "Jalur Model",
+    "SearchModels": "Model Pencarian",
+    "MinResource": "Sumber Daya Minimal",
+    "LastModified": "Terakhir diubah",
+    "Created": "Dibuat",
+    "Version": "Versi: kapan",
+    "Author": "Pengarang",
+    "MaxRetries": "Percobaan Ulang Maks",
+    "Path": "Jalur",
+    "HealthCheck": "Cek kesehatan",
+    "Port": "Pelabuhan",
+    "StartCommand": "Mulai Perintah",
+    "PreStartActions": "Tindakan Pra Mulai",
+    "Framework": "Kerangka kerja",
+    "Category": "Kategori",
+    "Label": "Label",
+    "Task": "Tugas",
+    "CloneAsFolder": "Mengkloning sebagai Folder",
+    "CloneSuccess": "Permintaan kloning telah berhasil dikirim.",
+    "CloneInfo": "Ini akan dikloning sebagai folder tipe pengguna Anda.",
+    "category": "Kategori"
+  },
+  "table": {
+    "SettingTable": "Penataan meja",
+    "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
+    "SearchTableColumn": "Cari kolom tabel"
+  },
+  "setting": {
+    "SearchPlaceholder": "Masukkan Istilah Pencarian"
   }
 }

@@ -25,7 +25,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 
-from ..models import keypair_resource_policies, keypairs, users
+from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
@@ -447,7 +447,40 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         (request,),
         return_when=FIRST_COMPLETED,
     )
-    row = None
+    user_row = None
+    keypair_row = None
+
+    async def _query_cred(access_key):
+        async with root_ctx.db.begin_readonly() as conn:
+            j = keypairs.join(
+                keypair_resource_policies,
+                keypairs.c.resource_policy == keypair_resource_policies.c.name,
+            )
+            query = (
+                sa.select([keypairs, keypair_resource_policies], use_labels=True)
+                .select_from(j)
+                .where(
+                    (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+                )
+            )
+            result = await conn.execute(query)
+            keypair_row = result.first()
+            if keypair_row is None:
+                return None, None
+
+            j = users.join(
+                user_resource_policies,
+                users.c.resource_policy == user_resource_policies.c.name,
+            )
+            query = (
+                sa.select([users, user_resource_policies], use_labels=True)
+                .select_from(j)
+                .where((users.c.main_access_key == access_key))
+            )
+            result = await conn.execute(query)
+            user_row = result.first()
+            return user_row, keypair_row
+
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
     elif hook_result.result:
@@ -455,26 +488,10 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         # The "None" access_key means that the hook has allowed anonymous access.
         access_key = hook_result.result
         if access_key is not None:
-
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
-                    )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
-                return result.first()
-
-            row = await execute_with_retry(_query_cred)
-            if row is None:
+            user_row, keypair_row = await execute_with_retry(
+                functools.partial(_query_cred, access_key)
+            )
+            if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
 
             now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
@@ -500,28 +517,14 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         params = _extract_auth_params(request)
         if params:
             sign_method, access_key, signature = params
-
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
-                    )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
-                    return result.first()
-
-            row = await execute_with_retry(_query_cred)
-            if row is None:
+            user_row, keypair_row = await execute_with_retry(
+                functools.partial(_query_cred, access_key)
+            )
+            if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
-            my_signature = await sign_request(sign_method, request, row["keypairs_secret_key"])
+            my_signature = await sign_request(
+                sign_method, request, keypair_row["keypairs_secret_key"]
+            )
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
 
@@ -543,28 +546,32 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             # unsigned requests may be still accepted for public APIs
             pass
 
-    if row is not None:
+    if user_row and keypair_row:
         auth_result = {
             "is_authorized": True,
             "keypair": {
-                col.name: row[f"keypairs_{col.name}"]
+                col.name: keypair_row[f"keypairs_{col.name}"]
                 for col in keypairs.c
                 if col.name != "secret_key"
             },
             "user": {
-                col.name: row[f"users_{col.name}"]
+                col.name: user_row[f"users_{col.name}"]
                 for col in users.c
                 if col.name not in ("password", "description", "created_at")
             },
-            "is_admin": row["keypairs_is_admin"],
+            "is_admin": keypair_row["keypairs_is_admin"],
         }
 
         validate_ip(request, auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
-            col.name: row[f"keypair_resource_policies_{col.name}"]
+            col.name: keypair_row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c
         }
-        auth_result["user"]["id"] = row["keypairs_user_id"]  # legacy
+        auth_result["user"]["resource_policy"] = {
+            col.name: user_row[f"user_resource_policies_{col.name}"]
+            for col in user_resource_policies.c
+        }
+        auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
         auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
         # Populate the result to the per-request state dict.
         request.update(auth_result)
