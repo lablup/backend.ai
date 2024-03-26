@@ -7541,6 +7541,6 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
 .highlight .il { color: #a5d6ff } /* Literal.Number.Integer.Long */
 
 /* DO NOT REMOVE THIS - customizing ads comment in ethical ads */
-.ethical-rtd .ethical-sidebar, a {
+div.ethical-callout > * > * > a {
   font-size: small;
 }
