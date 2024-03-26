@@ -680,6 +680,21 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToJSONSerializable(t.Trafaret):
+    from .types import JSONSerializableMixin
+
+    def __init__(self, cls: Type[JSONSerializableMixin]) -> None:
+        self._cls = cls
+
+    def check_and_return(self, value: Any) -> JSONSerializableMixin:
+        try:
+            return self._cls.from_json(value)
+        except (TypeError, ValueError) as e:
+            self._failure(
+                f"cannot convert the given value to {self._cls} (error: {e!r})", value=value
+            )
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value

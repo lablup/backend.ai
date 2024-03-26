@@ -167,6 +167,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
+    image_labels: Mapping[str, str]
     resource_spec: KernelResourceSpec
     service_ports: List[ServicePort]
     data: Dict[Any, Any]
@@ -189,6 +190,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, str],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -201,6 +203,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.agent_id = agent_id
         self.image = image
         self.version = version
+        self.image_labels = image_labels
         self.resource_spec = resource_spec
         self.service_ports = service_ports
         self.data = data
@@ -286,7 +289,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts):
+    async def start_service(
+        self,
+        service: str,
+        opts: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        mount_path: Optional[Mapping[str, Any]] = None,
+    ):
         raise NotImplementedError
 
     @abstractmethod
@@ -629,6 +638,28 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return []
 
+    async def _feed_start_service(
+        self,
+        service_type: bytes,
+        service_info: Mapping[str, Any],
+        wait_for: int | float,
+    ) -> dict[str, str]:
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart([
+            service_type,
+            json.dumps(service_info).encode("utf8"),
+        ])
+        try:
+            with timeout(wait_for):
+                result = await self.service_queue.get()
+            self.service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
+
     async def feed_start_model_service(self, model_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
@@ -668,6 +699,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
             return {"status": "failed", "error": "timeout"}
+
+    async def feed_start_mounted_service(self, service_info) -> dict[str, str]:
+        return await self._feed_start_service(b"start-mounted-service", service_info, 40)
 
     async def feed_shutdown_service(self, service_name: str):
         if self.input_sock.closed:

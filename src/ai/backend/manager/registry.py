@@ -2621,13 +2621,19 @@ class AgentRegistry:
         session: SessionRow,
         service: str,
         opts: Mapping[str, Any],
+        mount_config: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
             async with self.agent_cache.rpc_context(
                 session.main_kernel.agent,
                 order_key=session.main_kernel.id,
             ) as rpc:
-                return await rpc.call.start_service(str(session.main_kernel.id), service, opts)
+                return await rpc.call.start_service(
+                    str(session.main_kernel.id),
+                    service,
+                    opts,
+                    mount_config,
+                )
 
     async def shutdown_service(
         self,

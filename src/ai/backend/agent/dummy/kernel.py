@@ -22,6 +22,7 @@ class DummyKernel(AbstractKernel):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, Any],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -35,6 +36,7 @@ class DummyKernel(AbstractKernel):
             agent_id,
             image,
             version,
+            image_labels=image_labels,
             agent_config=agent_config,
             resource_spec=resource_spec,
             service_ports=service_ports,

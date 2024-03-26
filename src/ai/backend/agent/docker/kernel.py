@@ -16,6 +16,7 @@ import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
+from cachetools import LRUCache, cached
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -46,6 +47,7 @@ class DockerKernel(AbstractKernel):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, Any],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -58,6 +60,7 @@ class DockerKernel(AbstractKernel):
             agent_id,
             image,
             version,
+            image_labels=image_labels,
             agent_config=agent_config,
             resource_spec=resource_spec,
             service_ports=service_ports,
@@ -111,7 +114,25 @@ class DockerKernel(AbstractKernel):
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    @cached(
+        cache=LRUCache(maxsize=32),  # type: ignore
+        key=lambda self, local_config: (
+            self.image,
+            self.image_labels.get("ai.backend.base-distro", "ubuntu16.04"),
+        ),
+    )
+    def get_krunner_info(self, local_config: Mapping[str, Any]) -> Tuple[str, str, str]:
+        distro = self.image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        matched_libc_style = "glibc"
+        if distro.startswith("alpine"):
+            matched_libc_style = "musl"
+        arch = get_arch_name()
+        return arch, distro, matched_libc_style
+
+    async def start_service(
+        self,
+        service,
+    ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
             return {
@@ -128,7 +149,6 @@ class DockerKernel(AbstractKernel):
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
-            "options": opts,
         })
         return result
 

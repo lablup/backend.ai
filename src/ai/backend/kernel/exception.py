@@ -14,3 +14,11 @@ class DisallowedArgument(MessageError):
 
 class InvalidServiceDefinition(MessageError):
     pass
+
+
+class UnsupportedBaseDistroError(MessageError):
+    pass
+
+
+class InvalidServiceName(MessageError):
+    pass

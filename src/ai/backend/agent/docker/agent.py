@@ -679,6 +679,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
+            image_labels=self.kernel_config["image"]["labels"],
             service_ports=service_ports,
             resource_spec=resource_spec,
             environ=environ,
