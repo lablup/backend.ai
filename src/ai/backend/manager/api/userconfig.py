@@ -1,8 +1,10 @@
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Tuple
 
 import aiohttp_cors
+import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
@@ -11,6 +13,8 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
+    git_token,
+    git_tokens,
     keypairs,
     query_accessible_vfolders,
     query_bootstrap_script,
@@ -235,6 +239,47 @@ async def get_bootstrap_script(request: web.Request) -> web.Response:
         return web.json_response(script)
 
 
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def get_git_tokens(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    user_uuid = request["user"]["uuid"]
+
+    async with root_ctx.db.begin_readonly() as conn:
+        query = sa.select([git_tokens.c.domain, git_tokens.c.token]).where(
+            git_tokens.c.user_id == user_uuid
+        )
+        query_result = await conn.execute(query)
+        rows = query_result.fetchall()
+        result = [{"domain": row["domain"], "token": row["token"]} for row in rows]
+    return web.json_response(result, status=200)
+
+
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("params"): t.String,
+        },
+    )
+)
+async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
+    resp = []
+    root_ctx: RootContext = request.app["_root.context"]
+    user_uuid = request["user"]["uuid"]
+
+    # get token list then
+    token_list = params["params"]
+    async with root_ctx.db.begin() as conn:
+        await git_token.insert_update_git_tokens(conn, user_uuid, token_list)
+
+    token_list_json = json.loads(token_list)
+    for key, value in token_list_json.items():
+        resp.append({"domain": key, "token": value})
+
+    return web.json_response(resp)
+
+
 async def init(app: web.Application) -> None:
     pass
 
@@ -258,5 +303,7 @@ def create_app(
     cors.add(app.router.add_route("DELETE", "/dotfiles", delete))
     cors.add(app.router.add_route("POST", "/bootstrap-script", update_bootstrap_script))
     cors.add(app.router.add_route("GET", "/bootstrap-script", get_bootstrap_script))
+    cors.add(app.router.add_route("GET", "/git-tokens", get_git_tokens))
+    cors.add(app.router.add_route("PATCH", "/git-tokens", update_git_tokens))
 
     return app, []
