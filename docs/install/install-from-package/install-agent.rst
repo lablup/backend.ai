@@ -71,7 +71,7 @@ would be:
    scaling-group = "default"
    pid-file = "/home/bai/agent/agent.pid"
    event-loop = "uvloop"
-   # allow-compute-plugins = "ai.backend.accelerator.cuda_open"
+   # allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]
 
    [container]
    port-range = [30000, 31000]
