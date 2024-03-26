@@ -19,6 +19,7 @@ jobs:
       - name: Extract pr_number from commit message
         id: commit
         run: |
+          set -ex
           latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
           echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
           commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
@@ -107,8 +108,31 @@ jobs:
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ github.actor }}
+      - id: pr_id
+        run: |
+          pr_id=$(gh pr graphql -f query='
+            query ($pr_number: Int!) {
+              repository(owner: "lablup", name: "backend.ai") {
+                pullRequest(number: $pr_number) {
+                  id
+                }
+              }
+            }
+          ' -f pr_number="${{ steps.pr.outputs.pull-request-number }}" | jq -r '.data.repository.pullRequest.id')
+          echo "pr_id=$pr_id" >> $GITHUB_OUTPUT
       - name: Enable auto-merge
         if: ${{ steps.pr.outputs.pull-request-number }}
-        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --auto --squash
+        run: |
+          gh api graphql -f query='
+            mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+              enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, mergeMethod: $mergeMethod}) {
+                pullRequest {
+                  autoMergeRequest {
+                    enabled
+                  }
+                }
+              }
+            }
+          ' -f pullRequestId="${{ steps.pr_id.outputs.pr_id }}" -f mergeMethod="SQUASH"
         env:
           GH_TOKEN: ${{ github.token }}
