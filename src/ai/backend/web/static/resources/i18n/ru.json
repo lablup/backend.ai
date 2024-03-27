@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Добро пожаловать,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Добро пожаловать, {{ userName }}.",
       "Summary": "Обзор",
       "Sessions": "Сессии",
       "Import&Run": "Импорт и запуск",
@@ -61,7 +60,11 @@
       "YouMushChangeYourPassword": "В целях безопасности рекомендуется периодически менять пароль. Поскольку с момента последней смены пароля прошло определенное время, для продолжения использования сервиса необходимо его сменить.",
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
       "PleaseConfirmYourPassword": "Пожалуйста, подтвердите свой пароль",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Данные",
+      "InvalidBlankPassword": "Введите ваш пароль",
+      "InvalidBlankEmail": "Введите адрес электронной почты",
+      "DisMatchUserEmail": "Электронная почта пользователя не совпадает"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -240,19 +243,25 @@
       "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
       "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
       "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
+      "EnqueueComputeSessionWarning": "Если вы установите его больше, чем доступные на данный момент ресурсы, создание сеанса будет отложено в очереди до тех пор, пока он не станет доступным.",
+      "SessionName": "Имя сеанса",
+      "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
+      "TemplateAndHistory": "Шаблоны",
+      "ScheduleTimeSimple": "Установить время начала",
+      "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
+      "NumberOfContainer": "Количество контейнеров",
+      "ErrorCanNotExceedRemaining": "Не может быть установлено значение, превышающее остаток ресурсов ({{amount}}).",
+      "EnterEnvironmentVariable": "Введите имя переменной",
+      "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
+      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует.",
+      "Template": "Шаблон сессии",
+      "EnableAutomaticShmem": "Автоматическая разделяемая память",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
       "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
-      "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
-      "NumberOfContainer": "Количество контейнеров",
-      "EnterEnvironmentVariable": "Введите имя переменной",
-      "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
-      "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует."
+      "OnlyAllowsDiscreteNumberByClusterSize": "Допускается только целое число, если размер кластера не меньше 2.",
+      "StartAfter": "Начать после:",
+      "StartTimeDoesNotApply": "Если время начала не установлено, оно не применяется."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -401,7 +410,10 @@
     "Reset": "Перезагрузить",
     "EnterManually": "Ввести вручную",
     "Unset": "Unset",
-    "OK": "OK"
+    "OK": "OK",
+    "Download": "Скачать",
+    "Clone": "Клон",
+    "Config": "Конфигурация"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -445,7 +457,10 @@
     "Enabled": "Включено",
     "StorageProxies": "Хранилища данных",
     "None": "Нет",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Изображение",
+    "All": "Все",
+    "InProgress": "В процессе",
+    "Session": "Сессия"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -523,7 +538,8 @@
     "KeySeccessfullyDeleted": "Пара ключей удалена без последствий.",
     "SignoutSeccessfullyFinished": "Выход из системы завершен",
     "ModifyUserDetail": "Изменение сведений о пользователе",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Включить сеанс sudo",
+    "MainAccessKey": "Главный ключ доступа"
   },
   "data": {
     "Folders": "Папки",
@@ -689,7 +705,11 @@
     "Used": "Используется",
     "Pipeline": "Трубопроводные папки",
     "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack.",
-    "SearchByName": "Поиск по имени"
+    "SearchByName": "Поиск по имени",
+    "ModelStore": "Модельный магазин",
+    "New": "Новый",
+    "Add": "Добавить",
+    "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте."
   },
   "dialog": {
     "warning": {
@@ -834,7 +854,14 @@
     "DescAutoLogout": "Автоматический выход из системы, если все зарегистрированные страницы закрыты, кроме страниц, созданных в сеансе для приложений (например, блокнот jupyter, веб-терминал и т. Д.)",
     "BootstrapScriptDescription": "Bootstrap-скрипт будет выполняться только один раз после создания сессии",
     "SSHKeypairEnterManually": "Пара ключей SSH",
-    "SSHKeypairEnterManuallyFinished": "Пара ключей SSH успешно зарегистрирована."
+    "SSHKeypairEnterManuallyFinished": "Пара ключей SSH успешно зарегистрирована.",
+    "MyKeypairInfo": "Информация о моей паре ключей",
+    "DescMyKeypairInfo": "Посмотреть информацию о моей паре ключей",
+    "DarkMode": "Темный режим",
+    "LightMode": "Светлый режим",
+    "UseSystemSetting": "Использовать настройки системы",
+    "DescThemeMode": "Настройте внешний вид Backend.AI WebUI на вашем устройстве.",
+    "ThemeMode": "Тематический режим"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -856,7 +883,9 @@
     "Parameters": "Параметры",
     "ErrorType": "Тип ошибки",
     "LogMessageRemoved": "Сообщения журнала были удалены.",
-    "NoLogToDisplay": "Нет журналов для отображения"
+    "NoLogToDisplay": "Нет журналов для отображения",
+    "ShowOnlyError": "Ошибка только отображения",
+    "SearchLogs": "Поиск журналов"
   },
   "resourcePolicy": {
     "Resources": "Ресурсы",
@@ -918,7 +947,8 @@
     "RegistrySuccessfullyModified": "Реестр успешно модифицирован.",
     "ModifyRegistry": "Изменение реестра",
     "NoRegistryToDisplay": "Отсутствие отображаемых реестров",
-    "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?"
+    "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?",
+    "DescURLFormat": "Неверный тип URL"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",
@@ -1058,8 +1088,6 @@
     "Scaling": "Масштабирование",
     "AllowAgentSideRegistration": "Разрешить регистрацию на стороне агента",
     "DescAllowAgentSideRegistration": "Разрешить агенту зарегистрироваться в качестве менеджера. <br/> Используйте, только если кластер Backend.AI управляется в безопасном месте.",
-    "Plugins": "Плагины",
-    "CUDAGPUsupport": "Поддержка CUDA GPU",
     "DescCUDAGPUsupport": "Поддержка графического процессора NVIDIA CUDA. <br/> Требуется подключаемый модуль Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Отключено, поскольку в системе используется плагин Fractional GPU.",
     "ROCMGPUsupport": "Поддержка графического процессора ROCm",
@@ -1109,13 +1137,20 @@
     "RequireATOMPlugin": "Требуется наличие плагина Backend.AI ATOM Plugin.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Используйте поддержку Furiosa Warboy",
-    "RequireWarboyPlugin": "Требуется плагин Backend.AI Warboy Plugin."
+    "RequireWarboyPlugin": "Требуется плагин Backend.AI Warboy Plugin.",
+    "Plugins": "Плагины",
+    "OpenSourceCUDAGPUsupport": "Поддержка графического процессора CUDA с открытым исходным кодом",
+    "ShowOnlyChanged": "Отображать только изменения"
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
     "Visit": "Посещение",
     "SeeDetail": "См детали",
-    "Initializing": "Инициализация ..."
+    "Initializing": "Инициализация ...",
+    "NoNotification": "Нет уведомлений.",
+    "Notifications": "Уведомления",
+    "ClearNotifications": "Очистить уведомления",
+    "AreYouSureToClearAllNotifications": "Вы уверены, что удалите все уведомления?"
   },
   "information": {
     "Core": "Основной",
@@ -1251,7 +1286,7 @@
     "CouldNotCopyText": "Не удалось скопировать текст:",
     "NotebookBadgeURL": "URL блокнота",
     "GetAndRunNotebook": "Импорт и запуск",
-    "ImportGithubRepo": "Импортировать репозиторий Github",
+    "ImportGithubRepo": "Импортировать репозиторий GitHub",
     "GitHubURL": "GitHub URL",
     "GetToFolder": "Перейти в папку",
     "RepoWillBeFolder": "Импортированные репозитории GitHub преобразуются в папки и могут быть подключены при запуске сеанса.",
@@ -1265,13 +1300,13 @@
     "FolderName": "Имя импортированной папки:",
     "NotebookBadgeCodeHTML": "Код значка блокнота (HTML)",
     "NotebookBadgeCodeMarkdown": "Код значка блокнота (маркдаун)",
-    "GithubInternalError": "Внутренняя ошибка Github.",
-    "GithubAPILimitError": "Ошибка ограничения API Github.",
-    "GithubAPIEtcError": "Проблема с сервером Github.",
-    "ImportGitlabRepo": "Импорт репозитория Gitlab",
-    "GitlabRepoWillBeFolder": "Импортированные репозитории Gitlab преобразуются в папки и могут быть смонтированы при запуске сессии.",
-    "GitlabURL": "URL-адрес Gitlab",
-    "GitlabDefaultBranch": "Имя филиала Gitlab"
+    "GithubInternalError": "Внутренняя ошибка GitHub.",
+    "GithubAPILimitError": "Ошибка ограничения API GitHub.",
+    "GithubAPIEtcError": "Проблема с сервером GitHub.",
+    "ImportGitlabRepo": "Импорт репозитория GitLab",
+    "GitlabRepoWillBeFolder": "Импортированные репозитории GitLab преобразуются в папки и могут быть смонтированы при запуске сессии.",
+    "GitlabURL": "URL-адрес GitLab",
+    "GitlabDefaultBranch": "Имя филиала GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Статистика за этот месяц",
@@ -1349,7 +1384,9 @@
     "ConfirmTotpRemovalBody": "Уверены ли вы в том, что отказались от использования двухфакторной аутентификации?",
     "TotpSetupNotAvailable": "Двухфакторная аутентификация не может быть настроена.",
     "TurnOffTotp": "Отключите двухфакторную аутентификацию",
-    "RemoveTotpSetupCompleted": "Отключенная 2FA"
+    "RemoveTotpSetupCompleted": "Отключенная 2FA",
+    "EnterConfirmationCode": "Теперь введите OTP, сгенерированный аутентификатором, для проверки.",
+    "RequireOTP": "Напишите ОТП."
   },
   "inputLimit": {
     "4to64chars": "(4~64 символа)"
@@ -1433,12 +1470,55 @@
     "FormValidationFailed": "Не удалось выполнить валидацию формы",
     "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
-    "Image": "Изображение"
+    "Image": "Изображение",
+    "Owner": "Владелец",
+    "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}.",
+    "FailedToTerminateService": "Запрос на завершение службы завершился неудачно.",
+    "FailedToUpdateService": "Не удалось обновить службу.",
+    "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
+    "ServiceUpdated": "Сервис модели {{ name }} успешно обновлен.",
+    "ServiceTerminated": "Служба модели {{ name }} успешно прекращена."
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
     "reloadPage": "Перезагрузить страницу",
     "resetErrorBoundary": "Сброс границы ошибки",
     "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI."
+  },
+  "modelStore": {
+    "Description": "Описание",
+    "Model": "Модель",
+    "FilterByName": "Фильтровать по имени",
+    "ServiceDetails": "Детали услуги",
+    "Metadata": "Метаданные",
+    "ModelPath": "Путь модели",
+    "SearchModels": "Поиск моделей",
+    "MinResource": "Минимальный ресурс",
+    "LastModified": "Последнее изменение",
+    "Created": "Созданный",
+    "Version": "Версия",
+    "Author": "Автор",
+    "MaxRetries": "Макс. повторов",
+    "Path": "Путь",
+    "HealthCheck": "Проверка здоровья",
+    "Port": "Порт",
+    "StartCommand": "Запустить команду",
+    "PreStartActions": "Предстартовые действия",
+    "Framework": "Рамка",
+    "Category": "Категория",
+    "Label": "Этикетка",
+    "Task": "Задание",
+    "CloneAsFolder": "клонировать как папку",
+    "CloneSuccess": "Запрос на клонирование успешно отправлен.",
+    "CloneInfo": "Она будет клонирована как папка вашего типа пользователя.",
+    "category": "Категория"
+  },
+  "table": {
+    "SettingTable": "Сервировка стола",
+    "SelectColumnToDisplay": "Выберите столбцы для отображения",
+    "SearchTableColumn": "Поиск по столбцам таблицы"
+  },
+  "setting": {
+    "SearchPlaceholder": "Введите поисковый запрос"
   }
 }

@@ -89,6 +89,8 @@ logging_config_iv = t.Dict({
         t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
         t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
         t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("fqdn", default=True): t.Bool,
+        t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -208,14 +210,20 @@ def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler
     except ImportError:
         return None
     drv_config = config["graylog"]
-    graylog_handler = graypy.GELFTLSHandler(
-        host=drv_config["host"],
-        port=drv_config["port"],
-        validate=drv_config["ssl-verify"],
-        ca_certs=drv_config["ca-certs"],
-        keyfile=drv_config["keyfile"],
-        certfile=drv_config["certfile"],
-    )
+    graylog_params = {
+        "host": drv_config["host"],
+        "port": drv_config["port"],
+        "validate": drv_config["ssl-verify"],
+        "ca_certs": drv_config["ca-certs"],
+        "keyfile": drv_config["keyfile"],
+        "certfile": drv_config["certfile"],
+    }
+    if drv_config["localname"]:
+        graylog_params["localname"] = drv_config["localname"]
+    else:
+        graylog_params["fqdn"] = drv_config["fqdn"]
+
+    graylog_handler = graypy.GELFTLSHandler(**graylog_params)
     graylog_handler.setLevel(config["level"])
     return graylog_handler
 

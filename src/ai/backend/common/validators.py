@@ -238,7 +238,11 @@ class PurePath(t.Trafaret):
         self._relative_only = relative_only
 
     def check_and_return(self, value: Any) -> _PurePath:
-        p = _PurePath(value)
+        try:
+            p = _PurePath(value)
+        except (TypeError, ValueError):
+            self._failure("cannot parse value as a path", value=value)
+
         if self._relative_only and p.is_absolute():
             self._failure("expected relative path but the value is absolute", value=value)
         if self._base_path is not None:
