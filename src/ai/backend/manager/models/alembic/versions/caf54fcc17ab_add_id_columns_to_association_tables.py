@@ -40,11 +40,6 @@ def upgrade():
         "association_groups_users",
         metadata,
         sa.Column(
-            "id",
-            GUID,
-            nullable=False,
-        ),
-        sa.Column(
             "user_id",
             GUID,
             sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
@@ -62,11 +57,6 @@ def upgrade():
     sgroups_for_domains = sa.Table(
         "sgroups_for_domains",
         metadata,
-        sa.Column(
-            "id",
-            GUID,
-            nullable=False,
-        ),
         sa.Column(
             "scaling_group",
             sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
@@ -86,11 +76,6 @@ def upgrade():
         "sgroups_for_groups",
         metadata,
         sa.Column(
-            "id",
-            GUID,
-            nullable=False,
-        ),
-        sa.Column(
             "scaling_group",
             sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
             index=True,
@@ -108,11 +93,6 @@ def upgrade():
     sgroups_for_keypairs = sa.Table(
         "sgroups_for_keypairs",
         metadata,
-        sa.Column(
-            "id",
-            GUID,
-            nullable=False,
-        ),
         sa.Column(
             "scaling_group",
             sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
