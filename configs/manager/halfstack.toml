@@ -11,6 +11,7 @@ addr = { host = "localhost", port = 8100 }
 name = "backend"
 user = "postgres"
 password = "develove"
+conn-timeout = 0
 pool-recycle = 50
 
 
