@@ -4,6 +4,7 @@ import asyncio
 import enum
 import logging
 import math
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ from typing import (
     Sequence,
     Set,
     Type,
+    TypeAlias,
     Union,
     cast,
 )
@@ -31,6 +33,7 @@ import sqlalchemy as sa
 import trafaret as t
 from aiotools import TaskGroupError
 from sqlalchemy.engine import Row
+from sqlalchemy.orm import load_only, noload, selectinload
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
@@ -48,28 +51,33 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelLifecycleEventReason,
+    KernelStartedEvent,
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
+    KernelId,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
-from .models.kernel import LIVE_STATUS, kernels
+from .models.kernel import KernelRow, get_remaining_connection
 from .models.keypair import keypairs
-from .models.resource_policy import keypair_resource_policies
-from .models.user import users
+from .models.resource_policy import KeyPairResourcePolicyRow, keypair_resource_policies
+from .models.session import SessionRow, SessionStatus
+from .models.user import UserRow
+from .models.utils import get_db_now
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-    from ai.backend.common.types import AgentId, KernelId, SessionId
+    from ai.backend.common.types import AgentId, SessionId
 
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
@@ -107,13 +115,12 @@ def calculate_remaining_time(
     return remaining.total_seconds()
 
 
-async def get_redis_now(redis_obj: RedisConnectionInfo) -> float:
-    t = await redis_helper.execute(redis_obj, lambda r: r.time())
-    return t[0] + (t[1] / (10**6))
+class KernelRemainingTimeData(NamedTuple):
+    cluster_role: str
+    remaining: float | None
 
 
-async def get_db_now(dbconn: SAConnection) -> datetime:
-    return await dbconn.scalar(sa.select(sa.func.now()))
+KernelRemainingTime: TypeAlias = dict[KernelId, KernelRemainingTimeData]
 
 
 class UtilizationExtraInfo(NamedTuple):
@@ -199,6 +206,7 @@ class IdleCheckerHost:
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
             event_dispatcher, self._redis_live, self._redis_stat
         )
+        self.user_created_cache: dict[uuid.UUID, datetime] = {}
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -242,11 +250,11 @@ class IdleCheckerHost:
 
     async def update_app_streaming_status(
         self,
-        session_id: SessionId,
+        kernel_id: KernelId,
         status: AppStreamingStatus,
     ) -> None:
         for checker in self._checkers:
-            await checker.update_app_streaming_status(session_id, status)
+            await checker.update_app_streaming_status(kernel_id, status)
 
     async def _do_idle_check(
         self,
@@ -256,54 +264,69 @@ class IdleCheckerHost:
     ) -> None:
         log.debug("do_idle_check(): triggered")
         policy_cache: dict[AccessKey, Row] = {}
-        async with self._db.begin_readonly() as conn:
-            j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
-            query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.access_key,
-                    kernels.c.session_id,
-                    kernels.c.session_type,
-                    kernels.c.created_at,
-                    kernels.c.occupied_slots,
-                    kernels.c.cluster_size,
-                    users.c.created_at.label("user_created_at"),
-                ])
-                .select_from(j)
-                .where(
-                    (kernels.c.status.in_(LIVE_STATUS))
-                    & (kernels.c.cluster_role == DEFAULT_ROLE)
-                    & (kernels.c.session_type != SessionTypes.INFERENCE),
-                )
+        select_session = (
+            sa.select(SessionRow)
+            .select_from(SessionRow)
+            .where(
+                (SessionRow.status.is_(SessionStatus.RUNNING))
+                & (SessionRow.session_type.is_not(SessionTypes.INFERENCE))
             )
-            result = await conn.execute(query)
-            rows = result.fetchall()
-            for kernel in rows:
-                grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                policy = policy_cache.get(kernel["access_key"], None)
-                if policy is None:
-                    query = (
-                        sa.select([
-                            keypair_resource_policies.c.max_session_lifetime,
-                            keypair_resource_policies.c.idle_timeout,
-                        ])
-                        .select_from(
-                            sa.join(
-                                keypairs,
-                                keypair_resource_policies,
-                                keypair_resource_policies.c.name == keypairs.c.resource_policy,
-                            ),
-                        )
-                        .where(keypairs.c.access_key == kernel["access_key"])
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.access_key,
+                    SessionRow.session_type,
+                    SessionRow.created_at,
+                    SessionRow.occupying_slots,
+                    SessionRow.user_uuid,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(KernelRow.id, KernelRow.cluster_role),
+                ),
+            )
+        )
+        async with self._db.begin_readonly_session() as db_session:
+            session_rows: list[SessionRow] = (await db_session.scalars(select_session)).all()
+            for session in session_rows:
+                if session.user_uuid not in self.user_created_cache:
+                    user_created_query = (
+                        sa.select(UserRow)
+                        .where(UserRow.uuid.is_(session.user_uuid))
+                        .options(noload("*"), load_only(UserRow.created_at))
                     )
-                    result = await conn.execute(query)
-                    policy = result.first()
-                    assert policy is not None
-                    policy_cache[kernel["access_key"]] = policy
+                    user_row: UserRow = (await db_session.scalars(user_created_query)).first()
+                    _user_created_at: datetime = user_row.created_at
+                    self.user_created_cache[session.user_uuid] = _user_created_at
+                user_created_at = self.user_created_cache[session.user_uuid]
+                grace_period_end = await self._grace_period_checker.get_grace_period_end(
+                    user_created_at
+                )
+
+                if session.access_key not in policy_cache:
+                    select_kp_resource = sa.select([
+                        keypair_resource_policies.c.max_session_lifetime,
+                        keypair_resource_policies.c.idle_timeout,
+                    ]).select_from(
+                        sa.join(
+                            keypairs,
+                            keypair_resource_policies,
+                            keypair_resource_policies.c.name == keypairs.c.resource_policy,
+                        ),
+                    )
+                    _policy: KeyPairResourcePolicyRow = await db_session.scalar(select_kp_resource)
+                    assert _policy is not None
+                    policy_cache[session.access_key] = _policy
+                policy = policy_cache[session.access_key]
 
                 check_task = [
                     checker.check_idleness(
-                        kernel, conn, policy, self._redis_live, grace_period_end=grace_period_end
+                        session,
+                        db_session,
+                        policy,
+                        self._redis_live,
+                        grace_period_end=grace_period_end,
                     )
                     for checker in self._checkers
                 ]
@@ -322,13 +345,13 @@ class IdleCheckerHost:
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
                             checker.name,
-                            kernel["session_id"],
+                            session.id,
                         )
                         if not terminated:
                             terminated = True
                             await self._event_producer.produce_event(
                                 DoTerminateSessionEvent(
-                                    kernel["session_id"],
+                                    session.id,
                                     checker.terminate_reason,
                                 ),
                             )
@@ -374,7 +397,7 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
 
     async def update_app_streaming_status(
         self,
-        session_id: SessionId,
+        kernel_id: KernelId,
         status: AppStreamingStatus,
     ) -> None:
         pass
@@ -398,6 +421,17 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
         """
         pass
 
+    def define_session_remaining(self, remaining_map: KernelRemainingTime) -> float | None:
+        # TODO: Define fine-grained policy for multi-kernel session.
+        candidate = None
+        for remaining in remaining_map.values():
+            if remaining.cluster_role == DEFAULT_ROLE:
+                candidate = remaining.remaining
+                break
+            if candidate is None:
+                candidate = remaining.remaining
+        return candidate
+
     async def set_remaining_time_report(
         self, redis_obj: RedisConnectionInfo, session_id: SessionId, remaining: float
     ) -> None:
@@ -417,12 +451,12 @@ class AbstractIdleChecker(metaclass=ABCMeta):
     @abstractmethod
     async def check_idleness(
         self,
-        kernel: Row,
-        dbconn: SAConnection,
-        policy: Row,
+        session: SessionRow,
+        db_session: SASession,
+        policy: KeyPairResourcePolicyRow,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime] = None,
+        grace_period_end: datetime | None = None,
     ) -> bool:
         """
         Check the kernel is whether idle or not.
@@ -471,7 +505,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 
     async def get_grace_period_end(
         self,
-        kernel: Row,
+        user_created_at: datetime,
     ) -> Optional[datetime]:
         """
         Calculate the user's initial grace period for idle checkers.
@@ -480,7 +514,6 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         """
         if self.user_initial_grace_period is None:
             return None
-        user_created_at: datetime = kernel["user_created_at"]
         return user_created_at + self.user_initial_grace_period
 
     @property
@@ -557,33 +590,33 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     async def update_app_streaming_status(
         self,
-        session_id: SessionId,
+        kernel_id: KernelId,
         status: AppStreamingStatus,
     ) -> None:
         if status == AppStreamingStatus.HAS_ACTIVE_CONNECTIONS:
-            await self._disable_timeout(session_id)
+            await self._disable_timeout(kernel_id)
         elif status == AppStreamingStatus.NO_ACTIVE_CONNECTIONS:
-            await self._update_timeout(session_id)
+            await self._update_timeout(kernel_id)
 
-    async def _disable_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
+    async def _disable_timeout(self, kernel_id: KernelId) -> None:
+        log.debug(f"NetworkTimeoutIdleChecker._disable_timeout(k: {kernel_id})")
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
-                f"session.{session_id}.last_access",
+                f"kernel.{kernel_id}.last_access",
                 "0",
                 xx=True,
             ),
         )
 
-    async def _update_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
+    async def _update_timeout(self, kernel_id: KernelId) -> None:
+        log.debug(f"NetworkTimeoutIdleChecker._update_timeout(k: {kernel_id})")
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         t = t[0] + (t[1] / (10**6))
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
-                f"session.{session_id}.last_access",
+                f"kernel.{kernel_id}.last_access",
                 f"{t:.06f}",
                 ex=max(86400, int(self.idle_timeout.total_seconds() * 2)),
             ),
@@ -593,10 +626,10 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         self,
         context: None,
         source: AgentId,
-        event: SessionStartedEvent,
+        event: KernelStartedEvent,
     ) -> None:
-        log.debug("Got SessionStartedEvent")
-        await self._update_timeout(event.session_id)
+        log.debug("Got KernelStartedEvent")
+        await self._update_timeout(event.kernel_id)
 
     async def _execution_started_cb(
         self,
@@ -604,7 +637,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         source: AgentId,
         event: ExecutionStartedEvent,
     ) -> None:
-        await self._disable_timeout(event.session_id)
+        await self._disable_timeout(event.kernel_id)
 
     async def _execution_exited_cb(
         self,
@@ -612,67 +645,86 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         source: AgentId,
         event: ExecutionFinishedEvent | ExecutionTimeoutEvent | ExecutionCancelledEvent,
     ) -> None:
-        await self._update_timeout(event.session_id)
+        await self._update_timeout(event.kernel_id)
 
     async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
         return None
 
     async def check_idleness(
         self,
-        kernel: Row,
-        dbconn: SAConnection,
-        policy: Row,
+        session: SessionRow,
+        db_session: SASession,
+        policy: KeyPairResourcePolicyRow,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime] = None,
+        grace_period_end: datetime | None = None,
     ) -> bool:
         """
         Check the kernel is timeout or not.
         And save remaining time until timeout of kernel to Redis.
         """
-        session_id = kernel["session_id"]
+        session_id: SessionId = session.id
 
-        if kernel["session_type"] == SessionTypes.BATCH:
+        if session.session_type == SessionTypes.BATCH:
             return True
 
-        active_streams = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.zcount(
-                f"session.{session_id}.active_app_connections",
-                float("-inf"),
-                float("+inf"),
-            ),
-        )
-        if active_streams is not None and active_streams > 0:
+        active_stream_cnt: int | None = None
+        for kernel in session.kernels:
+            # TODO: Define fine-grained policy for multi-kernel session.
+            if kernel.cluster_role in (DEFAULT_ROLE, "main"):
+                active_stream_cnt = await get_remaining_connection(self._redis_live, kernel)
+                break
+        if active_stream_cnt is not None and active_stream_cnt > 0:
             return True
-        now: float = await get_redis_now(self._redis_live)
-        raw_last_access = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(f"session.{session_id}.last_access"),
-        )
-        if raw_last_access is None or raw_last_access == "0":
+        now: float = await redis_helper.get_redis_now(self._redis_live)
+        kernel_remaining: dict[KernelId, KernelRemainingTimeData] = {}
+
+        async def _check_kernel_idleness(kernel: KernelRow) -> None:
+            kernel_id = kernel.id
+            raw_last_access = await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.get(f"kernel.{kernel_id}.last_access"),
+            )
+            if raw_last_access is None or raw_last_access == "0":
+                kernel_remaining[kernel_id] = KernelRemainingTimeData(
+                    cluster_role=kernel.cluster_role,
+                    remaining=None,
+                )
+                return
+            last_access = float(raw_last_access)
+            # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
+            idle_timeout: float = self.idle_timeout.total_seconds()
+            # setting idle_timeout:
+            # - zero/inf means "infinite"
+            # - negative means "undefined"
+            if policy["idle_timeout"] >= 0:
+                idle_timeout = float(policy["idle_timeout"])
+            if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
+                kernel_remaining[kernel_id] = KernelRemainingTimeData(
+                    cluster_role=kernel.cluster_role,
+                    remaining=None,
+                )
+                return
+            tz = grace_period_end.tzinfo if grace_period_end is not None else None
+            remaining = calculate_remaining_time(
+                datetime.fromtimestamp(now, tz=tz),
+                datetime.fromtimestamp(last_access, tz=tz),
+                timedelta(seconds=idle_timeout),
+                grace_period_end,
+            )
+            kernel_remaining[kernel_id] = KernelRemainingTimeData(
+                cluster_role=kernel.cluster_role,
+                remaining=remaining if remaining > 0 else IDLE_TIMEOUT_VALUE,
+            )
+
+        for kernel in session.kernels:
+            await _check_kernel_idleness(kernel)
+        session_remaining = self.define_session_remaining(kernel_remaining)
+        if session_remaining is None:
             return True
-        last_access = float(raw_last_access)
-        # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
-        idle_timeout: float = self.idle_timeout.total_seconds()
-        # setting idle_timeout:
-        # - zero/inf means "infinite"
-        # - negative means "undefined"
-        if policy["idle_timeout"] >= 0:
-            idle_timeout = float(policy["idle_timeout"])
-        if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
-            return True
-        tz = grace_period_end.tzinfo if grace_period_end is not None else None
-        remaining = calculate_remaining_time(
-            datetime.fromtimestamp(now, tz=tz),
-            datetime.fromtimestamp(last_access, tz=tz),
-            timedelta(seconds=idle_timeout),
-            grace_period_end,
-        )
-        await self.set_remaining_time_report(
-            redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
-        )
-        return remaining >= 0
+
+        await self.set_remaining_time_report(redis_obj, session_id, session_remaining)
+        return session_remaining >= 0
 
     async def get_checker_result(
         self,
@@ -699,27 +751,27 @@ class SessionLifetimeChecker(BaseIdleChecker):
 
     async def check_idleness(
         self,
-        kernel: Row,
-        dbconn: SAConnection,
-        policy: Row,
+        session: SessionRow,
+        db_session: SASession,
+        policy: KeyPairResourcePolicyRow,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime] = None,
+        grace_period_end: datetime | None = None,
     ) -> bool:
         """
-        Check the kernel has been living longer than resource policy's `max_session_lifetime`.
-        And save remaining time until `max_session_lifetime` of kernel to Redis.
+        Check the session has been living longer than resource policy's `max_session_lifetime`.
+        And save remaining time until `max_session_lifetime` of session to Redis.
         """
 
-        session_id = kernel["session_id"]
+        session_id = session.id
         if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
-            now: datetime = await get_db_now(dbconn)
-            kernel_created_at: datetime = kernel["created_at"]
+            now: datetime = await get_db_now(db_session)
+            session_created_at: datetime = session.created_at
             remaining = calculate_remaining_time(
-                now, kernel_created_at, idle_timeout, grace_period_end
+                now, session_created_at, idle_timeout, grace_period_end
             )
             await self.set_remaining_time_report(
                 redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
@@ -828,23 +880,23 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     async def check_idleness(
         self,
-        kernel: Row,
-        dbconn: SAConnection,
-        policy: Row,
+        session: SessionRow,
+        db_session: SASession,
+        policy: KeyPairResourcePolicyRow,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime] = None,
+        grace_period_end: datetime | None = None,
     ) -> bool:
         """
         Check the the average utilization of kernel and whether it exceeds the threshold or not.
         And save the average utilization of kernel to Redis.
         """
-        session_id = kernel["session_id"]
+        session_id: SessionId = session.id
 
         interval = IdleCheckerHost.check_interval
         # time_window: Utilization is calculated within this window.
         time_window: timedelta = self.get_time_window(policy)
-        occupied_slots = kernel["occupied_slots"]
+        occupied_slots: ResourceSlot = session.occupying_slots
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
@@ -869,15 +921,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Report time remaining until the first time window is full as expire time
-        db_now: datetime = await get_db_now(dbconn)
-        kernel_created_at: datetime = kernel["created_at"]
+        db_now: datetime = await get_db_now(db_session)
+        session_created_at: datetime = session.created_at
         if grace_period_end is not None:
-            start_from = max(grace_period_end, kernel_created_at)
+            start_from = max(grace_period_end, session_created_at)
         else:
-            start_from = kernel_created_at
+            start_from = session_created_at
         total_initial_grace_period_end = start_from + self.initial_grace_period
         remaining = calculate_remaining_time(
-            db_now, kernel_created_at, time_window, total_initial_grace_period_end
+            db_now, session_created_at, time_window, total_initial_grace_period_end
         )
         await self.set_remaining_time_report(
             redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
@@ -901,14 +953,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 unavailable_resources.update(util_metric)
 
         # Get current utilization data from all containers of the session.
-        if kernel["cluster_size"] > 1:
-            query = sa.select([kernels.c.id]).where(
-                (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
-            )
-            rows = (await dbconn.execute(query)).fetchall()
-            kernel_ids = [k["id"] for k in rows]
-        else:
-            kernel_ids = [kernel["id"]]
+        kernel_ids = [k.id for k in session.kernels]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
             return True

@@ -5,7 +5,7 @@ import enum
 import logging
 import uuid
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -370,6 +370,54 @@ async def handle_kernel_exception(
         if error_callback:
             await error_callback()
         raise
+
+
+def get_kernel_conn_tracker_key(kernel_id: KernelId) -> str:
+    return f"kernel.{kernel_id}.active_app_connections"
+
+
+async def get_remaining_connection(
+    redis_conn: RedisConnectionInfo,
+    kernel: KernelRow,
+) -> int:
+    return await redis_helper.execute(
+        redis_conn,
+        lambda r: r.zcount(
+            get_kernel_conn_tracker_key(kernel),
+            float("-inf"),
+            float("+inf"),
+        ),
+    )
+
+
+async def update_and_check_disconnection(
+    redis_conn: RedisConnectionInfo,
+    kernel: KernelRow,
+    timeout: timedelta,
+) -> bool:
+    """
+    Update kernel's activeness.
+    Return True if the kernel has any disconnection.
+    """
+    conn_tracker_key = get_kernel_conn_tracker_key(kernel.id)
+    prev_remaining_count = await get_remaining_connection(redis_conn, kernel)
+    current_time = await redis_helper.get_redis_now(redis_conn)
+    removed_count = await redis_helper.execute(
+        redis_conn,
+        lambda r: r.zremrangebyscore(
+            conn_tracker_key,
+            float("-inf"),
+            current_time - timeout.total_seconds(),
+        ),
+    )
+    remaining_count = await redis_helper.execute(
+        redis_conn,
+        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
+    )
+    log.debug(
+        f"conn_tracker: gc {kernel.id} removed/remaining = {removed_count}/{remaining_count}",
+    )
+    return prev_remaining_count > 0 and remaining_count == 0
 
 
 kernels = sa.Table(
