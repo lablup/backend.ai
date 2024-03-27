@@ -159,17 +159,21 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
     # Create directory in the vfolder
     with closing(run_user(["vfolder", "mkdir", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "Directory creation failed."
+        assert "Successfully created" in p.before.decode(), "Directory creation failed."
 
     # Create already existing directory with exist-ok option
     with closing(run_user(["vfolder", "mkdir", "-e", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "Exist-ok option does not work properly."
+        assert (
+            "Successfully created" in p.before.decode()
+        ), "Exist-ok option does not work properly."
 
     # Test whether the parent directory is created automatically
     with closing(run_user(["vfolder", "mkdir", "-p", vfolder_name, dir_paths[1]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "The parent directory is not created automatically."
+        assert (
+            "Successfully created" in p.before.decode()
+        ), "The parent directory is not created automatically."
 
 
 @pytest.mark.dependency(
@@ -218,6 +222,27 @@ def test_delete_vfolder(run_user: ClientRunnerFunc):
         assert "Deleted" in p.before.decode(), "Test folder 3 not deleted successfully."
 
 
+@pytest.mark.dependency(depends=["test_delete_vfolder"])
+def test_delete_forever_vfolder(run_user: ClientRunnerFunc):
+    """
+    Test delete-forever vfolder function.
+    !! Make sure you execute this test after test_delete_vfolder !!
+    Otherwise, it will raise an error.
+    """
+    print("[ Delete-forever vfolder ]")
+    with closing(run_user(["vfolder", "delete-forever", "test_folder2"])) as p:
+        p.expect(EOF)
+        assert (
+            "Delete task started" in p.before.decode()
+        ), "Test folder 2 not deleted-completely successfully."
+
+    with closing(run_user(["vfolder", "delete-forever", "test_folder3"])) as p:
+        p.expect(EOF)
+        assert (
+            "Delete task started" in p.before.decode()
+        ), "Test folder 3 not deleted-completely successfully."
+
+
 def test_delete_vfolder_the_same_vfolder_name(
     run_user: ClientRunnerFunc, run_user2: ClientRunnerFunc
 ):
@@ -243,7 +268,7 @@ def test_delete_vfolder_the_same_vfolder_name(
         p.expect(EOF)
         assert (
             "Deleted" in p.before.decode()
-        ), "Test folder created by user2 not deleted successfully."
+        ), "Test folder created by user not deleted successfully."
 
 
 def test_list_vfolder(run_user: ClientRunnerFunc):

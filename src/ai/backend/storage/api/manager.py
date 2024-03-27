@@ -381,7 +381,18 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
+            try:
+                await volume.delete_vfolder(params["vfid"])
+            except asyncio.TimeoutError:
+                raise web.HTTPBadRequest(
+                    body=json.dumps(
+                        {
+                            "msg": "Task already ongoing",
+                            "vfid": str(params["vfid"]),
+                        },
+                    ),
+                    content_type="application/json",
+                )
             return web.Response(status=204)
 
 

@@ -129,6 +129,7 @@ class CephFSVolume(BaseVolume):
         return CephFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.local_config["storage-proxy"]["delete-concurrency"],
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:

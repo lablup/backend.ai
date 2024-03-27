@@ -148,10 +148,10 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
             sys.exit(ExitCode.FAILURE)
 
 
-@vfolder.command()
+@vfolder.command(aliases=["trash", "move-to-trash"])
 @click.argument("name", type=str)
 def delete(name):
-    """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
+    """Move the given virtual folder to trash-bin. The virtual folder will be under `delete-pending` status.
     This operation can be retracted by
     calling `restore()`.
 
@@ -160,7 +160,7 @@ def delete(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete()
+            session.VFolder(name).move_to_trash()
             print_done("Deleted.")
         except Exception as e:
             print_error(e)
@@ -185,7 +185,7 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete_trash(name):
+def delete_forever(name):
     """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
 
@@ -193,33 +193,17 @@ def delete_trash(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete_trash()
-            print_done("Delete completed.")
+            session.VFolder(name).delete_forever()
+            print_done("Delete task started.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
-@vfolder.command()
-@click.argument("name", type=str)
-def recover(name):
-    """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
-
-    NAME: Name of a virtual folder.
-    """
-    with Session() as session:
-        try:
-            session.VFolder(name).restore()
-            print_done("Restored.")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
-
-
-@vfolder.command()
+@vfolder.command(aliases=["recover"])
 @click.argument("name", type=str)
 def restore(name):
-    """Restore the given virtual folder from deleted status, from trash bin.
+    """Restore the given virtual folder from `delete-pending` status(trash-bin) to `ready`.
 
     NAME: Name of a virtual folder.
     """

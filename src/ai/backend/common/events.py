@@ -34,6 +34,7 @@ from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
 from . import msgpack, redis_helper
+from .defs import BackgroundTaskLogType
 from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
@@ -554,6 +555,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
     current_progress: float = attrs.field()
     total_progress: float = attrs.field()
     message: Optional[str] = attrs.field(default=None)
+    log_type: BackgroundTaskLogType = attrs.field(default=BackgroundTaskLogType.INFO)
 
     def serialize(self) -> tuple:
         return (
@@ -561,6 +563,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
             self.current_progress,
             self.total_progress,
             self.message,
+            str(self.log_type),
         )
 
     @classmethod
@@ -570,6 +573,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
             value[1],
             value[2],
             value[3],
+            BackgroundTaskLogType(value[4]),
         )
 
 
