@@ -78,6 +78,7 @@ from .config import (
     container_etcd_config_iv,
     docker_extra_config_iv,
 )
+from .dummy.config import dummy_local_config
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
@@ -885,7 +886,7 @@ def main(
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
     except config.ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            "ConfigurationError: Could not read or validate the agent local config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -916,16 +917,23 @@ def main(
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, agent_local_config_iv)
-        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
-            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
-                cfg["container"]["scratch-nfs-address"] is None
-                or cfg["container"]["scratch-nfs-options"] is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
-        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
-            config.check(raw_cfg, docker_extra_config_iv)
+        match cfg["agent"]["backend"]:
+            case AgentBackend.DOCKER:
+                config.check(raw_cfg, docker_extra_config_iv)
+            case AgentBackend.DUMMY:
+                dummy_cfg, _ = config.read_from_file(None, "agent.dummy")
+                cfg["dummy"] = config.check(dummy_cfg, dummy_local_config)
+            case AgentBackend.KUBERNETES:
+                if cfg["container"]["scratch-type"] == "k8s-nfs" and (
+                    cfg["container"]["scratch-nfs-address"] is None
+                    or cfg["container"]["scratch-nfs-options"] is None
+                ):
+                    raise ValueError(
+                        "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
+                    )
+            case _:
+                # Unable to reach here because trafaret check beforehand.
+                raise click.Abort()
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Agent configuration ==")
             pprint(cfg)
