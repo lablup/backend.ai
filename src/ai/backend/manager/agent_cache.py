@@ -9,6 +9,7 @@ from typing import AsyncIterator, Callable, Optional
 
 import sqlalchemy as sa
 import zmq
+from callosum.exceptions import AuthenticationError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 from sqlalchemy.engine.row import Row
@@ -18,9 +19,7 @@ from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
-from .api.exceptions import (
-    AgentError,
-)
+from .exceptions import AgentError, RPCError
 from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -164,5 +163,10 @@ class AgentRPCCache:
                     peer.call.order_key.reset(okey_token)
         except RPCUserError as orig_exc:
             raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
+        except AuthenticationError:
+            raise RPCError(
+                agent_id,
+                agent_addr,
+            )
         except Exception:
             raise
