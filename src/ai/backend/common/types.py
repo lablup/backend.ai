@@ -1158,6 +1158,7 @@ class AcceleratorMetadata(TypedDict):
 class AgentSelectionStrategy(enum.StrEnum):
     DISPERSED = "dispersed"
     CONCENTRATED = "concentrated"
+    ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
 
@@ -1178,7 +1179,6 @@ class VolumeMountableNodeType(enum.StrEnum):
 
 @dataclass
 class RoundRobinState(JSONSerializableMixin):
-    schedulable_group_id: str
     next_index: int
 
     def to_json(self) -> dict[str, Any]:
@@ -1191,9 +1191,12 @@ class RoundRobinState(JSONSerializableMixin):
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return t.Dict({
-            t.Key("schedulable_group_id"): t.String,
             t.Key("next_index"): t.Int,
         })
+
+
+# This is only used when AgentSelectionStrategy is ROUNDROBIN.
+RoundRobinContext = namedtuple("RoundRobinContext", ["sgroup_name", "sched_ctx"])
 
 
 # States of the round-robin scheduler for each resource group and architecture.

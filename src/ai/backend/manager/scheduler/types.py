@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
@@ -33,6 +34,8 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     ResourceSlot,
+    RoundRobinContext,
+    RoundRobinState,
     SessionId,
     SessionTypes,
     SlotName,
@@ -44,6 +47,11 @@ from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
+from .utils import (
+    get_num_extras,
+    get_requested_architecture,
+    sort_requested_slots_by_priority,
+)
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -404,10 +412,17 @@ class AbstractScheduler(metaclass=ABCMeta):
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # scheduler-specific config
     config_iv: t.Dict
+    agent_selection_resource_priority: list[str]
 
-    def __init__(self, sgroup_opts: ScalingGroupOpts, config: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        sgroup_opts: ScalingGroupOpts,
+        config: Mapping[str, Any],
+        agent_selection_resource_priority: list[str],
+    ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
+        self.agent_selection_resource_priority = agent_selection_resource_priority
 
     @abstractmethod
     def pick_session(
@@ -423,12 +438,13 @@ class AbstractScheduler(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    def assign_agent_for_session(
+    async def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
+        roundrobin_context: Optional[
+            RoundRobinContext
+        ] = None,  # Only used when using roundrobin agent selection strategy,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -441,15 +457,114 @@ class AbstractScheduler(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    def assign_agent_for_kernel(
+    async def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
+        compatible_agents: Sequence[AgentRow],
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         """
         Assign an agent for a kernel of the session.
         This may be called multiple times for multi-node multi-container sessions.
         """
         return None
+
+    async def select_agent(
+        self,
+        compatible_agents: Sequence[AgentRow],
+        pending_session_or_kernel: SessionRow | KernelRow,
+        use_num_extras: bool,
+        roundrobin_context: Optional[RoundRobinContext] = None,
+    ) -> Optional[AgentId]:
+        """
+        Select an agent for the pending session or kernel.
+        """
+
+        agent_selection_strategy = self.sgroup_opts.agent_selection_strategy
+        requested_slots = pending_session_or_kernel.requested_slots
+
+        possible_candidates = [
+            agent
+            for agent in compatible_agents
+            if agent.available_slots - agent.occupied_slots >= requested_slots
+        ]
+
+        if not possible_candidates:
+            return None
+
+        resource_priorities = sort_requested_slots_by_priority(
+            requested_slots, self.agent_selection_resource_priority
+        )
+
+        # Note that ROUNDROBIN is not working with the multi-node multi-container session.
+        # It assumes the pending session type is single-node session.
+        # Otherwise, it will use 'Dispersed' strategy as default strategy.
+
+        if agent_selection_strategy == AgentSelectionStrategy.ROUNDROBIN and isinstance(
+            pending_session_or_kernel, KernelRow
+        ):
+            agent_selection_strategy = AgentSelectionStrategy.DISPERSED
+
+        match agent_selection_strategy:
+            case AgentSelectionStrategy.ROUNDROBIN:
+                assert isinstance(pending_session_or_kernel, SessionRow)
+                assert roundrobin_context is not None
+                sched_ctx = roundrobin_context.sched_ctx
+                sgroup_name = roundrobin_context.sgroup_name
+                requested_architecture = get_requested_architecture(pending_session_or_kernel)
+
+                rr_state: (
+                    RoundRobinState | None
+                ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
+                    sgroup_name, requested_architecture
+                )
+
+                if rr_state is None:
+                    agent_idx = 0
+                else:
+                    agent_idx = rr_state.next_index % len(possible_candidates)
+
+                # This logic assumes that the list of possible agents is not changed.
+                # If the list of possible agents is changed, the next agent will be selected at random by agent_idx.
+                # In this case, we will just use the agent_idx for the simplicity.
+                chosen_agent = possible_candidates[agent_idx]
+
+                rr_state = RoundRobinState((agent_idx + 1) % len(possible_candidates))
+
+                await sched_ctx.registry.shared_config.put_roundrobin_state(
+                    sgroup_name, requested_architecture, rr_state
+                )
+            case AgentSelectionStrategy.LEGACY:
+                chosen_agent = max(
+                    possible_candidates,
+                    key=lambda agent: [
+                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
+                        *[
+                            agent.available_slots.get(key, -sys.maxsize)
+                            for key in resource_priorities
+                        ],
+                    ],
+                )
+            case AgentSelectionStrategy.CONCENTRATED:
+                chosen_agent = min(
+                    possible_candidates,
+                    key=lambda agent: [
+                        get_num_extras(agent, requested_slots) if use_num_extras else 0,
+                        *[
+                            (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
+                            for key in resource_priorities
+                        ],
+                    ],
+                )
+            case AgentSelectionStrategy.DISPERSED | _:
+                chosen_agent = max(
+                    possible_candidates,
+                    key=lambda agent: [
+                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
+                        *[
+                            (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
+                            for key in resource_priorities
+                        ],
+                    ],
+                )
+
+        return chosen_agent.id
