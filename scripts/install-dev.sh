@@ -888,7 +888,6 @@ configure_backendai() {
     sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
     mv ./agent.toml.sed ./agent.toml
   fi
-  sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then

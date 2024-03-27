@@ -15,7 +15,6 @@ import zmq.asyncio
 from ai.backend.common import msgpack
 from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
 
@@ -133,7 +132,6 @@ class MountTask(AbstractTask):
     name = "mount"
 
     mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
 
     fs_location: str = attrs.field()
     fs_type: str = attrs.field(default="nfs")
@@ -144,7 +142,6 @@ class MountTask(AbstractTask):
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str = attrs.field(default="/etc/fstab")
-    mount_prefix: str | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         return await _mount(
@@ -154,50 +151,46 @@ class MountTask(AbstractTask):
             self.cmd_options,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
         )
 
     @classmethod
     def from_event(
-        cls, event: DoVolumeMountEvent, *, mount_path: Path, mount_prefix: str | None = None
+        cls,
+        event: DoVolumeMountEvent,
+        *,
+        mount_path: Path,
     ) -> MountTask:
         return MountTask(
             str(mount_path),
-            event.quota_scope_id,
             event.fs_location,
             event.fs_type,
             event.cmd_options,
             event.scaling_group,
             event.edit_fstab,
             event.fstab_path,
-            mount_prefix,
         )
 
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
-            str(self.quota_scope_id),
             self.fs_location,
             self.fs_type,
             self.cmd_options,
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
         ))
 
     @classmethod
     def deserialize(cls, values: tuple) -> MountTask:
         return MountTask(
             values[0],
-            QuotaScopeID.parse(values[1]),
+            values[1],
             values[2],
             values[3],
             values[4],
             values[5],
             values[6],
-            values[7],
-            values[8],
         )
 
 
@@ -206,14 +199,12 @@ class UmountTask(AbstractTask):
     name = "umount"
 
     mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
     scaling_group: str | None = attrs.field(default=None)
 
     # if `edit_fstab` is False, `fstab_path` is ignored
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str | None = attrs.field(default=None)
-    mount_prefix: str | None = attrs.field(default=None)
     timeout: float | None = attrs.field(default=None)
 
     async def run(self) -> Any:
@@ -233,27 +224,22 @@ class UmountTask(AbstractTask):
         event: DoVolumeUnmountEvent,
         *,
         mount_path: Path,
-        mount_prefix: str | None = None,
         timeout: float | None = None,
     ) -> UmountTask:
         return UmountTask(
             str(mount_path),
-            event.quota_scope_id,
             event.scaling_group,
             event.edit_fstab,
             event.fstab_path,
-            mount_prefix,
             timeout,
         )
 
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
-            str(self.quota_scope_id),
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
-            self.mount_prefix,
             self.timeout,
         ))
 
@@ -261,12 +247,10 @@ class UmountTask(AbstractTask):
     def deserialize(cls, values: tuple) -> UmountTask:
         return UmountTask(
             values[0],
-            QuotaScopeID.parse(values[1]),
+            values[1],
             values[2],
             values[3],
             values[4],
-            values[5],
-            values[6],
         )
 
 

@@ -14,19 +14,6 @@ python_sources(
         "src/ai/backend/helpers:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
-        "!./__init__.py:src-watcher",
-    ],
-)
-python_sources(
-    name="src-watcher",
-    sources=[
-        "__init__.py",
-        "watcher.py",
-    ],
-    dependencies=[
-        ":resources",
-        # Exclude transitive dependencies of the agent itself!
-        "!./__init__.py:src",
     ],
 )
 
@@ -80,14 +67,12 @@ pex_binary(
         "//src/ai/backend/accelerator/mock:lib",
         "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
-        "!!./__init__.py:src-watcher",
     ],
 )
 pex_binary(
     name="pex-watcher",
     entry_point="watcher.py",
     dependencies=[
-        ":src-watcher",
         "!!stubs/trafaret:stubs",
         "!!./__init__.py:src",
     ],

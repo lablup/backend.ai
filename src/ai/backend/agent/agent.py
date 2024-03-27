@@ -67,7 +67,7 @@ from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.defs import MOUNT_MAP_KEY, REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -2389,41 +2389,40 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
-        log.debug("Storage proxy is in the same node. Skip the volume task.")
+    # TODO: This should be removed after agent-watcher is fully implemented
+    err_msg: str | None = None
+
+    mountpoint = Path(event.dir_name)
+    if mountpoint.is_mount():
+        log.debug("Volume is already mounted. Skip the volume task.")
         await context.event_producer.produce_event(
             VolumeMounted(
+                "already-mounted",
                 str(context.id),
                 VolumeMountableNodeType.AGENT,
+                str(mountpoint),
                 "",
-                event.quota_scope_id,
             )
         )
         return
-    mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
-    if volume_mount_prefix is None:
-        volume_mount_prefix = "./"
-    real_path = Path(volume_mount_prefix, event.dir_name)
-    err_msg: str | None = None
     try:
         await mount(
-            str(real_path),
+            str(mountpoint),
             event.fs_location,
             event.fs_type,
             event.cmd_options,
             event.edit_fstab,
             event.fstab_path,
-            mount_prefix,
         )
+        await context.etcd.put(f"{MOUNT_MAP_KEY}/{str(mountpoint)}", event.fs_location)
     except VolumeMountFailed as e:
         err_msg = str(e)
     await context.event_producer.produce_event(
         VolumeMounted(
+            "mount-event",
             str(context.id),
             VolumeMountableNodeType.AGENT,
-            str(real_path),
-            event.quota_scope_id,
+            str(mountpoint),
             err_msg,
         )
     )
@@ -2434,40 +2433,41 @@ async def handle_volume_umount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
-    if context.local_config["agent"]["cohabiting-storage-proxy"]:
-        log.debug("Storage proxy is in the same node. Skip the volume task.")
+    # TODO: This should be removed after agent-watcher is fully implemented
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
+    err_msg: str | None = None
+
+    mountpoint = Path(event.dir_name)
+    if not mountpoint.is_mount():
+        log.debug("Volume is already umounted. Skip the volume task.")
         await context.event_producer.produce_event(
             VolumeUnmounted(
+                "already-umounted",
                 str(context.id),
                 VolumeMountableNodeType.AGENT,
+                str(mountpoint),
                 "",
-                event.quota_scope_id,
             )
         )
         return
-    mount_prefix = await context.etcd.get("volumes/_mount")
-    timeout = await context.etcd.get("config/watcher/file-io-timeout")
-    volume_mount_prefix = context.local_config["agent"]["mount-path"]
-    real_path = Path(volume_mount_prefix, event.dir_name)
-    err_msg: str | None = None
     try:
         did_umount = await umount(
-            str(real_path),
-            mount_prefix,
+            str(mountpoint),
             event.edit_fstab,
             event.fstab_path,
             timeout_sec=float(timeout) if timeout is not None else None,
         )
+        await context.etcd.delete(f"{MOUNT_MAP_KEY}/{str(mountpoint)}")
     except VolumeMountFailed as e:
         err_msg = str(e)
     if not did_umount:
-        log.warning(f"{real_path} does not exist. Skip umount")
+        log.warning(f"{mountpoint} does not exist. Skip umount")
     await context.event_producer.produce_event(
         VolumeUnmounted(
+            "umount-event",
             str(context.id),
             VolumeMountableNodeType.AGENT,
-            str(real_path),
-            event.quota_scope_id,
+            str(mountpoint),
             err_msg,
         )
     )

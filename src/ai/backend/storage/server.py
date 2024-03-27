@@ -222,7 +222,7 @@ async def server_main(
     default=None,
     help=(
         "The config file path. "
-        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+        "[default: searching storage-proxy.toml in ./, ~/.config/backend.ai/, and /etc/backend.ai/]"
     ),
 )
 @click.option(
@@ -326,8 +326,8 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=num_workers,
-                    extra_procs=extra_procs,
                     args=(local_config, log_endpoint),
+                    extra_procs=extra_procs,
                 )
                 log.info("exit.")
         finally:

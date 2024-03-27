@@ -81,6 +81,11 @@ class AbstractPlugin(metaclass=ABCMeta):
         self.plugin_config = plugin_config
 
 
+class AbstractWebappPlugin(AbstractPlugin):
+    is_public: ClassVar[bool] = False
+    app_path: ClassVar[str] = "ai.backend"
+
+
 P = TypeVar("P", bound=AbstractPlugin)
 
 

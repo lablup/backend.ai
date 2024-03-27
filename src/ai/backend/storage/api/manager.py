@@ -29,6 +29,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import MOUNT_MAP_KEY
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -1123,10 +1124,8 @@ async def handle_volume_mount(
         log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
         return
     err_msg: str | None = None
-    mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
-    mount_path = Path(volume_mount_path, event.dir_name)
-    mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
+    mount_path = Path(event.dir_name)
+    mount_task = MountTask.from_event(event, mount_path=mount_path)
     resp = await context.watcher.request_task(mount_task)
     if not resp.succeeded:
         # Produce volume mounted event with error message.
@@ -1134,10 +1133,10 @@ async def handle_volume_mount(
         err_msg = resp.body
         await context.event_producer.produce_event(
             VolumeMounted(
+                "mount-fail",
                 str(context.node_id),
                 VolumeMountableNodeType.STORAGE_PROXY,
                 str(mount_path),
-                event.quota_scope_id,
                 err_msg,
             )
         )
@@ -1148,12 +1147,13 @@ async def handle_volume_mount(
     resp = await context.watcher.request_task(chown_task)
     if not resp.succeeded:
         err_msg = resp.body
+    await context.etcd.put(f"{MOUNT_MAP_KEY}/{str(mount_path)}", event.fs_location)
     await context.event_producer.produce_event(
         VolumeMounted(
+            "mount-success",
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
             str(mount_path),
-            event.quota_scope_id,
             err_msg,
         )
     )
@@ -1169,26 +1169,25 @@ async def handle_volume_umount(
     if context.watcher is None:
         log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
         return
-    mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
     volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
     umount_task = UmountTask.from_event(
         event,
         mount_path=mount_path,
-        mount_prefix=mount_prefix,
         timeout=float(timeout) if timeout is not None else None,
     )
     resp = await context.watcher.request_task(umount_task)
     err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
+    await context.etcd.delete(f"{MOUNT_MAP_KEY}/{str(mount_path)}")
     await context.event_producer.produce_event(
         VolumeUnmounted(
+            "umount-success",
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
             str(mount_path),
-            event.quota_scope_id,
             err_msg,
         )
     )
