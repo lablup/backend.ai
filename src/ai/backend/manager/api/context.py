@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import attrs
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.events import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
@@ -30,6 +32,7 @@ class BaseContext:
 class RootContext(BaseContext):
     pidx: int
     db: ExtendedAsyncSAEngine
+    stat_db: AsyncEngine | None
     distributed_lock_factory: DistributedLockFactory
     event_dispatcher: EventDispatcher
     event_producer: EventProducer

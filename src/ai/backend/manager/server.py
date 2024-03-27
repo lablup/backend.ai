@@ -25,6 +25,7 @@ from typing import (
     Sequence,
     cast,
 )
+from urllib.parse import quote_plus as urlquote
 
 import aiohttp_cors
 import aiomonitor
@@ -32,6 +33,7 @@ import aiotools
 import click
 from aiohttp import web
 from setproctitle import setproctitle
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
@@ -159,6 +161,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
+    ".stat",
     ".etcd",
     ".events",
     ".auth",
@@ -389,6 +392,24 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
+        yield
+
+
+@actxmgr
+async def stat_database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    local_config = root_ctx.local_config
+    if local_config["stat-db"] is not None:
+        username = local_config["stat-db"]["user"]
+        password = local_config["stat-db"]["password"]
+        address = local_config["stat-db"]["addr"]
+        dbname = local_config["stat-db"]["name"]
+        url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
+        db_engine = create_async_engine(url)
+        # root_ctx.stat_db = sessionmaker(db_engine)
+        root_ctx.stat_db = db_engine
+        yield
+    else:
+        root_ctx.stat_db = None
         yield
 
 
@@ -794,6 +815,7 @@ def build_root_app(
             manager_status_ctx,
             redis_ctx,
             database_ctx,
+            stat_database_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
             idle_checker_ctx,
