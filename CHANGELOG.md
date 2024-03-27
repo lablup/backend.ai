@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.10 (2024-03-27)
+
+### Features
+* Always enable `ai.backend.accelerator.cuda_open` in the scie-based installer ([#1966](https://github.com/lablup/backend.ai/issues/1966))
+
+### Fixes
+* Explicitly disable the user-site package detection in the krunner python commands to avoid potential conflicts with user-installed packages in `.local` directories ([#1962](https://github.com/lablup/backend.ai/issues/1962))
+* Fix `caf54fcc17ab` migration to drop a primary key only if it exists and in `589c764a18f1` migration, add missing table arguments. ([#1963](https://github.com/lablup/backend.ai/issues/1963))
+
+### Documentation Updates
+* Resize font-size of footer text in ethical ads in documentation hosted by read-the-docs ([#1965](https://github.com/lablup/backend.ai/issues/1965))
+
+
 ## 23.09.10rc6 (2024-03-14)
 
 ### Features
