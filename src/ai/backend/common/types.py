@@ -1229,11 +1229,9 @@ class RoundRobinState(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict(
-            {
-                t.Key("next_index"): t.Int,
-            }
-        )
+        return t.Dict({
+            t.Key("next_index"): t.Int,
+        })
 
 
 # This is only used when AgentSelectionStrategy is ROUNDROBIN.
