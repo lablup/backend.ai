@@ -1,5 +1,7 @@
 """add_id_columns_to_association_tables
 
+Adds ID column to select tables and replaces its Primary Key from pair of data columns to newly created ID column
+
 Revision ID: caf54fcc17ab
 Revises: 8b2ec7e3d22a
 Create Date: 2024-01-03 21:39:50.558724
@@ -36,17 +38,19 @@ def upgrade():
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
     )
 
-    def drop_existing_pk(idx: str, table: str):
+    def drop_existing_pk(table: str) -> None:
         try:
-            op.drop_constraint(idx, table, type_="primary")
+            # based on age of our constraint naming convention (ai.backend.manager.models.base)
+            # it is safe to assume that every primary key has pk_{table} as its name
+            op.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS pk_{table}")
         except sa.exc.ProgrammingError:
             # Skip dropping if the table has no primary key
             pass
 
-    drop_existing_pk("pk_association_groups_users", "association_groups_users")
-    drop_existing_pk("pk_sgroups_for_domains", "sgroups_for_domains")
-    drop_existing_pk("pk_sgroups_for_groups", "sgroups_for_groups")
-    drop_existing_pk("pk_sgroups_for_keypairs", "sgroups_for_keypairs")
+    drop_existing_pk("association_groups_users")
+    drop_existing_pk("sgroups_for_domains")
+    drop_existing_pk("sgroups_for_groups")
+    drop_existing_pk("sgroups_for_keypairs")
 
     op.create_primary_key("pk_association_groups_users", "association_groups_users", ["id"])
     op.create_primary_key("pk_sgroups_for_domains", "sgroups_for_domains", ["id"])
