@@ -30,15 +30,16 @@ from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
 from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
+    GUID,
     Base,
     BigInt,
     ForeignKeyIDColumn,
@@ -79,34 +80,28 @@ __all__ = (
 
 
 async def rescan_images(
-    etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
     *,
     local: bool | None = False,
     reporter: ProgressReporter | None = None,
 ) -> None:
-    # cannot import ai.backend.manager.config at start due to circular import
-    from ..config import container_registry_iv
-
     if local:
         registries = {
-            "local": {
-                "": "http://localhost",
-                "type": "local",
-                "username": None,
-                "password": None,
-                "project": None,
-            },
+            "local": ContainerRegistryRow(
+                registry_name="local",
+                url="http://localhost",
+                type=ContainerRegistryType.LOCAL,
+            )
         }
     else:
-        registry_config_iv = t.Mapping(t.String, container_registry_iv)
-        latest_registry_config = cast(
-            dict[str, Any],
-            registry_config_iv.check(
-                await etcd.get_prefix("config/docker/registry"),
-            ),
-        )
+        async with db.begin_readonly_session() as session:
+            result = await session.execute(sa.select(ContainerRegistryRow))
+            latest_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {row.registry_name: row for row in result.scalars().all()},
+            )
+
         # TODO: delete images from registries removed from the previous config?
         if registry_or_image is None:
             # scan all configured registries
@@ -161,6 +156,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -197,6 +193,7 @@ class ImageRow(Base):
         self,
         name,
         architecture,
+        registry_id,
         is_local=False,
         registry=None,
         image=None,
@@ -210,6 +207,7 @@ class ImageRow(Base):
     ) -> None:
         self.name = name
         self.registry = registry
+        self.registry_id = registry_id
         self.image = image
         self.tag = tag
         self.architecture = architecture
@@ -805,7 +803,7 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
+            await rescan_images(ctx.db, registry, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
