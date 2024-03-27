@@ -9,8 +9,12 @@ build:
     python: "3.11"
   jobs:
     post_checkout:
-      # Skip the build if there is no docs label
-      - scripts/check-docs-label.sh
+      # Skip building the documentation if there are no changes in the docs/ directory
+      - |
+        if [ "$READTHEDOCS_VERSION_TYPE" = "external" ] && git diff --quiet origin/main -- docs/ .readthedocs.yaml;
+        then
+          exit 183;
+        fi
     pre_build:
       # Auto-generate REST API reference
       - PYTHONPATH="src" python -m ai.backend.manager.openapi -o docs/manager/rest-reference/openapi.json
