@@ -76,7 +76,7 @@ START_OPTION = [
         "-m",
         "--mount",
         "mount",
-        metavar="NAME[=PATH]",
+        metavar="NAME[=PATH] or NAME[:PATH]",
         type=str,
         multiple=True,
         help=(
