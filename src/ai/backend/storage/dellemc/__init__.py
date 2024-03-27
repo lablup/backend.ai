@@ -57,6 +57,9 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
+        # TODO: Support inode quota
+        if config.limit_bytes is None:
+            return
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id_path = qspath / ".quota_id"
         if quota_id_path.exists():
