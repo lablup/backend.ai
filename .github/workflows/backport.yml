@@ -84,7 +84,7 @@ jobs:
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
             --amend -m "${{ needs.backport-target-branch.outputs.commit_message }}" \
-            --trailer "Backported-from=main($latest_release)" \
+            --trailer "Backported-from=main(${{ needs.backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
       - name: When cherry-pick is failed
