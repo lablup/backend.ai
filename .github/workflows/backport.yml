@@ -101,7 +101,7 @@ jobs:
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.BACKPORT_PAT }}
           title: "${{ steps.pr_title.outputs.commit_message_without_description }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
@@ -135,4 +135,4 @@ jobs:
             }
           ' -f pullRequestId="${{ steps.pr_id.outputs.pr_id }}" -f mergeMethod="SQUASH"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.BACKPORT_PAT }}
