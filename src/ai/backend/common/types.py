@@ -998,6 +998,12 @@ class ImageConfig(TypedDict):
     is_local: bool
 
 
+class ImageMutationTaskResponse(TypedDict):
+    bgtask_id: str
+    image_ref: str
+    architecture: str
+
+
 class ServicePort(TypedDict):
     name: str
     protocol: ServicePortProtocols

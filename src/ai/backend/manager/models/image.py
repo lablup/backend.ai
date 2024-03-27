@@ -26,10 +26,10 @@ import trafaret as t
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, get_registry_info
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
@@ -38,6 +38,7 @@ from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
 from ..defs import DEFAULT_IMAGE_ARCH
+from .agent import AgentRow
 from .base import (
     Base,
     BigInt,
@@ -330,6 +331,28 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
+
+    @classmethod
+    async def get_serialized(
+        cls,
+        session: AsyncSession,
+        shared_config: SharedConfig,
+        reference_candidates: List[Union[ImageAlias, ImageRef]],
+    ) -> dict[str, Any]:
+        img = await cls.resolve(session, reference_candidates)
+        registry_url, registry_creds = await get_registry_info(
+            shared_config.etcd, img.image_ref.registry
+        )
+        return {
+            "canonical": img.image_ref.canonical,
+            "is_local": False,
+            "registry": {
+                "name": img.image_ref.registry,
+                "url": registry_url,
+                "username": registry_creds.get("username", ""),
+                "password": registry_creds.get("password", ""),
+            },
+        }
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
@@ -740,46 +763,129 @@ class ImageNode(graphene.ObjectType):
             return cls.from_row(image_row)
 
 
+class AgentTask(graphene.ObjectType):
+    agent_id = graphene.String()
+    task_id = graphene.UUID()
+
+
+class PreloadImageInput(graphene.InputObjectType):
+    references = graphene.List(graphene.String, required=True)
+    target_agents = graphene.List(graphene.String, required=True)
+    force = graphene.Boolean(default_value=False)
+
+
 class PreloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
+        props = PreloadImageInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    task_id = graphene.String()
+    tasks = graphene.List(AgentTask, required=True)
 
     @staticmethod
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
+        props: PreloadImageInput,
     ) -> PreloadImage:
-        return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
+        log.info(
+            "preloading images ({0}) to agents ({1}) by API request",
+            ", ".join([img for img in props.references]),
+            ", ".join(props.target_agents),
+        )
+        ctx: GraphQueryContext = info.context
+
+        select_ag = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(props.target_agents))
+            .options(load_only(AgentRow.id, AgentRow.addr))
+        )
+        async with ctx.db.begin_readonly_session() as db_sess:
+            agents = cast(list[AgentRow], (await db_sess.scalars(select_ag)).all())
+            images = [
+                (
+                    await ImageRow.get_serialized(
+                        db_sess,
+                        ctx.shared_config,
+                        [
+                            ImageRef(ref, ["*"]),
+                            ImageAlias(ref),
+                        ],
+                    )
+                )
+                for ref in props.references
+            ]
+
+        tasks: list[dict[str, Any]] = []
+        for agent in agents:
+            task_id = await ctx.registry.pull_image(agent.id, agent.addr, images, force=props.force)
+            tasks.append({
+                "agent_id": agent.id,
+                "task_id": task_id,
+            })
+
+        return PreloadImage(ok=True, msg="", tasks=tasks)
+
+
+class UnloadImageInput(graphene.InputObjectType):
+    references = graphene.List(graphene.String, required=True)
+    target_agents = graphene.List(graphene.String, required=True)
 
 
 class UnloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
+        props = UnloadImageInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    task_id = graphene.String()
+    tasks = graphene.List(AgentTask, required=True)
 
     @staticmethod
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
+        props: UnloadImageInput,
     ) -> UnloadImage:
-        return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
+        log.info(
+            "unloading images ({0}) to agents ({1}) by API request",
+            ", ".join([img for img in props.references]),
+            ", ".join(props.target_agents),
+        )
+        ctx: GraphQueryContext = info.context
+        select_ag = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(props.target_agents))
+            .options(load_only(AgentRow.id, AgentRow.addr))
+        )
+        async with ctx.db.begin_readonly_session() as db_sess:
+            agents = cast(list[AgentRow], (await db_sess.scalars(select_ag)).all())
+            images = [
+                (
+                    await ImageRow.get_serialized(
+                        db_sess,
+                        ctx.shared_config,
+                        [
+                            ImageRef(ref, ["*"]),
+                            ImageAlias(ref),
+                        ],
+                    )
+                )
+                for ref in props.references
+            ]
+
+        tasks: list[dict[str, Any]] = []
+        for agent in agents:
+            task_id = await ctx.registry.remove_image(agent.id, agent.addr, images)
+            tasks.append({
+                "agent_id": agent.id,
+                "task_id": task_id,
+            })
+
+        return UnloadImage(ok=True, msg="", tasks=tasks)
 
 
 class RescanImages(graphene.Mutation):

@@ -1276,6 +1276,28 @@ class AgentRegistry:
         )
         return session_id
 
+    async def pull_image(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+        image_maps: Sequence[dict[str, Any]],
+        force: bool = False,
+    ) -> uuid.UUID:
+        async with self.agent_cache.rpc_context(
+            agent_id,
+        ) as rpc:
+            resp: str = await rpc.call.pull_image(image_maps, force)
+            return uuid.UUID(resp)
+
+    async def remove_image(
+        self, agent_id: AgentId, agent_addr: str, image_maps: Sequence[dict[str, Any]]
+    ) -> uuid.UUID:
+        async with self.agent_cache.rpc_context(
+            agent_id,
+        ) as rpc:
+            resp: str = await rpc.call.remove_image(image_maps)
+            return uuid.UUID(resp)
+
     async def start_session(
         self,
         sched_ctx: SchedulingContext,

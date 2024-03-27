@@ -1105,6 +1105,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def _read_data_root(self) -> Path:
+        proc = await asyncio.create_subprocess_exec(
+            *["docker", "info", "--format", "{{.DockerRootDir}}"],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            log.warning(f"Unable to read inode of root directory, err: {stderr.decode('utf8')}")
+            return Path("/")
+        raw_result: str = stdout.decode("utf8").rstrip()
+        return Path(raw_result)
+
+    async def get_free_image_disk(self) -> int | float:
+        data_root = self.backend_data_root
+        stat = os.statvfs(data_root)
+        return stat.f_bfree * stat.f_bsize / (2**30)
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -1271,8 +1289,21 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "auth": encoded_creds,
             }
         log.info("pulling image {} from registry", image_ref.canonical)
+        pull_event = asyncio.Event()
+        self.image_pull_tracker[image_ref.canonical] = pull_event
+        try:
+            async with closing_async(Docker()) as docker:
+                await docker.images.pull(image_ref.canonical, auth=auth_config)
+        finally:
+            pull_event.set()
+            if image_ref.canonical in self.image_pull_tracker:
+                del self.image_pull_tracker[image_ref.canonical]
+
+    async def remove_image(self, image_ref: ImageRef) -> None:
+        log.info("remove image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config)
+            # Remove the given image along with any untagged parent images that were referenced by that image.
+            await docker.images.delete(image_ref.canonical)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

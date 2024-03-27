@@ -545,7 +545,9 @@ class AbstractAgent(
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
+    image_pull_tracker: MutableMapping[str, asyncio.Event]
     port_pool: Set[int]
+    backend_data_root: Path
 
     redis: Redis
 
@@ -600,11 +602,13 @@ class AbstractAgent(
                 local_config["container"]["port-range"][1] + 1,
             )
         )
+        self.image_pull_tracker = {}
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self.backend_data_root = Path("/")
 
     async def __ainit__(self) -> None:
         """
@@ -637,6 +641,7 @@ class AbstractAgent(
             name="stat",
             db=REDIS_STAT_DB,
         )
+        self.backend_data_root = await self._read_data_root()
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
@@ -980,6 +985,12 @@ class AbstractAgent(
             or container_config["bind-host"]
         )
 
+    async def _read_data_root(self) -> Path:
+        """
+        Read data root of container backend.
+        """
+        return Path("/")
+
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         async with self.registry_lock:
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
@@ -1209,6 +1220,32 @@ class AbstractAgent(
                 suppress_events,
             ),
         )
+
+    @abstractmethod
+    async def get_free_image_disk(self) -> int | float:
+        """
+        Get free disk for images.
+        The unit of disk size is GiB.
+        """
+
+    async def check_free_image_disk(self, image_ref: ImageRef) -> None:
+        """
+        Check free disk for images.
+
+        TODO: get the size of image from metadata and compare it to free disk size.
+        Still, the real size can be different from the metadata
+        cause this agent have duplicate image layers.
+        """
+        if (minimum := self.local_config["agent"]["required-image-disk"]) is None:
+            return
+        try:
+            free = await self.get_free_image_disk()
+        except Exception as e:
+            raise AgentError(f"Unable to get free image disk. (e: {repr(e)})")
+        if free < minimum:
+            raise AgentError(
+                f"Need at least {minimum} GiB of free disk space to install a new image."
+            )
 
     @abstractmethod
     async def enumerate_containers(
@@ -1500,6 +1537,18 @@ class AbstractAgent(
         Pull the given image from the given registry.
         """
 
+    def get_ongoing_pulling(
+        self,
+        image_ref: ImageRef,
+    ) -> asyncio.Event | None:
+        return self.image_pull_tracker.get(image_ref.canonical)
+
+    @abstractmethod
+    async def remove_image(self, image_ref: ImageRef) -> None:
+        """
+        Remove the given image.
+        """
+
     @abstractmethod
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1719,10 +1768,17 @@ class AbstractAgent(
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
             if do_pull:
+                await self.check_free_image_disk(ctx.image_ref)
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                if (other_pull := self.get_ongoing_pulling(ctx.image_ref)) is not None:
+                    log.info(
+                        "image {} is already being pulled. Waiting...", ctx.image_ref.canonical
+                    )
+                    await other_pull.wait()
+                else:
+                    await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
             if not restarting:
                 await self.produce_event(

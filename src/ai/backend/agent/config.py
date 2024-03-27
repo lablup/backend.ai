@@ -20,6 +20,11 @@ agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
+            t.Key(
+                "required-image-disk",
+                default=None,
+            ): (t.Int | t.Null),  # GiB
+            t.Key("backend-data-root", default="/var/lib/docker"): t.String(),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
             t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
             t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(type="file"),
