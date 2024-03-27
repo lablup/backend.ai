@@ -102,12 +102,15 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     break
                 words = line.split()
                 if next_line_is_quota:
-                    used_bytes, hard_limit = int(words[0]), int(words[2])
+                    raw_used_bytes, hard_limit = words[0], int(words[2])
                     # words[1] is soft_limit
                     if hard_limit == 0:
                         return None
+                    if raw_used_bytes.endswith("*"):
+                        raw_used_bytes = raw_used_bytes[:-1]
+                    used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
                     return QuotaUsage(
-                        used_bytes=_kilobyte_to_byte(used_bytes), limit_bytes=hard_limit
+                        used_bytes=used_bytes, limit_bytes=_kilobyte_to_byte(hard_limit)
                     )
                 if Path(words[0]) == qspath:
                     next_line_is_quota = True
