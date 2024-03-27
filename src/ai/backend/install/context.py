@@ -440,7 +440,16 @@ class Context(metaclass=ABCMeta):
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
             parents=True, exist_ok=True
         )
-        # TODO: enable CUDA plugin if nvidia stack is detected
+        # enable the CUDA plugin (open-source version)
+        # The agent will show an error log if the CUDA is not available in the system and report
+        # "cuda.devices = 0" as the agent capacity, but it will still run.
+        self.sed_in_place(
+            toml_path,
+            re.compile("^(# )?allow-compute-plugins = .*"),
+            'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
+        )
+        # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
+        #       via an explicit installer option/config.
         r"""
         if [ $ENABLE_CUDA -eq 1 ]; then
           sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
