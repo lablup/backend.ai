@@ -28,7 +28,7 @@ Base: Any = declarative_base()
 
 class SessionMetric(Base):
     __tablename__ = "session_computesessionmetric"
-    __table_args__ = (sa.PrimaryKeyConstraint("time", "session_id", "status"),)
+    __table_args__ = (sa.PrimaryKeyConstraint("time"),)
 
     time = sa.Column("time", sa.DateTime(timezone=True), index=True, nullable=False)
     session_id = sa.Column("session_id", pgsql.UUID(), nullable=False)
