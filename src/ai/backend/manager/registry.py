@@ -1259,21 +1259,6 @@ class AgentRegistry:
                     ),
                 )
 
-            # Include the shared memory as a part of the requested memory.
-            # When checking the min/max range limits of memory size (=MM) specified as image
-            # metadata, we should take the share memory (=S) into account as well as the requested
-            # memory size (=M).
-            # Most client's session creation requests set S as the implicit default and the passed requested
-            # memory size is M - S, so this may break up the min/max check in the minimum edge.
-            # (e.g., MM.min = 256MiB, M = 256MiB, S = 64MiB -> intuitively this should work but if
-            # we compare MM.min with the passed value M - S (192MiB) only, it will prevent the session
-            # creation.)
-            total_mem = requested_slots["mem"] + shmem
-            log.debug(
-                f"Total memory size ({str(total_mem)}) is allocated to requested main memory size. (original memory: {str(requested_slots['mem'])}, shared memory: {str(shmem)})",
-            )
-            requested_slots["mem"] = total_mem
-
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
             log_args = (session_id, kernel_id, kernel["cluster_role"], kernel["cluster_idx"])
