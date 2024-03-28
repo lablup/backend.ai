@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import copy
 import itertools
 import logging
 import re
@@ -125,7 +124,7 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1061,16 +1060,13 @@ class AgentRegistry:
             )
 
             # Shared memory.
-            # We need to subtract the amount of shared memory from the memory limit of
-            # a container, since tmpfs including /dev/shm uses host-side kernel memory
-            # and cgroup's memory limit does not apply.
-            shmem = resource_opts.get("shmem", None)
-            if shmem is None:
-                shmem = labels.get("ai.backend.resource.preferred.shmem", "64m")
-            shmem = BinarySize.from_str(shmem)
+            # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
+            shmem = BinarySize.from_str(
+                resource_opts.get("shmem")
+                or labels.get("ai.backend.resource.preferred.shmem")
+                or DEFAULT_SHARED_MEMORY_SIZE
+            )
             resource_opts["shmem"] = shmem
-            image_min_slots = copy.deepcopy(image_min_slots)
-            image_min_slots["mem"] += shmem
 
             # Sanitize user input: does it have resource config?
             if (resources := creation_config.get("resources")) is not None:
@@ -1123,6 +1119,14 @@ class AgentRegistry:
                 if tpu is not None:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
+            # Check if the user has allocated an "imbalanced" shared memory amount.
+            if shmem >= requested_slots["mem"]:
+                raise InvalidAPIParameters(
+                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
+                        str(shmem), str(BinarySize(requested_slots["mem"]))
+                    ),
+                )
+
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
             log_args = (session_id, kernel_id, kernel["cluster_role"], kernel["cluster_idx"])
@@ -1153,14 +1157,6 @@ class AgentRegistry:
                             for k, v in image_max_slots.to_humanized(known_slot_types).items()
                         )
                     )
-                )
-
-            # Check if: shmem < memory
-            if shmem >= requested_slots["mem"]:
-                raise InvalidAPIParameters(
-                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
-                    ),
                 )
 
             # Add requested resource slot data to session
