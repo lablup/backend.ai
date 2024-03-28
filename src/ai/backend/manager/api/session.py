@@ -1094,7 +1094,6 @@ async def convert_session_to_image(
                     peruser_image_id = str(uuid.uuid4())
 
             new_canonical += f"-peruser_{peruser_image_id.replace('-', '')}"
-            log.debug("new canonical: {}", new_canonical)
             new_image_ref: ImageRef = ImageRef(
                 # peruser_* tag will not be exposed to Images list API callee; check Image.filter_allowed() for more
                 new_canonical,
@@ -1116,7 +1115,6 @@ async def convert_session_to_image(
             async for event, _ in background_task_manager.poll_bgtask_event(
                 uuid.UUID(resp["bgtask_id"])
             ):
-                log.debug("new event: {}", repr(event))
                 match event:
                     case BgtaskDoneEvent():
                         await reporter.update(increment=1, message="Committed image")
@@ -1142,7 +1140,6 @@ async def convert_session_to_image(
                 async for event, _ in background_task_manager.poll_bgtask_event(
                     uuid.UUID(resp["bgtask_id"])
                 ):
-                    log.debug("new event: {}", repr(event))
                     match event:
                         case BgtaskDoneEvent():
                             break

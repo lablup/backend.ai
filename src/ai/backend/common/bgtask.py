@@ -191,7 +191,6 @@ class BackgroundTaskManager:
             encoding="utf-8",
         )
 
-        log.debug("task info: {}", task_info)
         if task_info is None:
             # The task ID is invalid or represents a task completed more than 24 hours ago.
             raise ValueError("No such background task.")

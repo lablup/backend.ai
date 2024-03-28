@@ -97,8 +97,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 self.registry_url = url
                 async with aiotools.TaskGroup() as tg:
                     async for image in self.fetch_repositories(client_session):
-                        # tg.create_task(self._scan_image(client_session, image))
-                        await self._scan_image(client_session, image)
+                        tg.create_task(self._scan_image(client_session, image))
             await self.commit_rescan_result()
         finally:
             all_updates.reset(all_updates_token)
