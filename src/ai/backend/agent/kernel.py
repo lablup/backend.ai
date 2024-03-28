@@ -302,7 +302,15 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def commit(self, kernel_id, subdir, filename):
+    async def commit(
+        self,
+        kernel_id,
+        subdir,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
+    ):
         raise NotImplementedError
 
     @abstractmethod

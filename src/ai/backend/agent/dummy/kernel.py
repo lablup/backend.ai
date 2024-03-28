@@ -115,7 +115,15 @@ class DummyKernel(AbstractKernel):
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
-    async def commit(self, kernel_id, subdir, filename):
+    async def commit(
+        self,
+        kernel_id,
+        subdir,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
+    ) -> None:
         self.is_commiting = True
         delay = self.dummy_kernel_cfg["delay"]["commit"]
         await asyncio.sleep(delay)

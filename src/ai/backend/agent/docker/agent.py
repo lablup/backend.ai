@@ -1259,6 +1259,54 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        if image_ref.is_local:
+            return
+        auth_config = None
+        reg_user = registry_conf.get("username")
+        reg_passwd = registry_conf.get("password")
+        log.info("pushing image {} to registry", image_ref.canonical)
+        if self.local_config["docker"]["image-push-method"] == "skopeo":
+            skopeo_path = self.local_config["docker"]["skopeo-path"]
+            if not skopeo_path:
+                raise RuntimeError("skopeo-path config not set up!")
+            if reg_user and reg_passwd:
+                proc = await asyncio.subprocess.create_subprocess_exec(
+                    skopeo_path,
+                    "login",
+                    "-u",
+                    reg_user,
+                    "--password-stdin",
+                    image_ref.registry,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert proc.stdin
+                proc.stdin.write(reg_passwd.encode("utf-8"))
+                proc.stdin.write_eof()
+                await proc.stdin.drain()
+                out, err = await proc.communicate()
+                if "Login Succeeded!" not in out.decode("utf-8"):
+                    log.debug("skopeo login error: {}", err.decode("utf-8"))
+                    raise RuntimeError(f"failed to log in to registry {image_ref.registry}")
+                proc = await asyncio.subprocess.create_subprocess_exec(
+                    skopeo_path,
+                    "copy",
+                    f"docker://{image_ref.canonical}",
+                )
+        else:
+            if reg_user and reg_passwd:
+                encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
+                    "ascii"
+                )
+                auth_config = {
+                    "auth": encoded_creds,
+                }
+
+            async with closing_async(Docker()) as docker:
+                await docker.images.push(image_ref.canonical, auth=auth_config)
+
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")

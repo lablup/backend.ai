@@ -49,6 +49,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     EventProducer,
@@ -62,6 +63,7 @@ from ai.backend.common.types import (
     EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
+    ImageRegistry,
     KernelCreationConfig,
     KernelId,
     LogSeverity,
@@ -608,20 +610,52 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         subdir: str,
-        filename: str,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
             self.agent.commit,
-            kernel_id=KernelId(UUID(kernel_id)),
-            subdir=subdir,
+            KernelId(UUID(kernel_id)),
+            subdir,
+            canonical=canonical,
             filename=filename,
+            extra_labels=extra_labels,
         )
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(Path(subdir, filename)),
+            "path": str(Path(subdir, filename)) if filename else None,
+        }
+
+    @rpc_function
+    @collect_error
+    async def push_image(
+        self,
+        canonical: str,
+        architecture: str,
+        registry_conf: ImageRegistry,
+        *,
+        is_local: bool = False,
+    ) -> dict[str, Any]:
+        log.info("rpc::push_image(c:{})", canonical)
+        bgtask_mgr = self.local_config["background_task_manager"]
+        task_id = await bgtask_mgr.start(
+            self.agent.push_image,
+            ImageRef(
+                canonical,
+                known_registries=["*"],
+                is_local=is_local,
+                architecture=architecture,
+            ),
+            registry_conf,
+        )
+        return {
+            "bgtask_id": str(task_id),
+            "canonical": canonical,
         }
 
     @rpc_function

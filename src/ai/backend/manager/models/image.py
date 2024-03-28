@@ -190,7 +190,6 @@ class ImageRow(Base):
     )
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
-    # kernels = relationship("KernelRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
     def __init__(
@@ -662,19 +661,37 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
-        items = [item for item in items if item.registry in allowed_docker_registries]
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
+        filtered_items: list[Image] = []
+        for item in items:
+            if item.registry not in allowed_docker_registries:
+                continue
+            if is_installed and not item.installed:
+                continue
 
-            items = [*filter(_filter_operation, items)]
-        return items
+            operation_feature_detected = False
+            not_my_image = False
+
+            for label in item.labels:
+                match label.key:
+                    case "ai.backend.features" if "operation" in label.value:
+                        operation_feature_detected = True
+                    case "ai.backend.personalized-image-owner":
+                        if label.value != str(ctx.user["uuid"]):
+                            not_my_image = True
+                            break
+                        filtered_tag = "-".join([
+                            # t for t in item.tag.split("-") if not t.startswith("peruser_")
+                            t
+                            for t in item.tag.split("-")
+                        ])
+                        item.tag = filtered_tag
+
+            if (is_operation and not operation_feature_detected) or not_my_image:
+                continue
+            filtered_items.append(item)
+
+        return filtered_items
 
 
 class ImageNode(graphene.ObjectType):

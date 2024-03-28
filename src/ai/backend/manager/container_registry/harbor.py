@@ -102,18 +102,18 @@ class HarborRegistry_v1(BaseContainerRegistry):
                     data = json.loads(await resp.read())
                     architecture = arch_name_aliases.get(data["architecture"], data["architecture"])
                     labels = {}
-                    if "container_config" in data:
-                        raw_labels = data["container_config"].get("Labels")
-                        if raw_labels:
-                            labels.update(raw_labels)
-                        else:
-                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
-                    else:
-                        raw_labels = data["config"].get("Labels")
-                        if raw_labels:
-                            labels.update(raw_labels)
-                        else:
-                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
+
+                    # we should favor `config` instead of `container_config` since `config` can contain additional datas
+                    # set when commiting image via `--change` flag
+                    if _config_labels := data.get("config", {}).get("Labels"):
+                        labels = _config_labels
+                    elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+                        labels = _container_config_labels
+
+                    if not labels:
+                        log.warning(
+                            "Labels section not found on image {}:{}/{}", image, tag, architecture
+                        )
                     manifest = {
                         architecture: {
                             "size": size_bytes,
@@ -226,6 +226,42 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         artifact_url = self.registry_url.with_path(next_page_url.path).with_query(
                             next_page_url.query
                         )
+
+    async def _scan_tag(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        project, _, repository = image.partition("/")
+        project, repository, tag = [
+            urllib.parse.urlencode({"": x})[1:] for x in [project, repository, tag]
+        ]
+        api_url = self.registry_url / "api" / "v2.0"
+        rqst_args["headers"] = {}
+        async with sess.get(
+            api_url / "projects" / project / "repositories" / repository / "artifacts" / tag,
+            **rqst_args,
+        ) as resp:
+            if resp.status == 404:
+                # ignore missing tags
+                # (may occur after deleting an image from the docker hub)
+                return
+            resp.raise_for_status()
+            resp_json = await resp.json()
+            async with aiotools.TaskGroup() as tg:
+                match resp_json["manifest_media_type"]:
+                    case self.MEDIA_TYPE_OCI_INDEX:
+                        await self._process_oci_index(tg, sess, rqst_args, image, resp_json)
+                    case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                        await self._process_docker_v2_multiplatform_image(
+                            tg, sess, rqst_args, image, resp_json
+                        )
+                    case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                        await self._process_docker_v2_image(tg, sess, rqst_args, image, resp_json)
+                    case _ as media_type:
+                        raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
 
     async def _process_oci_index(
         self,
@@ -364,28 +400,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = json.loads(await resp.read())
             labels = {}
-            if "container_config" in data:
-                raw_labels = data["container_config"].get("Labels")
-                if raw_labels:
-                    labels.update(raw_labels)
-                else:
-                    log.warning(
-                        "label not found on image {}:{}/{}",
-                        image,
-                        tag,
-                        architecture,
-                    )
-            else:
-                raw_labels = data["config"].get("Labels")
-                if raw_labels:
-                    labels.update(raw_labels)
-                else:
-                    log.warning(
-                        "label not found on image {}:{}/{}",
-                        image,
-                        tag,
-                        architecture,
-                    )
+            if _config_labels := data.get("config", {}).get("Labels"):
+                labels = _config_labels
+            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+                labels = _container_config_labels
+
+            if not labels:
+                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+
             manifests[architecture] = {
                 "size": size_bytes,
                 "labels": labels,
@@ -426,28 +448,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = json.loads(await resp.read())
             labels = {}
-            if "container_config" in data:
-                raw_labels = data["container_config"].get("Labels")
-                if raw_labels:
-                    labels.update(raw_labels)
-                else:
-                    log.warning(
-                        "label not found on image {}:{}/{}",
-                        image,
-                        tag,
-                        architecture,
-                    )
-            else:
-                raw_labels = data["config"].get("Labels")
-                if raw_labels:
-                    labels.update(raw_labels)
-                else:
-                    log.warning(
-                        "label not found on image {}:{}/{}",
-                        image,
-                        tag,
-                        architecture,
-                    )
+            if _config_labels := data.get("config", {}).get("Labels"):
+                labels = _config_labels
+            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+                labels = _container_config_labels
+
+            if not labels:
+                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
             manifests[architecture] = {
                 "size": size_bytes,
                 "labels": labels,
