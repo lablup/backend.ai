@@ -1124,6 +1124,7 @@ class AgentRegistry:
                         )
 
             # Shared memory.
+            # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
             shmem = BinarySize.from_str(
                 resource_opts.get("shmem")
                 or labels.get("ai.backend.resource.preferred.shmem")
