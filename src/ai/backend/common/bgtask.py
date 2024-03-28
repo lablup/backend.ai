@@ -150,7 +150,7 @@ class BackgroundTaskManager:
             try:
                 async for event, extra_data in self.poll_bgtask_event(task_id):
                     body: dict[str, Any] = {
-                        "task_id": event.task_id,
+                        "task_id": str(event.task_id),
                         "message": event.message,
                     }
                     match event:
@@ -164,9 +164,14 @@ class BackgroundTaskManager:
                                 await resp.send(
                                     json.dumps(body), event="bgtask_" + extra_data["status"]
                                 )
+                            else:
+                                await resp.send("{}", event="bgtask_done")
                             await resp.send("{}", event="server_close")
                         case BgtaskCancelledEvent() | BgtaskFailedEvent():
                             await resp.send("{}", event="server_close")
+            except:
+                log.exception("")
+                raise
             finally:
                 return resp
 

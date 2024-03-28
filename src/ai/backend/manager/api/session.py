@@ -81,8 +81,10 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    ImageRow,
     KernelLoadingStrategy,
     KernelRole,
+    SessionDependencyRow,
     SessionRow,
     SessionStatus,
     UserRole,
@@ -94,7 +96,6 @@ from ..models import (
     session_templates,
     vfolders,
 )
-from ..models.session import SessionDependencyRow
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -998,7 +999,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
 
 
 class ConvertSessionToImageRequesteModel(BaseModel):
-    image_name: str
+    image_name: str = Field(pattern=r"[a-zA-Z0-9\.\-_]+")
     login_session_token: Annotated[str | None, Field(default=None)]
 
 
@@ -1053,22 +1054,47 @@ async def convert_session_to_image(
     base_image_ref = session.main_kernel.image_ref
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
-        reporter.total_progress = 4
+        reporter.total_progress = 3
         await reporter.update(message="Commit started")
         try:
-            log.debug(
-                "registry: {}, project: {}, name: {}",
-                registry_hostname,
-                registry_project,
-                base_image_ref.name,
-            )
             if "/" in base_image_ref.name:
                 new_name = base_image_ref.name.split("/", maxsplit=1)[1]
             else:
+                # for cases where project name is not specified (e.g. redis, nginx, ...)
                 new_name = base_image_ref.name
 
-            new_canonical = f"{registry_hostname}/{registry_project}/{new_name}:{base_image_ref.tag}-peruser_{str(request['user']['uuid']).replace('-', '')}-imagename_{params.image_name}"
-            log.debug("new image canonical: {}", new_canonical)
+            # remove any existing peruser related tag from base canonical
+            filtered_tag_set = [
+                x for x in base_image_ref.tag.split("-") if not x.startswith("peruser_")
+            ]
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            )
+            # check if image with same name exists and reuse ID it if is
+            async with root_ctx.db.begin_readonly_session() as sess:
+                query = sa.select(ImageRow).where(
+                    ImageRow.name.like(f"{new_canonical}%")
+                    & (
+                        ImageRow.labels["ai.backend.personalized-image-owner"].as_string()
+                        == str(request["user"]["uuid"])
+                    )
+                    & (
+                        ImageRow.labels["ai.backend.personalized-image-name"].as_string()
+                        == params.image_name
+                    )
+                )
+                existing_row = await sess.scalar(query)
+
+                peruser_image_id: str
+                if existing_row:
+                    peruser_image_id = existing_row.labels["ai.backend.personalized-image-id"]
+                    log.debug("reusing existing peruser image ID {}", peruser_image_id)
+                else:
+                    peruser_image_id = str(uuid.uuid4())
+
+            new_canonical += f"-peruser_{peruser_image_id.replace('-', '')}"
+            log.debug("new canonical: {}", new_canonical)
             new_image_ref: ImageRef = ImageRef(
                 # peruser_* tag will not be exposed to Images list API callee; check Image.filter_allowed() for more
                 new_canonical,
@@ -1076,10 +1102,16 @@ async def convert_session_to_image(
                 known_registries=["*"],
                 is_local=base_image_ref.is_local,
             )
+
+            # commit image with new tag set
             resp = await root_ctx.registry.commit_session(
                 session,
                 new_image_ref,
-                extra_labels={"ai.backend.image-owner": str(request["user"]["uuid"])},
+                extra_labels={
+                    "ai.backend.personalized-image-owner": str(request["user"]["uuid"]),
+                    "ai.backend.personalized-image-name": params.image_name,
+                    "ai.backend.personalized-image-id": peruser_image_id,
+                },
             )
             async for event, _ in background_task_manager.poll_bgtask_event(
                 uuid.UUID(resp["bgtask_id"])
@@ -1095,7 +1127,7 @@ async def convert_session_to_image(
                         raise BackendError(extra_msg="Operation cancelled")
 
             if not new_image_ref.is_local:
-                log.debug("registry config: {}", registry_conf)
+                # push image to registry from local agent
                 image_registry = ImageRegistry(
                     name=registry_hostname,
                     url=str(registry_conf[""]),
@@ -1120,6 +1152,7 @@ async def convert_session_to_image(
                             raise BackendError(extra_msg="Operation cancelled")
 
             await reporter.update(increment=1, message="Pushed image to registry")
+            # rescan updated image only
             await rescan_images(
                 root_ctx.shared_config.etcd,
                 root_ctx.db,

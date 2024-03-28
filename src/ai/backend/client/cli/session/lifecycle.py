@@ -843,7 +843,7 @@ def commit(session_id):
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID")
+@click.argument("session_id", metavar="SESSID_OR_NAME")
 @click.argument("image_name", metavar="IMAGENAME")
 def convert_to_image(session_id, image_name):
     """
@@ -851,7 +851,7 @@ def convert_to_image(session_id, image_name):
     Requires Backend.AI server set up for per-user image commit feature (24.03).
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSID_OR_NAME: Session ID or its alias given when creating the session.
     IMAGENAME: New image name.
     """
 
@@ -868,14 +868,13 @@ def convert_to_image(session_id, image_name):
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Session export process started.")
+                completion_msg_func = lambda: print_done("Session export process completed.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Committing container to image...") as viewer,
+                    ProgressViewer("Starting the session...") as viewer,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        print(data)
                         if ev.event == "bgtask_updated":
                             if viewer.tqdm is None:
                                 pbar = await viewer.to_tqdm()
@@ -896,6 +895,7 @@ def convert_to_image(session_id, image_name):
                             )
             finally:
                 completion_msg_func()
+                sys.exit()
 
     asyncio_run(export_tracker(result["task_id"]))
 
