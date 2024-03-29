@@ -219,7 +219,7 @@ class BaseResponseModel(BaseModel):
 
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseResponseModel)
 
 TPydanticResponse: TypeAlias = TResponseModel | list
 THandlerFuncWithoutParam: TypeAlias = Callable[
@@ -231,13 +231,11 @@ THandlerFuncWithParam: TypeAlias = Callable[
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
+    response: BaseResponseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case BaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
-        case BaseModel():
-            return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
