@@ -98,33 +98,6 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     )
 
 
-async def graphql_docs_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
-    request_path = request.match_info["path"]
-    static_path = request.app["config"]["service"]["graphql_docs_path"]
-    file_path = (static_path / request_path).resolve()
-    try:
-        file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        )
-    if file_path.is_file():
-        return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps({
-            "type": "https://api.backend.ai/probs/generic-not-found",
-            "title": "Not Found",
-        }),
-        content_type="application/problem+json",
-    )
-
-
 async def config_ini_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
@@ -698,7 +671,6 @@ async def server_main(
     else:
         raise ValueError("Unrecognized service.mode", config["service"]["mode"])
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
-    cors.add(app.router.add_route("GET", "/graphql-docs/{path:.*$}", graphql_docs_handler))
 
     app.on_shutdown.append(server_shutdown)
     app.on_cleanup.append(server_cleanup)

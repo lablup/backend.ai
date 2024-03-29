@@ -11,10 +11,6 @@ from ai.backend.common import validators as tx
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
 
-default_graphql_docs_path = Path(
-    pkg_resources.resource_filename("ai.backend.web", "graphql")
-).resolve()
-
 license_defs = {
     "edition": "Open Source",
     "valid_since": "",
@@ -42,7 +38,6 @@ config_iv = t.Dict({
         tx.AliasedKey(["ssl_cert", "ssl-cert"], default=None): t.Null | tx.Path(type="file"),
         tx.AliasedKey(["ssl_privkey", "ssl-privkey"], default=None): t.Null | tx.Path(type="file"),
         t.Key("static_path", default=default_static_path): tx.Path(type="dir"),
-        t.Key("graphql_docs_path", default=default_graphql_docs_path): tx.Path(type="dir"),
         tx.AliasedKey(
             ["force_endpoint_protocol", "force-endpoint-protocol"],
             default=None,

@@ -74,29 +74,3 @@ jobs:
           schema: 'main:src/ai/backend/manager/api/schema.graphql'
           rules: |
             custom-rule.js
-
-  graphql-docs:
-    needs: graphql-updated
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install spectaql
-        run: npm install -g spectaql
-      - name: Generate GraphQL docs
-        run: npx spectaql spectaql-config.yml
-      - name: Extract the author information
-        id: get_author_info
-        run: |
-          author_name=$(git show -q --pretty='format:%an')
-          author_email=$(git show -q --pretty='format:%ae')
-          echo "Retrieved author information: $author_name <$author_email>"
-          echo "name=$author_name" >> $GITHUB_OUTPUT
-          echo "email=$author_email" >> $GITHUB_OUTPUT
-      - name: Make commit message for changing change log file
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
-          commit_message: 'docs: update GraphQL docs'
