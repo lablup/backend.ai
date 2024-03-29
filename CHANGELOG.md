@@ -16,6 +16,52 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.0b1 (2024-03-14)
+
+### Features
+* Add a policy to predicate to limit the number and resources of concurrent pending sessions. ([#1226](https://github.com/lablup/backend.ai/issues/1226))
+* Implement `/services/_/try` API ([#1754](https://github.com/lablup/backend.ai/issues/1754))
+* Add support for multi directory mkdir by fixing cli to accept multiple arguments and by adding list type annotation to accept multiple directories ([#1803](https://github.com/lablup/backend.ai/issues/1803))
+* Add GraphQL mutations to allow altering model service (endpoint) specs, especially for resource allocation and image enviroment setups ([#1859](https://github.com/lablup/backend.ai/issues/1859))
+* Add a new client-side admin command group to manager the quota scopes (`admin quota-scope`), replacing the legacy `--quota` options in the vfolder management commands ([#1862](https://github.com/lablup/backend.ai/issues/1862))
+* Implement customization of name displayed in the Graylog source field through the config file. ([#1866](https://github.com/lablup/backend.ai/issues/1866))
+* Add `allow_non_auth_tcp` as allowed webui config key ([#1868](https://github.com/lablup/backend.ai/issues/1868))
+* Introduce `etcd-client-py` ([#1870](https://github.com/lablup/backend.ai/issues/1870))
+* Enhance logging by adding more detailed exceptions when scheduling sessions, such as conditions like missing kernels or no agents available at all for the selected pending session ([#1887](https://github.com/lablup/backend.ai/issues/1887))
+* Add validate-image-canonical and validate-image-alias cli command ([#1891](https://github.com/lablup/backend.ai/issues/1891))
+* Re-define vfolder delete status by adding `delete-pending`, `delete-error` vfolder status and set `delete-pending` as trash-bin status and `delete-complete` as hard-delete status. ([#1892](https://github.com/lablup/backend.ai/issues/1892))
+* Add new test cases for vfolder CLI commands. ([#1918](https://github.com/lablup/backend.ai/issues/1918))
+* Add the `--non-interactive` flag to the TUI installer ([#1922](https://github.com/lablup/backend.ai/issues/1922))
+* Bump the manager API version to v8.20240315 with some big changes memo'ed in manager/server.py ([#1938](https://github.com/lablup/backend.ai/issues/1938))
+* Add new `user_resource_policies.max_session_count_per_model_session` column to limit number of maximum available sessions per each model service created by user ([#1948](https://github.com/lablup/backend.ai/issues/1948))
+* Add the --headless flag that run install as headless mode, skips terminal I/O ([#1958](https://github.com/lablup/backend.ai/issues/1958))
+
+### Deprecations
+* Remove the image importer API no longer used and unused since the release of Forklift ([#1896](https://github.com/lablup/backend.ai/issues/1896))
+
+### Fixes
+* Write graphene field's deprecation/description message string directly instead of using message generation functions. ([#1734](https://github.com/lablup/backend.ai/issues/1734))
+* Let `mgr agent ping` command to use the agent's `ping()` RPC API instead of unimplemented `get_node_hwinfo()`, and fix the mis-interpretation of the compute plugin's metadata reports in the agent's `gather_hwinfo()`. ([#1793](https://github.com/lablup/backend.ai/issues/1793))
+* When creating a new user via the client admin CLI, always set the default option of the group to "default" to prevent mistakes of creating users without groups. ([#1860](https://github.com/lablup/backend.ai/issues/1860))
+* Fix malfunctioning CLI command `session create-from-template` by reorganizing `click.option` decorators ([#1890](https://github.com/lablup/backend.ai/issues/1890))
+* Fix GQL Relay node resolver to parse `filter` and `order` argument into SQL query properly. ([#1916](https://github.com/lablup/backend.ai/issues/1916))
+* Allow passing HTTP status codes via the pydantic-based API response model objects ([#1927](https://github.com/lablup/backend.ai/issues/1927))
+* Fix the potential missing resource slots when checking the remaining resources lots in the job scheduler ([#1928](https://github.com/lablup/backend.ai/issues/1928))
+* Fix inability to download beyond 500 MB via SFTP by preventing dropbear from decreasing the trasnfer window size indefinitely, which happens with non-retrying psftp-based SFTP client implementations ([#1930](https://github.com/lablup/backend.ai/issues/1930))
+* Fix CLI `agent info` related issues by replacing `HardwareMetadata` to `dict` when class check and adding parameter to default metric value formatter. ([#1934](https://github.com/lablup/backend.ai/issues/1934))
+* Change `endpoints.model` and `endpoint_tokens.endpoint` to nullable and set `ondelete="SET NULL"`. ([#1935](https://github.com/lablup/backend.ai/issues/1935))
+* Use `buildDate` instead of `build` to retrieve web static version to follow lablup/backend.ai-webui#2072 ([#1950](https://github.com/lablup/backend.ai/issues/1950))
+* Fix graylog log backend not working when `localname` config is set ([#1951](https://github.com/lablup/backend.ai/issues/1951))
+* Fix `endpoint.routings` GQL field showing routing ID instead of status enum ([#1952](https://github.com/lablup/backend.ai/issues/1952))
+
+### Documentation Updates
+* Update Backend.AI Installation & error guide for Pants version 2.18 and later ([#1904](https://github.com/lablup/backend.ai/issues/1904))
+
+### External Dependency Updates
+* Replace `passlib[bcrypt]` to `bcrypt` which is better maintained ([#1932](https://github.com/lablup/backend.ai/issues/1932))
+* Upgrade pyzmq and callosum version to improve malformed packet handling in manager-to-agent RPC channels ([#1939](https://github.com/lablup/backend.ai/issues/1939))
+
+
 ## 24.03.0a2 (2024-02-14)
 
 ### Breaking Changes
