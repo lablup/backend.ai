@@ -20,6 +20,7 @@ from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ...common.types import SSLContextType
 from ..models.image import ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -70,7 +71,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
-        ssl_ctx = None  # default
+        ssl_ctx: SSLContextType = True  # default
         if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
@@ -127,25 +128,23 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
-                session.add_all(
-                    [
-                        ImageRow(
-                            name=k.canonical,
-                            registry=k.registry,
-                            image=k.name,
-                            tag=k.tag,
-                            architecture=k.architecture,
-                            is_local=is_local,
-                            config_digest=v["config_digest"],
-                            size_bytes=v["size_bytes"],
-                            type=ImageType.COMPUTE,
-                            accelerators=v.get("accels"),
-                            labels=v["labels"],
-                            resources=v["resources"],
-                        )
-                        for k, v in _all_updates.items()
-                    ]
-                )
+                session.add_all([
+                    ImageRow(
+                        name=k.canonical,
+                        registry=k.registry,
+                        image=k.name,
+                        tag=k.tag,
+                        architecture=k.architecture,
+                        is_local=is_local,
+                        config_digest=v["config_digest"],
+                        size_bytes=v["size_bytes"],
+                        type=ImageType.COMPUTE,
+                        accelerators=v.get("accels"),
+                        labels=v["labels"],
+                        resources=v["resources"],
+                    )
+                    for k, v in _all_updates.items()
+                ])
                 await session.flush()
 
     async def scan_single_ref(self, image_ref: str) -> None:
@@ -265,7 +264,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     if raw_labels:
                         labels.update(raw_labels)
                     else:
-                        log.warn(
+                        log.warning(
                             "label not found on image {}:{}/{}",
                             image,
                             tag,
@@ -276,7 +275,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     if raw_labels:
                         labels.update(raw_labels)
                     else:
-                        log.warn(
+                        log.warning(
                             "label not found on image {}:{}/{}",
                             image,
                             tag,
@@ -356,11 +355,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
                 updates["resources"] = ImageRow.resources.type._schema.check(resources)
-                all_updates.get().update(
-                    {
-                        update_key: updates,
-                    }
-                )
+                all_updates.get().update({
+                    update_key: updates,
+                })
             except (InvalidImageName, InvalidImageTag) as e:
                 skip_reason = str(e)
             finally:

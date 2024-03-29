@@ -71,7 +71,7 @@ would be:
    scaling-group = "default"
    pid-file = "/home/bai/agent/agent.pid"
    event-loop = "uvloop"
-   # allow-compute-plugins = "ai.backend.accelerator.cuda_open"
+   # allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]
 
    [container]
    port-range = [30000, 31000]
@@ -87,7 +87,7 @@ would be:
    scratch-size = "1G"
 
    [watcher]
-   service-addr = { host = "bai-m1", port = 6009 }
+   service-addr = { host = "bai-a01"", port = 6009 }
    ssl-enabled = false
    target-service = "backendai-agent.service"
    soft-reset-available = false
@@ -188,6 +188,9 @@ First, create a runner script at ``${HOME}/bin/run-agent.sh``:
    if [ -z "$HOME" ]; then
       export HOME="/home/bai"
    fi
+
+   # -- If you have installed using static python --
+   source .venv/bin/activate
 
    # -- If you have installed using pyenv --
    if [ -z "$PYENV_ROOT" ]; then

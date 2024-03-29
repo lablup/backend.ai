@@ -231,13 +231,11 @@ async def get_container_process_table(
         f"exec/{exec_id}/start",
         method="POST",
         headers={"content-type": "application/json"},
-        data=json.dumps(
-            {
-                "Stream": False,  # get response immediately
-                "Detach": False,
-                "Tty": False,
-            }
-        ),
+        data=json.dumps({
+            "Stream": False,  # get response immediately
+            "Detach": False,
+            "Tty": False,
+        }),
     ) as resp:
         result = await resp.read()
         result = result.decode("latin-1").strip().split("\n")

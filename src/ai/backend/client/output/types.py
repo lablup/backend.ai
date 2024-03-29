@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Mapping, Optional, Seq
 
 import attr
 
+from ai.backend.common.types import ResultSet
+
 if TYPE_CHECKING:
     from ai.backend.client.cli.types import CLIContext
 
@@ -104,7 +106,9 @@ class FieldSpec:
 
 class FieldSet(UserDict, Mapping[str, FieldSpec]):
     def __init__(self, fields: Sequence[FieldSpec]) -> None:
-        super().__init__({f.alt_name: f for f in fields})
+        fields_set = {f.alt_name: f for f in fields}
+        fields_set.update({f.field_ref: fields_set[f.alt_name] for f in fields})
+        super().__init__(fields_set)
 
 
 T = TypeVar("T")
@@ -134,6 +138,13 @@ class BaseOutputHandler(metaclass=ABCMeta):
         self,
         items: Sequence[Mapping[str, Any]],
         fields: Sequence[FieldSpec],
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def print_result_set(
+        self,
+        result_set: ResultSet,
     ) -> None:
         raise NotImplementedError
 

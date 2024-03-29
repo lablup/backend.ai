@@ -17,14 +17,15 @@ from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
+from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
 from ...session import AsyncSession
-from ..params import CommaSeparatedListType, RangeExprOptionType
 from ..pretty import (
     format_info,
     print_done,
@@ -191,20 +192,20 @@ def format_stats(stats):
         max_fraction_len = 0
         for key, metric in stats.items():
             unit = metric["unit_hint"]
-            if unit == "bytes":
-                val = metric.get("stats.max", metric["current"])
-                val = naturalsize(val, binary=True)
-                val, unit = val.rsplit(" ", maxsplit=1)
-                val = "{:,}".format(Decimal(val))
-            elif unit == "msec":
-                val = "{:,}".format(Decimal(metric["current"]))
-                unit = "msec"
-            elif unit == "percent":
-                val = metric["pct"]
-                unit = "%"
-            else:
-                val = metric["current"]
-                unit = ""
+            match unit:
+                case "bytes":
+                    val = metric.get("stats.max", metric["current"])
+                    val = naturalsize(val, binary=True)
+                    val, unit = val.rsplit(" ", maxsplit=1)
+                    val = "{:,}".format(Decimal(val))
+                case "msec" | "usec" | "sec":
+                    val = "{:,}".format(Decimal(metric["current"]))
+                case "percent" | "pct" | "%":
+                    val = metric["pct"]
+                    unit = "%"
+                case _:
+                    val = metric["current"]
+                    unit = ""
             if val is None:
                 continue
             ip, _, fp = val.partition(".")
@@ -227,9 +228,9 @@ def format_stats(stats):
 def prepare_resource_arg(resources: Sequence[str]) -> Mapping[str, str]:
     if resources:
         parsed = {k: v for k, v in map(lambda s: s.split("=", 1), resources)}
-        if parsed["mem"] and not parsed["mem"][-1].isalpha():
+        if (mem_arg := parsed.get("mem")) is not None and not mem_arg[-1].isalpha():
             # The default suffix is "m" (mega) if not specified.
-            parsed["mem"] += "m"
+            parsed["mem"] = f"{mem_arg}m"
     else:
         parsed = {}  # use the defaults configured in the server
     return parsed
@@ -346,8 +347,8 @@ def prepare_mount_arg(
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option(
@@ -409,7 +410,7 @@ def run(
     scaling_group,  # click_start_option
     resources,  # click_start_option
     cluster_size,  # click_start_option
-    cluster_mode,
+    cluster_mode: ClusterMode,
     resource_opts,  # click_start_option
     architecture,
     domain,  # click_start_option

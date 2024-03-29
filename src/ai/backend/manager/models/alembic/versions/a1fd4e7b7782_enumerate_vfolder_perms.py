@@ -5,6 +5,7 @@ Revises: f9971fbb34d9
 Create Date: 2018-09-05 16:51:49.973195
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -18,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 # NOTE: VFolderPermission is EnumValueType
-vfperm_choices = list(map(lambda v: v.value, VFolderPermission))
+vfperm_choices = list(map(str, VFolderPermission))
 vfolderpermission = postgresql.ENUM(
     *vfperm_choices,
     name="vfolderpermission",

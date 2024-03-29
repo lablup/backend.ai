@@ -1,10 +1,11 @@
 from typing import Any, Dict, Sequence
 
+from ...cli.types import Undefined, undefined
 from ..output.fields import keypair_fields
 from ..output.types import FieldSpec, PaginatedResult
 from ..pagination import fetch_paginated_result
 from ..session import api_session
-from ..types import Undefined, set_if_set, undefined
+from ..types import set_if_set
 from .base import BaseFunction, api_function
 
 __all__ = ("KeyPair",)

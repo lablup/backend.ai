@@ -11,6 +11,7 @@ addr = { host = "localhost", port = 8100 }
 name = "backend"
 user = "postgres"
 password = "develove"
+pool-recycle = 50
 
 
 [manager]
@@ -65,6 +66,13 @@ protocol = "tcp"
 ssl-enabled = true
 ssl-verify = true
 
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
 
 [debug]
 enabled = false

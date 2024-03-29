@@ -284,6 +284,10 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     error_title = "The virtual folder already exists with the same name."
 
 
+class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
+    error_title = "Cannot delete model VFolders bound to alive model services."
+
+
 class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
@@ -406,13 +410,11 @@ class BackendAgentError(BackendError):
         self.agent_error_type = agent_error_type
         self.agent_error_title = agent_details["title"]
         self.agent_exception = agent_details.get("exception", "")
-        self.body = json.dumps(
-            {
-                "type": self.error_type,
-                "title": self.error_title,
-                "agent-details": agent_details,
-            }
-        ).encode()
+        self.body = json.dumps({
+            "type": self.error_type,
+            "title": self.error_title,
+            "agent-details": agent_details,
+        }).encode()
 
     def __str__(self):
         if self.agent_exception:

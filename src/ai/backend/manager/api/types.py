@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncContextManager, Awaitable, Callable, Iterable, Mapping, Tuple
+from typing import (
+    TYPE_CHECKING,
+    AsyncContextManager,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    Tuple,
+)
 
 import aiohttp_cors
 from aiohttp import web

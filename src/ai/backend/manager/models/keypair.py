@@ -111,6 +111,8 @@ class KeyPairRow(Base):
         back_populates="keypairs",
     )
 
+    user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+
 
 class UserInfo(graphene.ObjectType):
     email = graphene.String()
@@ -337,7 +339,7 @@ class KeyPair(graphene.ObjectType):
             .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count()]).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -349,7 +351,7 @@ class KeyPair(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return len(result.all())
 
     @classmethod
     async def load_slice(
@@ -373,14 +375,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
@@ -425,14 +425,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -468,14 +466,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select(
-                [
-                    keypairs,
-                    users.c.email,
-                    users.c.full_name,
-                    agg_to_array(groups.c.name).label("groups_name"),
-                ]
-            )
+            sa.select([
+                keypairs,
+                users.c.email,
+                users.c.full_name,
+                agg_to_array(groups.c.name).label("groups_name"),
+            ])
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -628,13 +624,25 @@ class DeleteKeyPair(graphene.Mutation):
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
+        from .user import UserRow
+
         ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_readonly_session() as db_session:
+            user_query = (
+                sa.select([sa.func.count()])
+                .select_from(UserRow)
+                .where(UserRow.main_access_key == access_key)
+            )
+            if (await db_session.scalar(user_query)) > 0:
+                return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-        await redis_helper.execute(
-            ctx.redis_stat,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        result = await simple_db_mutate(cls, ctx, delete_query)
+        if result.ok:
+            await redis_helper.execute(
+                ctx.redis_stat,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
+        return result
 
 
 class Dotfile(TypedDict):
