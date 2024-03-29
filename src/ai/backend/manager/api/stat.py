@@ -2,28 +2,50 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from datetime import date as _date
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, AsyncIterator, cast
 
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
+from pydantic import BaseModel, Field, computed_field
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.types import TypeDecorator
 
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .auth import auth_required
-from .manager import ALL_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
+from .utils import pydantic_params_api_handler
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import Dialect
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 Base: Any = declarative_base()
+
+
+class MetricMap(BaseModel):
+    pct: Decimal | None = Field(default=None)
+    current: Decimal | None = Field(default=None)
+    capacity: Decimal | None = Field(default=None)
+
+
+class MetricColumn(TypeDecorator):
+    impl = pgsql.JSONB
+    cache_ok = True
+
+    def process_result_value(self, value: dict[str, Any] | None, dialect: Dialect) -> MetricMap:
+        if value is None:
+            return MetricMap()
+        return MetricMap(**value)
 
 
 class SessionMetric(Base):
@@ -33,16 +55,78 @@ class SessionMetric(Base):
     time = sa.Column("time", sa.DateTime(timezone=True), index=True, nullable=False)
     session_id = sa.Column("session_id", pgsql.UUID(), nullable=False)
     status = sa.Column("status", sa.String(length=32), nullable=False)
-    cpu_util = sa.Column("cpu_util", pgsql.JSONB())
-    cpu_used = sa.Column("cpu_used", pgsql.JSONB())
-    mem = sa.Column("mem", pgsql.JSONB())
-    accel_util = sa.Column("accel_util", pgsql.JSONB())
-    accel_mem = sa.Column("accel_mem", pgsql.JSONB())
-    io_read = sa.Column("io_read", pgsql.JSONB())
-    io_write = sa.Column("io_write", pgsql.JSONB())
-    net_rx = sa.Column("net_rx", pgsql.JSONB())
-    net_tx = sa.Column("net_tx", pgsql.JSONB())
+    cpu_util = sa.Column("cpu_util", MetricColumn())
+    cpu_used = sa.Column("cpu_used", MetricColumn())
+    mem = sa.Column("mem", MetricColumn())
+    accel_util = sa.Column("accel_util", MetricColumn())
+    accel_mem = sa.Column("accel_mem", MetricColumn())
+    io_read = sa.Column("io_read", MetricColumn())
+    io_write = sa.Column("io_write", MetricColumn())
+    net_rx = sa.Column("net_rx", MetricColumn())
+    net_tx = sa.Column("net_tx", MetricColumn())
     accel_type = sa.Column("accel_type", sa.String(length=32))
+
+
+class DailyUtilizationRequestModel(BaseModel):
+    start: _date = Field()
+    end: _date = Field()
+
+
+class UtilizationMetricValue(BaseModel):
+    max: Decimal | None = Field(default=None)
+    min: Decimal | None = Field(default=None)
+    total: Decimal = Field(default=Decimal(0))
+    cnt: Decimal = Field(default=Decimal(0))
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def avg(self) -> Decimal | None:
+        if self.cnt == 0:
+            return None
+        return self.total / self.cnt
+
+    def update(self, val: Decimal | None) -> None:
+        if val is None:
+            return
+        if self.max is None or val > self.max:
+            self.max = val
+        if self.min is None or val < self.min:
+            self.min = val
+        self.total += val
+        self.cnt += 1
+
+
+class UtilizationMetricMap(BaseModel):
+    pct: UtilizationMetricValue = Field(default_factory=UtilizationMetricValue)
+    current: UtilizationMetricValue = Field(default_factory=UtilizationMetricValue)
+    capacity: UtilizationMetricValue = Field(default_factory=UtilizationMetricValue)
+
+    def update(self, val: MetricMap) -> None:
+        self.pct.update(val.pct)
+        self.current.update(val.current)
+        self.capacity.update(val.capacity)
+
+
+class DailyUtilization(BaseModel):
+    date: _date = Field()
+    cpu_util: UtilizationMetricMap = Field(
+        default_factory=UtilizationMetricMap, description="CPU utilization."
+    )
+    mem: UtilizationMetricMap = Field(
+        default_factory=UtilizationMetricMap, description="Main memory utilization."
+    )
+    accel_util: UtilizationMetricMap = Field(
+        default_factory=UtilizationMetricMap, description="Accelerator utilization."
+    )
+    accel_mem: UtilizationMetricMap = Field(
+        default_factory=UtilizationMetricMap, description="Accelerator memory utilization."
+    )
+
+    def update_from_row(self, metric: SessionMetric) -> None:
+        self.cpu_util.update(metric.cpu_util)
+        self.mem.update(metric.mem)
+        self.accel_util.update(metric.accel_util)
+        self.accel_mem.update(metric.accel_mem)
 
 
 @actxmgr
@@ -54,22 +138,32 @@ async def begin_session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 
 @auth_required
-@server_status_required(ALL_ALLOWED)
-async def get_user_stat(request: web.Request) -> web.Response:
+@pydantic_params_api_handler(DailyUtilizationRequestModel)
+async def get_daily_util(
+    request: web.Request, params: DailyUtilizationRequestModel
+) -> list[DailyUtilization]:
     root_ctx: RootContext = request.app["_root.context"]
     if root_ctx.stat_db is None:
         # TODO: Add middleware to do null check
-        return web.json_response({}, status=200)
+        return []
+    start, end = params.start, params.end
     async with begin_session(root_ctx.stat_db) as db_session:
-        stmt = sa.select(sa.func.count()).select_from(SessionMetric)
-        count = await db_session.scalar(stmt)
-        stmt = sa.select(SessionMetric).where(
-            SessionMetric.session_id == "35ed3faf-8f09-4d0b-b6cf-f31a2fdf9348"
+        stmt = (
+            sa.select(SessionMetric)
+            .where((SessionMetric.time >= start) & (SessionMetric.time <= end))
+            .order_by(SessionMetric.time)
         )
-        res = (await db_session.scalars(stmt)).first()
-        print(f"{count = }")
-        print(f"{res = }, {res.status = }, {res.time = }")
-        return web.json_response({"count": count}, status=200)
+        result = (await db_session.scalars(stmt)).all()
+        metric_rows = cast(list[SessionMetric], result)
+
+        daily: dict[_date, DailyUtilization] = {}
+        for r in metric_rows:
+            _date = r.time.date()
+            if _date not in daily:
+                daily[_date] = DailyUtilization(date=_date)
+            daily[_date].update_from_row(r)
+
+        return list(daily.values())
 
 
 async def init(app: web.Application) -> None:
@@ -90,6 +184,7 @@ def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("GET", get_user_stat))
+    add_route = app.router.add_route
+    cors.add(add_route("GET", "/utilization", get_daily_util))
+    # cors.add(add_route("GET", "/allocation", get_daily_alloc))
     return app, []
