@@ -71,7 +71,7 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.lint.log
         path: .pants.d/workdir/pants.log
@@ -134,7 +134,7 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.check.log
         path: .pants.d/workdir/pants.log
@@ -207,7 +207,7 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log
@@ -290,7 +290,7 @@ jobs:
         cd dist-local-proxy
         ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: local-proxy
         path: dist-local-proxy/*
@@ -309,12 +309,12 @@ jobs:
       run: |
         rm -rf dist/src.*/
     - name: Upload scies
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: scies
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
         path: .pants.d/workdir/pants.log
@@ -383,17 +383,12 @@ jobs:
         done
         ls -lh dist
     - name: Upload wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels
-        path: dist/*.whl
-    - name: Upload source tarballs
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*.tar.gz
+        path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
         path: .pants.d/workdir/pants.log
@@ -431,22 +426,22 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: scies
         path: dist
     - name: Download local-proxy
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: local-proxy
         path: dist
     - name: Download SBOM report
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: SBOM report
         path: dist
@@ -465,10 +460,44 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
+    - name: Update shorten URL
+      run: |
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
+        }'
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels, make-final-release]
+    needs: [make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
@@ -510,7 +539,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist
