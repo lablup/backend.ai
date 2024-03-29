@@ -16,6 +16,7 @@ from typing import (
     Optional,
     Sequence,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -816,12 +817,18 @@ class SessionRow(Base):
                         ),
                     )
                 )
-                session_row: SessionRow = (await db_session.scalars(session_query)).first()
-                determined_status = determine_session_status(session_row.kernels)
-
-                update_values = {
-                    "occupying_slots": session_row.occupying_slots + kernel_actual_allocs,
+                result = (await db_session.scalars(session_query)).first()
+                session_row = cast(SessionRow, result)
+                session_occupying_slots = cast(ResourceSlot, session_row.occupying_slots)
+                session_occupying_slots.sync_keys(kernel_actual_allocs)
+                for key, val in session_occupying_slots.items():
+                    session_occupying_slots[key] = str(
+                        Decimal(val) + Decimal(kernel_actual_allocs[key])
+                    )
+                update_values: dict[str, Any] = {
+                    "occupying_slots": session_occupying_slots,
                 }
+                determined_status = determine_session_status(session_row.kernels)
                 if determined_status != session_row.status:
                     update_values["status"] = determined_status
                     update_values["status_history"] = sql_json_merge(
