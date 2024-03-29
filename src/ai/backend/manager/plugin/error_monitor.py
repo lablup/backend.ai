@@ -76,7 +76,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
         async with self.db.begin() as conn:
             query = error_logs.insert().values({
-                "severity": severity,
+                "severity": severity.value.lower(),
                 "source": "manager",
                 "user": user,
                 "message": message,
@@ -101,7 +101,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             return
         async with self.db.begin() as conn:
             query = error_logs.insert().values({
-                "severity": event.severity,
+                "severity": event.severity.value.lower(),
                 "source": source,
                 "user": event.user,
                 "message": event.message,

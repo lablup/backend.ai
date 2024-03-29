@@ -46,6 +46,7 @@ from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -437,6 +438,13 @@ class AgentRegistry:
                     raise InvalidAPIParameters(
                         "Alias name cannot be set to an existing folder name: " + str(alias_name)
                     )
+
+        if _resources := config["resources"]:
+            available_resource_slots = await self.shared_config.get_resource_slots()
+            try:
+                ResourceSlot.from_user_input(_resources, available_resource_slots)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
 
         # Resolve the image reference.
         try:
@@ -991,6 +999,7 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
+            "use_host_network": use_host_network,
         }
 
         kernel_shared_data = {
@@ -3252,6 +3261,7 @@ class AgentRegistry:
                         },
                         "endpoint": {
                             "id": str(endpoint.id),
+                            "existing_url": str(endpoint.url) if endpoint.url else None,
                         },
                     },
                     "apps": inference_apps,
@@ -3424,6 +3434,8 @@ async def handle_model_service_status_update(
             route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
     except SessionNotFound:
         return
+    except NoResultFound:
+        return
 
     async def _update():
         async with context.db.begin_session() as db_sess:
@@ -3536,7 +3548,9 @@ async def invoke_session_callback(
                             except Exception as e:
                                 if is_db_retry_error(e):
                                     raise
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                                log.warning(
+                                    "failed to communicate with AppProxy endpoint: {}", str(e)
+                                )
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
@@ -3565,7 +3579,9 @@ async def invoke_session_callback(
                             except Exception as e:
                                 if is_db_retry_error(e):
                                     raise
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                                log.warning(
+                                    "failed to communicate with AppProxy endpoint: {}", str(e)
+                                )
                         await db_sess.commit()
 
             await execute_with_retry(_update)
@@ -3591,6 +3607,8 @@ async def invoke_session_callback(
                         await db_sess.execute(query)
 
             await execute_with_retry(_clear_error)
+    except NoResultFound:
+        pass  # Cases when we try to create a inference session for validation (/services/_/try API)
     except Exception:
         log.exception("error while updating route status:")
 
