@@ -163,6 +163,7 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
+from .models.session import finalize_running as finalize_session_running
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -1559,9 +1560,7 @@ class AgentRegistry:
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
             await KernelRow.update_kernel(self.db, kernel_id, new_status, update_data=update_data)
-            new_session_status = await SessionRow.finalize_running(
-                self.db, session_id, actual_allocs
-            )
+            new_session_status = await finalize_session_running(self.db, session_id, actual_allocs)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
             query = (
