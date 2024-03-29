@@ -73,13 +73,20 @@ class Context(metaclass=ABCMeta):
 
     _post_guides: list[PostGuide]
 
-    def __init__(self, dist_info: DistInfo, app: App) -> None:
+    def __init__(
+        self,
+        dist_info: DistInfo,
+        app: App,
+        *,
+        non_interactive: bool = False,
+    ) -> None:
         self._post_guides = []
         self.app = app
         self.log = current_log.get()
         self.cwd = Path.cwd()
         self.dist_info = dist_info
         self.wget_sema = asyncio.Semaphore(3)
+        self.non_interactive = non_interactive
         self.install_info = self.hydrate_install_info()
 
     @abstractmethod
@@ -264,7 +271,13 @@ class Context(metaclass=ABCMeta):
 
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-set-user-main-access-keys.json"
+        ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
             "ai.backend.install.fixtures", "example-resource-presets.json"
@@ -367,6 +380,7 @@ class Context(metaclass=ABCMeta):
         await self.etcd_put_json("", data)
         data = {}
         # TODO: in dev-mode, enable these.
+        data["api"] = {}
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
@@ -426,7 +440,16 @@ class Context(metaclass=ABCMeta):
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
             parents=True, exist_ok=True
         )
-        # TODO: enable CUDA plugin if nvidia stack is detected
+        # enable the CUDA plugin (open-source version)
+        # The agent will show an error log if the CUDA is not available in the system and report
+        # "cuda.devices = 0" as the agent capacity, but it will still run.
+        self.sed_in_place(
+            toml_path,
+            re.compile("^(# )?allow-compute-plugins = .*"),
+            'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
+        )
+        # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
+        #       via an explicit installer option/config.
         r"""
         if [ $ENABLE_CUDA -eq 1 ]; then
           sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
@@ -481,9 +504,9 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
             wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable[
-                "url"
-            ] = f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            wsproxy_itable["url"] = (
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            )
             data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
@@ -505,9 +528,9 @@ class Context(metaclass=ABCMeta):
             else:
                 assert halfstack.redis_addr
                 redis_table = tomlkit.table()
-                redis_table[
-                    "addr"
-                ] = f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+                redis_table["addr"] = (
+                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+                )
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
@@ -553,7 +576,10 @@ class Context(metaclass=ABCMeta):
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
                 print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
                 print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
-        for user in keypair_data["users"]:
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
+            current_shell = os.environ.get("SHELL", "sh")
+            user_data = json.loads(Path(user_path).read_bytes())
+        for user in user_data["users"]:
             username = user["username"]
             with open(base_path / f"env-local-{username}-session.sh", "w") as fp:
                 print(

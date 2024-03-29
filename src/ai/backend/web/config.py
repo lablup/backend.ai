@@ -74,6 +74,7 @@ config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("resources"): t.Dict({
         t.Key("open_port_to_public", default=False): t.ToBool,
+        t.Key("allow_non_auth_tcp", default=False): t.ToBool,
         t.Key("allow_preferred_port", default=False): t.ToBool,
         t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
         t.Key("max_memory_per_container", default=64): t.ToInt,

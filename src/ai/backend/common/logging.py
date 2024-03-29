@@ -49,11 +49,10 @@ default_pkg_ns = {
     "ai.backend": "INFO",
     "tests": "DEBUG",
 }
-
 logging_config_iv = t.Dict({
     t.Key("level", default="INFO"): loglevel_iv,
     t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
-    t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
+    t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file", "graylog")),
     t.Key(
         "console",
         default={
@@ -79,6 +78,18 @@ logging_config_iv = t.Dict({
         t.Key("ssl-enabled", default=True): t.Bool,
         t.Key("ssl-verify", default=True): t.Bool,
         # NOTE: logstash does not have format option.
+    }).allow_extra("*"),
+    t.Key("graylog", default=None): t.Null
+    | t.Dict({
+        t.Key("host"): t.String,
+        t.Key("port"): t.ToInt[1024:65535],
+        t.Key("level", default="INFO"): loglevel_iv,
+        t.Key("ssl-verify", default=False): t.Bool,
+        t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("fqdn", default=True): t.Bool,
+        t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -187,6 +198,30 @@ class LogstashHandler(logging.Handler):
             self._sock.sendall(json.dumps(log).encode("utf-8"))
 
 
+def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
+    try:
+        import graypy
+    except ImportError:
+        return None
+    drv_config = config["graylog"]
+    graylog_params = {
+        "host": drv_config["host"],
+        "port": drv_config["port"],
+        "validate": drv_config["ssl-verify"],
+        "ca_certs": drv_config["ca-certs"],
+        "keyfile": drv_config["keyfile"],
+        "certfile": drv_config["certfile"],
+    }
+    if drv_config["localname"]:
+        graylog_params["localname"] = drv_config["localname"]
+    else:
+        graylog_params["fqdn"] = drv_config["fqdn"]
+
+    graylog_handler = graypy.GELFTLSHandler(**graylog_params)
+    graylog_handler.setLevel(config["level"])
+    return graylog_handler
+
+
 class ConsoleFormatter(logging.Formatter):
     def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
         ct = self.converter(record.created)  # type: ignore
@@ -293,6 +328,7 @@ def log_worker(
     console_handler = None
     file_handler = None
     logstash_handler = None
+    graylog_handler = None
 
     if "console" in logging_config["drivers"]:
         console_handler = setup_console_log_handler(logging_config)
@@ -310,6 +346,8 @@ def log_worker(
             myhost="hostname",  # TODO: implement
         )
         logstash_handler.setLevel(logging_config["level"])
+    if "graylog" in logging_config["drivers"]:
+        graylog_handler = setup_graylog_handler(logging_config)
 
     zctx = zmq.Context()
     agg_sock = zctx.socket(zmq.PULL)
@@ -345,12 +383,17 @@ def log_worker(
                     file_handler.emit(rec)
                 if logstash_handler:
                     logstash_handler.emit(rec)
+                    print("logstash")
+                if graylog_handler:
+                    graylog_handler.emit(rec)
             except OSError:
                 # don't terminate the log worker.
                 continue
     finally:
         if logstash_handler:
             logstash_handler.cleanup()
+        if graylog_handler:
+            graylog_handler.close()
         agg_sock.close()
         zctx.term()
 
@@ -536,6 +579,7 @@ class Logger(AbstractLogger):
         _check_driver_config_exists_if_activated(cfg, "console")
         _check_driver_config_exists_if_activated(cfg, "file")
         _check_driver_config_exists_if_activated(cfg, "logstash")
+        _check_driver_config_exists_if_activated(cfg, "graylog")
 
         self.is_master = is_master
         self.log_endpoint = log_endpoint

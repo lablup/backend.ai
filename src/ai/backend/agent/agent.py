@@ -1370,35 +1370,33 @@ class AbstractAgent(
         Collect the hardware metadata from the compute plugins.
         """
         hwinfo: Dict[str, HardwareMetadata] = {}
-        tasks = []
+        tasks: list[Awaitable[tuple[DeviceName, Exception | HardwareMetadata]]] = []
 
         async def _get(
-            key: str,
+            key: DeviceName,
             plugin: AbstractComputePlugin,
-        ) -> Tuple[str, Union[Exception, HardwareMetadata]]:
+        ) -> tuple[DeviceName, Exception | HardwareMetadata]:
             try:
                 result = await plugin.get_node_hwinfo()
                 return key, result
             except Exception as e:
                 return key, e
 
-        keys = []
-        for key, plugin in self.computers.items():
-            keys.append(key)
-            tasks.append(_get(key, plugin.instance))
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for key, result in zip(keys, results):
+        for device_name, plugin in self.computers.items():
+            tasks.append(_get(device_name, plugin.instance))
+        results = await asyncio.gather(*tasks)
+        for device_name, result in results:
             match result:
                 case NotImplementedError():
                     continue
-                case BaseException():
-                    hwinfo[key] = {
+                case Exception():
+                    hwinfo[device_name] = {
                         "status": "unavailable",
                         "status_info": str(result),
                         "metadata": {},
                     }
-                case HardwareMetadata():
-                    hwinfo[key] = result
+                case dict():  # HardwareMetadata
+                    hwinfo[device_name] = result
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
@@ -1922,6 +1920,7 @@ class AbstractAgent(
                     krunner_opts.append("--debug")
                 cmdargs += [
                     "/opt/backend.ai/bin/python",
+                    "-s",
                     "-m",
                     "ai.backend.kernel",
                     *krunner_opts,
@@ -2108,7 +2107,7 @@ class AbstractAgent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
                     model["name"],
-                    ModelServiceStatus.HEALTHY,
+                    ModelServiceStatus.UNHEALTHY,
                 )
             )
 

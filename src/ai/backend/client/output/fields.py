@@ -184,6 +184,7 @@ session_fields = FieldSet([
     FieldSpec("scaling_group"),
     FieldSpec("service_ports", formatter=nested_dict_formatter),
     FieldSpec("mounts"),
+    FieldSpec("vfolder_mounts"),
     FieldSpec("occupying_slots", formatter=resource_slot_formatter),
     FieldSpec(
         "containers",
@@ -265,7 +266,6 @@ vfolder_fields = FieldSet([
     FieldSpec("status"),
     FieldSpec("unmanaged_path"),
     FieldSpec("usage_mode"),
-    FieldSpec("status"),
     FieldSpec("permission"),
     FieldSpec("ownership_type"),
     FieldSpec("max_files"),
@@ -319,4 +319,13 @@ routing_fields = FieldSet([
     FieldSpec("endpoint"),
     FieldSpec("session"),
     FieldSpec("traffic_ratio"),
+])
+
+
+quota_scope_fields = FieldSet([
+    FieldSpec("usage_bytes", formatter=sizebytes_output_formatter),
+    FieldSpec("usage_count"),
+    FieldSpec("hard_limit_bytes", formatter=sizebytes_output_formatter),
+    FieldSpec("quota_scope_id"),
+    FieldSpec("storage_host_name"),
 ])

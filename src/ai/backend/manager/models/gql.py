@@ -52,7 +52,7 @@ from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
+from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .group import (
     CreateGroup,
     DeleteGroup,
@@ -245,6 +245,8 @@ class Mutations(graphene.ObjectType):
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
+
+    modify_endpoint = ModifyEndpoint.Field()
 
 
 class Queries(graphene.ObjectType):
