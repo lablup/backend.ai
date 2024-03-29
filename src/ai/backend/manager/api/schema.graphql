@@ -8,7 +8,7 @@ type Queries {
   node(
     """The ID of the object"""
     id: ID!
-  ): AsyncNode
+  ): Node
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -24,8 +24,14 @@ type Queries {
   group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
   group(id: UUID!, domain_name: String): Group
   groups_by_name(name: String!, domain_name: String): [Group]
-  groups(domain_name: String, is_active: Boolean): [Group]
-  image(reference: String!, architecture: String = "aarch64"): Image
+  groups(
+    domain_name: String
+    is_active: Boolean
+
+    """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    type: [String] = ["GENERAL"]
+  ): [Group]
+  image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
@@ -78,13 +84,19 @@ type Queries {
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
   container_registry(hostname: String!): ContainerRegistry
   container_registries: [ContainerRegistry]
+
+  """Added in 24.03.0."""
+  model_card(id: String!): ModelCard
+
+  """Added in 24.03.0."""
+  model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
 }
 
 """
 This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
 Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/node.py
 """
-interface AsyncNode {
+interface Node {
   """The ID of the object"""
   id: ID!
 }
@@ -151,7 +163,12 @@ type ComputeContainer implements Item {
   cluster_role: String
   cluster_hostname: String
   session_id: UUID
+
+  """Deprecated since 24.03.0; use image_object.name"""
   image: String
+
+  """Added at 24.03.0"""
+  image_object: ImageNode
   architecture: String
   registry: String
   status: String
@@ -178,6 +195,39 @@ Leverages the internal Python implementation of UUID (uuid.UUID) to provide nati
 in fields, resolvers and input.
 """
 scalar UUID
+
+type ImageNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  humanized_name: String
+  tag: String
+  registry: String
+  architecture: String
+  is_local: Boolean
+  digest: String
+  labels: [KVPair]
+  size_bytes: BigInt
+  resource_limits: [ResourceLimit]
+  supported_accelerators: [String]
+}
+
+type KVPair {
+  key: String
+  value: String
+}
+
+"""
+BigInt is an extension of the regular graphene.Int scalar type
+to support integers outside the range of a signed 32-bit integer.
+"""
+scalar BigInt
+
+type ResourceLimit {
+  key: String
+  min: String
+  max: String
+}
 
 type AgentList implements PaginatedList {
   items: [Agent]!
@@ -218,7 +268,7 @@ type Domain {
   scaling_groups: [String]
 }
 
-type GroupNode implements AsyncNode {
+type GroupNode implements Node {
   """The ID of the object"""
   id: ID!
   name: String
@@ -272,7 +322,7 @@ type UserEdge {
   cursor: String!
 }
 
-type UserNode implements AsyncNode {
+type UserNode implements Node {
   """The ID of the object"""
   id: ID!
 
@@ -338,6 +388,12 @@ type Group {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added since 24.03.0."""
+  type: String
+
+  """Added since 24.03.0."""
+  per_user_image_storage_registry: JSONString
   scaling_groups: [String]
 }
 
@@ -360,23 +416,6 @@ type Image {
   hash: String
 }
 
-type KVPair {
-  key: String
-  value: String
-}
-
-"""
-BigInt is an extension of the regular graphene.Int scalar type
-to support integers outside the range of a signed 32-bit integer.
-"""
-scalar BigInt
-
-type ResourceLimit {
-  key: String
-  min: String
-  max: String
-}
-
 type User implements Item {
   id: ID
   uuid: UUID
@@ -397,6 +436,11 @@ type User implements Item {
   totp_activated: Boolean
   totp_activated_at: DateTime
   sudo_session_enabled: Boolean
+
+  """
+  Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
+  """
+  main_access_key: String
   groups: [UserGroup]
 }
 
@@ -529,9 +573,9 @@ type KeyPairResourcePolicy {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
 }
 
 type UserResourcePolicy {
@@ -544,7 +588,12 @@ type UserResourcePolicy {
 
   """Added since 24.03.1. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+
+  """
+  Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
 }
 
 type ProjectResourcePolicy {
@@ -557,7 +606,7 @@ type ProjectResourcePolicy {
 
   """Added since 24.03.1. Limitation of the quota size of project vfolders."""
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
 }
 
 type ResourcePreset {
@@ -697,7 +746,10 @@ type PredefinedAtomicPermission {
 type Endpoint implements Item {
   id: ID
   endpoint_id: UUID
-  image: String
+  image: String @deprecated(reason: "Deprecated since 23.09.9; use `image_object`")
+
+  """Added at 23.09.9"""
+  image_object: ImageNode
   domain: String
   project: String
   resource_group: String
@@ -705,8 +757,20 @@ type Endpoint implements Item {
   url: String
   model: UUID
   model_mount_destiation: String
-  created_user: UUID
-  session_owner: UUID
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
+
+  """Added at 23.09.8"""
+  created_user_email: String
+
+  """Added at 23.09.8"""
+  created_user_id: UUID
+  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8; use `session_owner_id`")
+
+  """Added at 23.09.8"""
+  session_owner_email: String
+
+  """Added at 23.09.8"""
+  session_owner_id: UUID
   tag: String
   startup_command: String
   bootstrap_script: String
@@ -795,12 +859,6 @@ type ContainerRegistry implements Node {
   config: ContainerRegistryConfig
 }
 
-"""An object with an ID"""
-interface Node {
-  """The ID of the object"""
-  id: ID!
-}
-
 type ContainerRegistryConfig {
   url: String!
   type: String!
@@ -808,6 +866,58 @@ type ContainerRegistryConfig {
   username: String
   password: String
   ssl_verify: Boolean
+}
+
+type ModelCard implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  vfolder: VirtualFolder
+  author: String
+
+  """Human readable name of the model."""
+  title: String
+  version: String
+
+  """The time the model was created."""
+  created_at: DateTime
+
+  """The last time the model was modified."""
+  modified_at: DateTime
+  description: String
+  task: String
+  category: String
+  architecture: String
+  framework: [String]
+  label: [String]
+  license: String
+  min_resource: JSONString
+  readme: String
+
+  """
+  Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
+  """
+  readme_filetype: String
+}
+
+type ModelCardConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ModelCardEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `ModelCard` and its cursor."""
+type ModelCardEdge {
+  """The item at the end of the edge"""
+  node: ModelCard
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 """All available GraphQL mutations."""
@@ -871,9 +981,9 @@ type Mutations {
   rescan_images(registry: String): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
-  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage
-  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
+  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
@@ -904,6 +1014,7 @@ type Mutations {
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
+  modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 }
 
 type ModifyAgent {
@@ -971,6 +1082,8 @@ type CreateGroup {
 }
 
 input GroupInput {
+  """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
   domain_name: String!
@@ -978,6 +1091,7 @@ input GroupInput {
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
+  per_user_image_storage_registry: JSONString = "{}"
 }
 
 type ModifyGroup {
@@ -997,6 +1111,7 @@ input ModifyGroupInput {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+  per_user_image_storage_registry: JSONString = "{}"
 }
 
 """Instead of deleting the group, just mark it as inactive."""
@@ -1061,6 +1176,7 @@ input ModifyUserInput {
   totp_activated: Boolean
   resource_policy: String
   sudo_session_enabled: Boolean
+  main_access_key: String
 }
 
 """
@@ -1212,9 +1328,9 @@ input CreateKeyPairResourcePolicyInput {
   max_containers_per_session: Int!
   idle_timeout: BigInt!
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
 }
 
 type ModifyKeyPairResourcePolicy {
@@ -1231,9 +1347,9 @@ input ModifyKeyPairResourcePolicyInput {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
 }
 
 type DeleteKeyPairResourcePolicy {
@@ -1253,6 +1369,11 @@ input CreateUserResourcePolicyInput {
 
   """Added since 24.03.1. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
+
+  """
+  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
 }
 
 type ModifyUserResourcePolicy {
@@ -1266,6 +1387,11 @@ input ModifyUserResourcePolicyInput {
 
   """Added since 24.03.1. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
+
+  """
+  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
 }
 
 type DeleteUserResourcePolicy {
@@ -1453,4 +1579,30 @@ input ModifyContainerRegistryInput {
 
 type DeleteContainerRegistry {
   container_registry: ContainerRegistry
+}
+
+type ModifyEndpoint {
+  ok: Boolean
+  msg: String
+
+  """Added at 23.09.8"""
+  endpoint: Endpoint
+}
+
+input ModifyEndpointInput {
+  resource_slots: JSONString
+  resource_opts: JSONString
+  cluster_mode: String
+  cluster_size: Int
+  desired_session_count: Int
+  image: ImageRefType
+  name: String
+  resource_group: String
+  open_to_public: Boolean
+}
+
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
 }
