@@ -1523,7 +1523,7 @@ class AgentRegistry:
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
                     else:  # maybe Decimal("Infinity"), etc.
                         total_allocs.append(Decimal(allocation))
-                slots[slot_name] = sum(total_allocs)
+                slots[slot_name] = str(sum(total_allocs))
         return slots
 
     async def finalize_running(
