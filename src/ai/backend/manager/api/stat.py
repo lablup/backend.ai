@@ -185,6 +185,6 @@ def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list
     app.on_shutdown.append(shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
-    cors.add(add_route("GET", "/utilization", get_daily_util))
-    # cors.add(add_route("GET", "/allocation", get_daily_alloc))
+    cors.add(add_route("GET", "/session/utilization", get_daily_util))
+    # cors.add(add_route("GET", "/session/allocation", get_daily_alloc))
     return app, []
