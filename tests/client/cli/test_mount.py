@@ -1,29 +1,8 @@
-from ai.backend.client.cli.session.execute import prepare_mount_arg, prepare_mount_arg_v2
+from ai.backend.client.cli.session.execute import prepare_mount_arg
 from ai.backend.common.types import MountPermission, MountTypes
 
 
-def test_vfolder_mount_v1():
-    # given
-    mount = [
-        "vf-5194d5d8",
-        "vf-70b99ea5=abcd",
-        "vf-cd6c0b91:qwer",
-        "vf-db50b713/subpath:/lorem/ipsum/dolor",
-    ]
-
-    # when
-    mount, mount_map = prepare_mount_arg(mount)
-
-    # then
-    assert set(mount) == {"vf-5194d5d8", "vf-70b99ea5", "vf-cd6c0b91", "vf-db50b713/subpath"}
-    assert mount_map == {
-        "vf-70b99ea5": "abcd",
-        "vf-cd6c0b91": "qwer",
-        "vf-db50b713/subpath": "/lorem/ipsum/dolor",
-    }
-
-
-def test_vfolder_mount_v2():
+def test_vfolder_mount():
     # given
     mount = [
         "type=bind,source=/colon\\:path/test,target=/data",
@@ -33,7 +12,7 @@ def test_vfolder_mount_v2():
     ]
 
     # when
-    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+    mount, mount_map, mount_options = prepare_mount_arg(mount)
 
     # then
     assert set(mount) == {"/colon:path/test", "/usr/abcd", "/usr/lorem", "/src/hello"}
@@ -63,14 +42,14 @@ def test_vfolder_mount_v2():
     }
 
 
-def test_vfolder_mount_v2_without_target():
+def test_vfolder_mount_without_target():
     # given
     mount = [
         "type=volume,source=vf-dd244f7f,perm=ro",
     ]
 
     # when
-    mount, mount_map, mount_options = prepare_mount_arg_v2(mount)
+    mount, mount_map, mount_options = prepare_mount_arg(mount)
 
     # then
     assert set(mount) == {"vf-dd244f7f"}
@@ -83,38 +62,7 @@ def test_vfolder_mount_v2_without_target():
     }
 
 
-def test_vfolder_mount_simple_with_v2():
-    # given
-    mount = [
-        "vf-d2340c9d",
-        "vf-a3430d85:/home/work/v1",
-        "vf-4bf23b66=/home/work/v1/tmp",
-    ]
-
-    # when
-    mount_v1, mount_map_v1 = prepare_mount_arg(mount)
-    mount_v2, mount_map_v2, mount_options_v2 = prepare_mount_arg_v2(mount)
-
-    # then
-    assert set(mount_v1) == set(mount_v2)
-    assert mount_map_v1 == mount_map_v2
-    assert mount_options_v2 == {
-        "vf-d2340c9d": {
-            "type": MountTypes.BIND,
-            "permission": None,
-        },
-        "vf-a3430d85": {
-            "type": MountTypes.BIND,
-            "permission": None,
-        },
-        "vf-4bf23b66": {
-            "type": MountTypes.BIND,
-            "permission": None,
-        },
-    }
-
-
-def test_vfolder_mount__edge_cases_with_v2():
+def test_vfolder_mount__edge_cases_with():
     # given
     mount = [
         "type=bind,source=vf-abc\\,zxc,target=/home/work",  # source with a comma
@@ -122,13 +70,13 @@ def test_vfolder_mount__edge_cases_with_v2():
     ]
 
     # when
-    mount_unescaped, *_ = prepare_mount_arg_v2(mount, escape=False)
+    mount_unescaped, *_ = prepare_mount_arg(mount, escape=False)
 
     # then
     assert set(mount_unescaped) == {"vf-abc\\,zxc", "vf-abc\\=zxc"}
 
     # when
-    mount_escaped, *_ = prepare_mount_arg_v2(mount, escape=True)
+    mount_escaped, *_ = prepare_mount_arg(mount, escape=True)
 
     # then
     assert set(mount_escaped) == {"vf-abc,zxc", "vf-abc=zxc"}

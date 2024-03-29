@@ -246,36 +246,6 @@ def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
 
 def prepare_mount_arg(
     mount_args: Optional[Sequence[str]] = None,
-) -> Tuple[Sequence[str], Mapping[str, str]]:
-    """
-    Parse the list of mount arguments into a list of
-    vfolder name and in-container mount path pairs.
-
-    :param mount_args: A list of mount arguments such as
-        [
-            "vf-5194d5d8",
-            "vf-70b99ea5=/home/work/abc",
-            "vf-cd6c0b91:/home/work/zxc",
-        ]
-    """
-    mounts = set()
-    mount_map = {}
-    if mount_args is not None:
-        for value in mount_args:
-            if "=" in value:
-                sp = value.split("=", maxsplit=1)
-            elif ":" in value:  # docker-like volume mount mapping
-                sp = value.split(":", maxsplit=1)
-            else:
-                sp = [value]
-            mounts.add(sp[0])
-            if len(sp) == 2:
-                mount_map[sp[0]] = sp[1]
-    return list(mounts), mount_map
-
-
-def prepare_mount_arg_v2(
-    mount_args: Optional[Sequence[str]] = None,
     *,
     escape: bool = True,
 ) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
@@ -487,7 +457,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map, mount_options = prepare_mount_arg_v2(mount, escape=True)
+    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
     if env_range is None:
         env_range = []  # noqa
