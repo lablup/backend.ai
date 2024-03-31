@@ -6,7 +6,6 @@ import os
 import sys
 import textwrap
 from pathlib import Path
-from typing import cast
 from weakref import WeakSet
 
 import click
@@ -17,6 +16,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.events import Key
 from textual.widgets import (
     ContentSwitcher,
     Footer,
@@ -43,8 +43,9 @@ top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
 
 class DevSetup(Static):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
+        self._non_interactive = non_interactive
         self._task = None
 
     def compose(self) -> ComposeResult:
@@ -60,9 +61,9 @@ class DevSetup(Static):
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
+        _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        ctx = DevContext(dist_info, self.app)
+        ctx = DevContext(dist_info, self.app, non_interactive=self._non_interactive)
         try:
             # prerequisites
             await ctx.check_prerequisites()
@@ -76,7 +77,7 @@ class DevSetup(Static):
             install_report = InstallReport(ctx.install_info, id="install-report")
             self.query_one("TabPane#tab-dev-report Label").remove()
             self.query_one("TabPane#tab-dev-report").mount(install_report)
-            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-dev-report"
+            self.query_one("TabbedContent", TabbedContent).active = "tab-dev-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -91,12 +92,15 @@ class DevSetup(Static):
         finally:
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
+            if self._non_interactive:
+                self.app.post_message(Key("q", "q"))
             current_log.reset(_log_token)
 
 
 class PackageSetup(Static):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
+        self._non_interactive = non_interactive
         self._task = None
 
     def compose(self) -> ComposeResult:
@@ -112,22 +116,25 @@ class PackageSetup(Static):
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
+        _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        ctx = PackageContext(dist_info, self.app)
+        ctx = PackageContext(dist_info, self.app, non_interactive=self._non_interactive)
         try:
             # prerequisites
-            if dist_info.target_path.exists():
-                input_box = InputDialog(
-                    f"The target path {dist_info.target_path} already exists. "
-                    "Overwrite it or set a different target path.",
-                    str(dist_info.target_path),
-                    allow_cancel=False,
-                )
-                _log.mount(input_box)
-                value = await input_box.wait()
-                assert value is not None
-                dist_info.target_path = Path(value)
+            if ctx.non_interactive:
+                assert dist_info.target_path is not None
+            else:
+                if dist_info.target_path.exists():
+                    input_box = InputDialog(
+                        f"The target path {dist_info.target_path} already exists. "
+                        "Overwrite it or set a different target path.",
+                        str(dist_info.target_path),
+                        allow_cancel=False,
+                    )
+                    _log.mount(input_box)
+                    value = await input_box.wait()
+                    assert value is not None
+                    dist_info.target_path = Path(value)
             await ctx.check_prerequisites()
             # install
             await ctx.install()
@@ -139,7 +146,7 @@ class PackageSetup(Static):
             install_report = InstallReport(ctx.install_info, id="install-report")
             self.query_one("TabPane#tab-pkg-report Label").remove()
             self.query_one("TabPane#tab-pkg-report").mount(install_report)
-            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-pkg-report"
+            self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -154,6 +161,8 @@ class PackageSetup(Static):
         finally:
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
+            if self._non_interactive:
+                self.app.post_message(Key("q", "q"))
             current_log.reset(_log_token)
 
 
@@ -313,6 +322,9 @@ class ModeMenu(Static):
             self._dist_info = DistInfo()
         self._enabled_menus = set()
         self._enabled_menus.add(InstallModes.PACKAGE)
+        self._non_interactive = args.non_interactive
+        if args.target_path is not None and args.target_path != str(Path.home() / "backendai"):
+            self._dist_info.target_path = Path(args.target_path)
         mode = args.mode
         try:
             self._build_root = find_build_root()
@@ -366,14 +378,22 @@ class ModeMenu(Static):
                 )
         yield Label(id="mode-desc")
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
+        self.call_later(self.update_platform_info)
+        if self._non_interactive:
+            # Trigger the selected mode immediately.
+            lv = self.app.query_one("#mode-list", ListView)
+            li = self.app.query_one(f"#mode-{self._mode.lower()}", ListItem)
+            lv.post_message(ListView.Selected(lv, li))
+
+    async def update_platform_info(self) -> None:
         os_info = await detect_os()
         text = Text()
         text.append("Platform: ")
         text.append_text(os_info.__rich__())  # type: ignore
         text.append("\n\n")
         text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
-        cast(Static, self.query_one("#heading")).update(text)
+        self.query_one("#heading", Static).update(text)
 
     def action_cursor_up(self) -> None:
         self.lv.action_cursor_up()
@@ -386,20 +406,20 @@ class ModeMenu(Static):
         if InstallModes.DEVELOP not in self._enabled_menus:
             return
         self.app.sub_title = "Development Setup"
-        switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
+        switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "dev-setup"
-        dev_setup: DevSetup = cast(DevSetup, self.app.query_one("#dev-setup"))
-        switcher.call_later(dev_setup.begin_install, self._dist_info)
+        dev_setup = self.app.query_one("#dev-setup", DevSetup)
+        self.app.call_later(dev_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
         if InstallModes.PACKAGE not in self._enabled_menus:
             return
         self.app.sub_title = "Package Setup"
-        switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
+        switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "pkg-setup"
-        pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
-        switcher.call_later(pkg_setup.begin_install, self._dist_info)
+        pkg_setup = self.app.query_one("#pkg-setup", PackageSetup)
+        self.app.call_later(pkg_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
@@ -430,6 +450,7 @@ class InstallerApp(App):
                 mode=None,
                 target_path=str(Path.home() / "backendai"),
                 show_guide=False,
+                non_interactive=False,
             )
         self._args = args
 
@@ -437,8 +458,8 @@ class InstallerApp(App):
         yield Header(show_clock=True)
         logo_text = textwrap.dedent(
             r"""
-        ____             _                  _      _    ___
-        | __ )  __ _  ___| | _____ _ __   __| |    / \  |_ _|
+        __                _                  _      _    ___
+        | |__   __ _  ___| | _____ _ __   __| |    / \  |_ _|
         |  _ \ / _` |/ __| |/ / _ \ '_ \ / _` |   / _ \  | |
         | |_) | (_| | (__|   <  __/ | | | (_| |_ / ___ \ | |
         |____/ \__,_|\___|_|\_\___|_| |_|\__,_(_)_/   \_\___|
@@ -457,12 +478,12 @@ class InstallerApp(App):
         else:
             with ContentSwitcher(id="top", initial="mode-menu"):
                 yield ModeMenu(self._args, id="mode-menu")
-                yield DevSetup(id="dev-setup")
-                yield PackageSetup(id="pkg-setup")
+                yield DevSetup(id="dev-setup", non_interactive=self._args.non_interactive)
+                yield PackageSetup(id="pkg-setup", non_interactive=self._args.non_interactive)
         yield Footer()
 
-    async def on_mount(self) -> None:
-        header: Header = cast(Header, self.query_one("Header"))
+    def on_mount(self) -> None:
+        header = self.query_one("Header", Header)
         header.tall = True
         self.title = "Backend.AI Installer"
 
@@ -495,6 +516,12 @@ class InstallerApp(App):
     help="Override the installation mode. [default: auto-detect]",
 )
 @click.option(
+    "--non-interactive",
+    is_flag=True,
+    default=False,
+    help="Run the installer non-interactively from the given CLI options.",
+)
+@click.option(
     "--target-path",
     type=str,
     default=str(Path.home() / "backendai"),
@@ -506,6 +533,12 @@ class InstallerApp(App):
     default=False,
     help="Show the post-install guide using INSTALL-INFO if present.",
 )
+@click.option(
+    "--headless",
+    is_flag=True,
+    default=False,
+    help="Run the installer as headless mode.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -513,6 +546,8 @@ def main(
     mode: InstallModes | None,
     target_path: str,
     show_guide: bool,
+    non_interactive: bool,
+    headless: bool,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -528,6 +563,7 @@ def main(
         mode=mode,
         target_path=target_path,
         show_guide=show_guide,
+        non_interactive=non_interactive,
     )
     app = InstallerApp(args)
-    app.run()
+    app.run(headless=headless)

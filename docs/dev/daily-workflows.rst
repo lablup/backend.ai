@@ -540,6 +540,49 @@ Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'
    may be owned by root and running ``pants`` as the user privilege would not work.
    In such cases, remove the directories with ``sudo`` and retry.
 
+Resolve the error message 'Pants is not abailable for your platform', When installing Backend.AI with pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When installing Backend.AI, you may find the following error message saying 'Pants is not available for your platform' if you have installed Pants 2.17 or older with prior versions of Backend.AI.
+
+.. code-block:: text
+
+   [INFO] Bootstrapping the Pants build system...
+   Pants system command is already installed.
+   Failed to fetch https://binaries.pantsbuild.org/tags/pantsbuild.pants/release_2.19.0: [22] HTTP response code said error (The requested URL returned error: 404)
+   Bootstrapping Pants 2.19.0 using cpython 3.9.15
+   Installing pantsbuild.pants==2.19.0 into a virtual environment at /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.4/65.4 KB 3.3 MB/s eta 0:00:00
+   ERROR: Could not find a version that satisfies the requirement pantsbuild.pants==2.19.0 (from versions: 0.0.17, 0.0.18, 0.0.20, 0.0.21, 0.0.22, ... (a long list of versions) ..., 2.17.0,
+   2.17.1rc0, 2.17.1rc1, 2.17.1rc2, 2.17.1rc3, 2.17.1, 2.18.0.dev0, 2.18.0.dev1, 2.18.0.dev3, 2.18.0.dev4, 2.18.0.dev5, 2.18.0.dev6, 2.18.0.dev7, 2.18.0a0)
+   ERROR: No matching distribution found for pantsbuild.pants==2.19.0
+   Install failed: Command '['/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/bin/python', '-sE', '-m', 'pip', '--disable-pip-versi
+   on-check', '--no-python-version-warning', '--log', PosixPath('/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/pants-install.log'
+   ), 'install', '--quiet', '--find-links', 'file:///home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/find_links/2.19.0/e430175b/index.html', '--p
+   rogress-bar', 'off', 'pantsbuild.pants==2.19.0']' returned non-zero exit status 1.
+   More information can be found in the log at: /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/logs/install.log
+
+   Error: Isolates your Pants from the elements.
+
+   Please select from the following boot commands:
+
+   <default>: Detects the current Pants installation and launches it.
+   bootstrap-tools: Introspection tools for the Pants bootstrap process.
+   pants: Runs a hermetic Pants installation.
+   pants-debug: Runs a hermetic Pants installation with a debug server for debugging Pants code.
+   update: Update scie-pants.
+
+   You can select a boot command by passing it as the 1st argument or else by setting the SCIE_BOOT environment variable.
+
+   ERROR: Failed to establish atomic directory /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/locks/install-a4f15e2d2c97473883ec33b4ee0f9d11f99dcf5bee63
+   8b1cc7a0270d55d0ec8d. Population of work directory failed: Boot binding command failed: exit status: 1
+
+   [ERROR] Cannot proceed the installation because Pants is not available for your platform!
+
+To resolve this error, `reinstall or upgrade Pants <https://www.pantsbuild.org/2.19/docs/getting-started/installing-pants>`_.
+As of the Pants 2.18.0 release, they no longer use the Python Package Index but GitHub releases to distribute the binary builds.
+
+
 Resolving missing directories error when running Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

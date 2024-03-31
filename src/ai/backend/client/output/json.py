@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Mapping, Optional, Sequence, TypeVar
 
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.common.types import ResultSet
+
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
 _json_opts: Mapping[str, Any] = {"indent": 2}
@@ -70,6 +73,12 @@ class JsonOutputHandler(BaseOutputHandler):
                 **_json_opts,
             )
         )
+
+    def print_result_set(
+        self,
+        result_set: ResultSet,
+    ) -> None:
+        print(json.dumps(result_set))
 
     def print_list(
         self,
@@ -189,14 +198,30 @@ class JsonOutputHandler(BaseOutputHandler):
         self,
         error: Exception,
     ) -> None:
-        print(
-            json.dumps(
-                {
-                    "error": str(error),
-                },
-                **_json_opts,
-            )
-        )
+        match error:
+            case BackendAPIError():
+                print(
+                    json.dumps(
+                        {
+                            "error": error.data["title"],
+                            "api": {
+                                "status": error.status,
+                                "reason": error.reason,
+                                **error.data,
+                            },
+                        },
+                        **_json_opts,
+                    )
+                )
+            case _:
+                print(
+                    json.dumps(
+                        {
+                            "error": str(error),
+                        },
+                        **_json_opts,
+                    )
+                )
 
     def print_fail(
         self,

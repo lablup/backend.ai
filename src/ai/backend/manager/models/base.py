@@ -22,6 +22,7 @@ from typing import (
     NamedTuple,
     Optional,
     Protocol,
+    Self,
     Sequence,
     Type,
     TypeVar,
@@ -54,7 +55,6 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
-    BinarySize,
     EndpointId,
     JSONSerializableMixin,
     KernelId,
@@ -78,6 +78,8 @@ from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import Dialect
+
     from .gql import GraphQueryContext
     from .user import UserRole
 
@@ -113,7 +115,16 @@ def zero_if_none(val):
     return 0 if val is None else val
 
 
-class EnumType(TypeDecorator, SchemaType):
+class FixtureOpModes(enum.StrEnum):
+    INSERT = "insert"
+    UPDATE = "update"
+
+
+T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
+T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
+
+
+class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -124,8 +135,7 @@ class EnumType(TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts):
-        assert issubclass(enum_cls, enum.Enum)
+    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -133,13 +143,21 @@ class EnumType(TypeDecorator, SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[T_Enum],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.name if value else None
 
-    def process_result_value(self, value: str, dialect):
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return EnumType(self._enum_cls, **self._opts)
 
     @property
@@ -147,7 +165,7 @@ class EnumType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
-class EnumValueType(TypeDecorator, SchemaType):
+class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -158,8 +176,7 @@ class EnumValueType(TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts):
-        assert issubclass(enum_cls, enum.Enum)
+    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -167,17 +184,60 @@ class EnumValueType(TypeDecorator, SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[T_Enum],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.value if value else None
 
-    def process_result_value(self, value: str, dialect):
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return EnumValueType(self._enum_cls, **self._opts)
 
     @property
-    def python_type(self):
+    def python_type(self) -> T_Enum:
+        return self._enum_class
+
+
+class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+    """
+    Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
+    """
+
+    impl = sa.VARCHAR
+    cache_ok = True
+
+    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+        self._opts = opts
+        super().__init__(length=64, **opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(
+        self,
+        value: Optional[T_StrEnum],
+        dialect: Dialect,
+    ) -> Optional[str]:
+        return value.value if value is not None else None
+
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[T_StrEnum]:
+        return self._enum_cls(value) if value is not None else None
+
+    def copy(self, **kw) -> type[Self]:
+        return StrEnumType(self._enum_cls, **self._opts)
+
+    @property
+    def python_type(self) -> T_StrEnum:
         return self._enum_class
 
 
@@ -199,13 +259,21 @@ class CurvePublicKeyColumn(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(sa.String(40))
 
-    def process_bind_param(self, value: Optional[PublicKey], dialect) -> Optional[str]:
+    def process_bind_param(
+        self,
+        value: Optional[PublicKey],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return value.decode("ascii") if value else None
 
-    def process_result_value(self, raw_value: str | None, dialect) -> Optional[PublicKey]:
-        if raw_value is None:
+    def process_result_value(
+        self,
+        value: str | None,
+        dialect: Dialect,
+    ) -> Optional[PublicKey]:
+        if value is None:
             return None
-        return PublicKey(raw_value.encode("ascii"))
+        return PublicKey(value.encode("ascii"))
 
 
 class QuotaScopeIDType(TypeDecorator):
@@ -219,11 +287,19 @@ class QuotaScopeIDType(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(sa.String(64))
 
-    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+    def process_bind_param(
+        self,
+        value: Optional[QuotaScopeID],
+        dialect: Dialect,
+    ) -> Optional[str]:
         return str(value) if value else None
 
-    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
-        return QuotaScopeID.parse(raw_value)
+    def process_result_value(
+        self,
+        value: Optional[str],
+        dialect: Dialect,
+    ) -> Optional[QuotaScopeID]:
+        return QuotaScopeID.parse(value) if value else None
 
 
 class ResourceSlotColumn(TypeDecorator):
@@ -235,8 +311,10 @@ class ResourceSlotColumn(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Union[Mapping, ResourceSlot, None], dialect
-    ) -> Optional[Mapping]:
+        self,
+        value: Optional[ResourceSlot],
+        dialect: Dialect,
+    ) -> Optional[Mapping[str, str]]:
         if value is None:
             return None
         if isinstance(value, ResourceSlot):
@@ -244,19 +322,17 @@ class ResourceSlotColumn(TypeDecorator):
         return value
 
     def process_result_value(
-        self, raw_value: dict[str, str] | None, dialect
-    ) -> ResourceSlot | None:
-        if raw_value is None:
+        self,
+        value: Optional[dict[str, str]],
+        dialect: Dialect,
+    ) -> Optional[ResourceSlot]:
+        if value is None:
             return None
-        # legacy handling
-        interim_value: Dict[str, Any] = raw_value
-        mem = raw_value.get("mem")
-        if isinstance(mem, str) and not mem.isdigit():
-            interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value)
-
-    def copy(self):
-        return ResourceSlotColumn()
+        try:
+            return ResourceSlot.from_json(value)
+        except ArithmeticError:
+            # for legacy-compat scenario
+            return ResourceSlot.from_user_input(value, None)
 
 
 class StructuredJSONColumn(TypeDecorator):
@@ -271,13 +347,17 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON)
         else:
             return super().load_dialect_impl(dialect)
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self,
+        value: Optional[Any],
+        dialect: Dialect,
+    ) -> Optional[Any]:
         if value is None:
             return self._schema.check({})
         try:
@@ -289,12 +369,16 @@ class StructuredJSONColumn(TypeDecorator):
             )
         return value
 
-    def process_result_value(self, raw_value, dialect):
-        if raw_value is None:
+    def process_result_value(
+        self,
+        value: Optional[Any],
+        dialect: Dialect,
+    ) -> Optional[Any]:
+        if value is None:
             return self._schema.check({})
-        return self._schema.check(raw_value)
+        return self._schema.check(value)
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONColumn(self._schema)
 
 
@@ -313,10 +397,10 @@ class StructuredJSONObjectColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         return self._schema.to_json(value)
 
-    def process_result_value(self, raw_value, dialect):
-        return self._schema.from_json(raw_value)
+    def process_result_value(self, value, dialect):
+        return self._schema.from_json(value)
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONObjectColumn(self._schema)
 
 
@@ -336,12 +420,12 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
 
-    def process_result_value(self, raw_value, dialect):
-        if raw_value is None:
+    def process_result_value(self, value, dialect):
+        if value is None:
             return []
-        return [self._schema.from_json(item) for item in raw_value]
+        return [self._schema.from_json(item) for item in value]
 
-    def copy(self):
+    def copy(self, **kw) -> type[Self]:
         return StructuredJSONObjectListColumn(self._schema)
 
 
@@ -353,12 +437,10 @@ class URLColumn(TypeDecorator):
     impl = sa.types.UnicodeText
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
-        if isinstance(value, yarl.URL):
-            return str(value)
-        return value
+    def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
+        return str(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
         if value is not None:
@@ -401,16 +483,20 @@ class PermissionListColumn(TypeDecorator):
         self._perm_type = perm_type
 
     @overload
-    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]: ...
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission], dialect: Dialect
+    ) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect: Dialect) -> List[str]: ...
 
     def process_bind_param(
-        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+        self,
+        value: Sequence[AbstractPermission] | Sequence[str] | None,
+        dialect: Dialect,
     ) -> List[str]:
         if value is None:
             return []
@@ -419,7 +505,11 @@ class PermissionListColumn(TypeDecorator):
         except ValueError:
             raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
 
-    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
+    def process_result_value(
+        self,
+        value: Sequence[str] | None,
+        dialect: Dialect,
+    ) -> set[AbstractPermission]:
         if value is None:
             return set()
         return set(self._perm_type(perm) for perm in value)
@@ -434,7 +524,11 @@ class VFolderHostPermissionColumn(TypeDecorator):
     cache_ok = True
     perm_col = PermissionListColumn(VFolderHostPermission)
 
-    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+    def process_bind_param(
+        self,
+        value: Mapping[str, Any] | None,
+        dialect: Dialect,
+    ) -> Mapping[str, Any]:
         if value is None:
             return {}
         return {
@@ -442,7 +536,9 @@ class VFolderHostPermissionColumn(TypeDecorator):
         }
 
     def process_result_value(
-        self, value: Mapping[str, Any] | None, dialect
+        self,
+        value: Mapping[str, Any] | None,
+        dialect: Dialect,
     ) -> VFolderHostPermissionMap:
         if value is None:
             return VFolderHostPermissionMap()
@@ -1074,27 +1170,84 @@ def set_if_set(
 
 async def populate_fixture(
     engine: SAEngine,
-    fixture_data: Mapping[str, Sequence[Dict[str, Any]]],
-    *,
-    ignore_unique_violation: bool = False,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
+        if table_name.startswith("__"):
+            # skip reserved names like "__mode"
+            continue
+        assert not isinstance(rows, str)
         table: sa.Table = getattr(models, table_name)
         assert isinstance(table, sa.Table)
+        if not rows:
+            return
+        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
         async with engine.begin() as conn:
+            # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, EnumType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls[row[col.name]]
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls[row[col.name]]
                 elif isinstance(col.type, EnumValueType):
                     for row in rows:
-                        row[col.name] = col.type._enum_cls(row[col.name])
+                        if col.name in row:
+                            row[col.name] = col.type._enum_cls(row[col.name])
                 elif isinstance(
                     col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
                 ):
                     for row in rows:
-                        row[col.name] = col.type._schema.from_json(row[col.name])
-            await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+                        if col.name in row:
+                            row[col.name] = col.type._schema.from_json(row[col.name])
+
+            match op_mode:
+                case FixtureOpModes.INSERT:
+                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
+                    await conn.execute(stmt)
+                case FixtureOpModes.UPDATE:
+                    stmt = sa.update(table)
+                    pkcols = []
+                    for pkidx, pkcol in enumerate(table.primary_key):
+                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        pkcols.append(pkcol)
+                    update_data = []
+                    # Extract the data column names from the FIRST row
+                    # (Therefore a fixture dataset for a single table in the udpate mode should
+                    # have consistent set of attributes!)
+                    try:
+                        datacols: list[sa.Column] = [
+                            getattr(table.columns, name)
+                            for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
+                        ]
+                    except AttributeError as e:
+                        raise ValueError(
+                            f"fixture for table {table_name!r} has an invalid column name: "
+                            f"{e.args[0]!r}"
+                        )
+                    stmt = stmt.values({
+                        datacol.name: sa.bindparam(datacol.name) for datacol in datacols
+                    })
+                    for row in rows:
+                        update_row = {}
+                        for pkidx, pkcol in enumerate(pkcols):
+                            try:
+                                update_row[f"_pk_{pkidx}"] = row[pkcol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing primary key column for update"
+                                    f"query: {pkcol.name!r}"
+                                )
+                        for datacol in datacols:
+                            try:
+                                update_row[datacol.name] = row[datacol.name]
+                            except KeyError:
+                                raise ValueError(
+                                    f"fixture for table {table_name!r} has a missing data column for update"
+                                    f"query: {datacol.name!r}"
+                                )
+                        update_data.append(update_row)
+                    await conn.execute(stmt, update_data)
 
 
 class InferenceSessionError(graphene.ObjectType):
@@ -1175,8 +1328,8 @@ def _build_sql_stmt_from_connection_args(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
 ) -> tuple[sa.sql.Select, list[WhereClauseType]]:
@@ -1189,8 +1342,8 @@ def _build_sql_stmt_from_connection_args(
     id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
-        parser = QueryOrderParser()
-        ordering_item_list = parser.parse_order(orm_class, order_expr)
+        parser = order_expr.parser
+        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
 
     # Apply SQL order_by
     match pagination_order:
@@ -1229,8 +1382,8 @@ def _build_sql_stmt_from_connection_args(
         stmt = stmt.limit(requested_page_size + 1)
 
     if filter_expr is not None:
-        condition_parser = QueryFilterParser()
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+        condition_parser = filter_expr.parser
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
 
     for cond in conditions:
         stmt = stmt.where(cond)
@@ -1241,8 +1394,8 @@ def _build_sql_stmt_from_sql_arg(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     *,
     limit: int | None = None,
     offset: int | None = None,
@@ -1251,22 +1404,23 @@ def _build_sql_stmt_from_sql_arg(
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
-        parser = QueryOrderParser()
-        stmt = parser.append_ordering(stmt, order_expr)
+        parser = order_expr.parser
+        stmt = parser.append_ordering(stmt, order_expr.expr)
 
     # default order_by id column
     stmt = stmt.order_by(id_column.asc())
 
     if filter_expr is not None:
-        condition_parser = QueryFilterParser()
-        # stmt = condition_parser.append_filter(stmt, filter_expr)
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+        condition_parser = filter_expr.parser
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
 
     if limit is not None:
         stmt = stmt.limit(limit)
 
     if offset is not None:
         stmt = stmt.offset(offset)
+    for cond in conditions:
+        stmt = stmt.where(cond)
     return stmt, conditions
 
 
@@ -1278,12 +1432,22 @@ class GraphQLConnectionSQLInfo(NamedTuple):
     requested_page_size: int | None
 
 
+class FilterExprArg(NamedTuple):
+    expr: str
+    parser: QueryFilterParser
+
+
+class OrderExprArg(NamedTuple):
+    expr: str
+    parser: QueryOrderParser
+
+
 def generate_sql_info_for_gql_connection(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
-    filter_expr: str | None = None,
-    order_expr: str | None = None,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
     offset: int | None = None,
     after: str | None = None,
     first: int | None = None,

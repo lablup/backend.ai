@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Herzlich willkommen,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Willkommen, {{ userName }}.",
       "Summary": "Zusammenfassung",
       "Sessions": "Sitzungen",
       "Import&Run": "Importieren und ausführen",
@@ -61,7 +60,11 @@
       "PasswordChangePlace": "Klicken Sie auf das Personensymbol in der oberen Leiste und rufen Sie das Menü \"Mein Konto\" auf.",
       "Notifications": "Benachrichtigungen",
       "Tasks": "Aufgaben",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Daten",
+      "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
+      "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
+      "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -240,17 +243,23 @@
       "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
       "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
       "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Wenn Sie einen größeren Wert als die derzeit verfügbaren Ressourcen festlegen, wird die Sitzungserstellung in der Warteschlange verzögert, bis sie verfügbar wird.",
+      "SessionName": "Sitzungsname",
+      "ResetFormConfirm": "Möchten Sie alle Ihre Einträge zurücksetzen?",
+      "TemplateAndHistory": "Vorlagen",
+      "ScheduleTimeSimple": "Startzeit einstellen",
       "ResourceAllocationPerContainer": "Ressourcenzuweisung pro Container",
       "NumberOfContainer": "Nummer des Behälters",
+      "ErrorCanNotExceedRemaining": "Kann nicht auf einen Wert gesetzt werden, der größer ist als die verbleibenden Ressourcen ({{Betrag}}).",
       "EnterEnvironmentVariable": "Variablenname eingeben",
       "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
-      "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert."
+      "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
+      "Template": "Sitzungsvorlage",
+      "EnableAutomaticShmem": "Automatischer gemeinsamer Speicher",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Nur Ganzzahlen sind zulässig, wenn die Clustergröße nicht weniger als 2 beträgt.",
+      "StartAfter": "Beginnen Sie nach:",
+      "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -399,7 +408,10 @@
     "Unset": "Nicht eingestellt",
     "OK": "OK",
     "Commit": "Commit",
-    "EnterManually": "Manuell eingeben"
+    "EnterManually": "Manuell eingeben",
+    "Download": "Herunterladen",
+    "Clone": "Klonen",
+    "Config": "Konfigurieren Sie"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -443,7 +455,10 @@
     "Enabled": "aktiviert",
     "StorageProxies": "Speicher",
     "None": "Keine",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Bild",
+    "All": "Alle",
+    "InProgress": "In Arbeit",
+    "Session": "Sitzung"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -521,7 +536,8 @@
     "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
     "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Sudo-Sitzung aktivieren",
+    "MainAccessKey": "Hauptzugangsschlüssel"
   },
   "data": {
     "Folders": "Ordner",
@@ -687,7 +703,11 @@
     "Pipeline": "Pipeline-Ordner",
     "DialogDataFolder": "Pipeline-spezifische Ordner, die bei der Erstellung von Pipelines in FastTrack automatisch erstellt werden.",
     "DialogModelFolder": "Sie können Modelle bedienen und verwalten.",
-    "SearchByName": "Suche mit Name"
+    "SearchByName": "Suche mit Name",
+    "ModelStore": "Modellladen",
+    "New": "Neu",
+    "Add": "hinzufügen",
+    "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich."
   },
   "dialog": {
     "warning": {
@@ -832,7 +852,14 @@
     "DescAutoLogout": "Melden Sie sich automatisch ab, wenn alle angemeldeten Seiten geschlossen sind, mit Ausnahme von sitzungsbasierten Seiten für Apps (z. B. Jupyter Notebook, Webterminal usw.)",
     "SSHKeypairEnterManuallyFinished": "SSH-Keypair wurde erfolgreich registriert.",
     "BootstrapScriptDescription": "Das Bootstrap-Skript wird nur einmal nach der Erstellung der Sitzung ausgeführt",
-    "SSHKeypairEnterManually": "SSH-Schlüsselpaar"
+    "SSHKeypairEnterManually": "SSH-Schlüsselpaar",
+    "MyKeypairInfo": "Meine Schlüsselpaarinformationen",
+    "DescMyKeypairInfo": "Siehe meine Schlüsselpaarinformationen",
+    "DarkMode": "Dunkler Modus",
+    "LightMode": "Lichtmodus",
+    "UseSystemSetting": "Verwenden Sie die Systemeinstellungen",
+    "DescThemeMode": "Passen Sie an, wie die Backend.AI-WebUI auf Ihrem Gerät aussieht.",
+    "ThemeMode": "Themenmodus"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -854,7 +881,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Fehlertyp",
     "LogMessageRemoved": "Protokollnachrichten wurden entfernt.",
-    "NoLogToDisplay": "Keine Protokolle anzeigen"
+    "NoLogToDisplay": "Keine Protokolle anzeigen",
+    "ShowOnlyError": "Nur Anzeigefehler",
+    "SearchLogs": "Protokolle durchsuchen"
   },
   "resourcePolicy": {
     "Resources": "Ressourcen",
@@ -916,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registry erfolgreich geändert.",
     "NoRegistryToDisplay": "Keine Registrierungen anzeigen",
     "ModifyRegistry": "Registry ändern",
-    "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?"
+    "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?",
+    "DescURLFormat": "Ungültiger URL-Typ"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -1056,8 +1086,6 @@
     "Scaling": "Skalierung",
     "AllowAgentSideRegistration": "Agentseitige Registrierung zulassen",
     "DescAllowAgentSideRegistration": "Erlauben Sie dem Agenten, sich beim Manager zu registrieren. <br/> Nur verwenden, wenn der Backend.AI-Cluster an einem sicheren Ort verwaltet wird.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "CUDA-GPU-Unterstützung",
     "DescCUDAGPUsupport": "NVIDIA CUDA-GPU-Unterstützung. <br/> Erfordert Backend.AI CUDA-Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Deaktiviert, weil das System das Fractional GPU-Plugin verwendet",
     "ROCMGPUsupport": "ROCm-GPU-Unterstützung",
@@ -1107,13 +1135,20 @@
     "OverlayNetworkSettings": "Overlay-Netzwerkeinstellungen",
     "OverlayNetworkSettingsDescription": "Ein Overlay-Netzwerk ist ein Computernetzwerk, das auf ein anderes Netzwerk aufgesetzt wird. Das Overlay-Netzwerk schafft ein verteiltes Netzwerk zwischen mehreren Docker-Daemon-Hosts des Backend.AI-Managers.",
     "MTUDescription": "Maximale Übertragungseinheit, die Größe des größten Pakets, das ein Netzprotokoll übertragen kann.",
-    "OutOfRange": "Außerhalb der Reichweite."
+    "OutOfRange": "Außerhalb der Reichweite.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Open Source CUDA GPU Unterstützung",
+    "ShowOnlyChanged": "Nur Änderungen anzeigen"
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
     "Visit": "Besuch",
     "SeeDetail": "Siehe Detail",
-    "Initializing": "Initialisieren..."
+    "Initializing": "Initialisieren...",
+    "NoNotification": "Keine Benachrichtigung.",
+    "Notifications": "Benachrichtigungen",
+    "ClearNotifications": "Klare Benachrichtigungen",
+    "AreYouSureToClearAllNotifications": "Sind Sie sicher, dass Sie alle Benachrichtigungen gelöscht haben?"
   },
   "information": {
     "Core": "Ader",
@@ -1249,7 +1284,7 @@
     "CouldNotCopyText": "Text konnte nicht kopiert werden:",
     "NotebookBadgeURL": "Notizbuch-URL",
     "GetAndRunNotebook": "Importieren und ausführen",
-    "ImportGithubRepo": "Github-Repository importieren",
+    "ImportGithubRepo": "GitHub-Repository importieren",
     "GitHubURL": "GitHub-URL",
     "GetToFolder": "Ordner aufrufen",
     "RepoWillBeFolder": "Importierte GitHub-Repositorys werden in Ordner konvertiert und können beim Sitzungsstart gemountet werden.",
@@ -1263,13 +1298,13 @@
     "FolderName": "Name des importierten Ordners:",
     "NotebookBadgeCodeHTML": "Notebook-Badge-Code (HTML)",
     "NotebookBadgeCodeMarkdown": "Notebook-Badge-Code (Abschlag)",
-    "GithubInternalError": "Github Interner Fehler.",
-    "GithubAPILimitError": "Github API-Beschränkungsfehler.",
-    "GithubAPIEtcError": "Github Server Problem.",
-    "ImportGitlabRepo": "Gitlab-Repository importieren",
-    "GitlabRepoWillBeFolder": "Importierte Gitlab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
-    "GitlabURL": "Gitlab-URL",
-    "GitlabDefaultBranch": "Gitlab-Zweigname"
+    "GithubInternalError": "GitHub Interner Fehler.",
+    "GithubAPILimitError": "GitHub API-Beschränkungsfehler.",
+    "GithubAPIEtcError": "GitHub Server Problem.",
+    "ImportGitlabRepo": "GitLab-Repository importieren",
+    "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
+    "GitlabURL": "GitLab-URL",
+    "GitlabDefaultBranch": "GitLab-Zweigname"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik für diesen Monat",
@@ -1382,7 +1417,14 @@
     "RoutingsCount": "Routings zählen",
     "Active/Total": "Aktiv/Gesamt",
     "Public": "Öffentlich",
-    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung"
+    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
+    "Owner": "Eigentümer",
+    "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert.",
+    "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen.",
+    "FailedToUpdateService": "Der Dienst konnte nicht aktualisiert werden.",
+    "ServiceCreated": "Der Modelldienst {{ name }} wurde erfolgreich erstellt.",
+    "ServiceUpdated": "Der Modelldienst {{ name }} wurde erfolgreich aktualisiert.",
+    "ServiceTerminated": "Der Modelldienst {{ name }} wurde erfolgreich beendet."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1433,10 +1475,48 @@
     "TurnOffTotp": "Deaktivieren Sie die Zwei-Faktor-Authentifizierung",
     "ConfirmTotpRemovalBody": "Sind Sie sicher, dass Sie die Zwei-Faktor-Authentifizierung nicht verwenden möchten?",
     "RemoveTotpSetupCompleted": "Deaktivierte 2FA",
-    "OTP": "Einmaliges Passwort"
+    "OTP": "Einmaliges Passwort",
+    "EnterConfirmationCode": "Geben Sie nun zur Überprüfung das vom Authentifikator generierte OTP ein.",
+    "RequireOTP": "Schreiben Sie OTP."
   },
   "OpenVSCodeRemote": "Lokalen Visual Studio Code öffnen",
   "inputLimit": {
     "4to64chars": "(4~64 Zeichen)"
+  },
+  "modelStore": {
+    "Description": "Beschreibung",
+    "Model": "Modell",
+    "FilterByName": "Nach Namen filtern",
+    "ServiceDetails": "Servicedetails",
+    "Metadata": "Metadaten",
+    "ModelPath": "Modellpfad",
+    "SearchModels": "Modelle suchen",
+    "MinResource": "Min. Ressource",
+    "LastModified": "Zuletzt bearbeitet",
+    "Created": "Erstellt",
+    "Version": "Ausführung",
+    "Author": "Autor",
+    "MaxRetries": "Max. Wiederholungsversuche",
+    "Path": "Weg",
+    "HealthCheck": "Gesundheitskontrolle",
+    "Port": "Hafen",
+    "StartCommand": "Befehl starten",
+    "PreStartActions": "Aktionen vor dem Start",
+    "Framework": "Rahmenwerk",
+    "Category": "Kategorien",
+    "Label": "Etikett",
+    "Task": "Aufgabe",
+    "CloneAsFolder": "Als Ordner klonen",
+    "CloneSuccess": "Die Klonanfrage wurde erfolgreich gesendet.",
+    "CloneInfo": "Er wird als Ihr Benutzertyp-Ordner geklont.",
+    "category": "Kategorie"
+  },
+  "table": {
+    "SettingTable": "Sitzordnung bei Tisch",
+    "SelectColumnToDisplay": "Wählen Sie die anzuzeigenden Spalten aus",
+    "SearchTableColumn": "Tabellenspalten durchsuchen"
+  },
+  "setting": {
+    "SearchPlaceholder": "Geben Sie einen Suchbegriff ein"
   }
 }

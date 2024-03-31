@@ -27,7 +27,7 @@ metadata = sa.MetaData(naming_convention=convention)
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-class ProjectType(str, enum.Enum):
+class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
 
@@ -107,7 +107,7 @@ association_groups_users = sa.Table(
 )
 
 
-projecttype_choices = list(map(lambda v: v.value, ProjectType))
+projecttype_choices = list(map(str, ProjectType))
 projecttype = postgresql.ENUM(
     *projecttype_choices,
     name="projecttype",

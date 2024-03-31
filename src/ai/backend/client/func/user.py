@@ -67,7 +67,7 @@ _user_info_fields = (
 )
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """
     The role (privilege level) of users.
     """
@@ -78,7 +78,7 @@ class UserRole(str, enum.Enum):
     MONITOR = "monitor"
 
 
-class UserStatus(enum.Enum):
+class UserStatus(enum.StrEnum):
     """
     The detailed status of users to represent the signup process and account lifecycles.
     """
