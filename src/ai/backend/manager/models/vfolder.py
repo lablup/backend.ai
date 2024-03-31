@@ -812,7 +812,7 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options[key]["permission"]:
+            match requested_perm := requested_mount_options.get(key, {}).get("permission"):
                 case MountPermission.READ_ONLY:
                     mount_perm = MountPermission.READ_ONLY
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
