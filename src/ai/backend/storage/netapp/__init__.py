@@ -80,7 +80,15 @@ class QTreeQuotaModel(BaseQuotaModel):
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         self.netapp_client.check_job_result(result, [])
         if options is not None:
-            await self.update_quota_scope(quota_scope_id, options)
+            result = await self.netapp_client.set_quota_rule(
+                self.svm_id,
+                self.volume_id,
+                qspath.name,
+                options,
+            )
+        self.netapp_client.check_job_result(result, [])
+        result = await self.netapp_client.enable_quota(self.volume_id)
+        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     async def describe_quota_scope(
         self,
@@ -97,15 +105,13 @@ class QTreeQuotaModel(BaseQuotaModel):
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        result = await self.netapp_client.set_quota_rule(
+        result = await self.netapp_client.update_quota_rule(
             self.svm_id,
             self.volume_id,
             qspath.name,
             config,
         )
         self.netapp_client.check_job_result(result, [])
-        result = await self.netapp_client.enable_quota(self.volume_id)
-        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     # FIXME: How do we implement unset_quota() for NetApp?
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
@@ -419,6 +425,8 @@ class NetAppVolume(BaseVolume):
             self.ontap_endpoint,
             self.config["netapp_ontap_user"],
             self.config["netapp_ontap_password"],
+            self.config["netapp_user_id"],
+            self.config["netapp_group_id"],
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
