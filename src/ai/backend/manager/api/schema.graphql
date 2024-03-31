@@ -31,7 +31,7 @@ type Queries {
     """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
-  image(reference: String!, architecture: String = "aarch64"): Image
+  image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
@@ -973,9 +973,9 @@ type Mutations {
   rescan_images(registry: String): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
-  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage
-  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
+  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
