@@ -29,6 +29,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MountPermission,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
@@ -38,7 +39,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..api.exceptions import (
+    InvalidAPIParameters,
+    VFolderNotFound,
+    VFolderOperationFailed,
+    VFolderPermissionError,
+)
 from ..audit_log_util import update_after_data
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
@@ -647,6 +653,7 @@ async def prepare_vfolder_mounts(
     resource_policy: Mapping[str, Any],
     requested_mount_references: Sequence[str | uuid.UUID],
     requested_mount_reference_map: Mapping[str | uuid.UUID, str],
+    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
@@ -657,6 +664,11 @@ async def prepare_vfolder_mounts(
     ]
     requested_mount_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+    requested_mount_options: dict[str, dict[str, Any]] = {
+        name: options
+        for name, options in requested_mount_reference_options.items()
+        if isinstance(name, str)
     }
 
     vfolder_ids_to_resolve = [
@@ -673,6 +685,8 @@ async def prepare_vfolder_mounts(
         requested_mounts.append(name)
         if path := requested_mount_reference_map.get(vfid):
             requested_mount_map[name] = path
+        if options := requested_mount_reference_options.get(vfid):
+            requested_mount_options[name] = options
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -799,6 +813,18 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
+            match requested_perm := requested_mount_options[key]["permission"]:
+                case MountPermission.READ_ONLY:
+                    mount_perm = MountPermission.READ_ONLY
+                case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
+                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                        raise VFolderPermissionError(
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"but attempted with '{requested_perm.value}' mode."
+                        )
+                    mount_perm = requested_perm
+                case _:  # None if unset
+                    mount_perm = vfolder["permission"]
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
@@ -806,7 +832,7 @@ async def prepare_vfolder_mounts(
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
-                    mount_perm=vfolder["permission"],
+                    mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
                 )
             )
