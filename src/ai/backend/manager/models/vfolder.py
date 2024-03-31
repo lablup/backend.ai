@@ -39,13 +39,13 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
+from ..api import audit_log
 from ..api.exceptions import (
     InvalidAPIParameters,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ..audit_log_util import update_after_data
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
     RESERVED_VFOLDER_PATTERNS,
@@ -891,7 +891,7 @@ async def update_vfolder_status(
                 updated_rows_list[0] if len(updated_rows_list) == 1 else updated_rows_list
             )
 
-            update_after_data(after_data_to_insert)
+            audit_log.update_after_data(after_data_to_insert)
 
     await execute_with_retry(_update)
     if do_log:

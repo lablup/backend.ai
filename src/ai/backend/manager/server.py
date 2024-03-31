@@ -54,6 +54,7 @@ from ai.backend.common.utils import env_info
 from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
+from .api.audit_log import audit_log_middleware
 from .api.context import RootContext
 from .api.exceptions import (
     BackendError,
@@ -763,6 +764,7 @@ def build_root_app(
         middlewares=[
             exception_middleware,
             api_middleware,
+            audit_log_middleware,
         ]
     )
     root_ctx = RootContext()

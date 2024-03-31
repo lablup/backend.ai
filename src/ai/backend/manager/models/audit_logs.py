@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
+from uuid import UUID
 
 import graphene
 import sqlalchemy as sa
@@ -13,7 +15,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .base import EnumValueType, Item, PaginatedList, metadata
+from .base import GUID, Base, EnumValueType, IDColumn, Item, PaginatedList
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 
@@ -23,9 +25,11 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 __all__: Sequence[str] = (
-    "audit_logs",
     "AuditLog",
+    "AuditLogAction",
     "AuditLogList",
+    "AuditLogTargetType",
+    "AuditLogRow",
 )
 
 
@@ -36,6 +40,7 @@ class AuditLogAction(str, enum.Enum):
     CHANGE = "CHANGE"
     DELETE = "DELETE"
     PURGE = "PURGE"
+    RESTORE = "RESTORE"
 
 
 class AuditLogTargetType(str, enum.Enum):
@@ -45,29 +50,57 @@ class AuditLogTargetType(str, enum.Enum):
     KEYPAIRS = "keypair"
     GROUP = "group"
     VFOLDER = "vfolder"
+    VFOLDER_INVITATION = "vfolder-invitation"
     COMPUTE_SESSION = "compute-session"
 
 
-audit_logs = sa.Table(
-    "audit_logs",
-    metadata,
-    sa.Column("user_id", sa.String(length=256), nullable=False),
-    sa.Column("access_key", sa.String(length=20), nullable=False),
-    sa.Column("email", sa.String(length=64), nullable=False),
-    sa.Column("action", EnumValueType(AuditLogAction), nullable=False),
-    sa.Column("data", pgsql.JSONB(), nullable=True),
-    sa.Column(
+class AuditLogRow(Base):
+    __tablename__ = "audit_logs"
+
+    id = IDColumn("id")
+    user_id = sa.Column("user_id", GUID, nullable=False)
+    access_key = sa.Column("access_key", sa.String(length=20), nullable=False)
+    email = sa.Column("email", sa.String(length=64), nullable=False)
+    action = sa.Column("action", EnumValueType(AuditLogAction), nullable=False)
+    data = sa.Column("data", pgsql.JSONB(), nullable=True)
+    target_type = sa.Column(
         "target_type",
-        EnumValueType(AuditLogTargetType),
-        index=True,
+        sa.String(length=32),
         nullable=False,
-    ),
-    sa.Column("target", sa.String(length=64), nullable=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
-    sa.Column("success", sa.Boolean(), server_default=sa.true(), nullable=False),
-    sa.Column("rest_api_path", sa.String(length=256), nullable=True),
-    sa.Column("gql_query", sa.String(length=256), nullable=True),
-)
+    )
+    target = sa.Column("target", sa.String(length=64), nullable=True)
+    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
+    success = sa.Column("success", sa.Boolean(), server_default=sa.true(), nullable=False)
+    rest_resource = sa.Column("rest_resource", sa.String(length=256), nullable=True)
+    gql_query = sa.Column("gql_query", sa.String(length=1024), nullable=True)
+
+    def __init__(
+        self,
+        id: UUID,
+        user_id: UUID,
+        access_key: str,
+        email: str,
+        action: AuditLogAction,
+        data: dict[str, Any],
+        target_type: AuditLogTargetType,
+        success: bool,
+        *,
+        target: str | None = None,
+        rest_resource: str | None = None,
+        gql_query: str | None = None,
+    ) -> None:
+        self.id = id
+        self.user_id = user_id
+        self.access_key = access_key
+        self.email = email
+        self.action = action
+        self.data = data
+        self.target_type = target_type.value
+        self.success = success
+        self.target = target
+        self.rest_resource = rest_resource
+        self.gql_query = gql_query
+        self.created_at = datetime.datetime.now()
 
 
 class AuditLog(graphene.ObjectType):
@@ -82,7 +115,7 @@ class AuditLog(graphene.ObjectType):
     target_type = graphene.String()
     target = graphene.String()
     created_at = GQLDateTime()
-    rest_api_path = graphene.String()
+    rest_resource = graphene.String()
     gql_query = graphene.String()
 
     @classmethod
@@ -102,7 +135,7 @@ class AuditLog(graphene.ObjectType):
             target_type=row["target_type"],
             target=row["target"],
             created_at=row["created_at"],
-            rest_api_path=row["rest_api_path"],
+            rest_resource=row["rest_resource"],
             gql_query=row["gql_query"],
         )
 
@@ -147,9 +180,8 @@ class AuditLog(graphene.ObjectType):
 
         if user_id is not None:
             query = (
-                sa.select([audit_logs])
-                .select_from(audit_logs)
-                .where((audit_logs.c.email == user_id) | (audit_logs.c.user_id == user_id))
+                sa.select(AuditLogRow)
+                .where((AuditLogRow.email == user_id) | (AuditLogRow.user_id == user_id))
                 .limit(limit)
                 .offset(offset)
             )
@@ -161,7 +193,7 @@ class AuditLog(graphene.ObjectType):
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(
-                audit_logs.c.created_at.desc(),
+                AuditLogRow.created_at.desc(),
             )
         async with ctx.db.begin_readonly() as conn:
             b = [
@@ -181,9 +213,9 @@ class AuditLog(graphene.ObjectType):
     ) -> int:
         query = (
             sa.select([sa.func.count()])
-            .select_from(audit_logs)
+            .select_from(AuditLogRow)
             .where(
-                (audit_logs.c.user_id == user_id) | (audit_logs.c.email == user_id),
+                (AuditLogRow.user_id == user_id) | (AuditLogRow.email == user_id),
             )
         )
         if filter is not None:

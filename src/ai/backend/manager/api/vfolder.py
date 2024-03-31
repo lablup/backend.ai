@@ -53,17 +53,13 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.audit_log_util import (
-    audit_log_middleware,
-    empty_after_data,
-    update_after_data,
-    update_before_data,
-)
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
+    AuditLogAction,
+    AuditLogTargetType,
     EndpointLifecycle,
     EndpointRow,
     GroupRow,
@@ -101,9 +97,9 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
-from ..models.audit_logs import AuditLogAction, AuditLogTargetType
 from ..models.utils import execute_with_retry
 from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES
+from . import audit_log
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -125,17 +121,19 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
-    ArgNameEnum,
     BaseResponseModel,
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
-    set_audit_log_action_target_decorator,
+)
+from .utils import (
+    audit_log_request as _audit_log_request,
 )
 
 if TYPE_CHECKING:
     from .context import RootContext
 
+audit_log_request = functools.partial(_audit_log_request, target_type=AuditLogTargetType.VFOLDER)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow: TypeAlias = Mapping[str, Any]
@@ -360,11 +358,8 @@ def vfolder_check_exists(
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["name"],
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     resp: Dict[str, Any] = {}
@@ -376,6 +371,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
     vfolder_name = params["name"]
+
+    audit_log.set_target(vfolder_name)
 
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
@@ -639,7 +636,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
             data_to_insert = result.one()
 
-            update_after_data(data_to_insert=data_to_insert)
+            audit_log.update_after_data(data_to_insert)
             # Here we grant creator the permission to alter VFolder contents
             if group_type == ProjectType.MODEL_STORE:
                 query = sa.insert(vfolder_permissions).values({
@@ -1029,15 +1026,14 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         t.Key("input"): t.Mapping(t.String, t.Any),
     }),
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["id"],
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
-    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
+    audit_log.set_target(params["id"])
+
+    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
     quota = int(params["input"]["size_bytes"])
@@ -1176,11 +1172,8 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         t.Key("new_name"): tx.Slug(allow_dot=True),
     })
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -1191,6 +1184,8 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
+
+    audit_log.set_target(old_name)
 
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -1212,7 +1207,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         )
 
         entries_filtered = [entry for entry in entries if entry["name"] == old_name]
-        update_before_data(data_to_insert=entries_filtered)
+        audit_log.update_before_data(entries_filtered)
 
         for entry in entries:
             if entry["name"] == new_name:
@@ -1247,7 +1242,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         updated_rows = await conn.execute(find_updated_row_queries)
         updated_rows_list = [row for row in updated_rows.all()]
 
-        update_after_data(data_to_insert=updated_rows_list)
+        audit_log.update_after_data(updated_rows_list)
 
     return web.Response(status=201)
 
@@ -1261,15 +1256,14 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
     })
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
+    audit_log.set_target(request.match_info["name"])
+
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
@@ -1282,7 +1276,7 @@ async def update_vfolder_options(
 
         result = await conn.execute(query)
         db_row_to_update = result.one()
-        update_before_data(data_to_insert=[db_row_to_update])
+        audit_log.update_before_data([db_row_to_update])
 
         folder_host = db_row_to_update._mapping["host"]
         await ensure_host_permission_allowed(
@@ -1319,7 +1313,7 @@ async def update_vfolder_options(
             updated_result = result.one()
             after_data_to_insert = updated_result
 
-    update_after_data(data_to_insert=[after_data_to_insert])
+    audit_log.update_after_data([after_data_to_insert])
     return web.Response(status=201)
 
 
@@ -1333,13 +1327,12 @@ async def update_vfolder_options(
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    audit_log.set_target(request.match_info["name"])
+
     if isinstance(params["path"], list) and len(params["path"]) > 50:
         raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
@@ -1383,12 +1376,6 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         tx.AliasedKey(["path", "file"]): t.String,
         t.Key("archive", default=False): t.ToBool,
     })
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
@@ -1450,12 +1437,6 @@ async def create_download_session(
         t.Key("size"): t.ToInt,
     })
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
-)
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
@@ -1510,12 +1491,6 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
         t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
     })
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
-)
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
@@ -1569,12 +1544,6 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         t.Key("dst"): t.String,
     })
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
-)
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
@@ -1612,12 +1581,6 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         t.Key("files"): t.List(t.String),
         t.Key("recursive", default=False): t.ToBool,
     })
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
@@ -1754,12 +1717,6 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
         tx.AliasedKey(["perm", "permission"]): VFolderPermissionValidator,
     }),
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["inv_id"],
-)
 async def update_invitation(request: web.Request, params: Any) -> web.Response:
     """
     Update sent invitation's permission. Other fields are not allowed to be updated.
@@ -1796,12 +1753,6 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
         tx.AliasedKey(["perm", "permission"], default="rw"): VFolderPermissionValidator,
         tx.AliasedKey(["emails", "user_ids", "userIDs"]): t.List(t.String),
     }),
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def invite(request: web.Request, params: Any) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
@@ -1973,12 +1924,6 @@ async def invitations(request: web.Request) -> web.Response:
         t.Key("inv_id"): t.String,
     }),
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["inv_id"],
-)
 async def accept_invitation(request: web.Request, params: Any) -> web.Response:
     """Accept invitation by invitee.
 
@@ -2070,12 +2015,6 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
         t.Key("inv_id"): t.String,
     })
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["inv_id"],
-)
 async def delete_invitation(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2132,12 +2071,6 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
         t.Key("permission", default="rw"): VFolderPermissionValidator,
         t.Key("emails"): t.List(t.String),
     }),
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def share(request: web.Request, params: Any) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
@@ -2263,12 +2196,6 @@ async def share(request: web.Request, params: Any) -> web.Response:
         t.Key("emails"): t.List(t.String),
     }),
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
-)
 async def unshare(request: web.Request, params: Any) -> web.Response:
     """
     Unshare a group folder from users.
@@ -2332,7 +2259,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         row_to_delete = result.fetchall()
 
         if row_to_delete:
-            update_before_data(row_to_delete)
+            audit_log.update_before_data(row_to_delete)
 
         # Delete vfolder_permission(s).
         query = sa.delete(vfolder_permissions).where(
@@ -2340,7 +2267,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
             & (vfolder_permissions.c.user.in_(users_to_unshare)),
         )
         await conn.execute(query)
-        empty_after_data()
+        audit_log.update_after_data({})
 
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
 
@@ -2373,7 +2300,7 @@ async def _delete(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        update_before_data(entry)
+        audit_log.update_before_data(entry)
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
@@ -2416,11 +2343,8 @@ class DeleteRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(DeleteRequestModel)
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["id"],
 )
 async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -2437,6 +2361,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         access_key,
         folder_id,
     )
+    audit_log.set_target(folder_id)
     await ensure_vfolder_status(request, VFolderAccessStatus.SOFT_DELETABLE, folder_id)
     try:
         await _delete(
@@ -2461,11 +2386,8 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def delete_by_name(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
@@ -2475,6 +2397,8 @@ async def delete_by_name(request: web.Request) -> web.Response:
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
+
+    audit_log.set_target(folder_name)
 
     log.info(
         "VFOLDER.DELETE (email:{}, ak:{}, vf:{})",
@@ -2575,6 +2499,9 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 @auth_required
 @pydantic_params_api_handler(DeleteFromTrashRequestModel)
+@audit_log_request(
+    action=AuditLogAction.PURGE,
+)
 async def delete_from_trash_bin(
     request: web.Request, params: DeleteFromTrashRequestModel
 ) -> SuccessResponseModel:
@@ -2589,6 +2516,8 @@ async def delete_from_trash_bin(
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    audit_log.set_target(folder_id)
+
     log.info(
         "VFOLDER.DELETE_FROM_TRASH_BIN (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2645,11 +2574,8 @@ class PurgeRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(PurgeRequestModel)
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.PURGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessResponseModel:
     """
@@ -2661,6 +2587,8 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessRespo
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
+
+    audit_log.set_target(folder_id)
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
@@ -2699,7 +2627,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessRespo
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
-        update_before_data(entry)
+        audit_log.update_before_data(entry)
 
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
@@ -2719,6 +2647,9 @@ class RestoreRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(RestoreRequestModel)
+@audit_log_request(
+    action=AuditLogAction.RESTORE,
+)
 async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessResponseModel:
     """
     Recover vfolder from trash bin, by changing status.
@@ -2729,6 +2660,8 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessR
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
+    audit_log.set_target(folder_id)
+
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.RESTORE (email: {}, ak:{}, vf:{})",
@@ -2784,12 +2717,6 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessR
     t.Dict({
         tx.AliasedKey(["shared_user_uuid", "sharedUserUuid"], default=None): t.String | t.Null,
     }),
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
@@ -2850,11 +2777,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
     }),
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.REQUEST_MATCH_INFO,
-    target_path=["name"],
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
@@ -2881,6 +2805,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     target_quota_scope_id = "..."  # TODO: implement
     source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)
     target_proxy_name, target_volume_name = root_ctx.storage_manager.split_host(target_folder_host)
+
+    audit_log.set_target(params["target_name"])
 
     # check if the source vfolder is allowed to be cloned
     if not row["cloneable"]:
@@ -3084,12 +3010,6 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         tx.AliasedKey(["perm", "permission"]): VFolderPermissionValidator | t.Null,
     }),
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["vfolder"],
-)
 async def update_shared_vfolder(request: web.Request, params: Any) -> web.Response:
     """
     Update permission for shared vfolders.
@@ -3118,10 +3038,8 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         )
 
         result = await conn.execute(query)
-        if (row_to_update := result.first()) is None:
+        if not result.first():
             raise ObjectNotFound("vfolder_permissions")
-
-        update_before_data(row_to_update)
 
         if perm is not None:
             query = (
@@ -3140,10 +3058,8 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
 
         result = await conn.execute(query)
 
-        if (perm is not None) and (updated_row := result.first()) is None:
+        if perm and not result.first():
             raise ObjectNotFound("vfolder_permissions")
-
-        update_after_data(updated_row if (perm is not None) else {})
 
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=200)
@@ -3336,12 +3252,6 @@ async def list_mounts(request: web.Request) -> web.Response:
         t.Key("edit_fstab", default=False): t.ToBool,
     }),
 )
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.CREATE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["name"],
-)
 async def mount_host(request: web.Request, params: Any) -> web.Response:
     """
     Mount device into vfolder host.
@@ -3443,12 +3353,6 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         t.Key("fstab_path", default=None): t.String | t.Null,
         t.Key("edit_fstab", default=False): t.ToBool,
     }),
-)
-@set_audit_log_action_target_decorator(
-    action=AuditLogAction.DELETE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["name"],
 )
 async def umount_host(request: web.Request, params: Any) -> web.Response:
     """
@@ -3581,11 +3485,8 @@ async def storage_task_exception_handler(
         t.Key("user_email"): t.String,
     }),
 )
-@set_audit_log_action_target_decorator(
+@audit_log_request(
     action=AuditLogAction.CHANGE,
-    target_type=AuditLogTargetType.VFOLDER,
-    arg_name_enum=ArgNameEnum.PARAMS,
-    target_path=["vfolder"],
 )
 async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
     """
@@ -3595,6 +3496,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     vfolder_id = params["vfolder"]
     user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
+
+    audit_log.set_target(vfolder_id)
 
     allowed_hosts_by_user = VFolderHostPermissionMap()
     async with root_ctx.db.begin_readonly() as conn:
@@ -3641,7 +3544,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         if (row_to_update := result.first()) is None:
             raise ObjectNotFound(object_name="vfolders")
 
-        update_before_data(row_to_update)
+        audit_log.update_before_data(row_to_update)
 
         folder_host = row_to_update._mapping["host"]
     if folder_host not in allowed_hosts_by_user:
@@ -3666,7 +3569,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             if (updated_row := result.one()) is None:
                 raise ObjectNotFound(object_name="vfolders")
 
-            update_after_data(updated_row)
+            audit_log.update_after_data(updated_row)
 
     await execute_with_retry(_update)
 
@@ -3717,7 +3620,6 @@ def create_app(default_cors_options):
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["folders.context"] = PrivateContext()
-    app.middlewares.append(audit_log_middleware)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
