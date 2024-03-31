@@ -1023,7 +1023,6 @@ type Mutations {
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
-  create_audit_logs(props: AuditLogInput!): CreateAuditLog
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
@@ -1550,23 +1549,6 @@ type DisassociateAllScalingGroupsWithDomain {
 type DisassociateAllScalingGroupsWithGroup {
   ok: Boolean
   msg: String
-}
-
-type CreateAuditLog {
-  ok: Boolean
-  msg: String
-  audit_logs: AuditLog
-}
-
-input AuditLogInput {
-  user_email: String!
-  user_id: String!
-  access_key: String!
-  data_before: JSONString!
-  data_after: JSONString!
-  action: String!
-  target_type: String!
-  target: String!
 }
 
 type SetQuotaScope {
