@@ -12,6 +12,8 @@ type Queries {
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
+  auditlog_list(limit: Int!, offset: Int!, filter: String, order: String, user_id: String): AuditLogList
+  auditlog(user_id: ID): [AuditLog]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
   domain(name: String): Domain
@@ -31,11 +33,12 @@ type Queries {
     """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
-  image(reference: String!, architecture: String = "aarch64"): Image
+  image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
+  user_from_email(email: String): User
   user_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, is_active: Boolean, status: String): UserList
 
   """Added in 24.03.0."""
@@ -199,6 +202,25 @@ type AgentList implements PaginatedList {
 interface PaginatedList {
   items: [Item]!
   total_count: Int!
+}
+
+type AuditLogList implements PaginatedList {
+  items: [AuditLog]!
+  total_count: Int!
+}
+
+type AuditLog implements Item {
+  id: ID
+  user_id: String
+  access_key: String
+  email: String
+  action: String
+  data: JSONString
+  target_type: String
+  target: String
+  created_at: DateTime
+  rest_api_path: String
+  gql_query: String
 }
 
 """A schema for normal users."""
@@ -973,9 +995,9 @@ type Mutations {
   rescan_images(registry: String): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
-  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage
-  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
+  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
@@ -1001,6 +1023,7 @@ type Mutations {
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
+  create_audit_logs(props: AuditLogInput!): CreateAuditLog
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
@@ -1527,6 +1550,23 @@ type DisassociateAllScalingGroupsWithDomain {
 type DisassociateAllScalingGroupsWithGroup {
   ok: Boolean
   msg: String
+}
+
+type CreateAuditLog {
+  ok: Boolean
+  msg: String
+  audit_logs: AuditLog
+}
+
+input AuditLogInput {
+  user_email: String!
+  user_id: String!
+  access_key: String!
+  data_before: JSONString!
+  data_after: JSONString!
+  action: String!
+  target_type: String!
+  target: String!
 }
 
 type SetQuotaScope {
