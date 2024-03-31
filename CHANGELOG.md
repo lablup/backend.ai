@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.0rc2 (2024-03-31)
+
+### Fixes
+* Hotfix session not created when VFolder is attached
+
+
 ## 24.03.0rc1 (2024-03-31)
 
 ### Features
