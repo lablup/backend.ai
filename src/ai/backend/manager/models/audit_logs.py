@@ -13,20 +13,19 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .base import EnumValueType, Item, PaginatedList, metadata, simple_db_mutate
+from .base import EnumValueType, Item, PaginatedList, metadata
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .user import UserRole
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+
+
 log = BraceStyleAdapter(logging.getLogger(__name__))
 __all__: Sequence[str] = (
     "audit_logs",
     "AuditLog",
     "AuditLogList",
-    "AuditLogInput",
-    "CreateAuditLog",
 )
 
 
@@ -46,16 +45,16 @@ class AuditLogTargetType(str, enum.Enum):
     KEYPAIRS = "keypair"
     GROUP = "group"
     VFOLDER = "vfolder"
-    COMPUTE_SESSION = "compute_session"
+    COMPUTE_SESSION = "compute-session"
 
 
 audit_logs = sa.Table(
     "audit_logs",
     metadata,
-    sa.Column("user_id", sa.String(length=256), index=True, nullable=False),
-    sa.Column("access_key", sa.String(length=20), index=True, nullable=False),
-    sa.Column("email", sa.String(length=64), index=True, nullable=False),
-    sa.Column("action", EnumValueType(AuditLogAction), index=True, nullable=False),
+    sa.Column("user_id", sa.String(length=256), nullable=False),
+    sa.Column("access_key", sa.String(length=20), nullable=False),
+    sa.Column("email", sa.String(length=64), nullable=False),
+    sa.Column("action", EnumValueType(AuditLogAction), nullable=False),
     sa.Column("data", pgsql.JSONB(), nullable=True),
     sa.Column(
         "target_type",
@@ -63,9 +62,9 @@ audit_logs = sa.Table(
         index=True,
         nullable=False,
     ),
-    sa.Column("target", sa.String(length=64), index=True, nullable=True),
+    sa.Column("target", sa.String(length=64), nullable=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
-    sa.Column("success", sa.Boolean(), server_default=sa.true(), index=True, nullable=False),
+    sa.Column("success", sa.Boolean(), server_default=sa.true(), nullable=False),
     sa.Column("rest_api_path", sa.String(length=256), nullable=True),
     sa.Column("gql_query", sa.String(length=256), nullable=True),
 )
@@ -200,70 +199,3 @@ class AuditLogList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(AuditLog, required=True)
-
-
-class AuditLogInput(graphene.InputObjectType):
-    user_email = graphene.String(required=True)
-    user_id = graphene.String(required=True)
-    access_key = graphene.String(required=True)
-    data_before = graphene.JSONString(required=True)
-    data_after = graphene.JSONString(required=True)
-    action = graphene.String(required=True)
-    target_type = graphene.String(required=True)
-    target = graphene.String(required=True)
-
-
-class CreateAuditLog(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        props = AuditLogInput(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    audit_logs = graphene.Field(lambda: AuditLog, required=False)
-
-    @classmethod
-    async def mutate(
-        cls,
-        # root,
-        info: graphene.ResolveInfo,
-        props: AuditLogInput,
-    ) -> CreateAuditLog:
-        graph_ctx: GraphQueryContext = info.context
-        if props["action"] == "CHANGE":
-            prepare_data_before = {}
-            prepare_data_after = {}
-            for key in props[
-                "data_after"
-            ].keys():  # check update command options to only show changes
-                value = props["data_after"][key]
-                if props["data_before"][key] != value and value is not None:
-                    if key == "password":
-                        # don't show new password
-                        prepare_data_after.update({key: "new_password_set"})
-                    else:
-                        prepare_data_after.update({key: value})
-            for key in prepare_data_after.keys():
-                prepare_data_before.update({key: props["data_before"][key]})
-        else:
-            prepare_data_before = props["data_before"]
-            prepare_data_after = props["data_after"]
-        data_set = {
-            "user_id": str(props["user_id"]),
-            "access_key": props["access_key"],
-            "email": props["user_email"],
-            "action": props["action"],
-            "target_type": props["target_type"],
-            "target": str(props["target"]),
-            "data": {
-                "before": prepare_data_before,
-                "after": prepare_data_after,
-            },
-        }
-        if prepare_data_after or prepare_data_before:
-            insert_query = sa.insert(audit_logs).values(data_set)
-        else:
-            log.warning("No data to write in Audit log")
-            insert_query = ()
-        return await simple_db_mutate(cls, graph_ctx, insert_query)
