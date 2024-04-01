@@ -44,6 +44,13 @@ async def size(request: web.Request) -> web.Response:
     return web.Response(text=size)
 
 
+@routes.get("/leave_joint")
+async def leave_joint(request: web.Request) -> web.Response:
+    raft: Raft = request.app["state"]["raft"]
+    await raft.get_raft_node().leave_joint()
+    return web.Response(text="OK")
+
+
 @routes.get("/put/{id}/{value}")
 async def put(request: web.Request) -> web.Response:
     raft: Raft = request.app["state"]["raft"]

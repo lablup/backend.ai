@@ -346,13 +346,13 @@ async def inspect_node_status(cli_ctx: CLIContext) -> None:
         })
 
         peers: dict[str, Any] | None = None
-        for _, peer_addr in initial_peers.items():
-            raft_client = await RaftServiceClient.build(peer_addr)
+        for intial_peer in initial_peers.to_dict().values():
+            raft_client = await RaftServiceClient.build(intial_peer.get_addr())
             try:
                 resp = await raft_client.get_peers()
                 peers = json.loads(resp)
             except Exception as e:
-                print(f"Failed to getting peers from {peer_addr}: {e}")
+                print(f"Failed to getting peers from {intial_peer.get_addr()}: {e}")
                 continue
 
         if peers is None:
