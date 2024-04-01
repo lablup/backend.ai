@@ -163,10 +163,16 @@ class AgentRPCCache:
                     peer.call.order_key.reset(okey_token)
         except RPCUserError as orig_exc:
             raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
-        except AuthenticationError:
+        except AuthenticationError as orig_exc:
+            detail = (
+                "Fail to initate RPC connection. "
+                "This could be caused by a connection delay or an attempt to connect to an invalid address. "
+                f"(repr: {repr(orig_exc)})."
+            )
             raise RPCError(
                 agent_id,
                 agent_addr,
+                detail,
             )
         except Exception:
             raise
