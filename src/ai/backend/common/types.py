@@ -225,6 +225,8 @@ MetricKey = NewType("MetricKey", str)
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
+AppVersion = NewType("AppVersion", str)
+
 
 class AbstractPermission(enum.StrEnum):
     """
@@ -921,11 +923,78 @@ class VFolderUsageMode(enum.StrEnum):
     GENERAL: normal virtual folder
     MODEL: virtual folder which provides shared models
     DATA: virtual folder which provides shared data
+    APP: virtual folder which provides service-app
     """
 
     GENERAL = "general"
     MODEL = "model"
     DATA = "data"
+    APP = "app"
+
+
+@attrs.define(slots=True)
+class AppMetadata(JSONSerializableMixin):
+    container_ports: list[int]
+    host_ports: list[int]
+    protocol: ServicePortProtocols
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "container_ports": self.container_ports,
+            "host_ports": self.host_ports,
+            "protocol": self.protocol.value,
+        }
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> AppMetadata:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        schema = t.Dict({
+            t.Key("container_ports"): t.List(t.Int),
+            t.Key("host_ports"): t.List(t.Int),
+            t.Key("protocol"): tx.Enum(ServicePortProtocols),
+        }).allow_extra("*")
+
+        class Metadata(t.Trafaret):
+            def check_and_return(self, value: Any) -> AppMetadata:
+                return AppMetadata(**schema.check(value))
+
+        return Metadata()
+
+
+@attrs.define(slots=True)
+class MountedAppConfig(JSONSerializableMixin):
+    service_name: str
+    service_def: Mapping[str, Any]
+    metadata: AppMetadata
+    copy_dir: Optional[PurePosixPath] = None
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "service_name": self.service_name,
+            "service_def": self.service_def,
+            "metadata": self.metadata.to_json(),
+            "copy_dir": str(self.copy_dir) if self.copy_dir is not None else None,
+        }
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> MountedAppConfig:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict({
+            t.Key("service_name"): t.String,
+            t.Key("metadata"): AppMetadata.as_trafaret(),
+            t.Key("service_def", default={}): t.Dict().allow_extra("*"),
+            t.Key("copy_dir", default=None): tx.Path(type="dir") | t.Null,
+        }).allow_extra("*")
 
 
 @attrs.define(slots=True)
@@ -1045,6 +1114,7 @@ class ServicePort(TypedDict):
     container_ports: Sequence[int]
     host_ports: Sequence[Optional[int]]
     is_inference: bool
+    mount_path: NotRequired[str]
 
 
 ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])

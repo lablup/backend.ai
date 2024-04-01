@@ -94,7 +94,7 @@ def list_allowed_types():
     help=(
         'Purpose of the folder. Normal folders are usually set to "general". '
         'Available options: "general", "data" (provides data to users), '
-        'and "model" (provides pre-trained models).'
+        '"model" (provides pre-trained models), and "app" (can be used as a mountable plugin).'
     ),
 )
 @click.option(

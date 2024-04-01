@@ -159,6 +159,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.agent_id,
             self.image_ref,
             self.kspec_version,
+            image_labels={},
             agent_config=self.local_config,
             service_ports=service_ports,
             resource_spec=resource_spec,

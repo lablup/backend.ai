@@ -43,6 +43,7 @@ _default_list_fields = (
     vfolder_fields["permission"],
     vfolder_fields["ownership_type"],
     vfolder_fields["status"],
+    vfolder_fields["usage_mode"],
 )
 
 T = TypeVar("T")
@@ -742,7 +743,12 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update_options(self, name: str, permission: str = None, cloneable: bool = None):
+    async def update_options(
+        self,
+        name: str,
+        permission: str = None,
+        cloneable: bool = None,
+    ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json({
             "cloneable": cloneable,

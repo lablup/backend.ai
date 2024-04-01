@@ -120,6 +120,7 @@ from ai.backend.common.types import (
     KernelCreationResult,
     KernelId,
     ModelServiceStatus,
+    MountedAppConfig,
     MountPermission,
     MountTypes,
     Sentinel,
@@ -361,12 +362,29 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         arch = get_arch_name()
         return arch, matched_distro, matched_libc_style, krunner_volume, krunner_pyver
 
+    async def _mount_app_vfolder(
+        self,
+        vfolder: VFolderMount,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        mount = Mount(
+            MountTypes.BIND,
+            Path(vfolder.host_path),
+            Path(vfolder.kernel_path),
+            MountPermission.READ_ONLY,
+            usage_mode=VFolderUsageMode.APP,
+        )
+        resource_spec.mounts.append(mount)
+
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
         resource_spec: KernelResourceSpec,
     ) -> None:
         for vfolder in vfolders:
+            if vfolder.usage_mode == VFolderUsageMode.APP:
+                await self._mount_app_vfolder(vfolder, resource_spec)
+                continue
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 # Only allow mount of ".logs" directory to prevent expose
                 # internal-only information, such as Docker credentials to user's ".docker" vfolder
@@ -378,6 +396,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 Path(vfolder.host_path),
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
+                usage_mode=vfolder.usage_mode,
             )
             resource_spec.mounts.append(mount)
 
@@ -1878,6 +1897,26 @@ class AbstractAgent(
                     except yaml.error.YAMLError as e:
                         raise AgentError(f"Invalid YAML syntax: {e}") from e
 
+                app_folders = [
+                    folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.APP
+                ]
+
+                for folder in app_folders:
+                    app_config = await self.read_app_config_file(folder)
+
+                    cntr_ports = app_config.metadata.container_ports
+                    host_ports = app_config.metadata.host_ports
+
+                    service_ports.append({
+                        "name": app_config.service_name,
+                        "protocol": app_config.metadata.protocol,
+                        "container_ports": tuple(cntr_ports),
+                        "host_ports": tuple(host_ports),
+                        "is_inference": False,
+                        "mount_path": str(folder.kernel_path),
+                    })
+                    exposed_ports.extend(cntr_ports)
+
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
                         image_labels.get("ai.backend.service-ports", ""),
@@ -2133,6 +2172,27 @@ class AbstractAgent(
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
+    async def read_app_config_file(self, folder: VFolderMount) -> MountedAppConfig:
+        config_path = Path(folder.host_path) / "app-config.json"
+
+        def _load():
+            with config_path.open() as f:
+                return json.load(f)
+
+        try:
+            raw_config: dict[str, Any] = await asyncio.get_running_loop().run_in_executor(
+                None, _load
+            )
+        except FileNotFoundError:
+            raise AgentError(
+                f"App config file does not exists on {str(config_path)} (ID {folder.vfid})"
+            )
+        except IOError:
+            raise AgentError(f"Cannot read app config file: {str(config_path)}")
+        except json.JSONDecodeError:
+            raise AgentError(f"malformed JSON in app config file: {str(config_path)}")
+        return MountedAppConfig.from_json(raw_config)
+
     @abstractmethod
     async def destroy_kernel(
         self,
@@ -2352,8 +2412,16 @@ class AbstractAgent(
     async def interrupt_kernel(self, kernel_id: KernelId):
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
-    async def start_service(self, kernel_id: KernelId, service: str, opts: dict):
-        return await self.kernel_registry[kernel_id].start_service(service, opts)
+    async def start_service(
+        self,
+        kernel_id: KernelId,
+        service: str,
+        opts: dict,
+        mount_config: Optional[Mapping[str, Any]],
+    ):
+        return await self.kernel_registry[kernel_id].start_service(
+            service, opts, self.local_config, mount_config
+        )
 
     async def shutdown_service(self, kernel_id: KernelId, service: str):
         try:
