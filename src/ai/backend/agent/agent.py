@@ -66,6 +66,7 @@ from tenacity import (
 from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
@@ -563,6 +564,8 @@ class AbstractAgent(
     stats_monitor: StatsPluginContext  # unused currently
     error_monitor: ErrorPluginContext  # unused in favor of produce_error_event()
 
+    background_task_manager: BackgroundTaskManager
+
     _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
@@ -637,6 +640,8 @@ class AbstractAgent(
             name="stat",
             db=REDIS_STAT_DB,
         )
+
+        self.background_task_manager = BackgroundTaskManager(self.event_producer)
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
@@ -2376,7 +2381,7 @@ class AbstractAgent(
         subdir: str,
         *,
         canonical: str | None = None,
-        filename: str,
+        filename: str | None = None,
         extra_labels: dict[str, str] = {},
     ):
         return await self.kernel_registry[kernel_id].commit(

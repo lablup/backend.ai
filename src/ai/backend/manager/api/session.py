@@ -1087,7 +1087,7 @@ async def convert_session_to_image(
                     ImageRow.name.like(f"{new_canonical}%")
                     & (
                         ImageRow.labels["ai.backend.personalized-image-owner"].as_string()
-                        == str(request["user"]["uuid"])
+                        == f"user:{request['user']['uuid']}"
                     )
                     & (
                         ImageRow.labels["ai.backend.personalized-image-name"].as_string()
@@ -1117,7 +1117,7 @@ async def convert_session_to_image(
                 session,
                 new_image_ref,
                 extra_labels={
-                    "ai.backend.personalized-image-owner": str(request["user"]["uuid"]),
+                    "ai.backend.personalized-image-owner": f"user:{request['user']['uuid']}",
                     "ai.backend.personalized-image-name": params.image_name,
                     "ai.backend.personalized-image-id": peruser_image_id,
                 },

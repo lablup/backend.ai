@@ -459,8 +459,8 @@ class AgentRegistry:
                 )
             requested_image_ref = image_row.image_ref
             if (
-                _owner_uuid := image_row.labels.get("ai.backend.image-owner")
-            ) and _owner_uuid != str(user_scope.user_uuid):
+                _owner_id := image_row.labels.get("ai.backend.personalized-image-owner")
+            ) and _owner_id != f"user:{user_scope.user_uuid}":
                 raise ImageNotFound
             if not requested_image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
@@ -3184,7 +3184,7 @@ class AgentRegistry:
         kernel: KernelRow = session.main_kernel
         if kernel.status != KernelStatus.RUNNING:
             raise InvalidAPIParameters(
-                f"Unable to commit since kernel(id: {kernel.id}) of session(id: {session.id}) is"
+                f"Unable to commit since the kernel k:{kernel.id} (of s:{session.id}) is"
                 " currently not in RUNNING state."
             )
         email = await self._get_user_email(kernel)

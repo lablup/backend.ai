@@ -47,12 +47,10 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
-from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
-    EventProducer,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
@@ -60,7 +58,6 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
-    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
     ImageRegistry,
@@ -219,7 +216,6 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
-        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
@@ -339,13 +335,6 @@ class AgentRPCServer(aobject):
         for k, v in container_etcd_config.items():
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
-
-    async def init_background_task_manager(self):
-        event_producer = await EventProducer.new(
-            cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=REDIS_STREAM_DB,
-        )
-        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -616,15 +605,19 @@ class AgentRPCServer(aobject):
         extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
-        bgtask_mgr = self.local_config["background_task_manager"]
-        task_id = await bgtask_mgr.start(
-            self.agent.commit,
-            KernelId(UUID(kernel_id)),
-            subdir,
-            canonical=canonical,
-            filename=filename,
-            extra_labels=extra_labels,
-        )
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _commit(reporter: ProgressReporter) -> None:
+            await self.agent.commit(
+                reporter,
+                KernelId(UUID(kernel_id)),
+                subdir,
+                canonical=canonical,
+                filename=filename,
+                extra_labels=extra_labels,
+            )
+
+        task_id = await bgtask_mgr.start(_commit)
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
@@ -642,17 +635,20 @@ class AgentRPCServer(aobject):
         is_local: bool = False,
     ) -> dict[str, Any]:
         log.info("rpc::push_image(c:{})", canonical)
-        bgtask_mgr = self.local_config["background_task_manager"]
-        task_id = await bgtask_mgr.start(
-            self.agent.push_image,
-            ImageRef(
-                canonical,
-                known_registries=["*"],
-                is_local=is_local,
-                architecture=architecture,
-            ),
-            registry_conf,
-        )
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _push_image(reporter: ProgressReporter) -> None:
+            await self.agent.push_image(
+                ImageRef(
+                    canonical,
+                    known_registries=["*"],
+                    is_local=is_local,
+                    architecture=architecture,
+                ),
+                registry_conf,
+            )
+
+        task_id = await bgtask_mgr.start(_push_image)
         return {
             "bgtask_id": str(task_id),
             "canonical": canonical,
