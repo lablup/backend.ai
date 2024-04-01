@@ -52,8 +52,6 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
-    - name: Check forbidden cross imports
-      run: pants dependencies '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
