@@ -615,8 +615,8 @@ def load(
 
 
 def load_raft_cluster_config(
-    debug_enabled: bool = False,
     raft_cluster_config_path: Optional[Path] = None,
+    log_level: LogSeverity = LogSeverity.INFO,
 ) -> Optional[LocalConfig]:
     try:
         raw_cfg, _ = config.read_from_file(raft_cluster_config_path, "raft-cluster-config")
@@ -625,7 +625,7 @@ def load_raft_cluster_config(
 
     try:
         cfg = config.check(raw_cfg, manager_raft_cluster_config_iv)
-        if debug_enabled:
+        if log_level == LogSeverity.DEBUG:
             print("== Raft cluster configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
     except config.ConfigurationError as e:

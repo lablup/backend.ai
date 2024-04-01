@@ -22,18 +22,20 @@ from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import LogSeverity, RedisConnectionInfo
 
-from ..config import LocalConfig, SharedConfig
+from ..config import LocalConfig, SharedConfig, load_raft_cluster_config
 from ..config import load as load_config
 
 
 class CLIContext:
     _local_config: LocalConfig | None
+    _raft_cluster_config: LocalConfig | None
     _logger: AbstractLogger
 
     def __init__(self, config_path: Path, log_level: LogSeverity) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None
+        self._raft_cluster_config = None
 
     @property
     def local_config(self) -> LocalConfig:
@@ -49,6 +51,23 @@ class CLIContext:
             print(pformat(e.invalid_data), file=sys.stderr)
             raise click.Abort()
         return self._local_config
+
+    @property
+    def raft_cluster_config(self) -> LocalConfig | None:
+        # Lazy-load the configuration only when requested.
+        try:
+            if self._raft_cluster_config is None:
+                self._raft_cluster_config = load_raft_cluster_config(
+                    self.config_path, self.log_level
+                )
+        except ConfigurationError as e:
+            print(
+                "ConfigurationError: Could not read or validate the manager raft cluster config:",
+                file=sys.stderr,
+            )
+            print(pformat(e.invalid_data), file=sys.stderr)
+            raise click.Abort()
+        return self._raft_cluster_config
 
     def __enter__(self) -> Self:
         # The "start-server" command is injected by ai.backend.cli from the entrypoint

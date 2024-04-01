@@ -343,12 +343,19 @@ async def inspect_node_status(cli_ctx: CLIContext) -> None:
     headers = ["ENDPOINT", "NODE ID", "IS LEADER", "RAFT TERM", "RAFT APPLIED INDEX"]
 
     if raft_configs is not None:
+        raft_cluster_configs = cli_ctx.raft_cluster_config
+        assert raft_cluster_configs is not None
+
+        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
+        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
         initial_peers = Peers({
             int(peer_config["node-id"]): Peer(
                 addr=f"{peer_config['host']}:{peer_config['port']}",
                 role=InitialRole.from_str(peer_config["role"]),
             )
-            for peer_config in raft_configs["peers"]
+            for peer_config in all_peers
         })
 
         peers: dict[str, Any] | None = None

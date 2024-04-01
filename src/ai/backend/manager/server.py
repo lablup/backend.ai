@@ -1086,7 +1086,7 @@ def main(
     Start the manager service as a foreground process.
     """
     cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
-    raft_cluster_cfg = load_raft_cluster_config(debug, raft_cluster_config_path)
+    raft_cluster_cfg = load_raft_cluster_config(raft_cluster_config_path, log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
