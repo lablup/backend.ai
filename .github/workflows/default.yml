@@ -460,40 +460,6 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
-    - name: Update shorten URL
-      run: |
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
-        }'
 
 
   build-conda-pack-for-windows:
