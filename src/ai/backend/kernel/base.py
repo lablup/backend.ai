@@ -32,8 +32,9 @@ import janus
 import msgpack
 import zmq
 from async_timeout import timeout
-from jupyter_client import AsyncKernelClient, AsyncKernelManager
+from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
+from jupyter_client.manager import AsyncKernelManager
 
 from .compat import current_loop
 from .intrinsic import (

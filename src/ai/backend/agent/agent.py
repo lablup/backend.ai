@@ -1853,6 +1853,16 @@ class AbstractAgent(
                             environ["BACKEND_MODEL_NAME"] = model["name"]
                             environ["BACKEND_MODEL_PATH"] = model["model_path"]
                             if service := model.get("service"):
+                                overlapping_services = [
+                                    s
+                                    for s in service_ports
+                                    if s["container_ports"][0] == service["port"]
+                                ]
+                                if len(overlapping_services) > 0:
+                                    raise AgentError(
+                                        f"Port {service['port']} overlaps with built-in service"
+                                        f" {overlapping_services[0]['name']}"
+                                    )
                                 service_ports.append({
                                     "name": f"{model['name']}-{service['port']}",
                                     "protocol": ServicePortProtocols.PREOPEN,
@@ -1875,6 +1885,15 @@ class AbstractAgent(
                     ):
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
+                        overlapping_services = [
+                            s for s in service_ports if s["container_ports"][0] == port_no
+                        ]
+                        if len(overlapping_services) > 0:
+                            raise AgentError(
+                                f"Port {port_no} overlaps with built-in service"
+                                f" {overlapping_services[0]['name']}"
+                            )
+
                         preopen_sport: ServicePort = {
                             "name": str(port_no),
                             "protocol": ServicePortProtocols.PREOPEN,
@@ -1920,6 +1939,7 @@ class AbstractAgent(
                     krunner_opts.append("--debug")
                 cmdargs += [
                     "/opt/backend.ai/bin/python",
+                    "-s",
                     "-m",
                     "ai.backend.kernel",
                     *krunner_opts,
