@@ -5,7 +5,6 @@ import functools
 import grp
 import importlib
 import importlib.resources
-import json
 import logging
 import os
 import pwd
@@ -34,8 +33,8 @@ import aiotools
 import click
 from aiohttp import web
 from aiotools import process_index
-from raftify import ClusterJoinTicket, InitialRole, Peer, Peers, Raft
 from raftify import Config as RaftConfig
+from raftify import InitialRole, Peer, Peers, Raft
 from raftify import RaftConfig as RaftCoreConfig
 from setproctitle import setproctitle
 
@@ -46,7 +45,6 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
-    REDIS_RAFT_PENDING_JOIN_REQUESTS,
     REDIS_STAT_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
@@ -375,18 +373,12 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
-    root_ctx.redis_raft_confchange_requests = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
-        name="raft_confchange_requests",  # raft configuration change requests
-        db=REDIS_RAFT_PENDING_JOIN_REQUESTS,
-    )
     for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
         root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
-        root_ctx.redis_raft_confchange_requests,
     ):
         await redis_helper.ping_redis_connection(redis_info.client)
     yield
@@ -395,7 +387,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
     await root_ctx.redis_lock.close()
-    await root_ctx.redis_raft_confchange_requests.close()
 
 
 @actxmgr
@@ -729,37 +720,6 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         raft_logger = RaftLogger(
             logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
         )
-
-        if peer_addr := raft_cluster_configs["join-through-peer-addr"]:
-            # Join the cluster through the peer dynamically
-
-            # TODO: Find leader_id by asking for leader_id to someone in initial_peers
-            leader_addr = peer_addr
-
-            all_tickets = [
-                ClusterJoinTicket(
-                    peer["node-id"],
-                    f"{peer['host']}:{peer['port']}",
-                    leader_addr,
-                    initial_peers,
-                ).to_dict()
-                for peer in all_peers
-            ]
-
-            raft_logger.info("Cluster join request made to the redis queue.")
-
-            await root_ctx.redis_raft_confchange_requests.client.rpush(
-                "pending-requests", json.dumps(all_tickets)
-            )
-
-            while True:
-                print("Waiting for the join request to be processed...")
-                await asyncio.sleep(1)
-                if (
-                    await root_ctx.redis_raft_confchange_requests.client.llen("pending-requests")
-                    == 0
-                ):
-                    break
 
         root_ctx.raft_ctx.cluster = Raft.bootstrap(
             node_id,
@@ -1142,11 +1102,11 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
-                if cfg["manager"]["event-loop"] == "uvloop":
-                    import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                import uvloop
+
+                uvloop.install()
+                log.info("Using uvloop as the event loop backend")
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,

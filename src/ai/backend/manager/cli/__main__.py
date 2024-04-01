@@ -13,9 +13,6 @@ from typing import Any
 import click
 from more_itertools import chunked
 from raftify import (
-    ConfChangeRequest,
-    ConfChangeSingle,
-    ConfChangeType,
     InitialRole,
     Peer,
     Peers,
@@ -406,47 +403,10 @@ async def handle_raft_cli_main(argv: list[str]):
     await cli_main(argv)
 
 
-async def handle_apply_pending_confchanges(cli_ctx: CLIContext):
-    async with redis_ctx(cli_ctx) as redis_conn_set:
-        if raw_pending_join_request := await redis_conn_set.raft_confchange_requests.client.rpop(
-            "pending-requests"
-        ):
-            pending_join_request = json.loads(raw_pending_join_request)
-            leader_addr = pending_join_request[0]["leader_addr"]
-
-            addrs = []
-            changes = []
-            for ticket in pending_join_request:
-                change = ConfChangeSingle()
-                change.set_node_id(ticket["reserved_id"])
-                change.set_change_type(ConfChangeType.AddNode)
-                changes.append(change)
-                addrs.append(ticket["raft_addr"])
-
-            client = await RaftServiceClient.build(leader_addr)
-            await client.change_config(ConfChangeRequest(changes=changes, addrs=addrs))
-            await redis_conn_set.raft_confchange_requests.client.delete("pending-requests")
-
-
-async def handle_leave_joint(leader_addr: str):
-    client = await RaftServiceClient.build(leader_addr)
-    await client.leave_joint()
-
-
 @main.command()
 @click.pass_obj
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def raft(cli_ctx: CLIContext, args) -> None:
-    match next(iter(args), None):
-        case "apply-pending-confchanges":
-            print("Applying pending confchanges...")
-            asyncio.run(handle_apply_pending_confchanges(cli_ctx))
-            return
-        case "leave-joint":
-            print("Apply leave joint.")
-            asyncio.run(handle_leave_joint(args[1]))
-            return
-
     register_custom_deserializer()
 
     argv = sys.argv
