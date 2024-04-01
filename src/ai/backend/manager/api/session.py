@@ -1083,10 +1083,13 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             owner_access_key,
             allow_stale=True,
             for_update=True,
+            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
         )
         if compute_session.status != SessionStatus.RUNNING:
             raise InvalidAPIParameters("Can't change name of not running session")
         compute_session.name = new_name
+        for kernel in compute_session.kernels:
+            kernel.session_name = new_name
         await db_sess.commit()
 
     return web.Response(status=204)
