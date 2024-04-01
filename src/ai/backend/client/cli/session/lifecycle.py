@@ -45,7 +45,12 @@ from ..pretty import (
     print_warn,
 )
 from .args import click_start_option
-from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from .execute import (
+    format_stats,
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
@@ -177,7 +182,7 @@ def _create_cmd(docs: str = None):
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
         parsed_resource_opts = prepare_resource_arg(resource_opts)
-        mount, mount_map = prepare_mount_arg(mount)
+        mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
         preopen_ports = preopen
         assigned_agent_list = assign_agent
@@ -197,6 +202,7 @@ def _create_cmd(docs: str = None):
                     cluster_mode=cluster_mode,
                     mounts=mount,
                     mount_map=mount_map,
+                    mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
                     resources=parsed_resources,
@@ -433,7 +439,7 @@ def _create_from_template_cmd(docs: str = None):
             if len(resource_opts) > 0 or no_resource
             else undefined
         )
-        prepared_mount, prepared_mount_map = (
+        prepared_mount, prepared_mount_map, _ = (
             prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
         )
         kwargs = {

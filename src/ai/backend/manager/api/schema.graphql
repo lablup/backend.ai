@@ -547,6 +547,9 @@ type ComputeSession implements Item {
   vfolder_mounts: [String]
   occupying_slots: JSONString
   occupied_slots: JSONString
+
+  """Added in 24.03.0"""
+  requested_slots: JSONString
   num_queries: BigInt
   containers: [ComputeContainer]
   dependencies: [ComputeSession]
@@ -789,6 +792,22 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+}
+
+type ImageNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  humanized_name: String
+  tag: String
+  registry: String
+  architecture: String
+  is_local: Boolean
+  digest: String
+  labels: [KVPair]
+  size_bytes: BigInt
+  resource_limits: [ResourceLimit]
+  supported_accelerators: [String]
 }
 
 type Routing implements Item {

@@ -72,6 +72,8 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ImageRegistry,
+    MountPermission,
+    MountTypes,
     SessionTypes,
     VFolderID,
 )
@@ -213,6 +215,14 @@ creation_config_v4_template = t.Dict({
 creation_config_v5 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
+        }).ignore_extra("*"),
+    ),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
