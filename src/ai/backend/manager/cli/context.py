@@ -11,7 +11,13 @@ import click
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
-from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_RAFT_PENDING_JOIN_REQUESTS,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+)
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
@@ -111,6 +117,7 @@ class RedisConnectionSet:
     stat: RedisConnectionInfo
     image: RedisConnectionInfo
     stream: RedisConnectionInfo
+    raft_confchange_requests: RedisConnectionInfo
 
 
 @contextlib.asynccontextmanager
@@ -145,13 +152,20 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         name="mgr_cli.stream",
         db=REDIS_STREAM_DB,
     )
+    redis_raft_confchange_requests = redis_helper.get_redis_object(
+        shared_config.data["redis"],
+        name="mgr_cli.raft_confchange_requests",  # raft configuration change requests
+        db=REDIS_RAFT_PENDING_JOIN_REQUESTS,
+    )
     yield RedisConnectionSet(
         live=redis_live,
         stat=redis_stat,
         image=redis_image,
         stream=redis_stream,
+        raft_confchange_requests=redis_raft_confchange_requests,
     )
     await redis_stream.close()
     await redis_image.close()
     await redis_stat.close()
     await redis_live.close()
+    await redis_raft_confchange_requests.close()
