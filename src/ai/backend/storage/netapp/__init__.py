@@ -86,9 +86,9 @@ class QTreeQuotaModel(BaseQuotaModel):
                 qspath.name,
                 options,
             )
-        self.netapp_client.check_job_result(result, [])
-        result = await self.netapp_client.enable_quota(self.volume_id)
-        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
+            self.netapp_client.check_job_result(result, [])
+            result = await self.netapp_client.enable_quota(self.volume_id)
+            self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     async def describe_quota_scope(
         self,
