@@ -1260,7 +1260,7 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
-            "requested_slots": row.requested_slots,
+            "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
         }
