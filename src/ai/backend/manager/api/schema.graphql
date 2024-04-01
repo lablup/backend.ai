@@ -794,22 +794,6 @@ type Endpoint implements Item {
   errors: [InferenceSessionError!]!
 }
 
-type ImageNode implements Node {
-  """The ID of the object"""
-  id: ID!
-  name: String
-  humanized_name: String
-  tag: String
-  registry: String
-  architecture: String
-  is_local: Boolean
-  digest: String
-  labels: [KVPair]
-  size_bytes: BigInt
-  resource_limits: [ResourceLimit]
-  supported_accelerators: [String]
-}
-
 type Routing implements Item {
   id: ID
   routing_id: UUID
