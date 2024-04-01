@@ -31,6 +31,8 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiotools import process_index
+from raftify import ClusterJoinTicket, Config, Peers, Raft, RaftConfig
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -50,11 +52,14 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginConte
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
+from ai.backend.manager.raft.logger import Logger as RaftLogger
+from ai.backend.manager.raft.state_machine import HashStore
+from ai.backend.manager.raft.utils import WebServer, register_custom_deserializer
 
 from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
-from .api.context import RootContext
+from .api.context import RaftClusterContext, RootContext
 from .api.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -426,6 +431,7 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
@@ -504,6 +510,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
     sched_dispatcher = await SchedulerDispatcher.new(
+        root_ctx.raft_ctx,
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
@@ -648,6 +655,112 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+
+
+@actxmgr
+async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    register_custom_deserializer()
+    local_config = root_ctx.local_config
+    raft_configs = local_config.get("raft")
+
+    if raft_configs is not None:
+        other_peers = [{**peer, "myself": False} for peer in raft_configs["peers"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_configs["myself"]]
+        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
+        initial_peers = Peers({
+            int(peer_config["node-id"]): f"{peer_config['host']}:{peer_config['port']}"
+            for peer_config in all_peers
+        })
+
+        raft_core_config = RaftConfig(
+            heartbeat_tick=raft_configs["heartbeat-tick"],
+            election_tick=raft_configs["election-tick"],
+            min_election_tick=raft_configs["min-election-tick"],
+            max_election_tick=raft_configs["max-election-tick"],
+            max_committed_size_per_ready=raft_configs["max-committed-size-per-ready"],
+            max_size_per_msg=raft_configs["max-size-per-msg"],
+            max_inflight_msgs=raft_configs["max-inflight-msgs"],
+            check_quorum=raft_configs["check-quorum"],
+            batch_append=raft_configs["batch-append"],
+            max_uncommitted_size=raft_configs["max-uncommitted-size"],
+            skip_bcast_commit=raft_configs["skip-bcast-commit"],
+            pre_vote=raft_configs["pre-vote"],
+            priority=raft_configs["priority"],
+        )
+
+        raft_cfg = Config(
+            log_dir=raft_configs["log-dir"],
+            save_compacted_logs=True,
+            compacted_log_dir=raft_configs["log-dir"],
+            restore_wal_from=raft_configs["restore-wal-from"],
+            restore_wal_snapshot_from=raft_configs["restore-wal-snapshot-from"],
+            raft_config=raft_core_config,
+        )
+
+        node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
+        node_id = node_id_offset + process_index.get() + 1
+        raft_addr = initial_peers.get(node_id)
+        leader_id = raft_configs["cluster-leader-id"]
+        leader_addr = initial_peers.get(leader_id)
+
+        if leader_addr is None:
+            raise Exception(f"Leader node {leader_id} not found in initial peers.")
+
+        store = HashStore()
+
+        leader_mark = "-leader" if node_id == leader_id else ""
+
+        raft_logger = RaftLogger(
+            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}{leader_mark}"),  # type: ignore
+        )
+
+        if node_id == leader_id:
+            root_ctx.raft_ctx.cluster = Raft.bootstrap_cluster(
+                node_id,
+                raft_addr,
+                store,  # type: ignore
+                raft_cfg,
+                raft_logger,  # type: ignore
+                initial_peers,
+            )
+            raft_cluster = root_ctx.raft_ctx.cluster
+            raft_cluster.run()  # type: ignore
+        else:
+            root_ctx.raft_ctx.cluster = Raft.new_follower(
+                node_id,
+                raft_addr,
+                store,  # type: ignore
+                raft_cfg,
+                raft_logger,  # type: ignore
+                initial_peers,
+            )
+            raft_cluster = root_ctx.raft_ctx.cluster
+            raft_cluster.run()  # type: ignore
+
+            # Wait for the leader node's gRPC server ready
+            await asyncio.sleep(2)
+
+            if raft_configs["bootstrap-done"]:
+                await raft_cluster.join(
+                    ClusterJoinTicket(
+                        node_id,
+                        leader_id,
+                        leader_addr,
+                        initial_peers,
+                    )
+                )
+                await raft_cluster.get_raft_node().set_bootstrap_done()
+            else:
+                await raft_cluster.member_bootstrap_ready(leader_addr, node_id, raft_logger)  # type: ignore
+
+        # Only for testing
+        asyncio.create_task(
+            WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
+        )
+
+        # assert root_ctx.raft_ctx.cluster.raft_node is not None, "RaftNode not initialized properly!"
+    yield
 
 
 class background_task_ctx:
@@ -796,6 +909,7 @@ def build_root_app(
             database_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
+            raft_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
             hook_plugin_ctx,
@@ -857,6 +971,8 @@ async def server_main(
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
+
+    root_ctx.raft_ctx = RaftClusterContext()
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
@@ -935,8 +1051,10 @@ async def server_main_logwrapper(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
+
     log_endpoint = _args[1]
     logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+
     try:
         with logger:
             async with server_main(loop, pidx, _args):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, cast
 
 import attrs
+from raftify import Raft, RaftNode
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -24,6 +25,25 @@ if TYPE_CHECKING:
 
 class BaseContext:
     pass
+
+
+class RaftClusterContext:
+    _cluster: Optional[Raft] = None
+
+    def use_raft(self) -> bool:
+        return self._cluster is not None
+
+    @property
+    def cluster(self) -> Raft:
+        return cast(Raft, self._cluster)
+
+    @cluster.setter
+    def cluster(self, rhs: Raft) -> None:
+        self._cluster = rhs
+
+    @property
+    def raft_node(self) -> RaftNode:
+        return self.cluster.get_raft_node()
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -53,3 +73,4 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    raft_ctx: RaftClusterContext

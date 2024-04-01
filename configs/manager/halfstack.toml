@@ -15,7 +15,7 @@ pool-recycle = 50
 
 
 [manager]
-num-proc = 4
+num-proc = 3
 service-addr = { host = "0.0.0.0", port = 8081 }
 #user = "nobody"
 #group = "nobody"
@@ -34,6 +34,27 @@ hide-agents = true
 # The order of agent selection.
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
+[raft]
+heartbeat-tick = 3
+election-tick = 10
+log-dir = "./logs"
+log-level = "debug"
+
+[[raft.peers]]
+host = "127.0.0.1"
+port = 60151
+node-id = 1
+
+[[raft.peers]]
+host = "127.0.0.1"
+port = 60152
+node-id = 2
+
+[[raft.peers]]
+host = "127.0.0.1"
+port = 60153
+node-id = 3
+
 [docker-registry]
 ssl-verify = false
 
@@ -47,6 +68,7 @@ drivers = ["console"]
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+"ai.backend.manager.server.raft" = "INFO"
 "alembic" = "INFO"
 "sqlalchemy" = "WARNING"
 
