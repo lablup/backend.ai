@@ -523,6 +523,7 @@ type ComputeSession implements Item {
   vfolder_mounts: [String]
   occupying_slots: JSONString
   occupied_slots: JSONString
+  requested_slots: JSONString
   num_queries: BigInt
   containers: [ComputeContainer]
   dependencies: [ComputeSession]
