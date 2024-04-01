@@ -1103,10 +1103,11 @@ def main(
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
 
-                import uvloop
+                if cfg["manager"]["event-loop"] == "uvloop":
+                    import uvloop
 
-                uvloop.install()
-                log.info("Using uvloop as the event loop backend")
+                    uvloop.install()
+                    log.info("Using uvloop as the event loop backend")
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
