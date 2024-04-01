@@ -1191,6 +1191,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
+    requested_slots = graphene.JSONString()
 
     # statistics
     num_queries = BigInt()
@@ -1259,6 +1260,7 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "requested_slots": row.requested_slots,
             # statistics
             "num_queries": row.num_queries,
         }
