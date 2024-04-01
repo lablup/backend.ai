@@ -164,11 +164,10 @@ backend = "netapp"
 path = "/vfroot/netapp"
 
 [volume.netapp.options]
+# Must set storage-proxy.user and storage-proxy.group to a valid Netapp user and group id
 netapp_ontap_endpoint = "https://netapp.example.com"
 netapp_ontap_user = "admin-username"
 netapp_ontap_password = "admin-passwd"
-netapp_user_id = 1100   # Owner user id. Must be created on Netapp mgmt server.
-netapp_group_id = 1100  # Owner group id. Must be created on Netapp mgmt server.
 netapp_svm = "svm-name"
 netapp_volume_name = "netapp-volume-name"
 netapp_xcp_cmd = ["/home/user/xcp/linux/xcp"]

@@ -425,8 +425,8 @@ class NetAppVolume(BaseVolume):
             self.ontap_endpoint,
             self.config["netapp_ontap_user"],
             self.config["netapp_ontap_password"],
-            self.config["netapp_user_id"],
-            self.config["netapp_group_id"],
+            self.local_config["storage-proxy"]["user"],
+            self.local_config["storage-proxy"]["group"],
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
