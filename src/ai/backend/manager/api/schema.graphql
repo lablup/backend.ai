@@ -1006,6 +1006,10 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+  move_to_trash_vfolder(vfolder_ids: [UUID]!): MoveToTrashVFolder
+  restore_vfolder(vfolder_ids: [UUID]!): RestoreVFolder
+  delete_forever_vfolder(vfolder_ids: [UUID]!): DeleteForeverVFolder
+  purge_vfolder(vfolder_ids: [UUID]!): PurgeVFolder
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -1542,6 +1546,49 @@ input QuotaScopeInput {
 
 type UnsetQuotaScope {
   quota_scope: QuotaScope
+}
+
+type MoveToTrashVFolder {
+  vfolders: [VFolderNode]
+  failed: [UUID]
+}
+
+type VFolderNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  group: UUID
+  creator: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type RestoreVFolder {
+  vfolders: [VFolderNode]
+  failed: [UUID]
+}
+
+type DeleteForeverVFolder {
+  task_id: UUID
+  vfolders: [VFolderNode]
+}
+
+type PurgeVFolder {
+  vfolders: [VFolderNode]
+  failed: [UUID]
 }
 
 type CreateContainerRegistry {
