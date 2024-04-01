@@ -74,8 +74,6 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-address", default=None): t.Null | t.String,
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
-            t.Key("image-push-method", default="docker"): t.Enum("skopeo", "docker"),
-            t.Key("skopeo-path", default=None): t.Null | tx.Path(type="file"),
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
         t.Key("resource"): t.Dict({
