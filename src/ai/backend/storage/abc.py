@@ -226,7 +226,7 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @final
     def mangle_vfpath(self, vfid: VFolderID) -> Path:
-        folder_id_hex = vfid.folder_id.hex
+        folder_id_hex = vfid.reference_id.hex
         prefix1 = folder_id_hex[0:2]
         prefix2 = folder_id_hex[2:4]
         rest = folder_id_hex[4:]

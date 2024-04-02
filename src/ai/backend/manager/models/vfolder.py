@@ -228,6 +228,21 @@ vfolders = sa.Table(
     "vfolders",
     metadata,
     IDColumn("id"),
+    # idea 1
+    # Change `id` into non-pk field and add new pk field. `id` is used to build vfolder dir.
+    # Pros: don't need to change VFolderID, QuotaScopeID or any directory builder.
+    # Cons: should change all SQL conditions where fetch vfolders by `id`. and still, need to update all VFolderID use cases...
+    # sa.Column("id", GUID, primary_key=False, nullable=False, index=True, server_default=sa.text("uuid_generate_v4()")),  # To recognize vfolder's directory
+    # sa.Column("pk_id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")),  # Primary key
+    # idea 2
+    # Add `reference_id` field to point real vfolder id used to build vfolder dir.
+    # Pros: don't need to change any SQL condition to fetch vfolder by `id`.
+    # Cons: should change all vfolder directory builders.
+    # Maybe this one is better..?
+    # All I need to do is just updaate `mangle_vfpath()` function and `VFolderID`
+    sa.Column(
+        "reference_id", GUID, nullable=True
+    ),  # Used if the vfolder is invited/shared. null when it is not invited/shared
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
@@ -393,6 +408,7 @@ async def query_accessible_vfolders(
     vfolders_selectors = [
         vfolders.c.name,
         vfolders.c.id,
+        vfolders.c.reference_id,
         vfolders.c.host,
         vfolders.c.quota_scope_id,
         vfolders.c.usage_mode,
@@ -428,6 +444,7 @@ async def query_accessible_vfolders(
             entries.append({
                 "name": row.vfolders_name,
                 "id": row.vfolders_id,
+                "reference_id": row.reference_id,
                 "host": row.vfolders_host,
                 "quota_scope_id": row.vfolders_quota_scope_id,
                 "usage_mode": row.vfolders_usage_mode,
@@ -769,7 +786,7 @@ async def prepare_vfolder_mounts(
             mount_base_path = PurePosixPath(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
-                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    VFolderID(vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]),
                     PurePosixPath(requested_vfolder_subpaths[key]),
                 ),
             )
@@ -785,7 +802,9 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
-                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                    "vfid": str(
+                        VFolderID(vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"])
+                    ),
                     "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
                 },
@@ -795,7 +814,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfid=VFolderID(
+                        vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]
+                    ),
                     vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
@@ -827,7 +848,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfid=VFolderID(
+                        vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]
+                    ),
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
@@ -972,6 +995,7 @@ async def initiate_vfolder_clone(
             async with db_engine.begin_session() as db_session:
                 insert_values = {
                     "id": target_folder_id.folder_id,
+                    "reference_id": None,
                     "name": vfolder_info.target_vfolder_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
@@ -2047,7 +2071,7 @@ class ModelCard(graphene.ObjectType):
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
         folder_name = vfolder_row.name
-        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
+        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id, vfolder_row.reference_id)
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
         async with graph_ctx.storage_manager.request(
             proxy_name,

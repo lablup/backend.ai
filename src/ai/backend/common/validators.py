@@ -478,22 +478,13 @@ class QuotaScopeID(t.Trafaret):
 
 class VFolderID(t.Trafaret):
     def check_and_return(self, value: Any) -> _VFolderID:
-        tuple_t = t.Tuple(QuotaScopeID(), UUID())
         match value:
             case str():
-                pieces = value.partition("/")
-                if len(pieces[2]) == 0:  # for old vFolder ID without quota scope ID
-                    converted = (None, UUID().check(pieces[0]))
-                else:
-                    converted = tuple_t.check((pieces[0], pieces[2]))
+                return _VFolderID.from_str(value)
             case tuple():
-                converted = tuple_t.check(value)
+                return _VFolderID.from_tuple(value)
             case _:
                 self._failure("cannot convert value to VFolderID", value=value)
-        return _VFolderID(
-            quota_scope_id=converted[0],
-            folder_id=converted[1],
-        )
 
 
 class TimeZone(t.Trafaret):

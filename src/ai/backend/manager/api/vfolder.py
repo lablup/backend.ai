@@ -577,6 +577,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         # TODO: include quota scope ID in the API response
         insert_values = {
             "id": vfid.folder_id.hex,
+            "reference_id": None,
             "name": params["name"],
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
@@ -671,6 +672,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
             resp.append({
                 "name": entry["name"],
                 "id": entry["id"].hex,
+                "reference_id": entry["reference_id"].hex,
                 "quota_scope_id": str(entry["quota_scope_id"]),
                 "host": entry["host"],
                 "status": entry["status"],
@@ -920,6 +922,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     resp = {
         "name": row["name"],
         "id": row["id"].hex,
+        "reference_id": row["reference_id"].hex,
         "host": row["host"],
         "quota_scope_id": str(row["quota_scope_id"]),
         "status": row["status"],
@@ -1090,6 +1093,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
 )
 async def get_usage(request: web.Request, params: Any) -> web.Response:
     entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = entries[0]
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -1104,7 +1108,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         "folder/usage",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -1121,6 +1125,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
 )
 async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = entries[0]
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
@@ -1130,7 +1135,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         "folder/used-bytes",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -1278,7 +1283,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "folder/file/mkdir",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpath": params["path"],
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
@@ -1338,7 +1343,7 @@ async def create_download_session(
         "folder/file/download",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpath": params["path"],
             "archive": params["archive"],
             "unmanaged_path": unmanaged_path if unmanaged_path else None,
@@ -1391,7 +1396,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
         "folder/file/upload",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpath": params["path"],
             "size": params["size"],
         },
@@ -1449,7 +1454,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         "folder/file/rename",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpath": params["target_path"],
             "new_name": params["new_name"],
         },
@@ -1487,7 +1492,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         "folder/file/move",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "src_relpath": params["src"],
             "dst_relpath": params["dst"],
         },
@@ -1526,7 +1531,7 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         "folder/file/delete",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpaths": params["files"],
             "recursive": recursive,
         },
@@ -1562,7 +1567,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
         "folder/file/list",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])),
             "relpath": params["path"],
         },
     ) as (_, storage_resp):
@@ -2675,7 +2680,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         params["permission"].value,
     )
     source_folder_host = row["host"]
-    source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
+    source_folder_id = VFolderID(row["quota_scope_id"], row["id"], row["reference_id"])
     target_folder_host = params["folder_host"]
     target_quota_scope_id = "..."  # TODO: implement
     source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)

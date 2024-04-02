@@ -887,14 +887,34 @@ class QuotaScopeID:
 
 class VFolderID:
     quota_scope_id: QuotaScopeID | None
-    folder_id: uuid.UUID
+    folder_id: uuid.UUID  # vfolders.id
+    reference_id: uuid.UUID  # vfolders.reference_id or vfolders.id
 
     @classmethod
     def from_row(cls, row: Any) -> VFolderID:
-        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+        if "reference_id" in row and row["reference_id"] is not None:
+            reference_id = row["reference_id"]
+        else:
+            reference_id = row["id"]
+        return cls(
+            quota_scope_id=row["quota_scope_id"], folder_id=row["id"], reference_id=reference_id
+        )
 
-    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Tuple(QuotaScopeID(), tx.UUID(), tx.UUID())
+
+    def __init__(
+        self,
+        quota_scope_id: QuotaScopeID | str | None,
+        folder_id: uuid.UUID,
+        # reference_id: uuid.UUID | None = None,
+        reference_id: uuid.UUID | None,  # To check all `VFolderID` usage by running type checking
+    ) -> None:
         self.folder_id = folder_id
+        self.reference_id = reference_id or folder_id
         match quota_scope_id:
             case QuotaScopeID():
                 self.quota_scope_id = quota_scope_id
@@ -907,8 +927,20 @@ class VFolderID:
 
     def __str__(self) -> str:
         if self.quota_scope_id is None:
-            return self.folder_id.hex
-        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+            return f"{self.folder_id.hex}/{self.reference_id.hex}"
+        return f"{self.quota_scope_id}/{self.folder_id.hex}/{self.reference_id.hex}"
+
+    @classmethod
+    def from_str(cls, value: str) -> VFolderID:
+        pieces = value.split("/")
+        if len(pieces) == 2:
+            # for old vFolder ID without quota scope ID
+            pieces.insert(0, None)
+        return cls.from_tuple(tuple(pieces))
+
+    @classmethod
+    def from_tuple(cls, value: tuple):
+        return cls(*cls.as_trafaret().check(value))
 
     def __eq__(self, other) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
