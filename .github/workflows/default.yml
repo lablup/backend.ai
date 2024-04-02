@@ -311,7 +311,7 @@ jobs:
     - name: Upload scies
       uses: actions/upload-artifact@v4
       with:
-        name: scies
+        name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
       uses: actions/upload-artifact@v4
@@ -433,8 +433,9 @@ jobs:
     - name: Download scies
       uses: actions/download-artifact@v4
       with:
-        name: scies
+        pattern: scies-*
         path: dist
+        merge-multiple: true
     - name: Download local-proxy
       uses: actions/download-artifact@v4
       with:
