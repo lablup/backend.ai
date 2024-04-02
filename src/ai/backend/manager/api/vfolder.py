@@ -2400,7 +2400,7 @@ class DeleteFromTrashRequestModel(BaseModel):
 @pydantic_params_api_handler(DeleteFromTrashRequestModel)
 async def delete_from_trash_bin(
     request: web.Request, params: DeleteFromTrashRequestModel
-) -> SuccessResponseModel:
+) -> web.Response:
     """
     Delete `delete-pending` vfolders in storage proxy
     """
@@ -2455,7 +2455,7 @@ async def delete_from_trash_bin(
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 class PurgeRequestModel(BaseModel):
@@ -2468,7 +2468,7 @@ class PurgeRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(PurgeRequestModel)
-async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessResponseModel:
+async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
     """
     Delete `delete-complete`d vfolder rows in DB
     """
@@ -2517,7 +2517,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessRespo
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 class RestoreRequestModel(BaseModel):
@@ -2530,7 +2530,7 @@ class RestoreRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(RestoreRequestModel)
-async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessResponseModel:
+async def restore(request: web.Request, params: RestoreRequestModel) -> web.Response:
     """
     Recover vfolder from trash bin, by changing status.
     """
@@ -2585,7 +2585,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessR
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
     await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 @auth_required
