@@ -246,12 +246,12 @@ class Mutations(graphene.ObjectType):
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
-    move_to_trash_vfolder = MoveToTrashVFolder.Field()
-    restore_vfolder = RestoreVFolder.Field()
-    delete_forever_vfolder = DeleteForeverVFolder.Field()
+    move_to_trash_vfolder = MoveToTrashVFolder.Field(description="Added in 24.03")
+    restore_vfolder = RestoreVFolder.Field(description="Added in 24.03")
+    delete_forever_vfolder = DeleteForeverVFolder.Field(description="Added in 24.03")
 
     # super-admin only
-    purge_vfolder = PurgeVFolder.Field()
+    purge_vfolder = PurgeVFolder.Field(description="Added in 24.03")
 
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
