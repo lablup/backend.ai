@@ -306,10 +306,6 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                 )
                 deleted_count = result.rowcount
 
-                vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-                log.info(f"Perfoming {vacuum_sql} operation...")
-                await conn.exec_driver_sql(vacuum_sql)
-
                 curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
                 if ret := curs.fetchone():
                     table_size = ret[0]
