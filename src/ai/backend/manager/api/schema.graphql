@@ -554,7 +554,7 @@ type KeyPairResourcePolicy {
   allowed_vfolder_hosts: JSONString
   max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
 type UserResourcePolicy {
@@ -562,15 +562,15 @@ type UserResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.0. Limitation of the number of user vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
 }
@@ -580,12 +580,12 @@ type ProjectResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 24.03.0. Limitation of the number of project vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of project vfolders."""
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ResourcePreset {
@@ -1323,7 +1323,7 @@ input CreateKeyPairResourcePolicyInput {
   allowed_vfolder_hosts: JSONString
   max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
 type ModifyKeyPairResourcePolicy {
@@ -1342,7 +1342,7 @@ input ModifyKeyPairResourcePolicyInput {
   allowed_vfolder_hosts: JSONString
   max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
 type DeleteKeyPairResourcePolicy {
@@ -1357,16 +1357,17 @@ type CreateUserResourcePolicy {
 }
 
 input CreateUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.0. Limitation of the number of user vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.0. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ModifyUserResourcePolicy {
@@ -1375,16 +1376,17 @@ type ModifyUserResourcePolicy {
 }
 
 input ModifyUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.0. Limitation of the number of user vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of user vfolders."""
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.0. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type DeleteUserResourcePolicy {
@@ -1399,11 +1401,12 @@ type CreateProjectResourcePolicy {
 }
 
 input CreateProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 24.03.0. Limitation of the number of project vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of project vfolders."""
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ModifyProjectResourcePolicy {
@@ -1412,11 +1415,12 @@ type ModifyProjectResourcePolicy {
 }
 
 input ModifyProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 24.03.0. Limitation of the number of project vfolders."""
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 24.03.0. Limitation of the quota size of project vfolders."""
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type DeleteProjectResourcePolicy {
