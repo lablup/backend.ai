@@ -110,25 +110,31 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
+    async def _begin_session(
+        self, conn: SAConnection, expire_on_commit=False
+    ) -> AsyncIterator[SASession]:
+        self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+        session = self._sess_factory()
+        yield session
+
+    @actxmgr
     async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            try:
-                yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise e
+            async with self._begin_session(conn, expire_on_commit=expire_on_commit) as session:
+                try:
+                    yield session
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    raise e
 
     @actxmgr
     async def begin_readonly_session(
         self, deferrable: bool = False, expire_on_commit=False
     ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
-            session = self._sess_factory()
-            yield session
+            async with self._begin_session(conn, expire_on_commit=expire_on_commit) as session:
+                yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -209,6 +215,7 @@ async def connect_database(
         connect_args=pgsql_connect_opts,
         pool_size=local_config["db"]["pool-size"],
         pool_recycle=local_config["db"]["pool-recycle"],
+        pool_pre_ping=local_config["db"]["pool-pre-ping"],
         max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
@@ -383,17 +390,3 @@ def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
 
 def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
-
-
-def description_msg(version: str, detail: str | None = None) -> str:
-    val = f"Added since {version}."
-    if detail:
-        val = f"{val} {detail}"
-    return val
-
-
-def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
-    val = f"Deprecated since {version}."
-    if detail:
-        val = f"{val} {detail}"
-    return val

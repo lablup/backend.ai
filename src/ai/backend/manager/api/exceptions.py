@@ -284,6 +284,10 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     error_title = "The virtual folder already exists with the same name."
 
 
+class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
+    error_title = "Cannot delete model VFolders bound to alive model services."
+
+
 class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
@@ -297,6 +301,11 @@ class VFolderFilterStatusFailed(BackendError, web.HTTPBadRequest):
 class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
     error_title = "There is no available virtual folder to filter its status."
+
+
+class VFolderPermissionError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-permission-error"
+    error_title = "The virtual folder does not permit the specified permission."
 
 
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):

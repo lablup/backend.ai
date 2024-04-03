@@ -46,6 +46,7 @@ from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -910,9 +911,12 @@ class AgentRegistry:
             )
             use_host_network_result = await conn.execute(use_host_network_query)
             use_host_network = use_host_network_result.scalar()
-            # Translate mounts/mount_map into vfolder mounts
+            # Translate mounts/mount_map/mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_options = (
+                session_enqueue_configs["creation_config"].get("mount_options") or {}
+            )
             allowed_vfolder_types = await self.shared_config.get_vfolder_types()
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -922,6 +926,7 @@ class AgentRegistry:
                 resource_policy,
                 requested_mounts,
                 requested_mount_map,
+                requested_mount_options,
             )
 
             # Prepare internal data for common dotfiles.
@@ -3436,6 +3441,8 @@ async def handle_model_service_status_update(
             route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
     except SessionNotFound:
         return
+    except NoResultFound:
+        return
 
     async def _update():
         async with context.db.begin_session() as db_sess:
@@ -3607,6 +3614,8 @@ async def invoke_session_callback(
                         await db_sess.execute(query)
 
             await execute_with_retry(_clear_error)
+    except NoResultFound:
+        pass  # Cases when we try to create a inference session for validation (/services/_/try API)
     except Exception:
         log.exception("error while updating route status:")
 

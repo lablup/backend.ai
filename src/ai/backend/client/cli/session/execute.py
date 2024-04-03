@@ -20,6 +20,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, MountExpression
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
@@ -191,20 +192,20 @@ def format_stats(stats):
         max_fraction_len = 0
         for key, metric in stats.items():
             unit = metric["unit_hint"]
-            if unit == "bytes":
-                val = metric.get("stats.max", metric["current"])
-                val = naturalsize(val, binary=True)
-                val, unit = val.rsplit(" ", maxsplit=1)
-                val = "{:,}".format(Decimal(val))
-            elif unit == "msec":
-                val = "{:,}".format(Decimal(metric["current"]))
-                unit = "msec"
-            elif unit == "percent":
-                val = metric["pct"]
-                unit = "%"
-            else:
-                val = metric["current"]
-                unit = ""
+            match unit:
+                case "bytes":
+                    val = metric.get("stats.max", metric["current"])
+                    val = naturalsize(val, binary=True)
+                    val, unit = val.rsplit(" ", maxsplit=1)
+                    val = "{:,}".format(Decimal(val))
+                case "msec" | "usec" | "sec":
+                    val = "{:,}".format(Decimal(metric["current"]))
+                case "percent" | "pct" | "%":
+                    val = metric["pct"]
+                    unit = "%"
+                case _:
+                    val = metric["current"]
+                    unit = ""
             if val is None:
                 continue
             ip, _, fp = val.partition(".")
@@ -244,26 +245,35 @@ def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_mount_arg(
-    mount_args: Optional[Sequence[str]],
-) -> Tuple[Sequence[str], Mapping[str, str]]:
+    mount_args: Optional[Sequence[str]] = None,
+    *,
+    escape: bool = True,
+) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
-    vfolder name and in-container mount path pairs.
+    vfolder name and in-container mount path pairs,
+    followed by extra options.
+
+    :param mount_args: A list of mount arguments such as
+        [
+            "type=bind,source=/colon:path/test,target=/data",
+            "type=bind,source=/colon:path/abcd,target=/zxcv,readonly",
+            # simple formats are still supported
+            "vf-abcd:/home/work/zxcv",
+        ]
     """
     mounts = set()
     mount_map = {}
+    mount_options = {}
     if mount_args is not None:
-        for value in mount_args:
-            if "=" in value:
-                sp = value.split("=", maxsplit=1)
-            elif ":" in value:  # docker-like volume mount mapping
-                sp = value.split(":", maxsplit=1)
-            else:
-                sp = [value]
-            mounts.add(sp[0])
-            if len(sp) == 2:
-                mount_map[sp[0]] = sp[1]
-    return list(mounts), mount_map
+        for mount_arg in mount_args:
+            mountpoint = {**MountExpression(mount_arg).parse(escape=escape)}
+            mount = str(mountpoint.pop("source"))
+            mounts.add(mount)
+            if target := mountpoint.pop("target", None):
+                mount_map[mount] = str(target)
+            mount_options[mount] = mountpoint
+    return list(mounts), mount_map, mount_options
 
 
 @main.command()
@@ -346,8 +356,8 @@ def prepare_mount_arg(
 @click.option(
     "--cluster-mode",
     metavar="MODE",
-    type=click.Choice(["single-node", "multi-node"]),
-    default="single-node",
+    type=click.Choice([*ClusterMode], case_sensitive=False),
+    default=ClusterMode.SINGLE_NODE,
     help="The mode of clustering.",
 )
 @click.option(
@@ -409,7 +419,7 @@ def run(
     scaling_group,  # click_start_option
     resources,  # click_start_option
     cluster_size,  # click_start_option
-    cluster_mode,
+    cluster_mode: ClusterMode,
     resource_opts,  # click_start_option
     architecture,
     domain,  # click_start_option
@@ -447,7 +457,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map = prepare_mount_arg(mount)
+    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
     if env_range is None:
         env_range = []  # noqa
@@ -627,6 +637,7 @@ def run(
                 cluster_mode=cluster_mode,
                 mounts=mount,
                 mount_map=mount_map,
+                mount_options=mount_options,
                 envs=envs,
                 resources=resources,
                 resource_opts=resource_opts,

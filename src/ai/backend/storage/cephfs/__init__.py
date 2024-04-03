@@ -87,24 +87,24 @@ class CephDirQuotaModel(BaseQuotaModel):
 
 
 class CephFSOpModel(BaseFSOpModel):
-    async def scan_tree_usage(self, target_path: Path) -> TreeUsage:
+    async def scan_tree_usage(self, path: Path) -> TreeUsage:
         loop = asyncio.get_running_loop()
         raw_reports = await loop.run_in_executor(
             None,
             lambda: (
-                os.getxattr(target_path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
-                os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+                os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
+                os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
             ),
         )
         file_count = int(raw_reports[0].strip().decode())
         used_bytes = int(raw_reports[1].strip().decode())
         return TreeUsage(file_count=file_count, used_bytes=used_bytes)
 
-    async def scan_tree_size(self, target_path: Path) -> BinarySize:
+    async def scan_tree_size(self, path: Path) -> BinarySize:
         loop = asyncio.get_running_loop()
         raw_report = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
         )
         return BinarySize(raw_report.strip().decode())
 

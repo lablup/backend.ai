@@ -226,3 +226,12 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
         else:
             result[k] = v
     return result
+
+
+def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+    for k in key_path[:-1]:
+        if k not in table:
+            return
+        table = table[k]
+    if table.get(key_path[-1]) is None:
+        table[key_path[-1]] = value

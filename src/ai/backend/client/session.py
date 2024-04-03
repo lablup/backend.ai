@@ -68,7 +68,7 @@ async def _negotiate_api_version(
                 )
             if server_version < MIN_API_VERSION:
                 warnings.warn(
-                    "The server is too old and does not meet the minimum API version"
+                    f"The server is too old ({server_version}) and does not meet the minimum API version"
                     f" requirement: v{MIN_API_VERSION[0]}.{MIN_API_VERSION[1]}\nPlease upgrade"
                     " the server or downgrade/reinstall the client SDK with the same"
                     " major.minor release of the server.",
@@ -270,6 +270,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Permission",
         "Service",
         "Model",
+        "QuotaScope",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -304,6 +305,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.manager import Manager
         from .func.model import Model
+        from .func.quota_scope import QuotaScope
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
         from .func.server_log import ServerLog
@@ -340,6 +342,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Permission = Permission
         self.Service = Service
         self.Model = Model
+        self.QuotaScope = QuotaScope
 
     @property
     def proxy_mode(self) -> bool:
