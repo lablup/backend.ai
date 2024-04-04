@@ -33,6 +33,8 @@ type Queries {
   ): [Group]
   image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
+
+  """Added since 24.03.0"""
   customized_images: [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
@@ -168,7 +170,7 @@ type ComputeContainer implements Item {
   """Deprecated since 24.03.0; use image_object.name"""
   image: String
 
-  """Added at 24.03.0"""
+  """Added since 24.03.0"""
   image_object: ImageNode
   architecture: String
   registry: String
@@ -991,6 +993,8 @@ type Mutations {
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+
+  """Added since 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
@@ -1101,6 +1105,8 @@ input GroupInput {
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
+
+  """Added since 24.03.0"""
   container_registry: JSONString = "{}"
 }
 
@@ -1121,6 +1127,8 @@ input ModifyGroupInput {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added since 24.03.0"""
   container_registry: JSONString = "{}"
 }
 
@@ -1303,6 +1311,7 @@ input ResourceLimitInput {
   max: String
 }
 
+"""Added since 24.03.0."""
 type ForgetImageById {
   ok: Boolean
   msg: String
