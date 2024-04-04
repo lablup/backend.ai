@@ -65,9 +65,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 
-from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
@@ -76,6 +74,7 @@ from .gql_relay import (
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from .utils import execute_with_retry
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
@@ -1178,7 +1177,9 @@ async def populate_fixture(
             # skip reserved names like "__mode"
             continue
         assert not isinstance(rows, str)
-        table: sa.Table = getattr(models, table_name)
+
+        table: sa.Table = metadata.tables.get(table_name)
+
         assert isinstance(table, sa.Table)
         if not rows:
             return
@@ -1190,7 +1191,7 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
-                elif isinstance(col.type, EnumValueType):
+                elif isinstance(col.type, (StrEnumType, EnumValueType)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])

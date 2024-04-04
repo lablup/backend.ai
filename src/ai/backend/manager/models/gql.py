@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import Undefined
+from graphql import OperationType, Undefined
 
 set_input_object_type_default_value(Undefined)
 
@@ -15,8 +15,9 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
+    ContainerRegistryConnection,
     CreateContainerRegistry,
     DeleteContainerRegistry,
     ModifyContainerRegistry,
@@ -672,9 +673,21 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+    container_registry = graphene.Field(ContainerRegistry, id=graphene.UUID(required=True))
 
-    container_registries = graphene.List(ContainerRegistry)
+    container_registries = graphene.List(
+        ContainerRegistry,
+        registry_name=graphene.String(required=True),
+        description="Added in 24.03.0.",
+    )
+
+    container_registry_node = graphene.Field(
+        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+
+    container_registry_nodes = PaginatedConnectionField(
+        ContainerRegistryConnection, description="Added in 24.03.0."
+    )
 
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
@@ -2049,19 +2062,54 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registry(
         root: Any,
         info: graphene.ResolveInfo,
-        hostname: str,
+        id: graphene.UUID,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load(ctx, id)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
+        registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_all(ctx)
+        return await ContainerRegistry.list_by_registry_name(ctx, registry_name)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> ContainerRegistry:
+        return await ContainerRegistry.get_node(info, id)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ContainerRegistry.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     async def resolve_model_card(
         root: Any,
@@ -2097,7 +2145,7 @@ class Queries(graphene.ObjectType):
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
-        if info.operation.operation == "mutation" and len(info.path) == 1:
+        if info.operation.operation == OperationType.MUTATION and len(info.path) == 1:
             mutation_cls = getattr(Mutations, info.field_name).type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])

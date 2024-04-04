@@ -142,3 +142,5 @@ docs/manager/rest-reference/openapi.json
 
 /DIST-INFO
 /INSTALL-INFO
+
+etcd_container_registries_backup.json
