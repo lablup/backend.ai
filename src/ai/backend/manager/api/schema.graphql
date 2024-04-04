@@ -393,7 +393,7 @@ type Group {
   type: String
 
   """Added since 24.03.0."""
-  per_user_image_storage_registry: JSONString
+  container_registry: JSONString
   scaling_groups: [String]
 }
 
@@ -597,6 +597,11 @@ type UserResourcePolicy {
   Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type ProjectResourcePolicy {
@@ -1094,7 +1099,7 @@ input GroupInput {
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
-  per_user_image_storage_registry: JSONString = "{}"
+  container_registry: JSONString = "{}"
 }
 
 type ModifyGroup {
@@ -1114,7 +1119,7 @@ input ModifyGroupInput {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
-  per_user_image_storage_registry: JSONString = "{}"
+  container_registry: JSONString = "{}"
 }
 
 """Instead of deleting the group, just mark it as inactive."""
@@ -1377,6 +1382,11 @@ input CreateUserResourcePolicyInput {
   Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type ModifyUserResourcePolicy {
@@ -1395,6 +1405,11 @@ input ModifyUserResourcePolicyInput {
   Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type DeleteUserResourcePolicy {
