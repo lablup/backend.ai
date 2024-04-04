@@ -113,7 +113,7 @@ association_groups_users = sa.Table(
     sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
 
-per_user_image_storage_registry_iv = t.Dict({}) | t.Dict({
+container_registry_iv = t.Dict({}) | t.Dict({
     t.Key("registry"): t.String(),
     t.Key("project"): t.String(),
 })
@@ -178,8 +178,8 @@ groups = sa.Table(
         default=ProjectType.GENERAL,
     ),
     sa.Column(
-        "per_user_image_storage_registry",
-        StructuredJSONColumn(per_user_image_storage_registry_iv),
+        "container_registry",
+        StructuredJSONColumn(container_registry_iv),
         nullable=True,
         default=None,
     ),
@@ -277,7 +277,7 @@ class Group(graphene.ObjectType):
     integration_id = graphene.String()
     resource_policy = graphene.String()
     type = graphene.String(description="Added since 24.03.0.")
-    per_user_image_storage_registry = graphene.JSONString(description="Added since 24.03.0.")
+    container_registry = graphene.JSONString(description="Added since 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -298,7 +298,7 @@ class Group(graphene.ObjectType):
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
             type=row["type"].name,
-            per_user_image_storage_registry=row["per_user_image_storage_registry"],
+            container_registry=row["container_registry"],
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -437,7 +437,7 @@ class GroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
-    per_user_image_storage_registry = graphene.JSONString(required=False, default_value={})
+    container_registry = graphene.JSONString(required=False, default_value={})
 
 
 class ModifyGroupInput(graphene.InputObjectType):
@@ -451,7 +451,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    per_user_image_storage_registry = graphene.JSONString(required=False, default_value={})
+    container_registry = graphene.JSONString(required=False, default_value={})
 
 
 class CreateGroup(graphene.Mutation):
@@ -488,7 +488,7 @@ class CreateGroup(graphene.Mutation):
             "domain_name": props.domain_name,
             "integration_id": props.integration_id,
             "resource_policy": props.resource_policy,
-            "per_user_image_storage_registry": props.per_user_image_storage_registry,
+            "container_registry": props.container_registry,
         }
         # set_if_set() applies to optional without defaults
         set_if_set(
@@ -540,7 +540,7 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "integration_id")
         set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "per_user_image_storage_registry")
+        set_if_set(props, data, "container_registry")
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")

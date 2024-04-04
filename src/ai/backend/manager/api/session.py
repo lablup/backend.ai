@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import enum
 import functools
 import json
 import logging
@@ -109,6 +110,7 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
+    QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1008,9 +1010,21 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     return web.json_response(resp, status=201)
 
 
+class CustomizedImageVisibilityScope(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
+
+
 class ConvertSessionToImageRequesteModel(BaseModel):
-    image_name: str = Field(pattern=r"[a-zA-Z0-9\.\-_]+")
+    image_name: str = Field(
+        pattern=r"[a-zA-Z0-9\.\-_]+",
+        description="Name of the image to be created.",
+    )
     login_session_token: Annotated[str | None, Field(default=None)]
+    image_visibility: CustomizedImageVisibilityScope = Field(
+        default=CustomizedImageVisibilityScope.USER,
+        description="Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error.",
+    )
 
 
 class ConvertSessionToImageResponseModel(BaseResponseModel):
@@ -1032,6 +1046,9 @@ async def convert_session_to_image(
     myself = asyncio.current_task()
     assert myself is not None
 
+    if params.image_visibility != CustomizedImageVisibilityScope.USER:
+        raise InvalidAPIParameters(f"Unsupported visibility scope {params.image_visibility}")
+
     log.info(
         "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
         requester_access_key,
@@ -1048,13 +1065,13 @@ async def convert_session_to_image(
         )
 
     project: GroupRow = session.group
-    if not project.per_user_image_storage_registry:
+    if not project.container_registry:
         raise InvalidAPIParameters(
             "Project not ready to convert session image (registry configuration not populated)"
         )
 
-    registry_hostname = project.per_user_image_storage_registry["registry"]
-    registry_project = project.per_user_image_storage_registry["project"]
+    registry_hostname = project.container_registry["registry"]
+    registry_project = project.container_registry["project"]
     registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
     if not registry_conf:
         raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
@@ -1062,6 +1079,8 @@ async def convert_session_to_image(
         raise InvalidAPIParameters(f"Project {registry_project} not found")
 
     base_image_ref = session.main_kernel.image_ref
+
+    image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
         reporter.total_progress = 3
@@ -1081,16 +1100,38 @@ async def convert_session_to_image(
             new_canonical = (
                 f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
             )
-            # check if image with same name exists and reuse ID it if is
+
             async with root_ctx.db.begin_readonly_session() as sess:
+                # check if user has passed its limit of customized image count
+                query = sa.select(sa.func.count(ImageRow)).where(
+                    (
+                        ImageRow.labels["ai.backend.customized-image-owner"].as_string()
+                        == f"{params.image_visibility.value}:{image_owner_id}"
+                    )
+                )
+                existing_image_count = await sess.scalar(query)
+
+                customized_image_count_limit = request["user"]["resource_policy"][
+                    "max_customized_image_count"
+                ]
+                if customized_image_count_limit <= existing_image_count:
+                    raise QuotaExceeded(
+                        extra_msg="You have reached your customized image count quota",
+                        extra_data={
+                            "limit": customized_image_count_limit,
+                            "current": existing_image_count,
+                        },
+                    )
+
+                # check if image with same name exists and reuse ID it if is
                 query = sa.select(ImageRow).where(
                     ImageRow.name.like(f"{new_canonical}%")
                     & (
-                        ImageRow.labels["ai.backend.personalized-image-owner"].as_string()
-                        == f"user:{request['user']['uuid']}"
+                        ImageRow.labels["ai.backend.customized-image-owner"].as_string()
+                        == f"{params.image_visibility.value}:{image_owner_id}"
                     )
                     & (
-                        ImageRow.labels["ai.backend.personalized-image-name"].as_string()
+                        ImageRow.labels["ai.backend.customized-image-name"].as_string()
                         == params.image_name
                     )
                 )
@@ -1098,7 +1139,7 @@ async def convert_session_to_image(
 
                 peruser_image_id: str
                 if existing_row:
-                    peruser_image_id = existing_row.labels["ai.backend.personalized-image-id"]
+                    peruser_image_id = existing_row.labels["ai.backend.customized-image-id"]
                     log.debug("reusing existing peruser image ID {}", peruser_image_id)
                 else:
                     peruser_image_id = str(uuid.uuid4())
@@ -1117,9 +1158,9 @@ async def convert_session_to_image(
                 session,
                 new_image_ref,
                 extra_labels={
-                    "ai.backend.personalized-image-owner": f"user:{request['user']['uuid']}",
-                    "ai.backend.personalized-image-name": params.image_name,
-                    "ai.backend.personalized-image-id": peruser_image_id,
+                    "ai.backend.customized-image-owner": f"{params.image_visibility.value}:{image_owner_id}",
+                    "ai.backend.customized-image-name": params.image_name,
+                    "ai.backend.customized-image-id": peruser_image_id,
                 },
             )
             async for event, _ in background_task_manager.poll_bgtask_event(

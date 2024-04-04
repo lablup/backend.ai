@@ -459,7 +459,7 @@ class AgentRegistry:
                 )
             requested_image_ref = image_row.image_ref
             if (
-                _owner_id := image_row.labels.get("ai.backend.personalized-image-owner")
+                _owner_id := image_row.labels.get("ai.backend.customized-image-owner")
             ) and _owner_id != f"user:{user_scope.user_uuid}":
                 raise ImageNotFound
             if not requested_image_ref.is_local:

@@ -677,7 +677,7 @@ class Image(graphene.ObjectType):
                 match label.key:
                     case "ai.backend.features" if "operation" in label.value:
                         operation_feature_detected = True
-                    case "ai.backend.personalized-image-owner":
+                    case "ai.backend.customized-image-owner":
                         if label.value != f"user:{ctx.user['uuid']}":
                             not_my_image = True
                             break
