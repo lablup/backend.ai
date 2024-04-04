@@ -336,7 +336,7 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
             ),
         ),
     )

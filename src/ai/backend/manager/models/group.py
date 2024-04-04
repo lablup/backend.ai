@@ -262,7 +262,7 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added since 24.03.0.")
+    type = graphene.String(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -411,7 +411,7 @@ class GroupInput(graphene.InputObjectType):
         required=False,
         default_value="GENERAL",
         description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
         ),
     )
     description = graphene.String(required=False, default_value="")
