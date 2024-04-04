@@ -2,13 +2,14 @@ name: 'Auto Label'
 
 on:
   pull_request_target:
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+    types: [labeled, unlabeled, opened, synchronize, reopened, edited]
 
 permissions:
+  issues: write
   pull-requests: write
 
 jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - uses: lablup/auto-label-in-issue@1.4.0
+      - uses: lablup/auto-label-in-issue@1.7.0

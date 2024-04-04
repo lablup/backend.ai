@@ -25,6 +25,16 @@ Then install the client library from PyPI.
    (venv-backend-ai) $ pip install -U pip setuptools
    (venv-backend-ai) $ pip install backend.ai-client
 
+.. note::
+
+   We recommend to install the client library with the same version as the server.
+   You can check the server version by visiting the server's webui, click the profile icon on the top-right corner, and then click the "About Backend.AI" menu. Then install the client library with the same version as the server.
+   
+   .. code-block:: console
+
+      (venv-backend-ai) $ pip install backend.ai-client==<server_version>
+
+   
 Set your API keypair as environment variables:
 
 .. code-block:: console

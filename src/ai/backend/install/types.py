@@ -50,6 +50,7 @@ class CliArgs:
     mode: InstallModes | None
     target_path: str
     show_guide: bool
+    non_interactive: bool
 
 
 class PrerequisiteError(RichCast, Exception):

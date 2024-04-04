@@ -206,7 +206,7 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
-class KernelLifecycleEventReason(str, enum.Enum):
+class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
     ANOMALY_DETECTED = "anomaly-detected"
@@ -238,6 +238,8 @@ class KernelLifecycleEventReason(str, enum.Enum):
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        if value is None:
+            return None
         try:
             return cls(value)
         except ValueError:
@@ -748,6 +750,7 @@ class EventHandler(Generic[TContext, TEvent]):
     callback: EventCallback[TContext, TEvent]
     coalescing_opts: Optional[CoalescingOptions]
     coalescing_state: CoalescingState
+    args_matcher: Callable[[tuple], bool] | None
 
 
 class CoalescingOptions(TypedDict):
@@ -903,11 +906,27 @@ class EventDispatcher(aobject):
         coalescing_opts: CoalescingOptions = None,
         *,
         name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TEvent]:
+        """
+        Register a callback as a consumer. When multiple callback registers as a consumer
+        on a single event, only one callable among those will be called.
+
+        args_matcher:
+          Optional. A callable which accepts event argument and supplies a bool as a return value.
+          When specified, EventDispatcher will only execute callback when this lambda returns True.
+        """
+
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
         handler = EventHandler(
-            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+            event_cls,
+            name,
+            context,
+            callback,
+            coalescing_opts,
+            CoalescingState(),
+            args_matcher,
         )
         self.consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
@@ -928,11 +947,26 @@ class EventDispatcher(aobject):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TEvent]:
+        """
+        Subscribes to given event. All handlers will be called when certain event pops up.
+
+        args_matcher:
+          Optional. A callable which accepts event argument and supplies a bool as a return value.
+          When specified, EventDispatcher will only execute callback when this lambda returns True.
+        """
+
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
         handler = EventHandler(
-            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+            event_cls,
+            name,
+            context,
+            callback,
+            coalescing_opts,
+            CoalescingState(),
+            args_matcher,
         )
         self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
@@ -946,6 +980,8 @@ class EventDispatcher(aobject):
         )
 
     async def handle(self, evh_type: str, evh: EventHandler, source: AgentId, args: tuple) -> None:
+        if evh.args_matcher and not evh.args_matcher(args):
+            return
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
         cb = evh.callback

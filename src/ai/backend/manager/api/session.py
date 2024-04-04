@@ -55,7 +55,15 @@ from ai.backend.common.events import AgentTerminatedEvent
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.common.types import AccessKey, AgentId, ClusterMode, SessionTypes, VFolderID
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    MountPermission,
+    MountTypes,
+    SessionTypes,
+    VFolderID,
+)
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -186,6 +194,14 @@ creation_config_v4_template = t.Dict({
 creation_config_v5 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
+        }).ignore_extra("*"),
+    ),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
@@ -1036,7 +1052,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
             """
     except (sqlalchemy.exc.InterfaceError, ConnectionRefusedError):
-        log.warn("report_stats(): error while connecting to PostgreSQL server")
+        log.warning("report_stats(): error while connecting to PostgreSQL server")
 
 
 @server_status_required(ALL_ALLOWED)

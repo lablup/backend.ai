@@ -26,6 +26,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -36,7 +37,12 @@ from ...session import AsyncSession, Session
 from .. import events
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
-from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from .execute import (
+    format_stats,
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
@@ -94,8 +100,8 @@ def _create_cmd(docs: str = None):
     @click.option(
         "--cluster-mode",
         metavar="MODE",
-        type=click.Choice(["single-node", "multi-node"]),
-        default="single-node",
+        type=click.Choice([*ClusterMode], case_sensitive=False),
+        default=ClusterMode.SINGLE_NODE,
         help="The mode of clustering.",
     )
     @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
@@ -165,7 +171,7 @@ def _create_cmd(docs: str = None):
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
         parsed_resource_opts = prepare_resource_arg(resource_opts)
-        mount, mount_map = prepare_mount_arg(mount)
+        mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
         preopen_ports = preopen
         assigned_agent_list = assign_agent
@@ -185,6 +191,7 @@ def _create_cmd(docs: str = None):
                     cluster_mode=cluster_mode,
                     mounts=mount,
                     mount_map=mount_map,
+                    mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
                     resources=parsed_resources,
@@ -261,6 +268,7 @@ session.command()(_create_cmd())
 
 def _create_from_template_cmd(docs: str = None):
     @click.argument("template_id")
+    @click_start_option()
     @click.option(
         "-o",
         "--owner",
@@ -271,7 +279,14 @@ def _create_from_template_cmd(docs: str = None):
         help="Set the owner of the target session explicitly.",
     )
     # job scheduling options
-    @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
+    @click.option(
+        "-i",
+        "--image",
+        metavar="IMAGE",
+        type=OptionalType(str),
+        default=undefined,
+        help="Set compute_session image to run.",
+    )
     @click.option(
         "-c",
         "--startup-command",
@@ -290,17 +305,18 @@ def _create_from_template_cmd(docs: str = None):
             "The session will get scheduled after all of them successfully finish."
         ),
     )
+    # resource spec
     @click.option(
-        "--depends",
-        metavar="SESSION_ID",
-        type=str,
-        multiple=True,
+        "--scaling-group",
+        "--sgroup",
+        metavar="SCALING_GROUP",
+        type=OptionalType(str),
+        default=undefined,
         help=(
-            "Set the list of session ID or names that the newly created session depends on. "
-            "The session will get scheduled after all of them successfully finish."
+            "The scaling group to execute session. If not specified "
+            "all available scaling groups are included in the scheduling."
         ),
     )
-    # resource spec
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
@@ -308,12 +324,28 @@ def _create_from_template_cmd(docs: str = None):
         default=undefined,
         help="The size of cluster in number of containers.",
     )
+    # resource grouping
     @click.option(
-        "--resource-opts",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help="Resource options for creating compute session (e.g: shmem=64m)",
+        "-d",
+        "--domain",
+        metavar="DOMAIN_NAME",
+        type=OptionalType(str),
+        default=undefined,
+        help=(
+            "Domain name where the session will be spawned. "
+            "If not specified, config's domain name will be used."
+        ),
+    )
+    @click.option(
+        "-g",
+        "--group",
+        metavar="GROUP_NAME",
+        type=OptionalType(str),
+        default=undefined,
+        help=(
+            "Group name where the session is spawned. "
+            "User should be a member of the group to execute the code."
+        ),
     )
     # template overrides
     @click.option(
@@ -340,35 +372,34 @@ def _create_from_template_cmd(docs: str = None):
             "any resource specified at template,"
         ),
     )
-    @click_start_option()
     def create_from_template(
         # base args
         template_id: str,
-        name: str | Undefined,  # click_start_option
+        name: str | None,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
-        type_: Literal["batch", "interactive"] | Undefined,  # click_start_option
+        type: Literal["batch", "interactive"],  # click_start_option
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         enqueue_only: bool,  # click_start_option
-        max_wait: int | Undefined,  # click_start_option
+        max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,  # click_start_option
+        callback_url: str | None,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | Undefined,  # click_start_option
+        tag: str | None,  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: str | Undefined,  # click_start_option
+        scaling_group: str | Undefined,
         resources: Sequence[str],  # click_start_option
-        cluster_size: int | Undefined,  # click_start_option
+        cluster_size: int | Undefined,
         resource_opts: Sequence[str],  # click_start_option
         # resource grouping
-        domain: str | None,  # click_start_option
-        group: str | None,  # click_start_option
+        domain: str | Undefined,
+        group: str | Undefined,
         # template overrides
         no_mount: bool,
         no_env: bool,
@@ -383,7 +414,7 @@ def _create_from_template_cmd(docs: str = None):
         \b
         TEMPLATE_ID: The template ID to create a session from.
         """
-        if name is undefined:
+        if name is None:
             name = f"pysdk-{secrets.token_hex(5)}"
         else:
             name = name
@@ -397,34 +428,38 @@ def _create_from_template_cmd(docs: str = None):
             if len(resource_opts) > 0 or no_resource
             else undefined
         )
-        prepared_mount, prepared_mount_map = (
+        prepared_mount, prepared_mount_map, _ = (
             prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
         )
+        kwargs = {
+            "name": name,
+            "type_": type,
+            "starts_at": starts_at,
+            "enqueue_only": enqueue_only,
+            "max_wait": max_wait,
+            "no_reuse": no_reuse,
+            "dependencies": depends,
+            "callback_url": callback_url,
+            "cluster_size": cluster_size,
+            "mounts": prepared_mount,
+            "mount_map": prepared_mount_map,
+            "envs": envs,
+            "startup_command": startup_command,
+            "resources": parsed_resources,
+            "resource_opts": parsed_resource_opts,
+            "owner_access_key": owner,
+            "domain_name": domain,
+            "group_name": group,
+            "scaling_group": scaling_group,
+            "tag": tag,
+        }
+        kwargs = {key: value for key, value in kwargs.items() if value is not undefined}
         with Session() as session:
             try:
                 compute_session = session.ComputeSession.create_from_template(
                     template_id,
                     image=image,
-                    name=name,
-                    type_=type_,
-                    starts_at=starts_at,
-                    enqueue_only=enqueue_only,
-                    max_wait=max_wait,
-                    no_reuse=no_reuse,
-                    dependencies=depends,
-                    callback_url=callback_url,
-                    cluster_size=cluster_size,
-                    mounts=prepared_mount,
-                    mount_map=prepared_mount_map,
-                    envs=envs,
-                    startup_command=startup_command,
-                    resources=parsed_resources,
-                    resource_opts=parsed_resource_opts,
-                    owner_access_key=owner,
-                    domain_name=domain,
-                    group_name=group,
-                    scaling_group=scaling_group,
-                    tag=tag,
+                    **kwargs,
                 )
             except Exception as e:
                 print_error(e)

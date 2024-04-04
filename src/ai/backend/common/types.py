@@ -14,7 +14,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from ssl import SSLContext
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -41,9 +42,12 @@ import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
+from aiohttp import Fingerprint
+from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
 from .exception import InvalidIpAddressValue
+from .models.minilang.mount import MountPointParser
 
 __all__ = (
     "aobject",
@@ -71,6 +75,7 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "MountPoint",
     "VFolderID",
     "QuotaScopeID",
     "VFolderUsageMode",
@@ -221,7 +226,7 @@ AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 
-class AbstractPermission(str, enum.Enum):
+class AbstractPermission(enum.StrEnum):
     """
     Abstract enum type for permissions
     """
@@ -242,15 +247,15 @@ class VFolderHostPermission(AbstractPermission):
     SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
 
 
-class LogSeverity(str, enum.Enum):
-    CRITICAL = "critical"
-    ERROR = "error"
-    WARNING = "warning"
-    INFO = "info"
-    DEBUG = "debug"
+class LogSeverity(enum.StrEnum):
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
 
 
-class SlotTypes(str, enum.Enum):
+class SlotTypes(enum.StrEnum):
     COUNT = "count"
     BYTES = "bytes"
     UNIQUE = "unique"
@@ -262,42 +267,52 @@ class HardwareMetadata(TypedDict):
     metadata: Dict[str, str]
 
 
-class AutoPullBehavior(str, enum.Enum):
+class AutoPullBehavior(enum.StrEnum):
     DIGEST = "digest"
     TAG = "tag"
     NONE = "none"
 
 
-class ServicePortProtocols(str, enum.Enum):
+class ServicePortProtocols(enum.StrEnum):
     HTTP = "http"
     TCP = "tcp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
 
 
-class SessionTypes(str, enum.Enum):
+class SessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
 
 
-class SessionResult(str, enum.Enum):
+class SessionResult(enum.StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
 
 
-class ClusterMode(str, enum.Enum):
+class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
 
 
-class CommitStatus(str, enum.Enum):
+class CommitStatus(enum.StrEnum):
     READY = "ready"
     ONGOING = "ongoing"
 
 
-class AbuseReportValue(str, enum.Enum):
+class ItemResult(TypedDict):
+    msg: Optional[str]
+    item: Optional[str]
+
+
+class ResultSet(TypedDict):
+    success: list[ItemResult]
+    failed: list[ItemResult]
+
+
+class AbuseReportValue(enum.StrEnum):
     DETECTED = "detected"
     CLEANING = "cleaning"
 
@@ -322,7 +337,7 @@ MetricValue = TypedDict(
     {
         "current": str,
         "capacity": Optional[str],
-        "pct": Optional[str],
+        "pct": str,
         "unit_hint": str,
         "stats.min": str,
         "stats.max": str,
@@ -330,8 +345,8 @@ MetricValue = TypedDict(
         "stats.avg": str,
         "stats.diff": str,
         "stats.rate": str,
+        "stats.version": Optional[int],
     },
-    total=False,
 )
 
 
@@ -340,12 +355,12 @@ class IntrinsicSlotNames(enum.Enum):
     MEMORY = SlotName("mem")
 
 
-class DefaultForUnspecified(str, enum.Enum):
+class DefaultForUnspecified(enum.StrEnum):
     LIMITED = "LIMITED"
     UNLIMITED = "UNLIMITED"
 
 
-class HandlerForUnknownSlotName(str, enum.Enum):
+class HandlerForUnknownSlotName(enum.StrEnum):
     DROP = "drop"
     ERROR = "error"
 
@@ -353,7 +368,7 @@ class HandlerForUnknownSlotName(str, enum.Enum):
 Quantum = Decimal("0.000")
 
 
-class MountPermission(str, enum.Enum):
+class MountPermission(enum.StrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -362,12 +377,50 @@ class MountPermission(str, enum.Enum):
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
-class MountTypes(str, enum.Enum):
+class MountTypes(enum.StrEnum):
     VOLUME = "volume"
     BIND = "bind"
     TMPFS = "tmpfs"
     K8S_GENERIC = "k8s-generic"
     K8S_HOSTPATH = "k8s-hostpath"
+
+
+class MountPoint(BaseModel):
+    type: MountTypes = Field(default=MountTypes.BIND)
+    source: Path
+    target: Path | None = Field(default=None)
+    permission: MountPermission | None = Field(alias="perm", default=None)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class MountExpression:
+    def __init__(self, expression: str, *, escape_map: Optional[Mapping[str, str]] = None) -> None:
+        self.expression = expression
+        self.escape_map = {
+            "\\,": ",",
+            "\\:": ":",
+            "\\=": "=",
+        }
+        if escape_map is not None:
+            self.escape_map.update(escape_map)
+        # self.unescape_map = {v: k for k, v in self.escape_map.items()}
+
+    def __str__(self) -> str:
+        return self.expression
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def parse(self, *, escape: bool = True) -> Mapping[str, str]:
+        parser = MountPointParser()
+        result = {**parser.parse_mount(self.expression)}
+        if escape:
+            for key, value in result.items():
+                for raw, alternative in self.escape_map.items():
+                    if raw in value:
+                        result[key] = value.replace(raw, alternative)
+        return MountPoint(**result).model_dump()  # type: ignore[arg-type]
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
@@ -673,16 +726,16 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError("Unknown slots", unknown_slots)
+            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, value: Any, unit: str) -> Decimal:
+    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
         try:
-            if unit == "bytes":
+            if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
                     return Decimal(value) if value.is_finite() else value
                 if isinstance(value, int):
@@ -692,8 +745,11 @@ class ResourceSlot(UserDict):
                 value = Decimal(value)
                 if value.is_finite():
                     value = value.quantize(Quantum).normalize()
-        except ArithmeticError:
-            raise ValueError("Cannot convert to decimal", value)
+        except (
+            ArithmeticError,
+            ValueError,  # catch wrapped errors from BinarySize.from_str()
+        ):
+            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
         return value
 
     @classmethod
@@ -708,16 +764,16 @@ class ResourceSlot(UserDict):
         return result
 
     @classmethod
-    def _guess_slot_type(cls, key: str) -> str:
+    def _guess_slot_type(cls, key: str) -> SlotTypes:
         if "mem" in key:
-            return "bytes"
-        return "count"
+            return SlotTypes.BYTES
+        return SlotTypes.COUNT
 
     @classmethod
     def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
         try:
             data = {
-                k: cls._normalize_value(v, slot_types[k])
+                k: cls._normalize_value(k, v, slot_types[k])
                 for k, v in policy["total_resource_slots"].items()
                 if v is not None and k in slot_types
             }
@@ -729,23 +785,25 @@ class ResourceSlot(UserDict):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
         return cls(data)
 
     @classmethod
     def from_user_input(
-        cls, obj: Mapping[str, Any], slot_types: Optional[Mapping]
+        cls,
+        obj: Mapping[str, Any],
+        slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> "ResourceSlot":
         try:
             if slot_types is None:
                 data = {
-                    k: cls._normalize_value(v, cls._guess_slot_type(k))
+                    k: cls._normalize_value(k, v, cls._guess_slot_type(k))
                     for k, v in obj.items()
                     if v is not None
                 }
             else:
                 data = {
-                    k: cls._normalize_value(v, slot_types[k])
+                    k: cls._normalize_value(k, v, slot_types[SlotName(k)])
                     for k, v in obj.items()
                     if v is not None
                 }
@@ -754,7 +812,10 @@ class ResourceSlot(UserDict):
                     if k not in data:
                         data[k] = Decimal(0)
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            extra_guide = ""
+            if e.args[0] == "shmem":
+                extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
@@ -765,7 +826,7 @@ class ResourceSlot(UserDict):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError("unit unknown for slot", e.args[0])
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
@@ -794,25 +855,23 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 @attrs.define(slots=True, frozen=True)
 class QuotaScopeID:
     scope_type: QuotaScopeType
-    scope_id: Any
+    scope_id: uuid.UUID
 
     @classmethod
     def parse(cls, raw: str) -> QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
-        match scope_type:
-            case "project":
-                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
-            case "user":
-                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+        match scope_type.lower():
+            case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
+                return cls(t, uuid.UUID(rest))
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+                raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
             case uuid.UUID():
-                return f"{self.scope_type.value}:{str(self.scope_id)}"
+                return f"{self.scope_type}:{str(self.scope_id)}"
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -823,7 +882,7 @@ class QuotaScopeID:
             case uuid.UUID():
                 return self.scope_id.hex
             case _:
-                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+                raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
 
 class VFolderID:
@@ -855,7 +914,7 @@ class VFolderID:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
 
-class VFolderUsageMode(str, enum.Enum):
+class VFolderUsageMode(enum.StrEnum):
     """
     Usage mode of virtual folder.
 
@@ -958,7 +1017,7 @@ class QuotaConfig:
         return cls.Validator()
 
 
-class QuotaScopeType(str, enum.Enum):
+class QuotaScopeType(enum.StrEnum):
     USER = "user"
     PROJECT = "project"
 
@@ -1180,6 +1239,8 @@ class RoundRobinState(JSONSerializableMixin):
 
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):
