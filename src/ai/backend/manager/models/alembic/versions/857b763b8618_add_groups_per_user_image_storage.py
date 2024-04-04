@@ -1,4 +1,4 @@
-"""add groups.per_user_image_storage
+"""add groups.container_registry
 
 Revision ID: 857b763b8618
 Revises: 75ea2b136830

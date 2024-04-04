@@ -1092,9 +1092,9 @@ async def convert_session_to_image(
                 # for cases where project name is not specified (e.g. redis, nginx, ...)
                 new_name = base_image_ref.name
 
-            # remove any existing peruser related tag from base canonical
+            # remove any existing customized related tag from base canonical
             filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("peruser_")
+                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
             new_canonical = (
@@ -1103,10 +1103,14 @@ async def convert_session_to_image(
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
-                query = sa.select(sa.func.count(ImageRow)).where(
-                    (
-                        ImageRow.labels["ai.backend.customized-image-owner"].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}"
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(ImageRow)
+                    .where(
+                        (
+                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                            == f"{params.image_visibility.value}:{image_owner_id}"
+                        )
                     )
                 )
                 existing_image_count = await sess.scalar(query)
@@ -1127,26 +1131,25 @@ async def convert_session_to_image(
                 query = sa.select(ImageRow).where(
                     ImageRow.name.like(f"{new_canonical}%")
                     & (
-                        ImageRow.labels["ai.backend.customized-image-owner"].as_string()
+                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
                         == f"{params.image_visibility.value}:{image_owner_id}"
                     )
                     & (
-                        ImageRow.labels["ai.backend.customized-image-name"].as_string()
+                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
                         == params.image_name
                     )
                 )
                 existing_row = await sess.scalar(query)
 
-                peruser_image_id: str
+                customized_image_id: str
                 if existing_row:
-                    peruser_image_id = existing_row.labels["ai.backend.customized-image-id"]
-                    log.debug("reusing existing peruser image ID {}", peruser_image_id)
+                    customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
+                    log.debug("reusing existing customized image ID {}", customized_image_id)
                 else:
-                    peruser_image_id = str(uuid.uuid4())
+                    customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-peruser_{peruser_image_id.replace('-', '')}"
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
             new_image_ref: ImageRef = ImageRef(
-                # peruser_* tag will not be exposed to Images list API callee; check Image.filter_allowed() for more
                 new_canonical,
                 architecture=base_image_ref.architecture,
                 known_registries=["*"],
@@ -1158,9 +1161,9 @@ async def convert_session_to_image(
                 session,
                 new_image_ref,
                 extra_labels={
-                    "ai.backend.customized-image-owner": f"{params.image_visibility.value}:{image_owner_id}",
-                    "ai.backend.customized-image-name": params.image_name,
-                    "ai.backend.customized-image-id": peruser_image_id,
+                    "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
+                    "ai.backend.customized-image.name": params.image_name,
+                    "ai.backend.customized-image.id": customized_image_id,
                 },
             )
             async for event, _ in background_task_manager.poll_bgtask_event(
