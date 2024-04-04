@@ -1,15 +1,15 @@
 [GLOBAL]
-pants_version = "2.19.1"
+pants_version = "2.21.0.dev4"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
     "pants.backend.experimental.python",
-    # "pants.backend.experimental.python.lint.ruff",
+    "pants.backend.experimental.python.lint.ruff.check",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
-    "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
+    # "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
     "scie",
@@ -55,6 +55,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.12.2"]
 tailor_pex_binary_targets = false
+pip_version = "24.0"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -80,13 +81,13 @@ towncrier = "tools/towncrier.lock"
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-# version = "v2.1.148"
-# known_versions = [
-#     "v2.1.148|macos_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
-#     "v2.1.148|macos_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
-#     "v2.1.148|linux_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
-#     "v2.1.148|linux_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
-# ]
+version = "v2.3.0"
+known_versions = [
+    "v2.3.0|macos_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+    "v2.3.0|macos_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+    "v2.3.0|linux_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+    "v2.3.0|linux_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 

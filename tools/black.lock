@@ -170,9 +170,11 @@
       "platform_tag": null
     }
   ],
+  "only_builds": [],
+  "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.1.148",
-  "pip_version": "23.2",
+  "pex_version": "2.3.0",
+  "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
     "black~=23.11.0"
