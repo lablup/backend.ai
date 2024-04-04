@@ -1259,6 +1259,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        if image_ref.is_local:
+            return
+        auth_config = None
+        reg_user = registry_conf.get("username")
+        reg_passwd = registry_conf.get("password")
+        log.info("pushing image {} to registry", image_ref.canonical)
+        if reg_user and reg_passwd:
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
+                "ascii"
+            )
+            auth_config = {
+                "auth": encoded_creds,
+            }
+
+        async with closing_async(Docker()) as docker:
+            await docker.images.push(image_ref.canonical, auth=auth_config)
+
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")

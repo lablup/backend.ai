@@ -96,6 +96,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
@@ -457,6 +458,10 @@ class AgentRegistry:
                     ],
                 )
             requested_image_ref = image_row.image_ref
+            if (
+                _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
+            ) and _owner_id != f"user:{user_scope.user_uuid}":
+                raise ImageNotFound
             if not requested_image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
                     query = (
@@ -3168,7 +3173,54 @@ class AgentRegistry:
     async def commit_session(
         self,
         session: SessionRow,
+        new_image_ref: ImageRef,
+        *,
+        extra_labels: dict[str, str] = {},
+    ) -> Mapping[str, Any]:
+        """
+        Commit a main kernel's container of the given session.
+        """
+
+        kernel: KernelRow = session.main_kernel
+        if kernel.status != KernelStatus.RUNNING:
+            raise InvalidAPIParameters(
+                f"Unable to commit since the kernel k:{kernel.id} (of s:{session.id}) is"
+                " currently not in RUNNING state."
+            )
+        email = await self._get_user_email(kernel)
+        async with handle_session_exception(self.db, "commit_session", session.id):
+            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
+                resp: Mapping[str, Any] = await rpc.call.commit(
+                    str(kernel.id),
+                    email,
+                    canonical=new_image_ref.canonical,
+                    extra_labels=extra_labels,
+                )
+        return resp
+
+    async def push_image(
+        self,
+        agent: AgentId,
+        image_ref: ImageRef,
+        registry: ImageRegistry,
+    ) -> Mapping[str, Any]:
+        """
+        Commit a main kernel's container of the given session.
+        """
+        async with self.agent_cache.rpc_context(agent) as rpc:
+            resp: Mapping[str, Any] = await rpc.call.push_image(
+                image_ref.canonical,
+                image_ref.architecture,
+                {**registry, "url": str(registry["url"])},
+                is_local=image_ref.is_local,
+            )
+        return resp
+
+    async def commit_session_to_file(
+        self,
+        session: SessionRow,
         filename: str | None,
+        extra_labels: dict[str, str] = {},
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
@@ -3187,9 +3239,11 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
-        async with handle_session_exception(self.db, "commit_session", session.id):
+        async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel.id), email, filename)
+                resp: Mapping[str, Any] = await rpc.call.commit(
+                    str(kernel.id), email, filename=filename, extra_labels=extra_labels
+                )
         return resp
 
     async def get_agent_local_config(
