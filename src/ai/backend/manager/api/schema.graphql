@@ -33,6 +33,7 @@ type Queries {
   ): [Group]
   image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
+  customized_images: [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -990,6 +991,7 @@ type Mutations {
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
@@ -1299,6 +1301,11 @@ input ResourceLimitInput {
   key: String
   min: String
   max: String
+}
+
+type ForgetImageById {
+  ok: Boolean
+  msg: String
 }
 
 type ForgetImage {
