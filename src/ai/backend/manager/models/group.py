@@ -437,7 +437,9 @@ class GroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
-    container_registry = graphene.JSONString(required=False, default_value={})
+    container_registry = graphene.JSONString(
+        required=False, default_value={}, description="Added since 24.03.0"
+    )
 
 
 class ModifyGroupInput(graphene.InputObjectType):
@@ -451,7 +453,9 @@ class ModifyGroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry = graphene.JSONString(required=False, default_value={})
+    container_registry = graphene.JSONString(
+        required=False, default_value={}, description="Added since 24.03.0"
+    )
 
 
 class CreateGroup(graphene.Mutation):
