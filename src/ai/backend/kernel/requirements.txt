@@ -1,11 +1,11 @@
 # copied from https://github.com/lablup/backend.ai-krunner-static-gnu/blob/main/src/ai/backend/krunner/static_gnu/requirements.txt
 pyzmq~=25.1
 uvloop~=0.19
-attrs~=22.1
+attrs~=23.2
 janus~=1.0
 msgpack~=1.0
 jupyter-client~=8.6.1
 setproctitle~=1.3.3
 
 # type stubs (dateutil is indirectly referred)
-types-dateutil
+types-python-dateutil

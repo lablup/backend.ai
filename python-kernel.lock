@@ -9,12 +9,13 @@
 //     "CPython==3.12.2"
 //   ],
 //   "generated_with_requirements": [
-//     "attrs~=22.1",
+//     "attrs~=23.2",
 //     "janus~=1.0",
 //     "jupyter-client~=8.6.1",
 //     "msgpack~=1.0",
 //     "pyzmq~=25.1",
 //     "setproctitle~=1.3.3",
+//     "types-python-dateutil",
 //     "uvloop~=0.19"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -37,47 +38,42 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836",
-              "url": "https://files.pythonhosted.org/packages/fb/6e/6f83bf616d2becdf333a1640f1d463fef3150e2e926b7010cb0f81c95e88/attrs-22.2.0-py3-none-any.whl"
+              "hash": "99b87a485a5820b23b879f04c2305b44b951b502fd64be915879d77a7e8fc6f1",
+              "url": "https://files.pythonhosted.org/packages/e0/44/827b2a91a5816512fcaf3cc4ebc465ccd5d598c45cefa6703fcf4a79018f/attrs-23.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99",
-              "url": "https://files.pythonhosted.org/packages/21/31/3f468da74c7de4fcf9b25591e682856389b3400b4b62f201e65f15ea3e07/attrs-22.2.0.tar.gz"
+              "hash": "935dc3b529c262f6cf76e50877d35a4bd3c1de194fd41f47a2b7ae8f19971f30",
+              "url": "https://files.pythonhosted.org/packages/e3/fc/f800d51204003fa8ae392c4e8278f256206e7a919b708eef054f5f4b650d/attrs-23.2.0.tar.gz"
             }
           ],
           "project_name": "attrs",
           "requires_dists": [
-            "attrs[docs,tests]; extra == \"dev\"",
+            "attrs[tests-mypy]; extra == \"tests-no-zope\"",
             "attrs[tests-no-zope]; extra == \"tests\"",
             "attrs[tests]; extra == \"cov\"",
+            "attrs[tests]; extra == \"dev\"",
             "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"tests-no-zope\"",
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"tests_no_zope\"",
-            "coverage-enable-subprocess; extra == \"cov\"",
             "coverage[toml]>=5.3; extra == \"cov\"",
             "furo; extra == \"docs\"",
             "hypothesis; extra == \"tests-no-zope\"",
-            "hypothesis; extra == \"tests-no-zope\"",
-            "mypy<0.990,>=0.971; platform_python_implementation == \"CPython\" and extra == \"tests-no-zope\"",
-            "mypy<0.990,>=0.971; platform_python_implementation == \"CPython\" and extra == \"tests_no_zope\"",
+            "importlib-metadata; python_version < \"3.8\"",
+            "mypy>=1.6; (platform_python_implementation == \"CPython\" and python_version >= \"3.8\") and extra == \"tests-mypy\"",
             "myst-parser; extra == \"docs\"",
+            "pre-commit; extra == \"dev\"",
             "pympler; extra == \"tests-no-zope\"",
-            "pympler; extra == \"tests-no-zope\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version < \"3.11\") and extra == \"tests-no-zope\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version < \"3.11\") and extra == \"tests_no_zope\"",
+            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version >= \"3.8\") and extra == \"tests-mypy\"",
             "pytest-xdist[psutil]; extra == \"tests-no-zope\"",
-            "pytest-xdist[psutil]; extra == \"tests-no-zope\"",
-            "pytest>=4.3.0; extra == \"tests-no-zope\"",
             "pytest>=4.3.0; extra == \"tests-no-zope\"",
             "sphinx-notfound-page; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
             "towncrier; extra == \"docs\"",
-            "zope.interface; extra == \"docs\"",
-            "zope.interface; extra == \"tests\""
+            "zope-interface; extra == \"docs\"",
+            "zope-interface; extra == \"tests\""
           ],
-          "requires_python": ">=3.6",
-          "version": "22.2.0"
+          "requires_python": ">=3.7",
+          "version": "23.2.0"
         },
         {
           "artifacts": [
@@ -580,6 +576,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "6b8cb66d960771ce5ff974e9dd45e38facb81718cc1e208b10b1baccbfdbee3b",
+              "url": "https://files.pythonhosted.org/packages/c7/1b/af4f4c4f3f7339a4b7eb3c0ab13416db98f8ac09de3399129ee5fdfa282b/types_python_dateutil-2.9.0.20240316-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "5d2f2e240b86905e40944dd787db6da9263f0deabef1076ddaed797351ec0202",
+              "url": "https://files.pythonhosted.org/packages/61/c5/c3a4d72ffa8efc2e78f7897b1c69ec760553246b67d3ce8c4431fac5d4e3/types-python-dateutil-2.9.0.20240316.tar.gz"
+            }
+          ],
+          "project_name": "types-python-dateutil",
+          "requires_dists": [],
+          "requires_python": ">=3.8",
+          "version": "2.9.0.20240316"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "69b1a937c3a517342112fb4c6df7e72fc39a38e7891a5730ed4985b5214b5475",
               "url": "https://files.pythonhosted.org/packages/f9/de/dc04a3ea60b22624b51c703a84bbe0184abcd1d0b9bc8074b5d6b7ab90bb/typing_extensions-4.10.0-py3-none-any.whl"
             },
@@ -658,12 +672,13 @@
   "pip_version": "23.2",
   "prefer_older_binary": false,
   "requirements": [
-    "attrs~=22.1",
+    "attrs~=23.2",
     "janus~=1.0",
     "jupyter-client~=8.6.1",
     "msgpack~=1.0",
     "pyzmq~=25.1",
     "setproctitle~=1.3.3",
+    "types-python-dateutil",
     "uvloop~=0.19"
   ],
   "requires_python": [
