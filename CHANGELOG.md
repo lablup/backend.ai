@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.0rc3 (2024-04-05)
+
+### Features
+* Add new API to create new image from live session ([#1973](https://github.com/lablup/backend.ai/issues/1973))
+
+### Fixes
+* Explicitly specify the storage-side UID/GID when creating qtrees in the NetApp storage backend ([#1983](https://github.com/lablup/backend.ai/issues/1983))
+* Change function default arguments from mutable object to `None`. ([#1986](https://github.com/lablup/backend.ai/issues/1986))
+* Revert some VFolder APIs response type to remove mismatch between `Content-Type` header and body. ([#1988](https://github.com/lablup/backend.ai/issues/1988))
+
+### Documentation Updates
+* Add note about installing client library with same version as server ([#1976](https://github.com/lablup/backend.ai/issues/1976))
+
+### External Dependency Updates
+* Upgrade the base runtime (CPython) version from 3.11.6 to 3.12.2 ([#1994](https://github.com/lablup/backend.ai/issues/1994))
+
+### Miscellaneous
+* Add `requested_slots` field to compute session GQL type. ([#1984](https://github.com/lablup/backend.ai/issues/1984))
+* Allow `pydantic.BaseModel` as the API handler return schema. ([#1987](https://github.com/lablup/backend.ai/issues/1987))
+
+
 ## 24.03.0rc2 (2024-03-31)
 
 ### Fixes
