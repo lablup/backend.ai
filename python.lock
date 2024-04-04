@@ -97,7 +97,7 @@
 //     "types-six",
 //     "types-tabulate",
 //     "typing_extensions~=4.3",
-//     "uvloop~=0.17.0; sys_platform != \"Windows\"",
+//     "uvloop~=0.19.0; sys_platform != \"Windows\"",
 //     "yarl!=1.9.0,!=1.9.1,!=1.9.2,<2.0,>=1.8.2",
 //     "zipstream-new~=1.1.8"
 //   ],
@@ -4344,36 +4344,56 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0ddf6baf9cf11a1a22c71487f39f15b2cf78eb5bde7e5b45fbb99e8a9d91b9e1",
-              "url": "https://files.pythonhosted.org/packages/ba/86/6dda1760481abf244cbd3908b79a4520d757040ca9ec37a79fc0fd01e2a0/uvloop-0.17.0.tar.gz"
+              "hash": "7207272c9520203fea9b93843bb775d03e1cf88a80a936ce760f60bb5add92f3",
+              "url": "https://files.pythonhosted.org/packages/a6/f2/6ce1e73933eb038c89f929e26042e64b2cb8d4453410153eed14918ca9a8/uvloop-0.19.0-cp312-cp312-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "5daa304d2161d2918fa9a17d5635099a2f78ae5b5960e742b2fcfbb7aefaa593",
+              "url": "https://files.pythonhosted.org/packages/71/bc/092068ae7fc16dcf20f3e389126ba7800cee75ffba83f78bf1d167aee3cd/uvloop-0.19.0-cp312-cp312-musllinux_1_1_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "da8435a3bd498419ee8c13c34b89b5005130a476bda1d6ca8cfdde3de35cd650",
+              "url": "https://files.pythonhosted.org/packages/85/57/6736733bb0e86a4b5380d04082463b289c0baecaa205934ba81e8a1d5ea4/uvloop-0.19.0-cp312-cp312-macosx_10_9_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0246f4fd1bf2bf702e06b0d45ee91677ee5c31242f39aab4ea6fe0c51aedd0fd",
+              "url": "https://files.pythonhosted.org/packages/9c/16/728cc5dde368e6eddb299c5aec4d10eaf25335a5af04e8c0abd68e2e9d32/uvloop-0.19.0.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2693049be9d36fef81741fddb3f441673ba12a34a704e7b4361efb75cf30befc",
+              "url": "https://files.pythonhosted.org/packages/e6/fc/f0daaf19f5b2116a2d26eb9f98c4a45084aea87bf03c33bcca7aa1ff36e5/uvloop-0.19.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "02506dc23a5d90e04d4f65c7791e65cf44bd91b37f24cfc3ef6cf2aff05dc7ec",
+              "url": "https://files.pythonhosted.org/packages/eb/0c/51339463da912ed34b48d470538d98a91660749b2db56902f23db9b42fdd/uvloop-0.19.0-cp312-cp312-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "7010271303961c6f0fe37731004335401eb9075a12680738731e9c92ddd96ad6",
+              "url": "https://files.pythonhosted.org/packages/fd/96/fdc318ffe82ae567592b213ec2fcd8ecedd927b5da068cf84d56b28c51a4/uvloop-0.19.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             }
           ],
           "project_name": "uvloop",
           "requires_dists": [
-            "Cython<0.30.0,>=0.29.32; extra == \"dev\"",
-            "Cython<0.30.0,>=0.29.32; extra == \"test\"",
-            "Sphinx~=4.1.2; extra == \"dev\"",
+            "Cython<0.30.0,>=0.29.36; extra == \"test\"",
             "Sphinx~=4.1.2; extra == \"docs\"",
-            "aiohttp; python_version < \"3.11\" and extra == \"dev\"",
-            "aiohttp; python_version < \"3.11\" and extra == \"test\"",
-            "flake8~=3.9.2; extra == \"dev\"",
-            "flake8~=3.9.2; extra == \"test\"",
-            "mypy>=0.800; extra == \"dev\"",
+            "aiohttp==3.9.0b0; python_version >= \"3.12\" and extra == \"test\"",
+            "aiohttp>=3.8.1; python_version < \"3.12\" and extra == \"test\"",
+            "flake8~=5.0; extra == \"test\"",
             "mypy>=0.800; extra == \"test\"",
-            "psutil; extra == \"dev\"",
             "psutil; extra == \"test\"",
-            "pyOpenSSL~=22.0.0; extra == \"dev\"",
-            "pyOpenSSL~=22.0.0; extra == \"test\"",
-            "pycodestyle~=2.7.0; extra == \"dev\"",
-            "pycodestyle~=2.7.0; extra == \"test\"",
-            "pytest>=3.6.0; extra == \"dev\"",
-            "sphinx-rtd-theme~=0.5.2; extra == \"dev\"",
+            "pyOpenSSL~=23.0.0; extra == \"test\"",
+            "pycodestyle~=2.9.0; extra == \"test\"",
             "sphinx-rtd-theme~=0.5.2; extra == \"docs\"",
-            "sphinxcontrib-asyncio~=0.3.0; extra == \"dev\"",
             "sphinxcontrib-asyncio~=0.3.0; extra == \"docs\""
           ],
-          "requires_python": ">=3.7",
-          "version": "0.17.0"
+          "requires_python": ">=3.8.0",
+          "version": "0.19.0"
         },
         {
           "artifacts": [
@@ -4621,7 +4641,7 @@
     "types-six",
     "types-tabulate",
     "typing_extensions~=4.3",
-    "uvloop~=0.17.0; sys_platform != \"Windows\"",
+    "uvloop~=0.19.0; sys_platform != \"Windows\"",
     "yarl!=1.9.0,!=1.9.1,!=1.9.2,<2.0,>=1.8.2",
     "zipstream-new~=1.1.8"
   ],
