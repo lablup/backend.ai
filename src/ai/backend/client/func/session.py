@@ -607,6 +607,24 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
+    async def export_to_image(self, new_image_name: str):
+        """
+        Commits running session to new image and then uploads to designated container registry.
+        Requires Backend.AI server set up for per-user image commit feature (24.03).
+        """
+        params = {"image_name": new_image_name}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/imagify",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
     async def interrupt(self):
         """
         Tries to interrupt the current ongoing code execution.
