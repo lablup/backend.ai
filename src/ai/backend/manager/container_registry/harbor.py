@@ -75,6 +75,54 @@ class HarborRegistry_v1(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    async def _scan_tag(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                if resp.status == 404:
+                    # ignore missing tags
+                    # (may occur after deleting an image from the docker hub)
+                    return
+                resp.raise_for_status()
+                data = await resp.json()
+
+                config_digest = data["config"]["digest"]
+                size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+                async with sess.get(
+                    self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+                ) as resp:
+                    resp.raise_for_status()
+                    data = json.loads(await resp.read())
+                    architecture = arch_name_aliases.get(data["architecture"], data["architecture"])
+                    labels = {}
+                    if "container_config" in data:
+                        raw_labels = data["container_config"].get("Labels")
+                        if raw_labels:
+                            labels.update(raw_labels)
+                        else:
+                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
+                    else:
+                        raw_labels = data["config"].get("Labels")
+                        if raw_labels:
+                            labels.update(raw_labels)
+                        else:
+                            log.warn("label not found on image {}:{}/{}", image, tag, architecture)
+                    manifest = {
+                        architecture: {
+                            "size": size_bytes,
+                            "labels": labels,
+                            "digest": config_digest,
+                        },
+                    }
+        await self._read_manifest(image, tag, manifest)
+
 
 class HarborRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(
@@ -170,7 +218,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                     )
                         finally:
                             if skip_reason:
-                                log.warn("Skipped image - {}:{} ({})", image, tag, skip_reason)
+                                log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
                     artifact_url = None
                     next_page_link = resp.links.get("next")
                     if next_page_link:
@@ -226,9 +274,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update(
-            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
-        )
+        rqst_args["headers"].update({
+            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+        })
         digests: list[tuple[str, str]] = []
         tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
@@ -264,9 +312,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         rqst_args = dict(_rqst_args)
         if not rqst_args.get("headers"):
             rqst_args["headers"] = {}
-        rqst_args["headers"].update(
-            {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
-        )
+        rqst_args["headers"].update({
+            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+        })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tag_name = image_info["tags"][0]["name"]
@@ -321,7 +369,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -332,7 +380,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -383,7 +431,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,
@@ -394,7 +442,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 if raw_labels:
                     labels.update(raw_labels)
                 else:
-                    log.warn(
+                    log.warning(
                         "label not found on image {}:{}/{}",
                         image,
                         tag,

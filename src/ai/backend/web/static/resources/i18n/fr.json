@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Bienvenue,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bienvenue, {{ userName }}.",
       "Summary": "Résumé",
       "Sessions": "Sessions",
       "Import&Run": "Importer et exécuter",
@@ -61,7 +60,11 @@
       "YouMushChangeYourPassword": "Il est recommandé de modifier périodiquement votre mot de passe pour des raisons de sécurité. Étant donné qu'un certain temps s'est écoulé depuis la dernière modification de votre mot de passe, vous devez le modifier pour pouvoir continuer à utiliser le service.",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
       "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Données",
+      "InvalidBlankPassword": "Tapez votre mot de passe",
+      "InvalidBlankEmail": "Entrer votre Email",
+      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -240,12 +243,23 @@
       "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
       "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
       "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
+      "EnqueueComputeSessionWarning": "Si vous la définissez sur une taille supérieure aux ressources actuellement disponibles, la création de la session sera retardée dans la file d'attente jusqu'à ce qu'elle devienne disponible.",
+      "SessionName": "Nom de la séance",
+      "ResetFormConfirm": "Voulez-vous réinitialiser toutes vos entrées ?",
+      "TemplateAndHistory": "Modèles",
+      "ScheduleTimeSimple": "Définir l'heure de début",
+      "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
+      "NumberOfContainer": "Nombre de conteneurs",
+      "ErrorCanNotExceedRemaining": "Ne peut être supérieur aux ressources restantes ({{montant}}).",
+      "EnterEnvironmentVariable": "Saisir le nom de la variable",
+      "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
+      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà.",
+      "Template": "Modèle de session",
+      "EnableAutomaticShmem": "Mémoire partagée automatique",
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "OnlyAllowsDiscreteNumberByClusterSize": "Seul un nombre entier est autorisé lorsque la taille du cluster n'est pas inférieure à 2.",
+      "StartAfter": "Commencez après :",
+      "StartTimeDoesNotApply": "Si l'heure de début n'est pas définie, elle ne s'applique pas."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -394,7 +408,10 @@
     "Reset": "Réinitialisation",
     "EnterManually": "Saisie manuelle",
     "Unset": "Non défini",
-    "OK": "OK"
+    "OK": "OK",
+    "Download": "Télécharger",
+    "Clone": "Clone",
+    "Config": "Config"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -438,7 +455,10 @@
     "Enabled": "Activée",
     "StorageProxies": "Stockages",
     "None": "Aucun",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Image",
+    "All": "Tous",
+    "InProgress": "En cours",
+    "Session": "Session"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -516,7 +536,8 @@
     "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
     "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
     "ModifyUserDetail": "Modifier les détails de l'utilisateur",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Activer la session sudo",
+    "MainAccessKey": "Clé d'accès principale"
   },
   "data": {
     "Folders": "Dossiers",
@@ -682,7 +703,11 @@
     "Used": "Utilisé",
     "Pipeline": "Dossiers du pipeline",
     "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack.",
-    "SearchByName": "Rechercher par nom"
+    "SearchByName": "Rechercher par nom",
+    "ModelStore": "Magasin de modèles",
+    "New": "Nouveau",
+    "Add": "Ajouter",
+    "CloningIsOnlyPossibleSameHost": "Actuellement, le clonage n'est possible que sur le même hôte."
   },
   "dialog": {
     "warning": {
@@ -827,7 +852,14 @@
     "DescAutoLogout": "Déconnectez-vous automatiquement si toutes les pages connectées sont fermées, à l'exception des pages d'origine de session pour les applications (par exemple, bloc-notes jupyter, terminal Web, etc.)",
     "BootstrapScriptDescription": "Le script Bootstrap ne sera exécuté qu'une seule fois après la création de la session.",
     "SSHKeypairEnterManually": "Couple de clés SSH",
-    "SSHKeypairEnterManuallyFinished": "La paire de clés SSH a été enregistrée avec succès."
+    "SSHKeypairEnterManuallyFinished": "La paire de clés SSH a été enregistrée avec succès.",
+    "MyKeypairInfo": "Informations sur ma paire de clés",
+    "DescMyKeypairInfo": "Voir les informations de ma paire de clés",
+    "DarkMode": "Mode sombre",
+    "LightMode": "Mode lumière",
+    "UseSystemSetting": "Utiliser les paramètres du système",
+    "DescThemeMode": "Personnalisez l'apparence de Backend.AI WebUI sur votre appareil.",
+    "ThemeMode": "Mode Thème"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilisation avancée du terminal Web : copier le contenu du terminal",
@@ -849,7 +881,9 @@
     "Parameters": "Paramètres",
     "ErrorType": "Type d'erreur",
     "LogMessageRemoved": "Les messages de journal ont été supprimés.",
-    "NoLogToDisplay": "Aucun journal à afficher"
+    "NoLogToDisplay": "Aucun journal à afficher",
+    "ShowOnlyError": "Afficher uniquement l'erreur",
+    "SearchLogs": "Journaux de recherche"
   },
   "resourcePolicy": {
     "Resources": "Ressources",
@@ -911,7 +945,8 @@
     "RegistrySuccessfullyModified": "Registre modifié avec succès.",
     "ModifyRegistry": "Modifier le registre",
     "NoRegistryToDisplay": "Aucun registre à afficher",
-    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?"
+    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?",
+    "DescURLFormat": "Type d'URL invalide"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -1051,8 +1086,6 @@
     "Scaling": "Mise à l'échelle",
     "AllowAgentSideRegistration": "Autoriser l'enregistrement côté agent",
     "DescAllowAgentSideRegistration": "Autoriser l'agent à s'inscrire auprès du gestionnaire. <br/> À utiliser uniquement si le cluster Backend.AI est géré sur un emplacement sécurisé.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "Prise en charge du processeur graphique CUDA",
     "DescCUDAGPUsupport": "Prise en charge du GPU NVIDIA CUDA. <br/> Nécessite le plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Désactivé car le système utilise le plug-in Fractional GPU",
     "ROCMGPUsupport": "Prise en charge du GPU ROCm",
@@ -1102,13 +1135,20 @@
     "RequireATOMPlugin": "Nécessite le plugin ATOM Backend.AI.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Utiliser le support Furiosa Warboy",
-    "RequireWarboyPlugin": "Requiert le plugin Backend.AI Warboy."
+    "RequireWarboyPlugin": "Requiert le plugin Backend.AI Warboy.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Prise en charge des GPU CUDA Open Source",
+    "ShowOnlyChanged": "Afficher uniquement les modifications"
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
     "Visit": "Visite",
     "SeeDetail": "Voir le détail",
-    "Initializing": "Initialisation..."
+    "Initializing": "Initialisation...",
+    "NoNotification": "Aucune notification.",
+    "Notifications": "Notifications",
+    "ClearNotifications": "Effacer les notifications",
+    "AreYouSureToClearAllNotifications": "Êtes-vous sûr d'avoir effacé toutes les notifications ?"
   },
   "information": {
     "Core": "Cœur",
@@ -1244,7 +1284,7 @@
     "CouldNotCopyText": "Impossible de copier le texte :",
     "NotebookBadgeURL": "URL du bloc-notes",
     "GetAndRunNotebook": "Importer et exécuter",
-    "ImportGithubRepo": "Importer le dépôt Github",
+    "ImportGithubRepo": "Importer le dépôt GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Accéder au dossier",
     "RepoWillBeFolder": "Les dépôts GitHub importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
@@ -1258,13 +1298,13 @@
     "FolderName": "Nom du dossier importé :",
     "NotebookBadgeCodeHTML": "Code de badge de bloc-notes (HTML)",
     "NotebookBadgeCodeMarkdown": "Code de badge de bloc-notes (Markdown)",
-    "GithubInternalError": "Erreur interne de Github.",
-    "GithubAPILimitError": "Erreur de limitation de l'API Github.",
-    "GithubAPIEtcError": "Problème de serveur Github.",
-    "ImportGitlabRepo": "Importer le dépôt Gitlab",
-    "GitlabRepoWillBeFolder": "Les dépôts Gitlab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nom de la branche Gitlab"
+    "GithubInternalError": "Erreur interne de GitHub.",
+    "GithubAPILimitError": "Erreur de limitation de l'API GitHub.",
+    "GithubAPIEtcError": "Problème de serveur GitHub.",
+    "ImportGitlabRepo": "Importer le dépôt GitLab",
+    "GitlabRepoWillBeFolder": "Les dépôts GitLab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nom de la branche GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiques pour ce mois",
@@ -1342,7 +1382,9 @@
     "ConfirmTotpRemovalBody": "Êtes-vous sûr de ne pas utiliser l'authentification à deux facteurs ?",
     "TotpSetupNotAvailable": "L'authentification à deux facteurs ne peut pas être configurée.",
     "TurnOffTotp": "Désactiver l'authentification à deux facteurs",
-    "RemoveTotpSetupCompleted": "2FA désactivé"
+    "RemoveTotpSetupCompleted": "2FA désactivé",
+    "EnterConfirmationCode": "Entrez maintenant l'OTP généré par l'authentificateur pour vérifier.",
+    "RequireOTP": "Écrivez OTP."
   },
   "inputLimit": {
     "4to64chars": "(4~64 caractères)"
@@ -1426,12 +1468,55 @@
     "FormValidationFailed": "La validation du formulaire a échoué",
     "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
-    "Image": "Image"
+    "Image": "Image",
+    "Owner": "Propriétaire",
+    "ServiceDelegatedFrom": "Le service modèle est créé par {{ createdUser }} mais la propriété de la session sera déléguée à {{ sessionOwner }}.",
+    "FailedToTerminateService": "La demande d'arrêt du service a échoué.",
+    "FailedToUpdateService": "Échec de la mise à jour du service.",
+    "ServiceCreated": "Le service modèle {{ name }} a été créé avec succès.",
+    "ServiceUpdated": "Le service modèle {{ name }} a été mis à jour avec succès.",
+    "ServiceTerminated": "Le service modèle {{ name }} a été terminé avec succès."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
     "reloadPage": "Recharger la page",
     "resetErrorBoundary": "Réinitialisation de la limite d'erreur",
     "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI."
+  },
+  "modelStore": {
+    "Description": "Description",
+    "Model": "Modèle",
+    "FilterByName": "Filtrer par nom",
+    "ServiceDetails": "Détails des services",
+    "Metadata": "Métadonnées",
+    "ModelPath": "Chemin du modèle",
+    "SearchModels": "Rechercher des modèles",
+    "MinResource": "Ressource minimale",
+    "LastModified": "Dernière modification",
+    "Created": "Créé",
+    "Version": "Version",
+    "Author": "Auteur",
+    "MaxRetries": "Nombre maximal de tentatives",
+    "Path": "Chemin",
+    "HealthCheck": "Bilan de santé",
+    "Port": "Port",
+    "StartCommand": "Démarrer la commande",
+    "PreStartActions": "Actions préalables au démarrage",
+    "Framework": "Le cadre",
+    "Category": "Catégories",
+    "Label": "Étiquette",
+    "Task": "Tâche",
+    "CloneAsFolder": "Cloner en tant que dossier",
+    "CloneSuccess": "La demande de clone a été envoyée avec succès.",
+    "CloneInfo": "Il sera cloné en tant que dossier de votre type d'utilisateur.",
+    "category": "Catégorie"
+  },
+  "table": {
+    "SettingTable": "Paramètre de table",
+    "SelectColumnToDisplay": "Sélectionnez les colonnes à afficher",
+    "SearchTableColumn": "Rechercher des colonnes dans un tableau"
+  },
+  "setting": {
+    "SearchPlaceholder": "Entrez le terme de recherche"
   }
 }

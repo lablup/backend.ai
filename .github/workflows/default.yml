@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -31,7 +31,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -52,8 +52,6 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
-    - name: Check forbidden cross imports
-      run: pants dependencies '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -76,13 +74,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.lint.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -100,7 +98,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -139,12 +137,12 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.check.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -160,7 +158,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: maxnowack/local-cache@v1
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -173,7 +171,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -212,7 +210,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -235,7 +233,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -252,7 +250,7 @@ jobs:
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: brew install coreutils
     - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -319,7 +317,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -334,7 +332,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -347,7 +345,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -398,7 +396,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
   build-sbom:
@@ -419,7 +417,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Install towncrier requirements
@@ -459,6 +457,14 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
 
 
   build-conda-pack-for-windows:
@@ -472,7 +478,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -487,7 +493,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip

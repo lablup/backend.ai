@@ -15,19 +15,19 @@ jobs:
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - uses: CycloneDX/gh-python-generate-sbom@v1.0.1
+    - uses: CycloneDX/gh-python-generate-sbom@v2
     - name: Upload SBOM report
       uses: actions/upload-artifact@v3
       with:

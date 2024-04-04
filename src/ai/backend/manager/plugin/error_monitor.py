@@ -75,17 +75,15 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         message = "".join(traceback.format_exception_only(exc_type, exc_instance)).strip()
 
         async with self.db.begin() as conn:
-            query = error_logs.insert().values(
-                {
-                    "severity": severity,
-                    "source": "manager",
-                    "user": user,
-                    "message": message,
-                    "context_lang": "python",
-                    "context_env": context,
-                    "traceback": "".join(traceback.format_tb(tb)).strip(),
-                }
-            )
+            query = error_logs.insert().values({
+                "severity": severity.value.lower(),
+                "source": "manager",
+                "user": user,
+                "message": message,
+                "context_lang": "python",
+                "context_env": context,
+                "traceback": "".join(traceback.format_tb(tb)).strip(),
+            })
             await conn.execute(query)
         log.debug(
             'collected an error log [{}] "{}" from manager',
@@ -102,17 +100,15 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         if not self.enabled:
             return
         async with self.db.begin() as conn:
-            query = error_logs.insert().values(
-                {
-                    "severity": event.severity,
-                    "source": source,
-                    "user": event.user,
-                    "message": event.message,
-                    "context_lang": "python",
-                    "context_env": event.context_env,
-                    "traceback": event.traceback,
-                }
-            )
+            query = error_logs.insert().values({
+                "severity": event.severity.value.lower(),
+                "source": source,
+                "user": event.user,
+                "message": event.message,
+                "context_lang": "python",
+                "context_env": event.context_env,
+                "traceback": event.traceback,
+            })
             await conn.execute(query)
         log.debug(
             'collected an error log [{}] "{}" from agent:{}',

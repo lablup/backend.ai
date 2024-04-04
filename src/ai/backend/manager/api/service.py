@@ -1,6 +1,9 @@
+import asyncio
+import json
 import logging
-import re
+import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
@@ -12,16 +15,44 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
+from pydantic import (
+    AliasChoices,
+    AnyUrl,
+    BaseModel,
+    Field,
+    HttpUrl,
+    NonNegativeFloat,
+    NonNegativeInt,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
+from yarl import URL
 
-from ai.backend.common import validators as tx
+from ai.backend.common import typed_validators as tv
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventHandler,
+    KernelLifecycleEventReason,
+    ModelServiceStatusEvent,
+    SessionCancelledEvent,
+    SessionEnqueuedEvent,
+    SessionPreparingEvent,
+    SessionStartedEvent,
+    SessionTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    ImageAlias,
+    SessionTypes,
+    VFolderID,
+    VFolderUsageMode,
+)
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
@@ -30,8 +61,11 @@ from ..models import (
     EndpointRow,
     EndpointTokenRow,
     ImageRow,
+    KernelLoadingStrategy,
+    KeyPairRow,
     RouteStatus,
     RoutingRow,
+    SessionRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
@@ -44,21 +78,19 @@ from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_access_key_scopes, get_user_uuid_scopes, undefined
+from .utils import (
+    BaseResponseModel,
+    get_access_key_scopes,
+    get_user_uuid_scopes,
+    pydantic_params_api_handler,
+    pydantic_response_api_handler,
+    undefined,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class UndefChecker(t.Trafaret):
-    def check_and_return(self, value: Any) -> object:
-        if value == undefined:
-            return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
 
 
 async def is_user_allowed_to_access_resource(
@@ -77,16 +109,47 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
+class ListServeRequestModel(BaseModel):
+    name: str | None = Field(default=None)
+
+
+class SuccessResponseModel(BaseResponseModel):
+    success: bool = Field(default=True)
+
+
+class CompactServeInfoModel(BaseModel):
+    id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    name: str = Field(description="Name of the model service.")
+    desired_session_count: NonNegativeInt = Field(
+        description="Number of identical inference sessions."
+    )
+    active_route_count: NonNegativeInt = Field(
+        description=(
+            "Information of routes which are actually spawned and ready to accept the traffic."
+        )
+    )
+    service_endpoint: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "HTTP(S) endpoint to the API service. This field will be filed after the attempt to"
+            " create a first inference session succeeds. Endpoint created is fixed and immutable"
+            " for the bound endpoint until the endpoint is destroyed."
+        ),
+    )
+    is_public: bool = Field(
+        description=(
+            'Indicates if the API endpoint is open to public. In this context "public" means there'
+            " will be no authentication required to communicate with this API service."
+        )
+    )
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("name", default=None): t.Null | t.String,
-        }
-    )
-)
-async def list_serve(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(ListServeRequestModel)
+async def list_serve(
+    request: web.Request, params: ListServeRequestModel
+) -> list[CompactServeInfoModel]:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
@@ -94,8 +157,8 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
     query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
         EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
     )
-    if params["name"]:
-        query_conds &= EndpointRow.name == params["name"]
+    if params.name:
+        query_conds &= EndpointRow.name == params.name
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
         query = (
@@ -104,27 +167,61 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
 
-    return web.json_response(
-        [
-            {
-                "id": str(endpoint.id),
-                "name": endpoint.name,
-                "desired_session_count": endpoint.desired_session_count,
-                "active_route_count": len(
-                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-                ),
-                "service_endpoint": endpoint.url,
-                "is_public": endpoint.open_to_public,
-            }
-            for endpoint in rows
-        ],
-        status=200,
+    return [
+        CompactServeInfoModel(
+            id=endpoint.id,
+            name=endpoint.name,
+            desired_session_count=endpoint.desired_session_count,
+            active_route_count=len([
+                r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
+            ]),
+            service_endpoint=endpoint.url,
+            is_public=endpoint.open_to_public,
+        )
+        for endpoint in rows
+    ]
+
+
+class RouteInfoModel(BaseModel):
+    route_id: uuid.UUID = Field(
+        description=(
+            "Unique ID referencing endpoint route. Each endpoint route has a one-to-one"
+            " relationship with the inference session."
+        )
+    )
+    session_id: uuid.UUID = Field(description="Unique ID referencing the inference session.")
+    traffic_ratio: NonNegativeFloat
+
+
+class ServeInfoModel(BaseResponseModel):
+    endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    name: str = Field(description="Name of the model service.")
+    desired_session_count: NonNegativeInt = Field(
+        description="Number of identical inference sessions."
+    )
+    active_routes: list[RouteInfoModel] = Field(
+        description="Information of routes which are bound with healthy sessions."
+    )
+    service_endpoint: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "HTTP(S) endpoint to the API service. This field will be filed after the attempt to"
+            " create a first inference session succeeds. Endpoint created is fixed and immutable"
+            " for the bound endpoint until the endpoint is destroyed."
+        ),
+    )
+    is_public: bool = Field(
+        description=(
+            'Indicates if the API endpoint is open to public. In this context "public" means there'
+            " will be no authentication required to communicate with this API service."
+        )
     )
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def get_info(request: web.Request) -> web.Response:
+@pydantic_response_api_handler
+async def get_info(request: web.Request) -> ServeInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -140,91 +237,144 @@ async def get_info(request: web.Request) -> web.Response:
             raise ObjectNotFound
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
-    resp = {
-        "endpoint_id": str(endpoint.id),
-        "name": endpoint.name,
-        "desired_session_count": endpoint.desired_session_count,
-        "active_routes": [
-            {
-                "route_id": str(r.id),
-                "session_id": str(r.session),
-                "traffic_ratio": r.traffic_ratio,
-            }
+
+    return ServeInfoModel(
+        endpoint_id=endpoint.id,
+        name=endpoint.name,
+        desired_session_count=endpoint.desired_session_count,
+        active_routes=[
+            RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
             for r in endpoint.routings
             if r.status == RouteStatus.HEALTHY
         ],
-        "service_endpoint": endpoint.url,
-        "is_public": endpoint.open_to_public,
-    }
-
-    return web.json_response(resp, status=200)
+        service_endpoint=endpoint.url,
+        is_public=endpoint.open_to_public,
+    )
 
 
-@auth_required
-@server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["name", "service_name", "clientSessionToken"])
-            >> "service_name": t.Regexp(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
-            tx.AliasedKey(["image", "lang"]): t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("tag", default=None): t.Null | t.String,
-            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-            t.Key("open_to_public", default=False): t.Bool,
-            t.Key("config"): t.Dict(
-                {
-                    t.Key("model"): t.String,
-                    tx.AliasedKey(["model_version", "modelVersion"], default=None): (
-                        t.Null | t.String
-                    ),
-                    tx.AliasedKey(
-                        ["model_mount_destination", "modelMountDestination"], default="/models"
-                    ): t.String,
-                    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
-                    # cluster_size is moved to the root-level parameters
-                    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): (
-                        t.Null | t.String
-                    ),
-                    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-                    tx.AliasedKey(
-                        ["resource_opts", "resourceOpts"], default=None
-                    ): t.Null | t.Mapping(t.String, t.Any),
-                }
-            ),
-        }
-    ),
-)
-async def create(request: web.Request, params: Any) -> web.Response:
+class ServiceConfigModel(BaseModel):
+    model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
+    model_version: int = Field(
+        validation_alias=AliasChoices("model_version", "modelVersion"),
+        description="Unused; Reserved for future works",
+        default=1,
+    )
+    model_mount_destination: str = Field(
+        validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
+        default="/models",
+        description=(
+            "Mount destination for the model VFolder will be mounted inside the inference session"
+        ),
+    )
+    environ: dict[str, str] | None = Field(
+        description="Environment variables to be set inside the inference session",
+        default=None,
+    )
+    scaling_group: str = Field(
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
+        description="Name of the resource group to spawn inference sessions",
+        examples=["nvidia-H100"],
+    )
+    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+
+
+class NewServiceRequestModel(BaseModel):
+    service_name: tv.SessionName = Field(
+        validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
+        description="Name of the service",
+    )
+    desired_session_count: int = Field(
+        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
+        description="Number of sessions to serve traffic",
+    )
+    image: str = Field(
+        validation_alias=AliasChoices("image", "lang"),
+        description="String reference of the image which will be used to create session",
+        examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
+    )
+    architecture: str = Field(
+        validation_alias=AliasChoices("arch", "architecture"),
+        description="Image architecture",
+        default=DEFAULT_IMAGE_ARCH,
+    )
+    group: str = Field(
+        validation_alias=AliasChoices("group", "groupName", "group_name"),
+        description="Name of project to spawn session",
+        default="default",
+    )
+    domain: str = Field(
+        validation_alias=AliasChoices("domain", "domainName", "domain_name"),
+        description="Name of domain to spawn session",
+        default="default",
+    )
+    cluster_size: int = Field(
+        validation_alias=AliasChoices("cluster_size", "clusterSize"), default=1
+    )
+    cluster_mode: ClusterMode = Field(
+        validation_alias=AliasChoices("cluster_mode", "clusterMode"),
+        default=ClusterMode.SINGLE_NODE,
+    )
+    tag: str | None = Field(default=None)
+    startup_command: str | None = Field(
+        validation_alias=AliasChoices("startup_command", "startupCommand"),
+        default=None,
+    )
+    bootstrap_script: str | None = Field(
+        validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
+        default=None,
+    )
+    callback_url: AnyUrl | None = Field(
+        validation_alias=AliasChoices("callback_url", "callbackUrl", "CallbackURL"),
+        default=None,
+    )
+    owner_access_key: str | None = Field(
+        description=(
+            "(for privileged users only) when specified, transfer ownership of the inference"
+            " session to specified user"
+        ),
+        default=None,
+    )
+    open_to_public: bool = Field(
+        description="If set to true, do not require an API key to access the model service",
+        default=False,
+    )
+    config: ServiceConfigModel
+
+
+@dataclass
+class ValidationResult:
+    model_id: uuid.UUID
+    requester_access_key: AccessKey
+    owner_access_key: AccessKey
+    owner_uuid: uuid.UUID
+    group_id: uuid.UUID
+    resource_policy: dict
+    scaling_group: str
+
+
+async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
         "owner_access_key": (
-            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+            None if params.owner_access_key is undefined else params.owner_access_key
         ),
     }
+
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
+    if params.desired_session_count > (
+        _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
+    ):
+        raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_readonly() as conn:
         checked_scaling_group = await check_scaling_group(
             conn,
-            params["config"]["scaling_group"],
+            params.config.scaling_group,
             SessionTypes.INFERENCE,
             owner_access_key,
-            params["domain"],
-            params["group"],
+            params.domain,
+            params.group,
         )
 
         query = (
@@ -242,17 +392,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if not sgroup["wsproxy_api_token"]:
             raise ServiceUnavailable("Scaling group not ready to start model service")
 
-        params["config"]["scaling_group"] = checked_scaling_group
+        params.config.scaling_group = checked_scaling_group
 
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(
+            request, params.model_dump(), conn
+        )
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
-            extra_vf_conds = vfolders.c.id == uuid.UUID(params["config"]["model"])
+            extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
             matched_vfolders = await query_accessible_vfolders(
                 conn,
                 owner_uuid,
                 user_role=request["user"]["role"],
-                domain_name=params["domain"],
+                domain_name=params.domain,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
             )
@@ -261,14 +413,14 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # TypeError: catching classes that do not inherit from BaseException is not allowed
             if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
                 try:
-                    extra_vf_conds = (vfolders.c.name == params["config"]["model"]) & (
+                    extra_vf_conds = (vfolders.c.name == params.config.model) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL
                     )
                     matched_vfolders = await query_accessible_vfolders(
                         conn,
                         owner_uuid,
                         user_role=request["user"]["role"],
-                        domain_name=params["domain"],
+                        domain_name=params.domain,
                         allowed_vfolder_types=allowed_vfolder_types,
                         extra_vf_conds=extra_vf_conds,
                     )
@@ -334,47 +486,73 @@ async def create(request: web.Request, params: Any) -> web.Response:
     except yaml.error.YAMLError as e:
         raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
+    return ValidationResult(
+        model_id,
+        requester_access_key,
+        owner_access_key,
+        owner_uuid,
+        group_id,
+        resource_policy,
+        checked_scaling_group,
+    )
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(NewServiceRequestModel)
+async def create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
+    """
+    Creates a new model service. If `desired_session_count` is greater than zero,
+    then inference sessions will be automatically scheduled upon successful creation of model service.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+
+    validation_result = await _validate(request, params)
+
     async with root_ctx.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params["image"], ["*"], params["architecture"]),
-                params["image"],
+                ImageRef(params.image, ["*"], params.architecture),
+                ImageAlias(params.image),
             ],
         )
 
-    params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
+    creation_config = params.config.model_dump()
+    creation_config["mount_map"] = {
+        validation_result.model_id: params.config.model_mount_destination
+    }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
-        params["image"],
-        params["architecture"],
+        params.image,
+        params.architecture,
         UserScope(
-            domain_name=params["domain"],
-            group_id=group_id,
+            domain_name=params.domain,
+            group_id=validation_result.group_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),
-        owner_access_key,
-        resource_policy,
+        validation_result.owner_access_key,
+        validation_result.resource_policy,
         SessionTypes.INFERENCE,
-        params["config"],
-        params["cluster_mode"],
-        params["cluster_size"],
+        creation_config,
+        params.cluster_mode,
+        params.cluster_size,
         dry_run=True,  # Setting this to True will prevent actual session from being enqueued
-        bootstrap_script=params["bootstrap_script"],
-        startup_command=params["startup_command"],
-        tag=params["tag"],
-        callback_url=params["callback_url"],
+        bootstrap_script=params.bootstrap_script,
+        startup_command=params.startup_command,
+        tag=params.tag,
+        callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
         sudo_session_enabled=sudo_session_enabled,
     )
 
     async with root_ctx.db.begin_session() as db_sess:
         query = sa.select(EndpointRow).where(
             (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
-            & (EndpointRow.name == params["service_name"])
+            & (EndpointRow.name == params.service_name)
         )
         result = await db_sess.execute(query)
         service_with_duplicate_name = result.scalar()
@@ -382,41 +560,208 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("Cannot create multiple services with same name")
 
         project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params["domain"], params["group"]
+            await db_sess.connection(), params.domain, params.group
         )
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
-            params["service_name"],
+            params.service_name,
             request["user"]["uuid"],
-            owner_uuid,
-            params["desired_session_count"],
+            validation_result.owner_uuid,
+            params.desired_session_count,
             image_row,
-            model_id,
-            params["domain"],
+            validation_result.model_id,
+            params.domain,
             project_id,
-            checked_scaling_group,
-            params["config"]["resources"],
-            params["cluster_mode"],
-            params["cluster_size"],
-            model_mount_destination=params["config"]["model_mount_destination"],
-            tag=params["tag"],
-            startup_command=params["startup_command"],
-            callback_url=params["callback_url"],
-            environ=params["config"]["environ"],
-            bootstrap_script=params["bootstrap_script"],
-            resource_opts=params["config"]["resource_opts"],
-            open_to_public=params["open_to_public"],
+            validation_result.scaling_group,
+            params.config.resources,
+            params.cluster_mode,
+            params.cluster_size,
+            model_mount_destination=params.config.model_mount_destination,
+            tag=params.tag,
+            startup_command=params.startup_command,
+            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
+            environ=params.config.environ,
+            bootstrap_script=params.bootstrap_script,
+            resource_opts=params.config.resource_opts,
+            open_to_public=params.open_to_public,
         )
         db_sess.add(endpoint)
-        await db_sess.commit()
+        await db_sess.flush()
+        endpoint_id = endpoint.id
 
-    return web.json_response({"endpoint_id": str(endpoint.id)})
+    return ServeInfoModel(
+        endpoint_id=endpoint_id,
+        name=params.service_name,
+        desired_session_count=params.desired_session_count,
+        active_routes=[],
+        service_endpoint=None,
+        is_public=params.open_to_public,
+    )
+
+
+class TryStartResponseModel(BaseModel):
+    task_id: str
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(NewServiceRequestModel)
+async def try_start(request: web.Request, params: NewServiceRequestModel) -> TryStartResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    background_task_manager = root_ctx.background_task_manager
+
+    validation_result = await _validate(request, params)
+
+    async with root_ctx.db.begin_readonly_session() as session:
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageRef(params.image, ["*"], params.architecture),
+                ImageAlias(params.image),
+            ],
+        )
+        query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
+            UserRow.uuid == request["user"]["uuid"]
+        )
+        created_user = (await session.execute(query)).fetchone()
+
+    creation_config = params.config.model_dump()
+    creation_config["mount_map"] = {
+        validation_result.model_id: params.config.model_mount_destination
+    }
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
+    async def _task(reporter: ProgressReporter) -> None:
+        terminated_event = asyncio.Event()
+
+        result = await root_ctx.registry.create_session(
+            f"model-eval-{secrets.token_urlsafe(16)}",
+            image_row.name,
+            image_row.architecture,
+            UserScope(
+                domain_name=params.domain,
+                group_id=validation_result.group_id,
+                user_uuid=created_user.uuid,
+                user_role=created_user.role,
+            ),
+            validation_result.owner_access_key,
+            validation_result.resource_policy,
+            SessionTypes.INFERENCE,
+            {
+                "mounts": [validation_result.model_id],
+                "mount_map": {
+                    validation_result.model_id: creation_config["model_mount_destination"]
+                },
+                "environ": creation_config["environ"],
+                "scaling_group": validation_result.scaling_group,
+                "resources": creation_config["resources"],
+                "resource_opts": creation_config["resource_opts"],
+                "preopen_ports": None,
+                "agent_list": None,
+            },
+            params.cluster_mode,
+            params.cluster_size,
+            bootstrap_script=params.bootstrap_script,
+            startup_command=params.startup_command,
+            tag=params.tag,
+            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
+            enqueue_only=True,
+            sudo_session_enabled=sudo_session_enabled,
+        )
+
+        await reporter.update(
+            message=json.dumps({
+                "event": "session_enqueued",
+                "session_id": str(result["sessionId"]),
+            })
+        )
+
+        async def _handle_event(
+            context: None,
+            source: AgentId,
+            event: SessionEnqueuedEvent
+            | SessionPreparingEvent
+            | SessionStartedEvent
+            | SessionCancelledEvent
+            | SessionTerminatedEvent
+            | ModelServiceStatusEvent,
+        ) -> None:
+            task_message = {"event": event.name, "session_id": str(event.session_id)}
+            match event:
+                case ModelServiceStatusEvent():
+                    task_message["is_healthy"] = event.new_status.value
+            await reporter.update(message=json.dumps(task_message))
+
+            match event:
+                case SessionTerminatedEvent() | SessionCancelledEvent():
+                    terminated_event.set()
+                case ModelServiceStatusEvent():
+                    async with root_ctx.db.begin_readonly_session() as db_sess:
+                        session = await SessionRow.get_session(
+                            db_sess,
+                            result["sessionId"],
+                            None,
+                            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                        )
+                        await root_ctx.registry.destroy_session(
+                            session,
+                            forced=True,
+                        )
+
+        session_event_matcher = lambda args: args[0] == str(result["sessionId"])
+        model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
+
+        handlers: list[EventHandler] = [
+            root_ctx.event_dispatcher.subscribe(
+                SessionPreparingEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionStartedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionCancelledEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                SessionTerminatedEvent,
+                None,
+                _handle_event,
+                args_matcher=session_event_matcher,
+            ),
+            root_ctx.event_dispatcher.subscribe(
+                ModelServiceStatusEvent,
+                None,
+                _handle_event,
+                args_matcher=model_service_event_matcher,
+            ),
+        ]
+
+        try:
+            await terminated_event.wait()
+        finally:
+            for handler in handlers:
+                root_ctx.event_dispatcher.unsubscribe(handler)
+
+    task_id = await background_task_manager.start(_task)
+    return TryStartResponseModel(task_id=str(task_id))
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def delete(request: web.Request) -> web.Response:
+@pydantic_response_api_handler
+async def delete(request: web.Request) -> SuccessResponseModel:
+    """
+    Removes model service (and inference sessions for the service also).
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -443,17 +788,24 @@ async def delete(request: web.Request) -> web.Response:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
-                .values(
-                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
-                )
+                .values({
+                    "desired_session_count": 0,
+                    "lifecycle_stage": EndpointLifecycle.DESTROYING,
+                })
             )
         await db_sess.execute(query)
-    return web.json_response({"success": True}, status=200)
+    return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def sync(request: web.Request) -> web.Response:
+@pydantic_response_api_handler
+async def sync(request: web.Request) -> SuccessResponseModel:
+    """
+    Force syncs up-to-date model service information with AppProxy.
+    In normal situations this will be automatically handled by Backend.AI schedulers,
+    but this API is left open in case of unexpected restart of AppProxy process.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -471,19 +823,26 @@ async def sync(request: web.Request) -> web.Response:
         await root_ctx.registry.update_appproxy_endpoint_routes(
             db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
         )
-    return web.json_response({"success": True}, status=200)
+    return SuccessResponseModel()
+
+
+class ScaleRequestModel(BaseModel):
+    to: int = Field(description="Ideal number of inference sessions")
+
+
+class ScaleResponseModel(BaseResponseModel):
+    current_route_count: int
+    target_count: int
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("to"): t.Int,
-        }
-    ),
-)
-async def scale(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(ScaleRequestModel)
+async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleResponseModel:
+    """
+    Updates ideal inference session count manually. Based on the difference of this number,
+    inference sessions will be created or removed automatically.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -499,31 +858,38 @@ async def scale(request: web.Request, params: Any) -> web.Response:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params["to"] < 0:
+    if params.to < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
+    elif params.to > (
+        _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
+    ):
+        raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": params["to"]})
+            .values({"desired_session_count": params.to})
         )
         await db_sess.execute(query)
-        return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
+        return ScaleResponseModel(
+            current_route_count=len(endpoint.routings), target_count=params.to
         )
+
+
+class UpdateRouteRequestModel(BaseModel):
+    traffic_ratio: NonNegativeFloat
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("traffic_ratio"): t.Float[0:],
-        }
-    ),
-)
-async def update_route(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(UpdateRouteRequestModel)
+async def update_route(
+    request: web.Request, params: UpdateRouteRequestModel
+) -> SuccessResponseModel:
+    """
+    Updates traffic bias of specific route.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -549,7 +915,7 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(RoutingRow)
             .where(RoutingRow.id == route_id)
-            .values({"traffic_ratio": params["traffic_ratio"]})
+            .values({"traffic_ratio": params.traffic_ratio})
         )
         await db_sess.execute(query)
         endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
@@ -558,13 +924,17 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
                 db_sess, endpoint, [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY]
             )
         except aiohttp.ClientError as e:
-            log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-        return web.json_response({"success": True})
+            log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+        return SuccessResponseModel()
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def delete_route(request: web.Request) -> web.Response:
+@pydantic_response_api_handler
+async def delete_route(request: web.Request) -> SuccessResponseModel:
+    """
+    Scales down the service by removing specific inference session.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -597,23 +967,32 @@ async def delete_route(request: web.Request) -> web.Response:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": route.endpoint_row.desired_session_count})
+            .values({"desired_session_count": route.endpoint_row.desired_session_count - 1})
         )
         await db_sess.execute(query)
-        return web.json_response({"success": True})
+        return SuccessResponseModel()
+
+
+class TokenRequestModel(BaseModel):
+    duration: tv.TimeDuration = Field(default=None, description="duration of the token.")
+    valid_until: int | None = Field(
+        default=None, description="Absolute token expiry date, expressed in Unix epoch format."
+    )
+
+
+class TokenResponseModel(BaseResponseModel):
+    token: str
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("duration", default=None): t.Null | tx.TimeDuration,
-            t.Key("valid_until", default=None): t.Null | t.Int,
-        }
-    ),
-)
-async def generate_token(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(TokenRequestModel)
+async def generate_token(request: web.Request, params: TokenRequestModel) -> TokenResponseModel:
+    """
+    Generates a token which acts as an API key to authenticate when calling model service endpoint.
+    If both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.
+    duration and valid_until can't be both specified.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -643,10 +1022,10 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params["valid_until"]:
-        exp = params["valid_until"]
-    elif params["duration"]:
-        exp = int((datetime.now() + params["duration"]).timestamp())
+    if params.valid_until:
+        exp = params.valid_until
+    elif params.duration:
+        exp = int((datetime.now() + params.duration).timestamp())
     else:
         raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
     if datetime.now().timestamp() > exp:
@@ -674,12 +1053,29 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
         )
         db_sess.add(token_row)
         await db_sess.commit()
-        return web.json_response({"token": token})
+        return TokenResponseModel(token=token)
+
+
+class ErrorInfoModel(BaseModel):
+    session_id: uuid.UUID | None
+    error: dict[str, Any]
+
+
+class ErrorListResponseModel(BaseResponseModel):
+    errors: list[ErrorInfoModel]
+    retries: int
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def list_errors(request: web.Request) -> web.Response:
+@pydantic_response_api_handler
+async def list_errors(request: web.Request) -> ErrorListResponseModel:
+    """
+    List errors raised while trying to create the inference sessions. Backend.AI will
+    stop trying to create an inference session for the model service if six (6) error stacks
+    up. The only way to clear the error and retry spawning session is to call
+    `clear_error` (POST /services/{service_id}/errors/clear) API.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     service_id = uuid.UUID(request.match_info["service_id"])
@@ -700,17 +1096,14 @@ async def list_errors(request: web.Request) -> web.Response:
 
     error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
-    return web.json_response(
-        {
-            "errors": [
-                {
-                    "session_id": route.error_data.get("session_id"),
-                    "error": route.error_data["errors"],
-                }
-                for route in error_routes
-            ],
-            "retries": endpoint.retries,
-        }
+    return ErrorListResponseModel(
+        errors=[
+            ErrorInfoModel(
+                session_id=route.error_data.get("session_id"), error=route.error_data["errors"]
+            )
+            for route in error_routes
+        ],
+        retries=endpoint.retries,
     )
 
 
@@ -775,6 +1168,7 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))

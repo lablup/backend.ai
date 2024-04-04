@@ -35,26 +35,21 @@ async def view_stats(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     match request.query.get("format", "text"):
         case "text":
-            text = "\n".join(
-                [
-                    f"total_async_tasks: {len(asyncio.all_tasks())}",
-                    f"total_active_handlers: {len(stats.active_handlers)}",
-                    f"active_static_handlers: {len(stats.active_static_handlers)}",
-                    f"active_webui_handlers: {len(stats.active_webui_handlers)}",
-                    f"active_config_handlers: {len(stats.active_config_handlers)}",
-                    f"active_login_handlers: {len(stats.active_login_handlers)}",
-                    f"active_login_check_handlers: {len(stats.active_login_check_handlers)}",
-                    f"active_token_login_handlers: {len(stats.active_token_login_handlers)}",
-                    f"active_logout_handlers: {len(stats.active_logout_handlers)}",
-                    f"active_healthcheck_handlers: {len(stats.active_healthcheck_handlers)}",
-                    f"active_proxy_api_handlers: {len(stats.active_proxy_api_handlers)}",
-                    f"active_proxy_plugin_handlers: {len(stats.active_proxy_plugin_handlers)}",
-                    (
-                        "active_proxy_websocket_handlers:"
-                        f" {len(stats.active_proxy_websocket_handlers)}"
-                    ),
-                ]
-            )
+            text = "\n".join([
+                f"total_async_tasks: {len(asyncio.all_tasks())}",
+                f"total_active_handlers: {len(stats.active_handlers)}",
+                f"active_static_handlers: {len(stats.active_static_handlers)}",
+                f"active_webui_handlers: {len(stats.active_webui_handlers)}",
+                f"active_config_handlers: {len(stats.active_config_handlers)}",
+                f"active_login_handlers: {len(stats.active_login_handlers)}",
+                f"active_login_check_handlers: {len(stats.active_login_check_handlers)}",
+                f"active_token_login_handlers: {len(stats.active_token_login_handlers)}",
+                f"active_logout_handlers: {len(stats.active_logout_handlers)}",
+                f"active_healthcheck_handlers: {len(stats.active_healthcheck_handlers)}",
+                f"active_proxy_api_handlers: {len(stats.active_proxy_api_handlers)}",
+                f"active_proxy_plugin_handlers: {len(stats.active_proxy_plugin_handlers)}",
+                f"active_proxy_websocket_handlers: {len(stats.active_proxy_websocket_handlers)}",
+            ])
             return web.Response(text=text)
         case "json":
             data = {

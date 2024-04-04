@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import sys
-from typing import Sequence
+import uuid
+from typing import Iterable, Sequence
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
-from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
-from ..params import BoolExprType, CommaSeparatedListType, OptionalType
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
@@ -47,6 +48,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
+        user_fields["main_access_key"],
     ]
     with Session() as session:
         try:
@@ -148,6 +150,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["groups"],
         user_fields["allowed_client_ip"],
         user_fields["sudo_session_enabled"],
+        user_fields["main_access_key"],
     ]
     try:
         with Session() as session:
@@ -170,7 +173,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         sys.exit(ExitCode.FAILURE)
 
 
-@user.command()
+@user.command(aliases=["create"])
 @pass_ctx_obj
 @click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
 @click.argument("email", type=str, metavar="EMAIL")
@@ -208,7 +211,14 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
-@click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--desc",
+    "--description",
+    "description",
+    type=str,
+    default="",
+    help="Description of the user.",
+)
 @click.option(
     "--sudo-session-enabled",
     is_flag=True,
@@ -217,6 +227,15 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         "Enable passwordless sudo for a user inside a compute session. "
         "Note that this feature does not automatically install sudo for the session."
     ),
+)
+@click.option(
+    "-g",
+    "--group",
+    "--groups",
+    "groups",
+    type=CommaSeparatedListType(),
+    default="default",
+    help='Add to the groups. If unspecified, it will use the "default" group.',
 )
 def add(
     ctx: CLIContext,
@@ -231,9 +250,11 @@ def add(
     allowed_ip: str | None,
     description: str,
     sudo_session_enabled: bool,
+    groups: Iterable[str],
 ):
     """
-    Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
+    Create a new user. As the user must belong to a domain,
+    you should provide DOMAIN_NAME explicitly.
 
     \b
     DOMAIN_NAME: Name of the domain where new user belongs to.
@@ -242,6 +263,23 @@ def add(
     """
     with Session() as session:
         try:
+            group_ids = []
+            # Resolve the group names to IDs if necessary.
+            for group_ref in groups:
+                try:
+                    uuid.UUID(group_ref)
+                    group_ids.append(group_ref)
+                except ValueError:
+                    data = session.Group.from_name(
+                        group_ref,
+                        domain_name=domain_name,
+                    )
+                    if not data:
+                        # Either domain_name or group_ref may be invalid.
+                        raise ValueError(
+                            f"Cannot find the group {group_ref!r} in the domain {domain_name!r}"
+                        )
+                    group_ids.append(data[0]["id"])
             data = session.User.create(
                 domain_name,
                 email,
@@ -252,16 +290,31 @@ def add(
                 status=status,
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
+                group_ids=group_ids,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
+                fields=(
+                    user_fields["domain_name"],
+                    user_fields["email"],
+                    user_fields["username"],
+                    user_fields["uuid"],
+                    user_fields["groups"],
+                ),
             )
-        except Exception as e:
+        except BackendAPIError as e:
             ctx.output.print_mutation_error(
                 e,
                 item_name="user",
                 action_name="add",
             )
             sys.exit(ExitCode.FAILURE)
+        except ValueError as e:
+            ctx.output.print_fail(str(e))
+            sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
@@ -269,6 +322,9 @@ def add(
                 action_name="add",
             )
             sys.exit(ExitCode.FAILURE)
+
+        # post-process group names
+        data["user"]["groups"] = ", ".join(item["name"] for item in data["user"]["groups"])
         ctx.output.print_mutation_result(
             data,
             item_name="user",
@@ -348,6 +404,12 @@ def add(
         "Note that this feature does not automatically install sudo for the session."
     ),
 )
+@click.option(
+    "--main-access-key",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set main access key which works as default.",
+)
 def update(
     ctx: CLIContext,
     email: str,
@@ -361,6 +423,7 @@ def update(
     allowed_ip: Sequence[str] | Undefined,
     description: str | Undefined,
     sudo_session_enabled: bool | Undefined,
+    main_access_key: str | Undefined,
 ):
     """
     Update an existing user.
@@ -382,6 +445,7 @@ def update(
                 allowed_client_ip=allowed_ip,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
+                main_access_key=main_access_key,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

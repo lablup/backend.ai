@@ -8,6 +8,7 @@ import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -93,7 +94,10 @@ from .predicates import (
     check_domain_resource_limit,
     check_group_resource_limit,
     check_keypair_resource_limit,
+    check_pending_session_count_limit,
+    check_pending_session_resource_limit,
     check_reserved_batch_session,
+    check_user_resource_limit,
 )
 from .types import (
     AbstractScheduler,
@@ -477,8 +481,20 @@ class SchedulerDispatcher(aobject):
                     if not sess_ctx.is_private:
                         predicates += [
                             (
+                                "pending_session_resource_limit",
+                                check_pending_session_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "pending_session_count_limit",
+                                check_pending_session_count_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
                                 "keypair_resource_limit",
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_resource_limit",
+                                check_user_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
                                 "user_group_resource_limit",
@@ -504,26 +520,20 @@ class SchedulerDispatcher(aobject):
             passed_predicates = []
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": repr(result),
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": repr(result),
+                    })
                     continue
                 if result.passed:
-                    passed_predicates.append(
-                        {
-                            "name": predicate_name,
-                        }
-                    )
+                    passed_predicates.append({
+                        "name": predicate_name,
+                    })
                 else:
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": result.message or "",
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": result.message or "",
+                    })
 
             async def _check_predicates_hook() -> HookResult:
                 async with self.db.begin_readonly_session() as db_sess:
@@ -550,12 +560,10 @@ class SchedulerDispatcher(aobject):
                     # Append result only when plugin exists.
                     passed_predicates.append({"name": hook_name})
             else:
-                failed_predicates.append(
-                    {
-                        "name": hook_name,
-                        "msg": hook_result.reason or "",
-                    }
-                )
+                failed_predicates.append({
+                    "name": hook_name,
+                    "msg": hook_result.reason or "",
+                })
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
@@ -717,12 +725,16 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
+        if not sess_ctx.kernels:
+            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
 
         try:
+            if not candidate_agents:
+                raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -764,7 +776,10 @@ class SchedulerDispatcher(aobject):
                 available_slots, occupied_slots = result
 
                 for key in available_slots.keys():
-                    if available_slots[key] - occupied_slots[key] >= sess_ctx.requested_slots[key]:
+                    if (
+                        available_slots[key] - occupied_slots.get(key, Decimal("0"))
+                        >= sess_ctx.requested_slots[key]
+                    ):
                         continue
                     else:
                         raise InstanceNotAvailable(
@@ -780,10 +795,10 @@ class SchedulerDispatcher(aobject):
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    rr_state: RoundRobinState | None = (
-                        await sched_ctx.registry.shared_config.get_roundrobin_state(
-                            sgroup_name, requested_architecture
-                        )
+                    rr_state: (
+                        RoundRobinState | None
+                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
+                        sgroup_name, requested_architecture
                     )
 
                     if rr_state is not None:
@@ -995,11 +1010,12 @@ class SchedulerDispatcher(aobject):
                         # Check the resource availability of the manually designated agent
                         result = (
                             await agent_db_sess.execute(
-                                sa.select(
-                                    [AgentRow.available_slots, AgentRow.occupied_slots]
-                                ).where(AgentRow.id == agent.id)
+                                sa.select([
+                                    AgentRow.available_slots,
+                                    AgentRow.occupied_slots,
+                                ]).where(AgentRow.id == agent.id)
                             )
-                        ).fecthall()[0]
+                        ).fetchall()[0]
 
                         if result is None:
                             raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
@@ -1026,6 +1042,10 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
+                        if not candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg="No agents are available for scheduling"
+                            )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
@@ -1335,7 +1355,7 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warn("prepare(): timeout while executing start_session()")
+            log.warning("prepare(): timeout while executing start_session()")
 
     async def scale_services(
         self,
@@ -1492,12 +1512,10 @@ class SchedulerDispatcher(aobject):
             async with self.db.begin_session() as db_sess:
                 query = (
                     sa.update(EndpointRow)
-                    .values(
-                        {
-                            "destroyed_at": sa.func.now(),
-                            "lifecycle_stage": EndpointLifecycle.DESTROYED,
-                        }
-                    )
+                    .values({
+                        "destroyed_at": sa.func.now(),
+                        "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                    })
                     .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
                 )
                 await db_sess.execute(query)
@@ -1516,7 +1534,7 @@ class SchedulerDispatcher(aobject):
                         endpoint,
                     )
                 except Exception as e:
-                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                    log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,

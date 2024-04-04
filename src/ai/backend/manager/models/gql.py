@@ -13,6 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
 from .etcd import (
     ContainerRegistry,
@@ -49,10 +50,19 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
-from .base import DataLoaderManager, privileged_query, scoped_query
+from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
-from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
+from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    ModifyGroup,
+    ProjectType,
+    PurgeGroup,
+)
 from .image import (
     AliasImage,
     ClearImages,
@@ -114,11 +124,15 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
+    UserConnection,
     UserList,
+    UserNode,
     UserRole,
     UserStatus,
 )
 from .vfolder import (
+    ModelCard,
+    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -232,13 +246,15 @@ class Mutations(graphene.ObjectType):
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
 
+    modify_endpoint = ModifyEndpoint.Field()
+
 
 class Queries(graphene.ObjectType):
     """
     All available GraphQL queries.
     """
 
-    node = graphene.relay.Node.Field()
+    node = AsyncNode.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -292,6 +308,11 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
     )
 
+    group_node = graphene.Field(
+        GroupNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    group_nodes = PaginatedConnectionField(GroupConnection, description="Added in 24.03.0.")
+
     group = graphene.Field(
         Group,
         id=graphene.UUID(required=True),
@@ -311,6 +332,13 @@ class Queries(graphene.ObjectType):
         Group,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=(
+                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
+        ),
     )
 
     image = graphene.Field(
@@ -357,6 +385,11 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
+
+    user_node = graphene.Field(
+        UserNode, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    user_nodes = PaginatedConnectionField(UserConnection, description="Added in 24.03.0.")
 
     keypair = graphene.Field(
         KeyPair,
@@ -643,6 +676,11 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    model_card = graphene.Field(
+        ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
+    )
+    model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
@@ -794,6 +832,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    async def resolve_group_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await GroupNode.get_node(info, id)
+
+    async def resolve_group_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await GroupNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     @staticmethod
     async def resolve_group(
         root: Any,
@@ -801,6 +869,7 @@ class Queries(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Group:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -835,7 +904,7 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id)
+            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -897,6 +966,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str = None,
         is_active: bool = None,
+        type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -917,7 +987,12 @@ class Queries(graphene.ObjectType):
             return client_groups
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return await Group.load_all(info.context, domain_name=domain_name, is_active=is_active)
+        return await Group.load_all(
+            info.context,
+            domain_name=domain_name,
+            is_active=is_active,
+            type=[ProjectType[t] for t in type],
+        )
 
     @staticmethod
     async def resolve_image(
@@ -1088,6 +1163,36 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return UserList(user_list, total_count)
+
+    async def resolve_user_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await UserNode.get_node(info, id)
+
+    async def resolve_user_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await UserNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
@@ -1957,6 +2062,36 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
+
+    async def resolve_model_card(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelCard.get_node(info, id)
+
+    async def resolve_model_cards(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ModelCard.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
 
 class GQLMutationPrivilegeCheckMiddleware:

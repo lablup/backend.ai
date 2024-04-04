@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "欢迎，",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "欢迎，{{ userName }}.",
       "Summary": "概括",
       "Sessions": "会话",
       "Import&Run": "导入并运行",
@@ -61,7 +60,11 @@
       "PasswordChangePlace": "点击顶部栏上的个人图标，进入 \"我的账户 \"菜单。",
       "Notifications": "通知",
       "Tasks": "任务",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "数据",
+      "InvalidBlankPassword": "输入您的密码",
+      "InvalidBlankEmail": "输入你的电子邮箱",
+      "DisMatchUserEmail": "用户电子邮件不匹配"
     },
     "YouAreOffline": "您现在离线",
     "YouAreOnline": "您现在在线",
@@ -240,12 +243,23 @@
       "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
+      "EnqueueComputeSessionWarning": "如果将其设置为大于当前可用资源，则会话创建将在队列中延迟，直到可用。",
+      "SessionName": "会话名称",
+      "ResetFormConfirm": "您想重置所有条目吗？",
+      "TemplateAndHistory": "模板",
+      "ScheduleTimeSimple": "设置开始时间",
+      "ResourceAllocationPerContainer": "每个集装箱的资源分配",
+      "NumberOfContainer": "集装箱数量",
+      "ErrorCanNotExceedRemaining": "不能设置为大于剩余资源（{{amount}}）。",
+      "EnterEnvironmentVariable": "输入变量名称",
+      "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
+      "EnvironmentVariableDuplicateName": "已经存在的变量名。",
+      "Template": "会议模板",
+      "EnableAutomaticShmem": "自动共享内存",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "OnlyAllowsDiscreteNumberByClusterSize": "当簇大小不小于 2 时，只允许使用整数。",
+      "StartAfter": "之后开始：",
+      "StartTimeDoesNotApply": "如果未设置开始时间，则不适用。"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -394,7 +408,10 @@
     "Unset": "未设置",
     "OK": "好的",
     "Commit": "承诺",
-    "EnterManually": "手动输入"
+    "EnterManually": "手动输入",
+    "Download": "下载",
+    "Clone": "克隆",
+    "Config": "配置"
   },
   "agent": {
     "Endpoint": "端点",
@@ -438,7 +455,10 @@
     "Enabled": "启用",
     "StorageProxies": "存储",
     "None": "无",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "图像",
+    "All": "全部",
+    "InProgress": "进行中",
+    "Session": "会话"
   },
   "credential": {
     "Permission": "允许",
@@ -516,7 +536,8 @@
     "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
     "NoUserToDisplay": "无用户显示",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "启用 sudo 会话",
+    "MainAccessKey": "主访问密钥"
   },
   "data": {
     "Folders": "文件夹",
@@ -682,7 +703,11 @@
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
     "DialogModelFolder": "您可以服务和管理模型。",
-    "SearchByName": "按名称搜索"
+    "SearchByName": "按名称搜索",
+    "ModelStore": "模型店",
+    "New": "新的",
+    "Add": "添加",
+    "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。"
   },
   "dialog": {
     "warning": {
@@ -827,7 +852,14 @@
     "DescAutoLogout": "如果所有登录页面都关闭，除了应用程序的会话发起页面（例如 jupyter 笔记本、网络终端等），则自动注销",
     "SSHKeypairEnterManuallyFinished": "SSH 密钥对已成功注册。",
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
-    "SSHKeypairEnterManually": "SSH 密钥对"
+    "SSHKeypairEnterManually": "SSH 密钥对",
+    "MyKeypairInfo": "我的密钥对信息",
+    "DescMyKeypairInfo": "查看我的密钥对信息",
+    "DarkMode": "深色模式",
+    "LightMode": "灯光模式",
+    "UseSystemSetting": "使用系统设置",
+    "DescThemeMode": "自定义 Backend.AI WebUI 在您设备上的外观。",
+    "ThemeMode": "主题模式"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -849,7 +881,9 @@
     "Parameters": "参数",
     "ErrorType": "错误类型",
     "LogMessageRemoved": "日志消息已被删除。",
-    "NoLogToDisplay": "无日志显示"
+    "NoLogToDisplay": "无日志显示",
+    "ShowOnlyError": "仅显示错误",
+    "SearchLogs": "搜索日志"
   },
   "resourcePolicy": {
     "Resources": "资源",
@@ -911,7 +945,8 @@
     "RegistrySuccessfullyModified": "注册表已成功修改。",
     "NoRegistryToDisplay": "无注册表显示",
     "ModifyRegistry": "修改注册表",
-    "ConfirmNoUserName": "未指定用户和密码，要保存吗？"
+    "ConfirmNoUserName": "未指定用户和密码，要保存吗？",
+    "DescURLFormat": "无效的 URL 类型"
   },
   "resourceGroup": {
     "ResourceGroups": "资源组",
@@ -1051,8 +1086,6 @@
     "Scaling": "缩放",
     "AllowAgentSideRegistration": "允许代理端注册",
     "DescAllowAgentSideRegistration": "允许代理将自己注册到经理。 <br/> 仅当 Backend.AI 集群在安全位置管理时使用。",
-    "Plugins": "插件",
-    "CUDAGPUsupport": "CUDA GPU 支持",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
     "CUDAGPUdisabledByFGPUsupport": "已禁用，因为系统使用分数 GPU 插件",
     "ROCMGPUsupport": "ROCm GPU 支持",
@@ -1102,13 +1135,20 @@
     "OverlayNetworkSettings": "覆盖网络设置",
     "OverlayNetworkSettingsDescription": "覆盖网络是在另一个网络之上分层的计算机网络。覆盖网络在 Backend.AI 管理器的多个 Docker 守护进程主机之间创建了一个分布式网络。",
     "MTUDescription": "最大传输单位，网络协议可传输的最大数据包的大小。",
-    "OutOfRange": "超出范围。"
+    "OutOfRange": "超出范围。",
+    "Plugins": "插件",
+    "OpenSourceCUDAGPUsupport": "开源 CUDA GPU 支持",
+    "ShowOnlyChanged": "仅显示更改"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
     "Visit": "访问",
     "SeeDetail": "查看详情",
-    "Initializing": "正在初始化..."
+    "Initializing": "正在初始化...",
+    "NoNotification": "无通知。",
+    "Notifications": "通知",
+    "ClearNotifications": "清除通知",
+    "AreYouSureToClearAllNotifications": "您确定清除所有通知吗？"
   },
   "information": {
     "Core": "核",
@@ -1244,7 +1284,7 @@
     "CouldNotCopyText": "无法复制文本：",
     "NotebookBadgeURL": "笔记本网址",
     "GetAndRunNotebook": "导入并运行",
-    "ImportGithubRepo": "导入 Github 存储库",
+    "ImportGithubRepo": "导入 GitHub 存储库",
     "GitHubURL": "GitHub 网址",
     "GetToFolder": "进入文件夹",
     "RepoWillBeFolder": "导入的 GitHub 存储库转换为文件夹，并且可以在会话开始时挂载。",
@@ -1258,13 +1298,13 @@
     "FolderName": "导入的文件夹名称：",
     "NotebookBadgeCodeHTML": "笔记本徽章代码 (HTML)",
     "NotebookBadgeCodeMarkdown": "笔记本徽章代码 (Markdown)",
-    "GithubInternalError": "Github 内部错误。",
-    "GithubAPILimitError": "Github API 限制错误。",
-    "GithubAPIEtcError": "Github 服务器问题。",
-    "ImportGitlabRepo": "导入 Gitlab 仓库",
-    "GitlabRepoWillBeFolder": "导入的 Gitlab 资源库会转换为文件夹，并可在会话启动时挂载。",
-    "GitlabURL": "Gitlab URL",
-    "GitlabDefaultBranch": "Gitlab 分支名称"
+    "GithubInternalError": "GitHub 内部错误。",
+    "GithubAPILimitError": "GitHub API 限制错误。",
+    "GithubAPIEtcError": "GitHub 服务器问题。",
+    "ImportGitlabRepo": "导入 GitLab 仓库",
+    "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
+    "GitlabURL": "GitLab URL",
+    "GitlabDefaultBranch": "GitLab 分支名称"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "本月统计",
@@ -1417,7 +1457,14 @@
     "Active/Total": "活动/总数",
     "Public": "公众",
     "YouAreAboutToTerminate": "您即将终止",
-    "Image": "图片"
+    "Image": "图片",
+    "Owner": "所有者",
+    "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}",
+    "FailedToTerminateService": "终止服务的请求失败。",
+    "FailedToUpdateService": "更新服务失败。",
+    "ServiceCreated": "模型服务 {{ name }} 已成功创建。",
+    "ServiceUpdated": "模型服务 {{ name }} 已成功更新。",
+    "ServiceTerminated": "模型服务 {{ name }} 已成功终止。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1428,10 +1475,48 @@
     "TurnOffTotp": "关闭双因素身份验证",
     "ConfirmTotpRemovalBody": "您确定不使用双因素身份验证吗？",
     "RemoveTotpSetupCompleted": "禁用 2FA",
-    "OTP": "一次性密码"
+    "OTP": "一次性密码",
+    "EnterConfirmationCode": "现在输入验证器生成的 OTP 进行验证。",
+    "RequireOTP": "写入一次性密码。"
   },
   "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
   "inputLimit": {
     "4to64chars": "（4 至 64 个字符）"
+  },
+  "modelStore": {
+    "Description": "描述",
+    "Model": "模型",
+    "FilterByName": "按名称过滤",
+    "ServiceDetails": "服务详情",
+    "Metadata": "元数据",
+    "ModelPath": "模型路径",
+    "SearchModels": "搜索型号",
+    "MinResource": "最小资源",
+    "LastModified": "上一次更改",
+    "Created": "已创建",
+    "Version": "版本",
+    "Author": "作者",
+    "MaxRetries": "最大重试次数",
+    "Path": "小路",
+    "HealthCheck": "健康检查",
+    "Port": "港口",
+    "StartCommand": "启动命令",
+    "PreStartActions": "开始前的行动",
+    "Framework": "框架",
+    "Category": "类别",
+    "Label": "标签",
+    "Task": "任务",
+    "CloneAsFolder": "克隆为文件夹",
+    "CloneSuccess": "克隆请求已成功发送。",
+    "CloneInfo": "它将被克隆为用户类型文件夹。",
+    "category": "类别"
+  },
+  "table": {
+    "SettingTable": "桌面设置",
+    "SelectColumnToDisplay": "选择要显示的列",
+    "SearchTableColumn": "搜索表格列"
+  },
+  "setting": {
+    "SearchPlaceholder": "输入搜索词"
   }
 }

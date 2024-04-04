@@ -5,6 +5,7 @@ Revises: 85615e005fa3
 Create Date: 2023-09-19 16:29:20.893345
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -70,16 +71,24 @@ def downgrade():
 
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETE_ONGOING}' TO '{DELETING}'")
 
-    op.execute(text(f"""DELETE FROM pg_enum
+    op.execute(
+        text(
+            f"""DELETE FROM pg_enum
         WHERE enumlabel = '{ERROR}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""))
-    op.execute(text(f"""DELETE FROM pg_enum
+        )"""
+        )
+    )
+    op.execute(
+        text(
+            f"""DELETE FROM pg_enum
         WHERE enumlabel = '{DELETE_COMPLETE}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""))
+        )"""
+        )
+    )
     # op.execute(
     #     text(
     #         f"""DELETE FROM pg_enum
@@ -89,9 +98,13 @@ def downgrade():
     #     )"""
     #     )
     # )
-    op.execute(text(f"""DELETE FROM pg_enum
+    op.execute(
+        text(
+            f"""DELETE FROM pg_enum
         WHERE enumlabel = '{PURGE_ONGOING}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""))
+        )"""
+        )
+    )
     op.drop_column("vfolders", "status_history")
