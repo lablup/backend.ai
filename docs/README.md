@@ -16,7 +16,7 @@ Developer guide for Backend.AI documentation
 Then, follow the instructions below:
 
 ```console
-$ pyenv virtualenv $(pyenv latest 3.11) bai-docs
+$ pyenv virtualenv $(pyenv latest 3.12) bai-docs
 $ git clone https://github.com/lablup/backend.ai bai-dev
 $ cd ./bai-dev/docs
 $ pyenv local bai-docs
