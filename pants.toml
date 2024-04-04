@@ -53,7 +53,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.6"]
+interpreter_constraints = ["CPython==3.11.8"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
@@ -92,7 +92,6 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.6"]  # don't know why this is required... (maybe a Pants bug?)
 
 [ruff]
 install_from_resolve = "ruff"
