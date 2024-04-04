@@ -20,7 +20,6 @@ license_defs = {
 _config_defaults: Mapping[str, Any] = {
     "pipeline": {
         "endpoint": yarl.URL("http://127.0.0.1:9500"),
-        "frontend-endpoint": yarl.URL("http://127.0.0.1:3000"),
     },
 }
 
