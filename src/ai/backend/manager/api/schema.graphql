@@ -28,7 +28,7 @@ type Queries {
     domain_name: String
     is_active: Boolean
 
-    """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(reference: String!, architecture: String = "x86_64"): Image
@@ -351,7 +351,7 @@ type Group {
   integration_id: String
   resource_policy: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   type: String
   scaling_groups: [String]
 }
@@ -524,7 +524,7 @@ type ComputeSession implements Item {
   occupying_slots: JSONString
   occupied_slots: JSONString
 
-  """Added in 24.03.0"""
+  """Added in 24.03.0."""
   requested_slots: JSONString
   num_queries: BigInt
   containers: [ComputeContainer]
@@ -552,8 +552,8 @@ type KeyPairResourcePolicy {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
   max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
@@ -619,10 +619,10 @@ type StorageVolume implements Item {
   performance_metric: JSONString
   usage: JSONString
 
-  """Added since 24.03.0. Name of the proxy which this volume belongs to."""
+  """Added in 24.03.0. Name of the proxy which this volume belongs to."""
   proxy: String
 
-  """Added since 24.03.0. Name of the storage."""
+  """Added in 24.03.0. Name of the storage."""
   name: String
 }
 
@@ -725,9 +725,9 @@ type PredefinedAtomicPermission {
 type Endpoint implements Item {
   id: ID
   endpoint_id: UUID
-  image: String @deprecated(reason: "Deprecated since 23.09.9; use `image_object`")
+  image: String @deprecated(reason: "Deprecated since 23.09.9. use `image_object`")
 
-  """Added at 23.09.9"""
+  """Added in 23.09.9."""
   image_object: ImageNode
   domain: String
   project: String
@@ -736,19 +736,19 @@ type Endpoint implements Item {
   url: String
   model: UUID
   model_mount_destiation: String
-  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   created_user_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   created_user_id: UUID
-  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8; use `session_owner_id`")
+  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8. use `session_owner_id`")
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_id: UUID
   tag: String
   startup_command: String
@@ -1077,7 +1077,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -1321,8 +1321,8 @@ input CreateKeyPairResourcePolicyInput {
   max_containers_per_session: Int!
   idle_timeout: BigInt!
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
   max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
@@ -1340,8 +1340,8 @@ input ModifyKeyPairResourcePolicyInput {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
   max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 }
 
@@ -1582,7 +1582,7 @@ type ModifyEndpoint {
   ok: Boolean
   msg: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   endpoint: Endpoint
 }
 
