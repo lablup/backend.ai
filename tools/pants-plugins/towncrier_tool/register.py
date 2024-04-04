@@ -28,7 +28,7 @@ class TowncrierSubsystem(PythonToolBase):
     default_main = ConsoleScript("towncrier")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
+    default_interpreter_constraints = ["CPython>=3.12,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("towncrier_tool", "towncrier.lock")
