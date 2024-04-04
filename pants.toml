@@ -92,7 +92,7 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.12.2"]  # don't know why this is required... (maybe a Pants bug?)
+interpreter_constraints = ["CPython==3.11"]  # don't know why this is required... (maybe a Pants bug?)
 
 [ruff]
 install_from_resolve = "ruff"
