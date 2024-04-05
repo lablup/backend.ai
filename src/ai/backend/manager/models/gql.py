@@ -203,7 +203,7 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
-    forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
+    forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0.")
     forget_image = ForgetImage.Field()
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
@@ -356,7 +356,7 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(),
     )
 
-    customized_images = graphene.List(Image, description="Added since 24.03.0")
+    customized_images = graphene.List(Image, description="Added in 24.03.0.")
 
     user = graphene.Field(
         User,

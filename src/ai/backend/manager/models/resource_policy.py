@@ -448,7 +448,7 @@ class UserResourcePolicy(graphene.ObjectType):
         description="Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
     )
     max_customized_image_count = graphene.Int(
-        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+        description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
     @classmethod

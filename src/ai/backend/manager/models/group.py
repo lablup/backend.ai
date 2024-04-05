@@ -438,7 +438,7 @@ class GroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0."
     )
 
 
@@ -454,7 +454,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0."
     )
 
 

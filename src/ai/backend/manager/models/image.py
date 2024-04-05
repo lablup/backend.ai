@@ -833,7 +833,7 @@ class RescanImages(graphene.Mutation):
 
 
 class ForgetImageById(graphene.Mutation):
-    """Added since 24.03.0."""
+    """Added in 24.03.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
