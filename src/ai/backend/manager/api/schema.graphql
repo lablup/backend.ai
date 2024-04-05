@@ -1025,9 +1025,17 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+
+  """Added in 24.03"""
   move_to_trash_vfolder(vfolder_ids: [UUID]!): MoveToTrashVFolder
+
+  """Added in 24.03"""
   restore_vfolder(vfolder_ids: [UUID]!): RestoreVFolder
+
+  """Added in 24.03"""
   delete_forever_vfolder(vfolder_ids: [UUID]!): DeleteForeverVFolder
+
+  """Added in 24.03"""
   purge_vfolder(vfolder_ids: [UUID]!): PurgeVFolder
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
@@ -1594,7 +1602,6 @@ type MoveToTrashVFolder {
   failed: [UUID]
 }
 
-"""Added in 24.03.0."""
 type VFolderNode implements Node {
   """The ID of the object"""
   id: ID!
