@@ -33,19 +33,19 @@ class RPCError(RuntimeError):
     __slots__ = (
         "agent_id",
         "agent_addr",
-        "exc_repr",
+        "extra_msg",
     )
 
     def __init__(
         self,
         agent_id: AgentId,
         agent_addr: str,
-        exc_repr: str,
+        extra_msg: str,
     ) -> None:
-        super().__init__(agent_id, agent_addr, exc_repr)
+        super().__init__(agent_id, agent_addr, extra_msg)
         self.agent_id = agent_id
         self.agent_addr = agent_addr
-        self.exc_repr = exc_repr
+        self.extra_msg = extra_msg
 
 
 class AgentError(RuntimeError):
