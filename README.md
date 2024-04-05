@@ -270,6 +270,7 @@ Python Version Compatibility
 
 | Backend.AI Core Version | Compatible Python Version |
 |:-----------------------:|:-------------------------:|
+| 24.03.x / 24.09.x       | 3.12.x                    |
 | 23.03.x / 23.09.x       | 3.11.x                    |
 | 22.03.x / 22.09.x       | 3.10.x                    |
 | 21.03.x / 21.09.x       | 3.8.x                     |
