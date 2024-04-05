@@ -395,7 +395,7 @@ type Group {
   """Added in 24.03.0."""
   type: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   container_registry: JSONString
   scaling_groups: [String]
 }
@@ -1401,7 +1401,7 @@ input CreateUserResourcePolicyInput {
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -1422,10 +1422,9 @@ input ModifyUserResourcePolicyInput {
   Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
