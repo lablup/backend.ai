@@ -1,7 +1,8 @@
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
   return changes.map((change) => {
-    // console.log(change);
+    const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{2}.\d{1})/;
+    const addNotationRegex = /Added in (\d{2}\.\d{2}.\d{1})/;
     if (
       [
         "FIELD_DEPRECATION_REASON_ADDED",
@@ -10,14 +11,13 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const newReason =
-        change.meta?.addedDeprecationReason || change.meta?.newDeprecationReason;
-      const regex = /Deprecated since (\d{2}\.\d{2}.\d{1})/;
-      if (!newReason.match(regex)) {
+        change.meta?.addedDeprecationReason ?? change.meta?.newDeprecationReason;
+      if (newReason && !newReason.match(deprecateNotationRegex)) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X"';
+          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X."';
         change.message =
-          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X", ' +
+          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X.", ' +
           change.message;
       }
     } else if (
@@ -28,12 +28,12 @@ module.exports = (props) => {
       const description = newSchema.getTypeMap()[typeName].getFields()[
         fieldName
       ].astNode.description?.value;
-      if (!description || !description.match(/Added in (\d{2}\.\d{2}.\d{1})/)) {
+      if (!description || (description && !description.match(addNotationRegex))) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'New fields must include a description with a version number in the format "Added in XX.XX.X"';
+          'New fields must include a description with a version number in the format "Added in XX.XX.X."';
         change.message =
-          'New fields must include a description with a version number in the format "Added in XX.XX.X", ' +
+          'New fields must include a description with a version number in the format "Added in XX.XX.X.", ' +
           change.message;
       }
     } else if (
@@ -43,12 +43,12 @@ module.exports = (props) => {
       const typeName = change.path.split(".")[0];
       const description =
         newSchema.getTypeMap()[typeName].astNode.description?.value;
-      if (!description || !description.match(/since (\d{2}\.\d{2})/)) {
+      if (!description || (description && !description.match(addNotationRegex))) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'New types must include a description with a version number in the format "since XX.XX"';
+          'New types must include a description with a version number in the format "Added in XX.XX.X."';
         change.message =
-          'New types must include a description with a version number in the format "XX.XX", ' +
+          'New types must include a description with a version number in the format "Added in XX.XX.X.", ' +
           change.message;
       }
     } else if (
@@ -63,12 +63,12 @@ module.exports = (props) => {
         (arg) => arg.name === argumentName
       )?.description;
 
-      if (!description || !description.match(/since (\d{2}\.\d{2})/)) {
+      if (!description || (description && !description.match(addNotationRegex))) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'New arguments must include a description with a version number in the format "since XX.XX"';
+          'New arguments must include a description with a version number in the format "Added in XX.XX.X."';
         change.message =
-          'New arguments must include a description with a version number in the format "XX.XX", ' +
+          'New arguments must include a description with a version number in the format "XX.XX.X.", ' +
           change.message;
       }
     }
