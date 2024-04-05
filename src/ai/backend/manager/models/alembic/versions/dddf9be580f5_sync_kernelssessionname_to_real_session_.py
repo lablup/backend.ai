@@ -1,7 +1,7 @@
 """sync_kernelssessionname_to_real_session_name
 
 Revision ID: dddf9be580f5
-Revises: 75ea2b136830
+Revises: 857b763b8618
 Create Date: 2024-04-01 16:58:14.341114
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "dddf9be580f5"
-down_revision = "75ea2b136830"
+down_revision = "857b763b8618"
 branch_labels = None
 depends_on = None
 
