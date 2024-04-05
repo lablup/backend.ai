@@ -31,6 +31,11 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "1431986dac3923c5945271f169f59c45b8802a114c8f548d611f2015133df77a",
+              "url": "https://files.pythonhosted.org/packages/6e/e6/b31a4b2aa9489da59b35ee0ea4259d6fe9b321a1eaa6492f19342d03d53b/coverage-6.5.0-pp36.pp37.pp38-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
               "hash": "f642e90754ee3e06b0e7e51bce3379590e76b7f76b708e1a71ff043f87025c84",
               "url": "https://files.pythonhosted.org/packages/5c/66/38d1870cb7cf62da49add1d6803fdbcdef632b2808b5c80bcac35b7634d8/coverage-6.5.0.tar.gz"
             }
@@ -46,9 +51,11 @@
       "platform_tag": null
     }
   ],
+  "only_builds": [],
+  "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.1.148",
-  "pip_version": "23.2",
+  "pex_version": "2.3.0",
+  "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
     "coverage[toml]<7.0,>=6.4"
