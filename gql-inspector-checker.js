@@ -11,13 +11,13 @@ module.exports = (props) => {
     ) {
       const newReason =
         change.meta?.addedDeprecationReason || change.meta.newDeprecationReason;
-      const regex = /Deprecated since (\d{2}\.\d{2})/;
+      const regex = /Deprecated since (\d{2}\.\d{2}.\d{1})/;
       if (!newReason.match(regex)) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'Deprecation reason must include a version number in the format "Deprecated since XX.XX"';
+          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X"';
         change.message =
-          'Deprecation reason must include a version number in the format "Deprecated since XX.XX", ' +
+          'Deprecation reason must include a version number in the format "Deprecated since XX.XX.X", ' +
           change.message;
       }
     } else if (
@@ -28,12 +28,12 @@ module.exports = (props) => {
       const description = newSchema.getTypeMap()[typeName].getFields()[
         fieldName
       ].astNode.description?.value;
-      if (!description || !description.match(/since (\d{2}\.\d{2})/)) {
+      if (!description || !description.match(/Added in (\d{2}\.\d{2}.\d{1})/)) {
         change.criticality.level = "BREAKING";
         change.criticality.reason =
-          'New fields must include a description with a version number in the format "since XX.XX"';
+          'New fields must include a description with a version number in the format "Added in XX.XX.X"';
         change.message =
-          'New fields must include a description with a version number in the format "XX.XX", ' +
+          'New fields must include a description with a version number in the format "Added in XX.XX.X", ' +
           change.message;
       }
     } else if (
