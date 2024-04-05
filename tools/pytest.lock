@@ -207,8 +207,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "69eb372f7e2ece89f14751fbcbe470295d73ed41ecd37ca36ed2eb47512a6ab9",
-              "url": "https://files.pythonhosted.org/packages/f4/1b/79cdb7b11bbbd6540a536ac79412904b5c1f8903d5c1330084212afa8ceb/coverage-7.4.4-cp312-cp312-musllinux_1_1_x86_64.whl"
+              "hash": "b2c5edc4ac10a7ef6605a966c58929ec6c1bd0917fb8c15cb3363f65aa40e677",
+              "url": "https://files.pythonhosted.org/packages/99/15/dbcb5d0a22bf5357cf456dfd16f9ceb89c54544d6201d53bc77c75077a8e/coverage-7.4.4-pp38.pp39.pp310-none-any.whl"
             },
             {
               "algorithm": "sha256",
@@ -249,6 +249,11 @@
               "algorithm": "sha256",
               "hash": "c901df83d097649e257e803be22592aedfd5182f07b3cc87d640bbb9afd50f49",
               "url": "https://files.pythonhosted.org/packages/bf/d5/f809d8b630cf4c11fe490e20037a343d12a74ec2783c6cdb5aee725e7137/coverage-7.4.4.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "69eb372f7e2ece89f14751fbcbe470295d73ed41ecd37ca36ed2eb47512a6ab9",
+              "url": "https://files.pythonhosted.org/packages/f4/1b/79cdb7b11bbbd6540a536ac79412904b5c1f8903d5c1330084212afa8ceb/coverage-7.4.4-cp312-cp312-musllinux_1_1_x86_64.whl"
             }
           ],
           "project_name": "coverage",
@@ -827,9 +832,11 @@
       "platform_tag": null
     }
   ],
+  "only_builds": [],
+  "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.1.148",
-  "pip_version": "23.2",
+  "pex_version": "2.3.0",
+  "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
     "aioresponses>=0.7.6",
