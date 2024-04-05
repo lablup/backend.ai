@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.0rc4 (2024-04-05)
+
+### Fixes
+* Upgrade pants to 2.21.0.dev4 for Python 3.12 support in their embedded pex/pip versions ([#1998](https://github.com/lablup/backend.ai/issues/1998))
+* Fix Graylog log adapter not working after upgrading to Python 3.12 ([#1999](https://github.com/lablup/backend.ai/issues/1999))
+
+
 ## 24.03.0rc3 (2024-04-05)
 
 ### Features
