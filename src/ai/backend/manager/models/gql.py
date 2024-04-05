@@ -68,7 +68,9 @@ from .image import (
     ClearImages,
     DealiasImage,
     ForgetImage,
+    ForgetImageById,
     Image,
+    ImageLoadFilter,
     ModifyImage,
     PreloadImage,
     RescanImages,
@@ -205,6 +207,7 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
+    forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
     forget_image = ForgetImage.Field()
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
@@ -363,6 +366,8 @@ class Queries(graphene.ObjectType):
         is_installed=graphene.Boolean(),
         is_operation=graphene.Boolean(),
     )
+
+    customized_images = graphene.List(Image, description="Added since 24.03.0")
 
     user = graphene.Field(
         User,
@@ -1028,6 +1033,27 @@ class Queries(graphene.ObjectType):
         return item
 
     @staticmethod
+    async def resolve_customized_images(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> Sequence[Image]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        client_domain = ctx.user["domain_name"]
+        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        if client_role == UserRole.SUPERADMIN:
+            pass
+        elif client_role in (UserRole.ADMIN, UserRole.USER):
+            items = await Image.filter_allowed(
+                info.context,
+                items,
+                client_domain,
+            )
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+        return items
+
+    @staticmethod
     async def resolve_images(
         root: Any,
         info: graphene.ResolveInfo,
@@ -1038,7 +1064,13 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, is_installed=is_installed, is_operation=is_operation)
+        image_load_filters: set[ImageLoadFilter] = set()
+        if is_installed is not None:
+            image_load_filters.add(ImageLoadFilter.INSTALLED)
+        if is_operation is not None:
+            image_load_filters.add(ImageLoadFilter.EXCLUDE_OPERATIONAL)
+
+        items = await Image.load_all(ctx, filters=image_load_filters)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1046,8 +1078,6 @@ class Queries(graphene.ObjectType):
                 info.context,
                 items,
                 client_domain,
-                is_installed=is_installed,
-                is_operation=is_operation,
             )
         else:
             raise InvalidAPIParameters("Unknown client role")

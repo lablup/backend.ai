@@ -176,6 +176,7 @@ class UserRow(Base):
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+    kernels = relationship("KernelRow", back_populates="user_row")
 
     created_endpoints = relationship(
         "EndpointRow", back_populates="created_user_row", foreign_keys="EndpointRow.created_user"

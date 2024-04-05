@@ -33,6 +33,9 @@ type Queries {
   ): [Group]
   image(reference: String!, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
+
+  """Added since 24.03.0"""
+  customized_images: [Image]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -163,7 +166,12 @@ type ComputeContainer implements Item {
   cluster_role: String
   cluster_hostname: String
   session_id: UUID
+
+  """Deprecated since 24.03.0; use image_object.name"""
   image: String
+
+  """Added since 24.03.0"""
+  image_object: ImageNode
   architecture: String
   registry: String
   status: String
@@ -190,6 +198,39 @@ Leverages the internal Python implementation of UUID (uuid.UUID) to provide nati
 in fields, resolvers and input.
 """
 scalar UUID
+
+type ImageNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  humanized_name: String
+  tag: String
+  registry: String
+  architecture: String
+  is_local: Boolean
+  digest: String
+  labels: [KVPair]
+  size_bytes: BigInt
+  resource_limits: [ResourceLimit]
+  supported_accelerators: [String]
+}
+
+type KVPair {
+  key: String
+  value: String
+}
+
+"""
+BigInt is an extension of the regular graphene.Int scalar type
+to support integers outside the range of a signed 32-bit integer.
+"""
+scalar BigInt
+
+type ResourceLimit {
+  key: String
+  min: String
+  max: String
+}
 
 type AgentList implements PaginatedList {
   items: [Agent]!
@@ -353,6 +394,9 @@ type Group {
 
   """Added since 24.03.0."""
   type: String
+
+  """Added since 24.03.0."""
+  container_registry: JSONString
   scaling_groups: [String]
 }
 
@@ -373,23 +417,6 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
-}
-
-type KVPair {
-  key: String
-  value: String
-}
-
-"""
-BigInt is an extension of the regular graphene.Int scalar type
-to support integers outside the range of a signed 32-bit integer.
-"""
-scalar BigInt
-
-type ResourceLimit {
-  key: String
-  min: String
-  max: String
 }
 
 type User implements Item {
@@ -573,6 +600,11 @@ type UserResourcePolicy {
   Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type ProjectResourcePolicy {
@@ -770,22 +802,6 @@ type Endpoint implements Item {
   errors: [InferenceSessionError!]!
 }
 
-type ImageNode implements Node {
-  """The ID of the object"""
-  id: ID!
-  name: String
-  humanized_name: String
-  tag: String
-  registry: String
-  architecture: String
-  is_local: Boolean
-  digest: String
-  labels: [KVPair]
-  size_bytes: BigInt
-  resource_limits: [ResourceLimit]
-  supported_accelerators: [String]
-}
-
 type Routing implements Item {
   id: ID
   routing_id: UUID
@@ -977,6 +993,9 @@ type Mutations {
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+
+  """Added since 24.03.0"""
+  forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
@@ -1090,6 +1109,9 @@ input GroupInput {
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
+
+  """Added since 24.03.0"""
+  container_registry: JSONString = "{}"
 }
 
 type ModifyGroup {
@@ -1109,6 +1131,9 @@ input ModifyGroupInput {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added since 24.03.0"""
+  container_registry: JSONString = "{}"
 }
 
 """Instead of deleting the group, just mark it as inactive."""
@@ -1290,6 +1315,12 @@ input ResourceLimitInput {
   max: String
 }
 
+"""Added since 24.03.0."""
+type ForgetImageById {
+  ok: Boolean
+  msg: String
+}
+
 type ForgetImage {
   ok: Boolean
   msg: String
@@ -1371,6 +1402,11 @@ input CreateUserResourcePolicyInput {
   Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type ModifyUserResourcePolicy {
@@ -1389,6 +1425,11 @@ input ModifyUserResourcePolicyInput {
   Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+
+  """
+  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
 }
 
 type DeleteUserResourcePolicy {
