@@ -10,7 +10,7 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const newReason =
-        change.meta?.addedDeprecationReason || change.meta.newDeprecationReason;
+        change.meta?.addedDeprecationReason || change.meta?.newDeprecationReason;
       const regex = /Deprecated since (\d{2}\.\d{2}.\d{1})/;
       if (!newReason.match(regex)) {
         change.criticality.level = "BREAKING";
