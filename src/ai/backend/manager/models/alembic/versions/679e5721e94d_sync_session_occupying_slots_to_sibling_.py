@@ -1,7 +1,7 @@
 """sync_session_occupying_slots_to_sibling_kernels
 
 Revision ID: 679e5721e94d
-Revises: 75ea2b136830
+Revises: 857b763b8618
 Create Date: 2024-04-01 17:34:33.480996
 
 """
@@ -20,7 +20,7 @@ from ai.backend.manager.models.base import GUID, IDColumn, ResourceSlotColumn, c
 
 # revision identifiers, used by Alembic.
 revision = "679e5721e94d"
-down_revision = "75ea2b136830"
+down_revision = "857b763b8618"
 branch_labels = None
 depends_on = None
 
