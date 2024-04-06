@@ -1603,6 +1603,7 @@ type MoveToTrashVFolder {
   failed: [UUID]
 }
 
+"""Added in 23.03.1."""
 type VFolderNode implements Node {
   """The ID of the object"""
   id: ID!
