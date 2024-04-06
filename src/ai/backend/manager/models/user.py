@@ -992,9 +992,9 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
+        await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, email)
         delete_query = sa.delete(users).where(users.c.email == email)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
 
@@ -1088,8 +1088,8 @@ class PurgeUser(graphene.Mutation):
     async def delete_vfolders(
         cls,
         engine: ExtendedAsyncSAEngine,
-        user_uuid: UUID,
         storage_manager: StorageSessionManager,
+        email: str,
     ) -> int:
         """
         Delete user's all virtual folders as well as their physical data.
@@ -1102,6 +1102,9 @@ class PurgeUser(graphene.Mutation):
         from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
 
         async with engine.begin_session() as conn:
+            user_uuid = await conn.scalar(
+                sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
+            )
             await conn.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
