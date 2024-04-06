@@ -1597,6 +1597,7 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
+"""Added in 23.03.1."""
 type MoveToTrashVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
@@ -1625,16 +1626,19 @@ type VFolderNode implements Node {
   status: String
 }
 
+"""Added in 23.03.1."""
 type RestoreVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
 }
 
+"""Added in 23.03.1."""
 type DeleteForeverVFolder {
   task_id: UUID
   vfolders: [VFolderNode]
 }
 
+"""Added in 23.03.1."""
 type PurgeVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
