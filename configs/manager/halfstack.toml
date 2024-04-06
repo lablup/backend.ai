@@ -13,6 +13,7 @@ user = "postgres"
 password = "develove"
 conn-timeout = 0
 pool-recycle = 50
+pool-pre-ping = false
 
 
 [manager]

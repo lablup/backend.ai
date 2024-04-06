@@ -35,9 +35,22 @@ from ...output.fields import session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from .. import events
-from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
+from ..pretty import (
+    ProgressViewer,
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 from .args import click_start_option
-from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from .execute import (
+    format_stats,
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
@@ -169,7 +182,7 @@ def _create_cmd(docs: str = None):
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
         parsed_resource_opts = prepare_resource_arg(resource_opts)
-        mount, mount_map = prepare_mount_arg(mount)
+        mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
         preopen_ports = preopen
         assigned_agent_list = assign_agent
@@ -189,6 +202,7 @@ def _create_cmd(docs: str = None):
                     cluster_mode=cluster_mode,
                     mounts=mount,
                     mount_map=mount_map,
+                    mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
                     resources=parsed_resources,
@@ -425,7 +439,7 @@ def _create_from_template_cmd(docs: str = None):
             if len(resource_opts) > 0 or no_resource
             else undefined
         )
-        prepared_mount, prepared_mount_map = (
+        prepared_mount, prepared_mount_map, _ = (
             prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
         )
         kwargs = {
@@ -832,6 +846,64 @@ def commit(session_id):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID_OR_NAME")
+@click.argument("image_name", metavar="IMAGENAME")
+def convert_to_image(session_id, image_name):
+    """
+    Commits running session to new image and then uploads to designated container registry.
+    Requires Backend.AI server set up for per-user image commit feature (24.03).
+
+    \b
+    SESSID_OR_NAME: Session ID or its alias given when creating the session.
+    IMAGENAME: New image name.
+    """
+
+    with Session() as session:
+        try:
+            _sess = session.ComputeSession(session_id)
+            result = _sess.export_to_image(image_name)
+            print_info(f"Request to commit Session(name or id: {session_id})")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+    async def export_tracker(bgtask_id):
+        async with AsyncSession() as session:
+            try:
+                bgtask = session.BackgroundTask(bgtask_id)
+                completion_msg_func = lambda: print_done("Session export process completed.")
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer("Starting the session...") as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+
+                            pbar = viewer.tqdm
+                            pbar.total = data["total_progress"]
+                            pbar.update(data["current_progress"] - pbar.n)
+                            pbar.display(data["message"])
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(
+                                f"Error during the operation: {error_msg}",
+                            )
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                "The operation has been cancelled in the middle. "
+                                "(This may be due to server shutdown.)",
+                            )
+            finally:
+                completion_msg_func()
+                sys.exit()
+
+    asyncio_run(export_tracker(result["task_id"]))
 
 
 @session.command()

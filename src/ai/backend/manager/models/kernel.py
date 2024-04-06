@@ -73,6 +73,7 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
+from .image import ImageNode
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -549,8 +550,14 @@ kernels = sa.Table(
 class KernelRow(Base):
     __table__ = kernels
     session = relationship("SessionRow", back_populates="kernels")
-    # image_row = relationship("ImageRow", back_populates="kernels")
+    image_row = relationship(
+        "ImageRow",
+        foreign_keys="KernelRow.image",
+        primaryjoin="KernelRow.image == ImageRow.name",
+    )
     agent_row = relationship("AgentRow", back_populates="kernels")
+    group_row = relationship("GroupRow", back_populates="kernels")
+    user_row = relationship("UserRow", back_populates="kernels")
 
     @property
     def image_ref(self) -> ImageRef:
@@ -792,7 +799,8 @@ class ComputeContainer(graphene.ObjectType):
     session_id = graphene.UUID()  # owner session
 
     # image
-    image = graphene.String()
+    image = graphene.String(description="Deprecated since 24.03.0; use image_object.name")
+    image_object = graphene.Field(ImageNode, description="Added since 24.03.0")
     architecture = graphene.String()
     registry = graphene.String()
 
@@ -818,7 +826,7 @@ class ComputeContainer(graphene.ObjectType):
     preopen_ports = graphene.List(lambda: graphene.Int, required=False)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Mapping[str, Any]:
         assert row is not None
         from .user import UserRole
 
@@ -827,38 +835,39 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row["status_history"] or {}
+        status_history = row.status_history or {}
         return {
             # identity
-            "id": row["id"],
-            "idx": row["cluster_idx"],
-            "role": row["cluster_role"],
-            "hostname": row["cluster_hostname"],
-            "cluster_idx": row["cluster_idx"],
-            "local_rank": row["local_rank"],
-            "cluster_role": row["cluster_role"],
-            "cluster_hostname": row["cluster_hostname"],
-            "session_id": row["session_id"],
+            "id": row.id,
+            "idx": row.cluster_idx,
+            "role": row.cluster_role,
+            "hostname": row.cluster_hostname,
+            "cluster_idx": row.cluster_idx,
+            "local_rank": row.local_rank,
+            "cluster_role": row.cluster_role,
+            "cluster_hostname": row.cluster_hostname,
+            "session_id": row.session_id,
             # image
-            "image": row["image"],
-            "architecture": row["architecture"],
-            "registry": row["registry"],
+            "image": row.image,
+            "image_object": ImageNode.from_row(row.image_row),
+            "architecture": row.architecture,
+            "registry": row.registry,
             # status
-            "status": row["status"].name,
-            "status_changed": row["status_changed"],
-            "status_info": row["status_info"],
-            "status_data": row["status_data"],
-            "created_at": row["created_at"],
-            "terminated_at": row["terminated_at"],
-            "starts_at": row["starts_at"],
+            "status": row.status.name,
+            "status_changed": row.status_changed,
+            "status_info": row.status_info,
+            "status_data": row.status_data,
+            "created_at": row.created_at,
+            "terminated_at": row.terminated_at,
+            "starts_at": row.starts_at,
             "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
-            "occupied_slots": row["occupied_slots"].to_json(),
+            "occupied_slots": row.occupied_slots.to_json(),
             # resources
-            "agent": row["agent"] if not hide_agents else None,
-            "agent_addr": row["agent_addr"] if not hide_agents else None,
-            "container_id": row["container_id"] if not hide_agents else None,
-            "resource_opts": row["resource_opts"],
-            "preopen_ports": row["preopen_ports"],
+            "agent": row.agent if not hide_agents else None,
+            "agent_addr": row.agent_addr if not hide_agents else None,
+            "container_id": row.container_id if not hide_agents else None,
+            "resource_opts": row.resource_opts,
+            "preopen_ports": row.preopen_ports,
             # statistics
             # last_stat is resolved by Graphene (resolve_last_stat method)
         }
@@ -939,21 +948,21 @@ class ComputeContainer(graphene.ObjectType):
     ) -> int:
         query = (
             sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(kernels.c.session_id == session_id)
+            .select_from(KernelRow)
+            .where(KernelRow.session_id == session_id)
         )
         if cluster_role is not None:
-            query = query.where(kernels.c.cluster_role == cluster_role)
+            query = query.where(KernelRow.cluster_role == cluster_role)
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+            query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(KernelRow.access_key == access_key)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as conn:
             result = await conn.execute(query)
             return result.scalar()
 
@@ -973,20 +982,20 @@ class ComputeContainer(graphene.ObjectType):
         order: str = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
-            sa.select([kernels])
-            .select_from(kernels)
-            .where(kernels.c.session_id == session_id)
+            sa.select(KernelRow)
+            .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
+            .options(selectinload(KernelRow.image_row))
         )
         if cluster_role is not None:
-            query = query.where(kernels.c.cluster_role == cluster_role)
+            query = query.where(KernelRow.cluster_role == cluster_role)
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+            query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(KernelRow.access_key == access_key)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -995,7 +1004,7 @@ class ComputeContainer(graphene.ObjectType):
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(*DEFAULT_KERNEL_ORDERING)
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as conn:
             return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
 
     @classmethod
@@ -1005,19 +1014,19 @@ class ComputeContainer(graphene.ObjectType):
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[ComputeContainer]]:
         query = (
-            sa.select([kernels])
-            .select_from(kernels)
+            sa.select(KernelRow)
             # TODO: use "owner session ID" when we implement multi-container session
-            .where(kernels.c.session_id.in_(session_ids))
+            .where(KernelRow.session_id.in_(session_ids))
+            .options(selectinload(KernelRow.image_row))
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as conn:
             return await batch_multiresult(
                 ctx,
                 conn,
                 query,
                 cls,
                 session_ids,
-                lambda row: row["session_id"],
+                lambda row: row.session_id,
             )
 
     @classmethod
@@ -1029,28 +1038,27 @@ class ComputeContainer(graphene.ObjectType):
         domain_name: str = None,
         access_key: AccessKey = None,
     ) -> Sequence[Optional[ComputeContainer]]:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
-        )
         query = (
-            sa.select([kernels])
-            .select_from(j)
+            sa.select(KernelRow)
             .where(
-                (kernels.c.id.in_(container_ids)),
+                (KernelRow.id.in_(container_ids)),
             )
+            .options(selectinload(KernelRow.group_row))
+            .options(selectinload(KernelRow.user_row))
+            .options(selectinload(KernelRow.image_row))
         )
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
-        async with ctx.db.begin_readonly() as conn:
+            query = query.where(KernelRow.access_key == access_key)
+        async with ctx.db.begin_readonly_session() as conn:
             return await batch_result(
                 ctx,
                 conn,
                 query,
                 cls,
                 container_ids,
-                lambda row: row["id"],
+                lambda row: row.id,
             )
 
 

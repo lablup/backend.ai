@@ -176,6 +176,7 @@ class ComputeSession(BaseFunction):
         callback_url: Optional[str] = None,
         mounts: List[str] = None,
         mount_map: Mapping[str, str] = None,
+        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Mapping[str, str] = None,
         startup_command: str = None,
         resources: Mapping[str, str | int] = None,
@@ -238,6 +239,7 @@ class ComputeSession(BaseFunction):
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
+        :param mount_options: Mapping which contains extra options for vfolder.
         :param envs: The environment variables which always bypasses the jail policy.
         :param resources: The resource specification. (TODO: details)
         :param cluster_size: The number of containers in this compute session.
@@ -264,6 +266,8 @@ class ComputeSession(BaseFunction):
             mounts = []
         if mount_map is None:
             mount_map = {}
+        if mount_options is None:
+            mount_options = {}
         if resources is None:
             resources = {}
         if resource_opts is None:
@@ -303,12 +307,14 @@ class ComputeSession(BaseFunction):
             if assign_agent is not None:
                 params["config"].update({
                     "mount_map": mount_map,
+                    "mount_options": mount_options,
                     "preopen_ports": preopen_ports,
                     "agentList": assign_agent,
                 })
             else:
                 params["config"].update({
                     "mount_map": mount_map,
+                    "mount_options": mount_options,
                     "preopen_ports": preopen_ports,
                 })
         if api_session.get().api_version >= (4, "20190615"):
@@ -595,6 +601,24 @@ class ComputeSession(BaseFunction):
         rqst = Request(
             "POST",
             f"/{prefix}/{self.name}/commit",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def export_to_image(self, new_image_name: str):
+        """
+        Commits running session to new image and then uploads to designated container registry.
+        Requires Backend.AI server set up for per-user image commit feature (24.03).
+        """
+        params = {"image_name": new_image_name}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/imagify",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -1201,6 +1225,7 @@ class InferenceSession(BaseFunction):
         callback_url: Optional[str] = None,
         mounts: Optional[List[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
+        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
         resources: Optional[Mapping[str, str]] = None,

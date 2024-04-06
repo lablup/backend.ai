@@ -104,6 +104,7 @@ user_resource_policies = sa.Table(
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
     sa.Column("max_session_count_per_model_session", sa.Integer(), nullable=False),
+    sa.Column("max_customized_image_count", sa.Integer(), nullable=False, default=3),
 )
 
 
@@ -112,12 +113,18 @@ class UserResourcePolicyRow(Base):
     users = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
-        self, name, max_vfolder_count, max_quota_scope_size, max_session_count_per_model_session
+        self,
+        name,
+        max_vfolder_count,
+        max_quota_scope_size,
+        max_session_count_per_model_session,
+        max_customized_image_count,
     ) -> None:
         self.name = name
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
         self.max_session_count_per_model_session = max_session_count_per_model_session
+        self.max_customized_image_count = max_customized_image_count
 
 
 project_resource_policies = sa.Table(
@@ -442,6 +449,9 @@ class UserResourcePolicy(graphene.ObjectType):
     max_session_count_per_model_session = graphene.Int(
         description="Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
     )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+    )
 
     @classmethod
     def from_row(
@@ -458,6 +468,7 @@ class UserResourcePolicy(graphene.ObjectType):
             max_vfolder_count=row.max_vfolder_count,
             max_quota_scope_size=row.max_quota_scope_size,
             max_session_count_per_model_session=row.max_session_count_per_model_session,
+            max_customized_image_count=row.max_customized_image_count,
         )
 
     @classmethod
@@ -523,6 +534,9 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
     max_session_count_per_model_session = graphene.Int(
         description="Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
     )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+    )
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
@@ -534,6 +548,9 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
     )
     max_session_count_per_model_session = graphene.Int(
         description="Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
+    )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
     )
 
 
@@ -564,6 +581,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
                 props.max_vfolder_count,
                 props.max_quota_scope_size,
                 props.max_session_count_per_model_session,
+                props.max_customized_image_count,
             )
             db_sess.add(row)
             await db_sess.flush()
@@ -600,6 +618,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         set_if_set(props, data, "max_session_count_per_model_session")
+        set_if_set(props, data, "max_customized_image_count")
         update_query = (
             sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
         )
