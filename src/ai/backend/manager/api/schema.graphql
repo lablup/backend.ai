@@ -1026,16 +1026,16 @@ type Mutations {
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
 
-  """Added in 24.03"""
+  """Added in 24.03.1."""
   move_to_trash_vfolder(vfolder_ids: [UUID]!): MoveToTrashVFolder
 
-  """Added in 24.03"""
+  """Added in 24.03.1."""
   restore_vfolder(vfolder_ids: [UUID]!): RestoreVFolder
 
-  """Added in 24.03"""
+  """Added in 24.03.1."""
   delete_forever_vfolder(vfolder_ids: [UUID]!): DeleteForeverVFolder
 
-  """Added in 24.03"""
+  """Added in 24.03.1"""
   purge_vfolder(vfolder_ids: [UUID]!): PurgeVFolder
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
@@ -1597,11 +1597,13 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
+"""Added in 24.03.1"""
 type MoveToTrashVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
 }
 
+"""Added in 24.03.1"""
 type VFolderNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -1625,16 +1627,19 @@ type VFolderNode implements Node {
   status: String
 }
 
+"""Added in 24.03.1"""
 type RestoreVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
 }
 
+"""Added in 24.03.1"""
 type DeleteForeverVFolder {
   task_id: UUID
   vfolders: [VFolderNode]
 }
 
+"""Added in 24.03.1"""
 type PurgeVFolder {
   vfolders: [VFolderNode]
   failed: [UUID]
