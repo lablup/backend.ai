@@ -1551,6 +1551,7 @@ class VirtualFolderList(graphene.ObjectType):
 class VFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
+        description = "Added in 23.03.1."
 
     host = graphene.String()
     quota_scope_id = graphene.String()
