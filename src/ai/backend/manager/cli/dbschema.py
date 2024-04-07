@@ -105,9 +105,7 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     script = ScriptDirectory.from_config(alembic_cfg)
     serialized_revisions = []
 
-    for sc in script.walk_revisions(
-        base="base", head="heads"
-    ):
+    for sc in script.walk_revisions(base="base", head="heads"):
         revision_dump = RevisionDump(
             down_revision=sc._format_down_revision() if sc.down_revision else None,
             revision=sc.revision,
@@ -141,22 +139,26 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     "--dry-run",
     default=False,
     is_flag=True,
-    help="When specified, this command only informs of revisions unapplied without actually applying it to the database."
+    help="When specified, this command only informs of revisions unapplied without actually applying it to the database.",
 )
 @click.pass_obj
-def apply_missing_revisions(cli_ctx: CLIContext, previous_version: str, alembic_config: str, dry_run: bool) -> None:
+def apply_missing_revisions(
+    cli_ctx: CLIContext, previous_version: str, alembic_config: str, dry_run: bool
+) -> None:
     """
     Compare current alembic revision paths with the given serialized
     alembic revision history and try to execute every missing revisions.
     """
-    with importlib.resources.as_file(importlib.resources.files("ai.backend.manager.models.alembic.revision_history")) as f:
+    with importlib.resources.as_file(
+        importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
+    ) as f:
         try:
             with open(f / f"{previous_version}.json", "r") as fr:
                 revision_history: RevisionHistory = json.loads(fr.read())
         except FileNotFoundError:
             log.error(
                 "Could not find revision history dump as of Backend.AI version {}. Make sure you have upgraded this Backend.AI cluster to very latest version of prior major release before initiating this major upgrade.",
-                previous_version
+                previous_version,
             )
             sys.exit(1)
 
@@ -164,9 +166,7 @@ def apply_missing_revisions(cli_ctx: CLIContext, previous_version: str, alembic_
     script_directory = ScriptDirectory.from_config(alembic_cfg)
     revisions_to_apply: dict[str, Script] = {}
 
-    for sc in script_directory.walk_revisions(
-        base="base", head="heads"
-    ):
+    for sc in script_directory.walk_revisions(base="base", head="heads"):
         revisions_to_apply[sc.revision] = sc
 
     for applied_revision in revision_history["revisions"]:
@@ -182,7 +182,10 @@ def apply_missing_revisions(cli_ctx: CLIContext, previous_version: str, alembic_
         with EnvironmentContext(
             alembic_cfg,
             script_directory,
-            fn=lambda rev, con: [MigrationStep.upgrade_from_script(script_directory.revision_map, script_to_apply) for script_to_apply in scripts],
+            fn=lambda rev, con: [
+                MigrationStep.upgrade_from_script(script_directory.revision_map, script_to_apply)
+                for script_to_apply in scripts
+            ],
             destination_rev=script_to_apply.revision,
         ):
             script_directory.run_env()
