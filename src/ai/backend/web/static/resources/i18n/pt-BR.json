@@ -113,7 +113,8 @@
     "ATOMEnabled": "ATOM NPU Ativado",
     "WarboyEnabled": "NPU do Warboy activada",
     "DownloadWebUIApp": "Descarregar a aplicação Backend.AI Web UI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel habilitada"
   },
   "session": {
     "launcher": {
@@ -255,11 +256,22 @@
       "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
       "EnvironmentVariableDuplicateName": "Um nome de variável que já existe.",
       "Template": "Modelo de sessão",
-      "EnableAutomaticShmem": "Memória partilhada automática",
+      "EnableAutomaticMiniumShmem": "Definir a memória partilhada mínima",
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Somente números inteiros são permitidos quando o tamanho do cluster não é menor que 2.",
       "StartAfter": "Comece depois:",
-      "StartTimeDoesNotApply": "Se a hora de início não estiver definida, ela não se aplica."
+      "StartTimeDoesNotApply": "Se a hora de início não estiver definida, ela não se aplica.",
+      "MiniumAllocation": "Requisitos mínimos",
+      "MiniumAllocationTooltip": "Selecionar como requisito mínimo para o ambiente de execução selecionado",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Está a utilizar o iniciador de sessão \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Saltar para a revisão",
+      "InteractiveModeDesc": "permite-lhe criar, testar e executar código de forma interactiva através do jupyter notebook, visual studio code, etc.",
+      "BatchModeDesc": "Pode executar o seu código com vários nós e clusters para escalar a sua ideia",
+      "AddEnvironmentVariable": "Adicionar variáveis de ambiente",
+      "EnvironmentVariableValueRequired": "Introduzir um valor.",
+      "PleaseCompleteForm": "O formulário está incompleto ou contém erros. Por favor, verifique os seus dados."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -312,12 +324,16 @@
     "Architecture": "Arquitetura",
     "SessionType": "Tipo de sessão",
     "Validation": {
-      "EnterValidSessionName": "Introduzir um nome de sessão válido",
+      "EnterValidSessionName": "Insira uma combinação de pelo menos quatro letras do alfabeto, ou números, ou hífen, ou sublinhado.",
       "SessionNameRequired": "O nome da sessão é obrigatório",
       "SluggedStrings": "Cadeias de caracteres com slugged (>3 caracteres)",
       "SessionNameAlreadyExist": "O nome da sessão já existe",
       "SessionNameTooLong64": "Insira 64 caracteres ou menos.",
-      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 4 letras, números, '.', '_' e '-'."
+      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 4 letras, números, '.', '_' e '-'.",
+      "SessionNameTooShort": "Introduza pelo menos 4 caracteres.",
+      "SessionNameShouldStartWith": "Deve começar por uma letra do alfabeto, um número ou \"_\".",
+      "SessionNameShouldEndWith": "Deve terminar com uma letra do alfabeto, um número ou \"_\".",
+      "SessionNameInvalidCharacter": "O meio de um nome só pode conter letras do alfabeto, números e '_'."
     },
     "Interactive": "Interativo",
     "Batch": "Lote",
@@ -377,7 +393,15 @@
     "CPU": "CPU",
     "MEM": "Memória",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memória)"
+    "GPU(MEM)": "GPU (memória)",
+    "Agents": "Agentes",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memória)",
+    "ConvertSessionToImage": "Converter sessão em imagem",
+    "SessionName": "Nome da sessão",
+    "SessionId": "Identificação de sessão",
+    "EnvironmentAndVersion": "Ambiente e versão",
+    "Tags": "Tag"
   },
   "button": {
     "Cancel": "Cancelar",
@@ -411,7 +435,10 @@
     "EnterManually": "Introduzir manualmente",
     "Download": "Descarregar",
     "Clone": "Clone",
-    "Config": "Configuração"
+    "Config": "Configuração",
+    "Next": "Seguinte",
+    "Previous": "Anterior",
+    "PushToImage": "Enviar sessão para imagem personalizada"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -537,7 +564,8 @@
     "Status": "Estado",
     "NoUserToDisplay": "Nenhum utilizador a apresentar",
     "EnableSudoSession": "Habilitar sessão sudo",
-    "MainAccessKey": "Chave de acesso principal"
+    "MainAccessKey": "Chave de acesso principal",
+    "InactivateTheFollowingUsers": "Inative os seguintes usuários."
   },
   "data": {
     "Folders": "Pastas",
@@ -590,7 +618,7 @@
       "FolderRenamed": "Pasta renomeada",
       "FolderNameMismatched": "Nome da pasta incompatível. Verifique se o caractere de espaço no campo de entrada ou não.",
       "SameFileName": "O valor de entrada é igual ao nome do arquivo a ser atualizado. Por favor, mude para um nome diferente.",
-      "FolderDeleted": "Pasta excluída",
+      "FolderDeleted": "A pasta {{ folderName }} foi excluída.",
       "FolderUpdated": "Opção (ões) de pasta atualizada (s)",
       "FolderDisconnected": "A pasta foi desconectada.",
       "FileRenamed": "Arquivo renomeado",
@@ -617,7 +645,13 @@
       "CloneFolder": "Clonar pasta",
       "ShareFolder": "Partilhar pasta",
       "ModifyPermissions": "Modificar permissões",
-      "LeaveFolder": "Pasta de saída"
+      "LeaveFolder": "Pasta de saída",
+      "DeleteForever": "Apagar para sempre",
+      "Restore": "Restaurar",
+      "FolderRestored": "A pasta {{ folderName }} foi restaurada.",
+      "FolderDeletedForever": "A pasta {{ folderName }} foi excluída definitivamente.",
+      "MoveToTrashBin": "Mover para a lixeira",
+      "MovedToTrashBin": "A pasta {{ folderName }} foi movida para a lixeira."
     },
     "explorer": {
       "Delete": "Excluir...",
@@ -668,7 +702,8 @@
       "SFTPSessionNotAvailable": "A sessão SFTP não está disponível neste momento",
       "StartingSSH/SFTPSession": "Iniciando a sessão SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Atingiu o limite da contagem de sessões de carregamento em execução",
-      "NumberOfSFTPSessionsExceededBody": "Está a executar todas as sessões de carregamento disponíveis que tem permissão para criar. Termine as sessões de carregamento não utilizadas antes de iniciar uma nova sessão."
+      "NumberOfSFTPSessionsExceededBody": "Está a executar todas as sessões de carregamento disponíveis que tem permissão para criar. Termine as sessões de carregamento não utilizadas antes de iniciar uma nova sessão.",
+      "DownloadNotAllowed": "O download de arquivo/pasta não é permitido nesta pasta."
     },
     "invitation": {
       "NoValidEmails": "Nenhum e-mail válido foi inserido",
@@ -707,21 +742,24 @@
     "ModelStore": "Loja de modelos",
     "New": "Novo",
     "Add": "Adicionar",
-    "CloningIsOnlyPossibleSameHost": "Atualmente, a clonagem só é possível no mesmo host."
+    "CloningIsOnlyPossibleSameHost": "Atualmente, a clonagem só é possível no mesmo host.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "AVISO: isso não pode ser desfeito!",
       "LogDeletion": "Tem certeza de que deseja excluir todas as mensagens de log?",
       "WillBeAppliedToNewSessions": "Esta atualização será aplicada a novas sessões.",
-      "Required": "Necessário"
+      "Required": "Necessário",
+      "DeleteForeverDesc": "AVISO: os itens selecionados serão excluídos para sempre e você não poderá restaurá-los."
     },
     "ask": {
       "DoYouWantToProceed": "Você quer prosseguir?"
     },
     "title": {
       "LetsDouble-Check": "Vamos verificar novamente",
-      "Notice": "Aviso"
+      "Notice": "Aviso",
+      "DeleteForever": "Apagar para sempre?"
     },
     "ErrorOccurred": "Ocorreu um erro",
     "error": {
@@ -1138,7 +1176,10 @@
     "OutOfRange": "Fora de alcance.",
     "Plugins": "Plug-ins",
     "OpenSourceCUDAGPUsupport": "Suporte para GPU CUDA de código aberto",
-    "ShowOnlyChanged": "Exibir apenas alterações"
+    "ShowOnlyChanged": "Exibir apenas alterações",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Use o acelerador Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Requer plug-in Backend.AI Hyperaccel LPU."
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
@@ -1191,14 +1232,12 @@
     "LeaveService": "Sair do serviço",
     "DescConfirmLeave": "Para confirmar, digite seu e-mail e senha novamente.",
     "Password": "Senha",
-    "E-mail": "E-mail",
     "APIKey": "Chave API",
     "SecretKey": "Chave secreta",
     "Endpoint": "Endpoint",
     "NotAUser": "Não é um usuário?",
     "LoginAnotherway": "Quer fazer o login de outra maneira?",
     "SignUp": "Inscrever-se",
-    "LoginWithE-mail": "Login com e-mail",
     "LoginWithIAM": "Login com IAM",
     "ClickToUseIAM": "Clique para usar IAM",
     "ClickToUseID": "Clique para usar o ID",
@@ -1226,7 +1265,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Iniciar sessão com SAML",
       "LoginWithRealm": "Iniciar sessão com {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Login com e-mail ou nome de usuário",
+    "E-mailorUsername": "Email ou nome de usuário"
   },
   "signup": {
     "SignupBETA": "Inscrição (somente convite beta)",
@@ -1411,7 +1452,7 @@
     "ForProject": "Para o projeto",
     "QuotaDoesNotSupported": "Este backend de armazenamento não suporta quotas.",
     "BeCarefulToSetUserResourcePolicy": "A alteração de uma política de recursos pode afetar todos os utilizadores que utilizam essa política de recursos do utilizador, pelo que deve ser utilizada com cuidado.",
-    "StorageSetting": ""
+    "StorageSetting": "Configuração de armazenamento"
   },
   "modelService": {
     "TokenGenerated": "Token gerado",
@@ -1482,7 +1523,8 @@
   },
   "OpenVSCodeRemote": "Abrir o código local do Visual Studio",
   "inputLimit": {
-    "4to64chars": "(4~64 caracteres)"
+    "4to64chars": "(4~64 caracteres)",
+    "4to32chars": "(4~32 caracteres)"
   },
   "modelStore": {
     "Description": "Descrição",

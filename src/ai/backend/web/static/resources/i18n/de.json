@@ -113,7 +113,8 @@
     "ATOMEnabled": "ATOM NPU Aktiviert",
     "WarboyEnabled": "Warboy NPU Aktiviert",
     "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert"
   },
   "session": {
     "launcher": {
@@ -255,11 +256,22 @@
       "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
       "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
       "Template": "Sitzungsvorlage",
-      "EnableAutomaticShmem": "Automatischer gemeinsamer Speicher",
+      "EnableAutomaticMiniumShmem": "Minimalen gemeinsamen Speicher festlegen",
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Nur Ganzzahlen sind zulässig, wenn die Clustergröße nicht weniger als 2 beträgt.",
       "StartAfter": "Beginnen Sie nach:",
-      "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht."
+      "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht.",
+      "MiniumAllocation": "Mindestanforderungen",
+      "MiniumAllocationTooltip": "Wählen Sie als Mindestanforderung für die ausgewählte Betriebsumgebung",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Sie verwenden den \"{{launcher}}\"-Sitzungsstarter.",
+      "SkipToConfirmAndLaunch": "Zur Bewertung springen",
+      "InteractiveModeDesc": "ermöglicht das interaktive Erstellen, Testen und Ausführen von Code über Jupyter Notebook, Visual Studio Code usw.",
+      "BatchModeDesc": "Sie können Ihren Code mit mehreren Knoten und Clustern ausführen, um Ihre Idee zu skalieren",
+      "AddEnvironmentVariable": "Umgebungsvariablen hinzufügen",
+      "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
+      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -312,12 +324,16 @@
     "Architecture": "Architektur",
     "SessionType": "SessionType",
     "Validation": {
-      "EnterValidSessionName": "Gültigen Sitzungsnamen eingeben",
+      "EnterValidSessionName": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, Bindestrichen oder Unterstrichen ein.",
       "SessionNameRequired": "Sitzungsname ist erforderlich",
       "SluggedStrings": "Geschliffene Zeichenfolgen (>3 Zeichen)",
       "SessionNameAlreadyExist": "Sitzungsname existiert bereits",
       "SessionNameTooLong64": "Bitte geben Sie maximal 64 Zeichen ein.",
-      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein."
+      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein.",
+      "SessionNameTooShort": "Bitte geben Sie mindestens 4 Zeichen ein.",
+      "SessionNameShouldStartWith": "Er muss mit einem Buchstaben des Alphabets, einer Zahl oder '_' beginnen.",
+      "SessionNameShouldEndWith": "Er muss mit einem Buchstaben des Alphabets, einer Zahl oder '_' enden.",
+      "SessionNameInvalidCharacter": "Die Mitte eines Namens darf nur Buchstaben des Alphabets, Zahlen und '_' enthalten."
     },
     "Interactive": "Interaktiv",
     "Batch": "Stapel",
@@ -377,7 +393,15 @@
     "CPU": "CPU",
     "MEM": "Speicher",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (Speicher)"
+    "GPU(MEM)": "GPU (Speicher)",
+    "Agents": "Agenten",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (Speicher)",
+    "ConvertSessionToImage": "Konvertieren Sie die Sitzung in ein Bild",
+    "SessionName": "Sitzungsname",
+    "SessionId": "Session-ID",
+    "EnvironmentAndVersion": "Umgebung und Version",
+    "Tags": "Stichworte"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -411,7 +435,10 @@
     "EnterManually": "Manuell eingeben",
     "Download": "Herunterladen",
     "Clone": "Klonen",
-    "Config": "Konfigurieren Sie"
+    "Config": "Konfigurieren Sie",
+    "Next": "Weiter",
+    "Previous": "Vorherige",
+    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -537,7 +564,8 @@
     "Status": "Status",
     "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
     "EnableSudoSession": "Sudo-Sitzung aktivieren",
-    "MainAccessKey": "Hauptzugangsschlüssel"
+    "MainAccessKey": "Hauptzugangsschlüssel",
+    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer."
   },
   "data": {
     "Folders": "Ordner",
@@ -590,7 +618,7 @@
       "FolderRenamed": "Ordner umbenannt",
       "FolderNameMismatched": "Ordnername stimmt nicht überein. Bitte prüfen Sie, ob Leerzeichen im Eingabefeld vorhanden sind oder nicht.",
       "SameFileName": "Der Eingabewert ist mit dem zu aktualisierenden Dateinamen identisch. Bitte ändern Sie es in einen anderen Namen.",
-      "FolderDeleted": "Ordner gelöscht",
+      "FolderDeleted": "Der Ordner {{ FolderName }} wurde gelöscht.",
       "FolderUpdated": "Ordneroption(en) aktualisiert",
       "FolderDisconnected": "Ordner wurde getrennt.",
       "FileRenamed": "Datei umbenannt",
@@ -617,7 +645,13 @@
       "CloneFolder": "Ordner klonen",
       "ShareFolder": "Ordner teilen",
       "ModifyPermissions": "Berechtigungen ändern",
-      "LeaveFolder": "Ordner verlassen"
+      "LeaveFolder": "Ordner verlassen",
+      "Restore": "Wiederherstellen",
+      "DeleteForever": "Unwiederuflich löschen",
+      "FolderRestored": "Der Ordner {{ folderName }} wurde wiederhergestellt.",
+      "FolderDeletedForever": "Der Ordner {{ folderName }} wurde endgültig gelöscht.",
+      "MoveToTrashBin": "In den Papierkorb verschieben",
+      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben."
     },
     "explorer": {
       "Delete": "Löschen...",
@@ -668,7 +702,8 @@
       "SFTPSessionNotAvailable": "SFTP Session ist jetzt nicht verfügbar",
       "StartingSSH/SFTPSession": "SFTP-Sitzung starten...",
       "NumberOfSFTPSessionsExceededTitle": "Limit der laufenden Upload-Session erreicht",
-      "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten."
+      "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten.",
+      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet."
     },
     "invitation": {
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
@@ -707,21 +742,24 @@
     "ModelStore": "Modellladen",
     "New": "Neu",
     "Add": "hinzufügen",
-    "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich."
+    "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ACHTUNG: Dies kann nicht rückgängig gemacht werden!",
       "LogDeletion": "Möchten Sie wirklich alle Protokollnachrichten löschen?",
       "WillBeAppliedToNewSessions": "Dieses Update wird auf neue Sitzungen angewendet.",
-      "Required": "Erforderlich"
+      "Required": "Erforderlich",
+      "DeleteForeverDesc": "ACHTUNG: Ausgewählte Elemente werden für immer gelöscht und Sie können sie nicht wiederherstellen."
     },
     "ask": {
       "DoYouWantToProceed": "Willst du fortfahren?"
     },
     "title": {
       "LetsDouble-Check": "Lass uns das überprüfen",
-      "Notice": "Hinweis"
+      "Notice": "Hinweis",
+      "DeleteForever": "Unwiederuflich löschen?"
     },
     "ErrorOccurred": "Ein Fehler ist aufgetreten",
     "error": {
@@ -1138,7 +1176,10 @@
     "OutOfRange": "Außerhalb der Reichweite.",
     "Plugins": "Plugins",
     "OpenSourceCUDAGPUsupport": "Open Source CUDA GPU Unterstützung",
-    "ShowOnlyChanged": "Nur Änderungen anzeigen"
+    "ShowOnlyChanged": "Nur Änderungen anzeigen",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Verwenden Sie den Hyperaccel LPU-Beschleuniger.",
+    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
@@ -1191,14 +1232,12 @@
     "LeaveService": "Dienst verlassen",
     "DescConfirmLeave": "Bitte geben Sie zur Bestätigung Ihre E-Mail und Ihr Passwort erneut ein.",
     "Password": "Passwort",
-    "E-mail": "Email",
     "APIKey": "API-Schlüssel",
     "SecretKey": "Geheimer Schlüssel",
     "Endpoint": "Endpunkt",
     "NotAUser": "Kein Benutzer?",
     "LoginAnotherway": "Möchten Sie sich auf andere Weise anmelden?",
     "SignUp": "Anmelden",
-    "LoginWithE-mail": "Mit E-Mail anmelden",
     "LoginWithIAM": "Mit IAM anmelden",
     "ClickToUseIAM": "Klicken Sie hier, um IAM zu verwenden",
     "ClickToUseID": "Klicken Sie hier, um die ID zu verwenden",
@@ -1226,7 +1265,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Anmeldung mit SAML",
       "LoginWithRealm": "Anmeldung mit {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Melden Sie sich mit E-Mail oder Benutzernamen an",
+    "E-mailorUsername": "E-Mail Adresse oder Benutzername"
   },
   "signup": {
     "SignupBETA": "Anmeldung (nur Beta-Einladung)",
@@ -1464,7 +1505,8 @@
     "ForUser": "Für Benutzer",
     "ForProject": "Für Projekt",
     "QuotaDoesNotSupported": "Dieses Speicher-Backend unterstützt keine Quoten.",
-    "BeCarefulToSetUserResourcePolicy": "Die Änderung einer Ressourcenrichtlinie kann sich auf alle Benutzer auswirken, die diese Benutzer-Ressourcenrichtlinie verwenden, daher ist sie mit Vorsicht zu genießen."
+    "BeCarefulToSetUserResourcePolicy": "Die Änderung einer Ressourcenrichtlinie kann sich auf alle Benutzer auswirken, die diese Benutzer-Ressourcenrichtlinie verwenden, daher ist sie mit Vorsicht zu genießen.",
+    "StorageSetting": "Speichereinstellung"
   },
   "totp": {
     "TotpSetupCompleted": "Aktivierte 2FA",
@@ -1481,7 +1523,8 @@
   },
   "OpenVSCodeRemote": "Lokalen Visual Studio Code öffnen",
   "inputLimit": {
-    "4to64chars": "(4~64 Zeichen)"
+    "4to64chars": "(4~64 Zeichen)",
+    "4to32chars": "(4~32 Zeichen)"
   },
   "modelStore": {
     "Description": "Beschreibung",
