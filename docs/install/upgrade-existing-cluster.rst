@@ -76,17 +76,19 @@ To plan the upgrade, first check following facts:
   You can not skip the stop-gap version! 
 
 
-Allowed upgrade paths
+Example of allowed upgrade paths
 ~~~~~~~~~~~~~~~~~~~~~
 * 23.09.10 -> 24.03.0
 * 23.09.10 -> 24.03.5
 * 23.09.9 -> 23.09.10 -> 24.03.0
 * 23.03.11 -> 23.09.0 -> 23.09.1 -> ... -> 23.09.10 -> 24.03.0
+* ...
 
-Forbidden upgrade paths
+Example of orbidden upgrade paths
 ~~~~~~~~~~~~~~~~~~~~~~~
 * 23.09.9 -> 24.03.0
 * 23.03.0 -> 24.03.0
+* ...
 
 
 Upgrading Backend.AI Manager
