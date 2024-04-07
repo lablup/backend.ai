@@ -7,6 +7,7 @@ backend_packages = [
     "pants.backend.shell",
     "pants.backend.experimental.python",
     "pants.backend.experimental.python.lint.ruff.check",
+    "pants.backend.experimental.python.lint.ruff.format",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
     # "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin

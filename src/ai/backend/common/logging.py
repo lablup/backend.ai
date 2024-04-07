@@ -202,14 +202,7 @@ class LogstashHandler(logging.Handler):
 class GELFTLSHandler(graypy.GELFTLSHandler):
     ssl_ctx: ssl.SSLContext
 
-    def __init__(
-        self,
-        host,
-        port=12204,
-        validate=False,
-        ca_certs=None,
-        **kwargs
-    ):
+    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs):
         """Initialize the GELFTLSHandler
 
         :param host: GELF TLS input host.
@@ -241,7 +234,8 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
             plain_socket.settimeout(timeout)
 
         wrapped_socket = self.ssl_ctx.wrap_socket(
-            plain_socket, server_hostname=self.host,
+            plain_socket,
+            server_hostname=self.host,
         )
         wrapped_socket.connect((self.host, self.port))
 
