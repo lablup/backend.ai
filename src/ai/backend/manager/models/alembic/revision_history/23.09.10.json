@@ -1,0 +1,1181 @@
+{
+  "manager_version": "23.09.10",
+  "revisions": [
+    {
+      "down_revision": "589c764a18f1",
+      "revision": "75ea2b136830",
+      "is_head": true,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add user_resource_policies.max_session_count_per_model_session"
+    },
+    {
+      "down_revision": "a5319bfc7d7c",
+      "revision": "589c764a18f1",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "change_endpoint_to_nullable"
+    },
+    {
+      "down_revision": "caf54fcc17ab",
+      "revision": "a5319bfc7d7c",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_unique_constraints_to_association_tables"
+    },
+    {
+      "down_revision": "8b2ec7e3d22a",
+      "revision": "caf54fcc17ab",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_id_columns_to_association_tables"
+    },
+    {
+      "down_revision": "c5ed277b7f7b",
+      "revision": "8b2ec7e3d22a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove unique constraint of endpoint.url"
+    },
+    {
+      "down_revision": "d3f8c74bf148",
+      "revision": "c5ed277b7f7b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "change_main_access_key_ondelete_to_set_null"
+    },
+    {
+      "down_revision": "8c74e7df26f8",
+      "revision": "d3f8c74bf148",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "user_main_keypair"
+    },
+    {
+      "down_revision": "85615e005fa3",
+      "revision": "8c74e7df26f8",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "make routings contain error"
+    },
+    {
+      "down_revision": "a083c6c962e5",
+      "revision": "85615e005fa3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "kernel_requested_slots_to_not_nullable"
+    },
+    {
+      "down_revision": "97d8c7aa5e96",
+      "revision": "a083c6c962e5",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add foreign key constraints to columns in endpoints table"
+    },
+    {
+      "down_revision": "4871d46ba31b",
+      "revision": "97d8c7aa5e96",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-agent-public-key"
+    },
+    {
+      "down_revision": "d04592473df7",
+      "revision": "4871d46ba31b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add sudo_session_enabled"
+    },
+    {
+      "down_revision": "4b0128c49210, e812d42bc34f",
+      "revision": "d04592473df7",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "02535458c0b3",
+      "revision": "4b0128c49210",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove size limit for model_service_token.token"
+    },
+    {
+      "down_revision": "02535458c0b3",
+      "revision": "e812d42bc34f",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove unique constraint of endpoints.name"
+    },
+    {
+      "down_revision": "ae7d4cd92aa7",
+      "revision": "02535458c0b3",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add model service token log"
+    },
+    {
+      "down_revision": "eb9441fcf90a",
+      "revision": "ae7d4cd92aa7",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add endpoints.retries"
+    },
+    {
+      "down_revision": "69c059996cbd",
+      "revision": "eb9441fcf90a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_images_col_to_session"
+    },
+    {
+      "down_revision": "9e599b62f6f1",
+      "revision": "69c059996cbd",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_agent_ids_col_to_session"
+    },
+    {
+      "down_revision": "a9eb2b002330",
+      "revision": "9e599b62f6f1",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "update kernels.vfolder_mounts.vfid structure"
+    },
+    {
+      "down_revision": "5fbd368d12a2",
+      "revision": "a9eb2b002330",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add new resource policies"
+    },
+    {
+      "down_revision": "85984c98b90f",
+      "revision": "5fbd368d12a2",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-quota_scope_id"
+    },
+    {
+      "down_revision": "857bdec5abda",
+      "revision": "85984c98b90f",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "update endpoint and routing table"
+    },
+    {
+      "down_revision": "210c4d9be768",
+      "revision": "857bdec5abda",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_auto_terminate_col"
+    },
+    {
+      "down_revision": "d58a526bf837",
+      "revision": "210c4d9be768",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add keypair_resource_policy.max_concurrent_sftp_sessions column"
+    },
+    {
+      "down_revision": "d6a02307a057",
+      "revision": "d58a526bf837",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_password_changed_at_col"
+    },
+    {
+      "down_revision": "fdc9d6ac49b4",
+      "revision": "d6a02307a057",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove_session_resource_opts"
+    },
+    {
+      "down_revision": "fe59ec332c07",
+      "revision": "fdc9d6ac49b4",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_public_host_to_agent"
+    },
+    {
+      "down_revision": "bedd92de93af",
+      "revision": "fe59ec332c07",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_is_public_flag_to_scaling_group"
+    },
+    {
+      "down_revision": "3efd66393bd0, 10c58e701d87",
+      "revision": "bedd92de93af",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "add role column on kernels table"
+    },
+    {
+      "down_revision": "ac4e179c57fe",
+      "revision": "3efd66393bd0",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add totp_activated_at column"
+    },
+    {
+      "down_revision": "cace152eefac",
+      "revision": "ac4e179c57fe",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add totp_key column at user table"
+    },
+    {
+      "down_revision": "36b69ddee76e",
+      "revision": "10c58e701d87",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add is_local to images"
+    },
+    {
+      "down_revision": "f108628f032b",
+      "revision": "36b69ddee76e",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "empty message"
+    },
+    {
+      "down_revision": "b5be363ab05c",
+      "revision": "f108628f032b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add endpoint and routing tables"
+    },
+    {
+      "down_revision": "b6b884fbae1f",
+      "revision": "b5be363ab05c",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add a new session type INFERENCE"
+    },
+    {
+      "down_revision": "cace152eefac",
+      "revision": "b6b884fbae1f",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_session_table"
+    },
+    {
+      "down_revision": "213a04e90ecf",
+      "revision": "cace152eefac",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "change keypair's ssh key column type"
+    },
+    {
+      "down_revision": "c53397a490be, 95f51fc6ffdb",
+      "revision": "213a04e90ecf",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "5bce905c21e5",
+      "revision": "c53397a490be",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add use_host_network column"
+    },
+    {
+      "down_revision": "6129745f49b6, 5bce905c21e5",
+      "revision": "95f51fc6ffdb",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "360af8f33d4e",
+      "revision": "6129745f49b6",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add local_rank column in Kernels table"
+    },
+    {
+      "down_revision": "360af8f33d4e",
+      "revision": "5bce905c21e5",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add_vfolder_host_permission"
+    },
+    {
+      "down_revision": "f83d630c0bc9, 1f55a65cfc4f",
+      "revision": "360af8f33d4e",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": true,
+      "doc": "merge f83d and 1f55"
+    },
+    {
+      "down_revision": "35923972eddb",
+      "revision": "f83d630c0bc9",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_allowed_ip_column"
+    },
+    {
+      "down_revision": "35923972eddb",
+      "revision": "1f55a65cfc4f",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add status column to vfolders"
+    },
+    {
+      "down_revision": "81c264528f20",
+      "revision": "35923972eddb",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "create kernels.status_history column"
+    },
+    {
+      "down_revision": "d727b5da20e6",
+      "revision": "81c264528f20",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-max-session-lifetime"
+    },
+    {
+      "down_revision": "a7ca9f175d5f",
+      "revision": "d727b5da20e6",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-callback_url-to-kernels"
+    },
+    {
+      "down_revision": "d59ff89e7514, 11146ba02235",
+      "revision": "a7ca9f175d5f",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "0f7a4b643940",
+      "revision": "d59ff89e7514",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove_keypair_concurrency_used"
+    },
+    {
+      "down_revision": "0f7a4b643940",
+      "revision": "11146ba02235",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "change char col to str"
+    },
+    {
+      "down_revision": "7dd1d81c3204, 911023380bc9",
+      "revision": "0f7a4b643940",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": true,
+      "doc": "empty message"
+    },
+    {
+      "down_revision": "60a1effa77d2",
+      "revision": "7dd1d81c3204",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-vfolder-mounts-to-kernels"
+    },
+    {
+      "down_revision": "015d84d5a5ef",
+      "revision": "911023380bc9",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add architecture column on agents"
+    },
+    {
+      "down_revision": "60a1effa77d2",
+      "revision": "015d84d5a5ef",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add image table"
+    },
+    {
+      "down_revision": "8679d0a7e22b",
+      "revision": "60a1effa77d2",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "Add wsproxy_addr column on scaling_group"
+    },
+    {
+      "down_revision": "518ecf41f567",
+      "revision": "8679d0a7e22b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-scheduled-to-kernelstatus"
+    },
+    {
+      "down_revision": "dc9b66466e43",
+      "revision": "518ecf41f567",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-index-for-cluster_role"
+    },
+    {
+      "down_revision": "06184d82a211",
+      "revision": "dc9b66466e43",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "remove-clusterized"
+    },
+    {
+      "down_revision": "250e8656cf45",
+      "revision": "06184d82a211",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-session_creation_id"
+    },
+    {
+      "down_revision": "57e717103287",
+      "revision": "250e8656cf45",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-status_data"
+    },
+    {
+      "down_revision": "eec98e65902a",
+      "revision": "57e717103287",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "rename-clone_allowed-to-cloneable"
+    },
+    {
+      "down_revision": "d463fc5d6109, 97f6c80c8aa5",
+      "revision": "eec98e65902a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge-with-vfolder-clone"
+    },
+    {
+      "down_revision": "0d553d59f369",
+      "revision": "d463fc5d6109",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_clone_allowed_to_vfolders"
+    },
+    {
+      "down_revision": "e421c02cf9e4, 25e903510fa1",
+      "revision": "97f6c80c8aa5",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "548cc8aa49c8",
+      "revision": "e421c02cf9e4",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "rename_kernel_dependencies_to_session_dependencies"
+    },
+    {
+      "down_revision": "1e673659b283",
+      "revision": "548cc8aa49c8",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "update_cluster_columns_in_kernels"
+    },
+    {
+      "down_revision": "d5cc54fd36b5",
+      "revision": "1e673659b283",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add clusterized column to agents table"
+    },
+    {
+      "down_revision": "0d553d59f369",
+      "revision": "d5cc54fd36b5",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Update for multi-container sessions."
+    },
+    {
+      "down_revision": "0d553d59f369",
+      "revision": "25e903510fa1",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_dotfiles_to_domains_and_groups"
+    },
+    {
+      "down_revision": "9cd61b1ae70d",
+      "revision": "0d553d59f369",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "replace_users_is_active_to_status_and_its_info"
+    },
+    {
+      "down_revision": "e35332f8d23d",
+      "revision": "9cd61b1ae70d",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_scheduable_field_to_agents"
+    },
+    {
+      "down_revision": "da24ff520049",
+      "revision": "e35332f8d23d",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_modified_at_to_users_and_kernels"
+    },
+    {
+      "down_revision": "529113b08c2c",
+      "revision": "da24ff520049",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_startsat_field_into_kernels"
+    },
+    {
+      "down_revision": "c481d3dc6c7d",
+      "revision": "529113b08c2c",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_vfolder_type_column"
+    },
+    {
+      "down_revision": "f5530eccf202",
+      "revision": "c481d3dc6c7d",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_shared_memory_to_resource_presets"
+    },
+    {
+      "down_revision": "ed666f476f39",
+      "revision": "f5530eccf202",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-kernels-uuid-prefix-index"
+    },
+    {
+      "down_revision": "d643752544de",
+      "revision": "ed666f476f39",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_bootstrap_script_to_keypairs"
+    },
+    {
+      "down_revision": "51dddd79aa21, d2aafa234374",
+      "revision": "d643752544de",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "Merge 51dd and d2aa"
+    },
+    {
+      "down_revision": "3bb80d1887d6",
+      "revision": "51dddd79aa21",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add logs column on kernel table"
+    },
+    {
+      "down_revision": "3bb80d1887d6",
+      "revision": "d2aafa234374",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Create error_logs table"
+    },
+    {
+      "down_revision": "1e8531583e20",
+      "revision": "3bb80d1887d6",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add preopen ports"
+    },
+    {
+      "down_revision": "ce209920f654",
+      "revision": "1e8531583e20",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add dotfile column to keypairs"
+    },
+    {
+      "down_revision": "65c4a109bbc7",
+      "revision": "ce209920f654",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Create task_template table"
+    },
+    {
+      "down_revision": "0262e50e90e0, 5e88398bc340",
+      "revision": "65c4a109bbc7",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "Merge migration"
+    },
+    {
+      "down_revision": "4b7b650bc30e",
+      "revision": "0262e50e90e0",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_ssh_keypair_into_keypair"
+    },
+    {
+      "down_revision": "d452bacd085c",
+      "revision": "5e88398bc340",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add unmanaged_path column to vfolders"
+    },
+    {
+      "down_revision": "4b7b650bc30e",
+      "revision": "d452bacd085c",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "Add mount_map column to kernel"
+    },
+    {
+      "down_revision": "202b6dcbc159",
+      "revision": "4b7b650bc30e",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add_creator_in_vfolders"
+    },
+    {
+      "down_revision": "3f1dafab60b2",
+      "revision": "202b6dcbc159",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-internal-data-to-kernels"
+    },
+    {
+      "down_revision": "c092dabf3ee5, 6f5fe19894b7",
+      "revision": "3f1dafab60b2",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "merge"
+    },
+    {
+      "down_revision": "48ab2dfefba9",
+      "revision": "c092dabf3ee5",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-batch-session"
+    },
+    {
+      "down_revision": "48ab2dfefba9",
+      "revision": "6f5fe19894b7",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "vfolder_invitation_state_to_enum_type"
+    },
+    {
+      "down_revision": "0c5733f80e4d",
+      "revision": "48ab2dfefba9",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "reindex-kernel-updated-order"
+    },
+    {
+      "down_revision": "9bd986a75a2a",
+      "revision": "0c5733f80e4d",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "index-kernel-timestamps"
+    },
+    {
+      "down_revision": "513164749de4",
+      "revision": "9bd986a75a2a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "allow_kernels_scaling_group_nullable"
+    },
+    {
+      "down_revision": "405aa2c39458",
+      "revision": "513164749de4",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-cancelled-to-kernelstatus"
+    },
+    {
+      "down_revision": "5b45f28d2cac",
+      "revision": "405aa2c39458",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "job-queue"
+    },
+    {
+      "down_revision": "9c89b9011872",
+      "revision": "5b45f28d2cac",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_resource_opts_in_kernels"
+    },
+    {
+      "down_revision": "2a82340fa30e",
+      "revision": "9c89b9011872",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_attached_devices_field_in_kernels"
+    },
+    {
+      "down_revision": "c1409ad0e8da",
+      "revision": "2a82340fa30e",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_mounts_info_in_kernel_db"
+    },
+    {
+      "down_revision": "22e52d03fc61, 9a91532c8534",
+      "revision": "c1409ad0e8da",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "empty message"
+    },
+    {
+      "down_revision": "c401d78cc7b9",
+      "revision": "22e52d03fc61",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_allowed_docker_registries_in_domains"
+    },
+    {
+      "down_revision": "c401d78cc7b9",
+      "revision": "9a91532c8534",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-scaling-group"
+    },
+    {
+      "down_revision": "3cf19d906e71",
+      "revision": "c401d78cc7b9",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add_allowed_vfolder_hosts_to_domain_and_group"
+    },
+    {
+      "down_revision": "22964745c12b, 5d8e6043455e",
+      "revision": "3cf19d906e71",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "empty message"
+    },
+    {
+      "down_revision": "02950808ca3d",
+      "revision": "22964745c12b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_total_resource_slots_to_group"
+    },
+    {
+      "down_revision": "02950808ca3d",
+      "revision": "5d8e6043455e",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_user_group_ids_in_vfolder"
+    },
+    {
+      "down_revision": "4cc87e7fbfdf",
+      "revision": "02950808ca3d",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "add-agent-version"
+    },
+    {
+      "down_revision": "e18ed5fcfedf",
+      "revision": "4cc87e7fbfdf",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "stats-refactor"
+    },
+    {
+      "down_revision": "c5e4e764f9e3",
+      "revision": "e18ed5fcfedf",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add superadmin role for user"
+    },
+    {
+      "down_revision": "6f1c1b83870a",
+      "revision": "c5e4e764f9e3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add domain, group, user fields to kernels"
+    },
+    {
+      "down_revision": "7a82e0c70122",
+      "revision": "6f1c1b83870a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "merge user's first_/last_name into full_name"
+    },
+    {
+      "down_revision": "bae1a7326e8a",
+      "revision": "7a82e0c70122",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add group model"
+    },
+    {
+      "down_revision": "819c2b3830a9",
+      "revision": "bae1a7326e8a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add domain model"
+    },
+    {
+      "down_revision": "8e660aa31fe3",
+      "revision": "819c2b3830a9",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add user model"
+    },
+    {
+      "down_revision": "01456c812164",
+      "revision": "8e660aa31fe3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-resource-presets"
+    },
+    {
+      "down_revision": "dbc1e053b880",
+      "revision": "01456c812164",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-idle-timeout-to-keypair-resource-policy"
+    },
+    {
+      "down_revision": "2b0931e4a059",
+      "revision": "dbc1e053b880",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-keypair-resource-policy"
+    },
+    {
+      "down_revision": "f0f4ee907155",
+      "revision": "2b0931e4a059",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "convert-lang-to-image-and-registry"
+    },
+    {
+      "down_revision": "ff4bfca66bf8",
+      "revision": "f0f4ee907155",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "dynamic-resource-slots"
+    },
+    {
+      "down_revision": "0e558d06e0e3, 352fa4f88f61",
+      "revision": "ff4bfca66bf8",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": true,
+      "doc": "empty message"
+    },
+    {
+      "down_revision": "10e39a34eed5",
+      "revision": "0e558d06e0e3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-service-ports"
+    },
+    {
+      "down_revision": "57b523dec0e8",
+      "revision": "352fa4f88f61",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add tpu slot on kernel model"
+    },
+    {
+      "down_revision": "10e39a34eed5",
+      "revision": "57b523dec0e8",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add tpu slots"
+    },
+    {
+      "down_revision": "d582942886ad",
+      "revision": "10e39a34eed5",
+      "is_head": false,
+      "is_branch_point": true,
+      "is_merge_point": false,
+      "doc": "Enlarge kernels.lang column length"
+    },
+    {
+      "down_revision": "a1fd4e7b7782",
+      "revision": "d582942886ad",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add tag to kernels"
+    },
+    {
+      "down_revision": "f9971fbb34d9",
+      "revision": "a1fd4e7b7782",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "enumerate_vfolder_perms"
+    },
+    {
+      "down_revision": "185852ff9872",
+      "revision": "f9971fbb34d9",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add state column to vfolder_invitations"
+    },
+    {
+      "down_revision": "1fa6a31ea8e3",
+      "revision": "185852ff9872",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add vfolder_permissions table"
+    },
+    {
+      "down_revision": "26d0c387e764",
+      "revision": "1fa6a31ea8e3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add inviter field for vfolder_invitations"
+    },
+    {
+      "down_revision": "f8a71c3bffa2",
+      "revision": "26d0c387e764",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "create vfolder_invitations table"
+    },
+    {
+      "down_revision": "bf4bae8f942e",
+      "revision": "f8a71c3bffa2",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "stringify_userid"
+    },
+    {
+      "down_revision": "babc74594aa6",
+      "revision": "bf4bae8f942e",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-kernel-host"
+    },
+    {
+      "down_revision": "c3e74dcf1808",
+      "revision": "babc74594aa6",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add-partial-index-to-kernels"
+    },
+    {
+      "down_revision": "d52bf5ec9ef3",
+      "revision": "c3e74dcf1808",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_environ_to_kernels"
+    },
+    {
+      "down_revision": "4545f5c948b3",
+      "revision": "d52bf5ec9ef3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "convert_cpu_gpu_slots_to_float"
+    },
+    {
+      "down_revision": "e7371ca5797a",
+      "revision": "4545f5c948b3",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "add_io_scratch_size_stats"
+    },
+    {
+      "down_revision": "93e9d31d40bf",
+      "revision": "e7371ca5797a",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "rename_mem_stats"
+    },
+    {
+      "down_revision": "80176413d8aa",
+      "revision": "93e9d31d40bf",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "agent_add_region"
+    },
+    {
+      "down_revision": "4b8a66fb8d82",
+      "revision": "80176413d8aa",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "keypairs_get_is_admin"
+    },
+    {
+      "down_revision": "854bd902b1bc",
+      "revision": "4b8a66fb8d82",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "revamp_keypairs"
+    },
+    {
+      "down_revision": "0f3bc98edaa0",
+      "revision": "854bd902b1bc",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "change-kernel-identification"
+    },
+    {
+      "down_revision": "7ea324d0535b",
+      "revision": "0f3bc98edaa0",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "more_status"
+    },
+    {
+      "down_revision": "5de06da3c2b5",
+      "revision": "7ea324d0535b",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "vfolder-and-kernel"
+    },
+    {
+      "down_revision": null,
+      "revision": "5de06da3c2b5",
+      "is_head": false,
+      "is_branch_point": false,
+      "is_merge_point": false,
+      "doc": "init"
+    }
+  ]
+}
