@@ -913,7 +913,9 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            # Question: 아래 로직의 의도를 모르겠음. type이란 인자가 없기 때문에 제거.
+            # client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            client_groups = await loader.load(client_user_id)
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
