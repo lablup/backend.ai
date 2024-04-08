@@ -113,7 +113,8 @@
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
     "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU"
   },
   "session": {
     "launcher": {
@@ -255,13 +256,24 @@
       "EnvironmentVariableNamePatternError": "Nazwa zmiennej musi zaczynać się od litery lub podkreślenia i może zawierać tylko litery, cyfry i podkreślenia.",
       "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje.",
       "Template": "Szablon sesji",
-      "EnableAutomaticShmem": "Automatyczna pamięć współdzielona",
+      "EnableAutomaticMiniumShmem": "Ustawienie minimalnej ilości pamięci współdzielonej",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
       "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Jeśli rozmiar klastra jest nie mniejszy niż 2, dozwolona jest tylko liczba całkowita.",
       "StartAfter": "Rozpocznij po:",
-      "StartTimeDoesNotApply": "Jeśli godzina rozpoczęcia nie jest ustawiona, nie ma ona zastosowania."
+      "StartTimeDoesNotApply": "Jeśli godzina rozpoczęcia nie jest ustawiona, nie ma ona zastosowania.",
+      "MiniumAllocation": "Minimalne wymagania",
+      "MiniumAllocationTooltip": "Wybierz jako minimalne wymaganie dla wybranego środowiska uruchomieniowego",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Używasz programu uruchamiającego sesję \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Przejdź do recenzji",
+      "InteractiveModeDesc": "umożliwia interaktywne tworzenie, testowanie i uruchamianie kodu za pomocą notatnika jupyter, kodu visual studio itp.",
+      "BatchModeDesc": "Możesz uruchomić swój kod z wieloma węzłami i klastrami, aby skalować swój pomysł",
+      "AddEnvironmentVariable": "Dodaj zmienne środowiskowe",
+      "EnvironmentVariableValueRequired": "Wprowadź wartość.",
+      "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -314,12 +326,16 @@
     "Architecture": "Architektura",
     "SessionType": "SessionType",
     "Validation": {
-      "EnterValidSessionName": "Wprowadź prawidłową nazwę sesji",
+      "EnterValidSessionName": "Wprowadź kombinację co najmniej 4 liter alfabetu, cyfr, łącznika lub podkreślenia.",
       "SessionNameRequired": "Nazwa sesji jest wymagana",
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
       "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
       "SessionNameTooLong64": "Wprowadź maksymalnie 64 znaki.",
-      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 4 liter, cyfr, „.”, „_” i „-”."
+      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 4 liter, cyfr, „.”, „_” i „-”.",
+      "SessionNameTooShort": "Wprowadź co najmniej 4 znaki.",
+      "SessionNameShouldStartWith": "Musi zaczynać się od litery alfabetu, cyfry lub znaku \"_\".",
+      "SessionNameShouldEndWith": "Musi kończyć się literą alfabetu, cyfrą lub znakiem \"_\".",
+      "SessionNameInvalidCharacter": "Środek nazwy może zawierać tylko litery alfabetu, cyfry i \"_\"."
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -379,7 +395,15 @@
     "CPU": "CPU",
     "MEM": "Pamięć",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (pamięć)"
+    "GPU(MEM)": "GPU (pamięć)",
+    "Agents": "Agenci",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (pamięć)",
+    "ConvertSessionToImage": "Konwertuj sesję na obraz",
+    "SessionName": "Nazwa sesji",
+    "SessionId": "Identyfikator sesji",
+    "EnvironmentAndVersion": "Środowisko i wersja",
+    "Tags": "Tagi"
   },
   "button": {
     "Cancel": "Anuluj",
@@ -413,7 +437,10 @@
     "EnterManually": "Wprowadź ręcznie",
     "Download": "Pobierz",
     "Clone": "Klon",
-    "Config": "Konfiguracja"
+    "Config": "Konfiguracja",
+    "Next": "Następny",
+    "Previous": "Poprzedni",
+    "PushToImage": "Prześlij sesję do spersonalizowanego obrazu"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -539,7 +566,8 @@
     "Status": "Status",
     "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
     "EnableSudoSession": "Włącz sesję sudo",
-    "MainAccessKey": "Główny klucz dostępu"
+    "MainAccessKey": "Główny klucz dostępu",
+    "InactivateTheFollowingUsers": "Dezaktywuj następujących użytkowników."
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -592,7 +620,7 @@
       "FolderRenamed": "Zmieniono nazwę folderu",
       "FolderNameMismatched": "Niezgodna nazwa folderu. Sprawdź, czy znak spacji w polu wejściowym, czy nie.",
       "SameFileName": "Wartość wejściowa jest taka sama jak nazwa pliku do aktualizacji. Zmień go na inną nazwę.",
-      "FolderDeleted": "Folder usunięty",
+      "FolderDeleted": "Folder {{ folderName }} został usunięty.",
       "FolderUpdated": "Zaktualizowano opcje folderów",
       "FolderDisconnected": "Folder został odłączony.",
       "FileRenamed": "Zmieniono nazwę pliku",
@@ -619,7 +647,13 @@
       "CloneFolder": "Klonowanie folderu",
       "ShareFolder": "Folder udostępniony",
       "ModifyPermissions": "Modyfikowanie uprawnień",
-      "LeaveFolder": "Zostaw folder"
+      "LeaveFolder": "Zostaw folder",
+      "Restore": "Przywrócić",
+      "DeleteForever": "Usuń na zawsze",
+      "FolderRestored": "Folder {{ folderName }} został przywrócony.",
+      "FolderDeletedForever": "Folder {{ folderName }} został usunięty na zawsze.",
+      "MoveToTrashBin": "Przenieś do kosza",
+      "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza."
     },
     "explorer": {
       "Delete": "Kasować...",
@@ -670,7 +704,8 @@
       "SFTPSessionNotAvailable": "Sesja SFTP nie jest obecnie dostępna",
       "StartingSSH/SFTPSession": "Rozpoczęcie sesji SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Osiągnięto limit liczby uruchomionych sesji przesyłania",
-      "NumberOfSFTPSessionsExceededBody": "Uruchomiono wszystkie dostępne sesje przesyłania, które można utworzyć. Przed rozpoczęciem nowej sesji zakończ nieużywane sesje przesyłania."
+      "NumberOfSFTPSessionsExceededBody": "Uruchomiono wszystkie dostępne sesje przesyłania, które można utworzyć. Przed rozpoczęciem nowej sesji zakończ nieużywane sesje przesyłania.",
+      "DownloadNotAllowed": "Pobieranie pliku/folderu w tym folderze jest niedozwolone."
     },
     "invitation": {
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
@@ -709,21 +744,24 @@
     "ModelStore": "Sklep modelarski",
     "New": "Nowy",
     "Add": "Dodaj",
-    "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście."
+    "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "UWAGA: nie można tego cofnąć!",
       "LogDeletion": "Czy na pewno chcesz usunąć wszystkie komunikaty dziennika?",
       "WillBeAppliedToNewSessions": "Ta aktualizacja zostanie zastosowana do nowych sesji.",
-      "Required": "Wymagane"
+      "Required": "Wymagane",
+      "DeleteForeverDesc": "UWAGA: wybrane elementy zostaną usunięte na zawsze i nie będzie można ich przywrócić."
     },
     "ask": {
       "DoYouWantToProceed": "Czy chcesz kontynuować?"
     },
     "title": {
       "LetsDouble-Check": "Sprawdźmy dokładnie",
-      "Notice": "Zawiadomienie"
+      "Notice": "Zawiadomienie",
+      "DeleteForever": "Usuń na zawsze?"
     },
     "ErrorOccurred": "Wystąpił błąd",
     "error": {
@@ -1140,7 +1178,10 @@
     "OutOfRange": "Poza zasięgiem.",
     "Plugins": "Wtyczki",
     "OpenSourceCUDAGPUsupport": "Obsługa procesorów graficznych Open Source CUDA",
-    "ShowOnlyChanged": "Wyświetl tylko zmiany"
+    "ShowOnlyChanged": "Wyświetl tylko zmiany",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Użyj akceleratora Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Wymaga wtyczki Backend.AI Hyperaccel LPU."
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
@@ -1193,14 +1234,12 @@
     "LeaveService": "Opuść usługę",
     "DescConfirmLeave": "Aby potwierdzić, wpisz ponownie swój adres e-mail i hasło.",
     "Password": "Hasło",
-    "E-mail": "E-mail",
     "APIKey": "Klucz API",
     "SecretKey": "Sekretny klucz",
     "Endpoint": "Punkt końcowy",
     "NotAUser": "Nie jesteś użytkownikiem?",
     "LoginAnotherway": "Chcesz się zalogować w inny sposób?",
     "SignUp": "Zapisz się",
-    "LoginWithE-mail": "Zaloguj się przez e-mail",
     "LoginWithIAM": "Zaloguj się przez IAM",
     "ClickToUseIAM": "Kliknij, aby użyć uprawnień",
     "ClickToUseID": "Kliknij, aby użyć identyfikatora",
@@ -1228,7 +1267,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Logowanie za pomocą SAML",
       "LoginWithRealm": "Zaloguj się za pomocą {{ realmName }}."
-    }
+    },
+    "LoginWithE-mailorUsername": "Zaloguj się za pomocą adresu e-mail lub nazwy użytkownika",
+    "E-mailorUsername": "Email lub nazwa użytkownika"
   },
   "signup": {
     "SignupBETA": "Rejestracja (tylko zaproszenie do wersji beta)",
@@ -1466,7 +1507,8 @@
     "ForUser": "Dla użytkownika",
     "ForProject": "Dla projektu",
     "QuotaDoesNotSupported": "Ten backend pamięci masowej nie obsługuje limitów.",
-    "BeCarefulToSetUserResourcePolicy": "Zmiana polityki zasobów może mieć wpływ na wszystkich użytkowników korzystających z tej polityki zasobów użytkownika, więc należy jej używać ostrożnie."
+    "BeCarefulToSetUserResourcePolicy": "Zmiana polityki zasobów może mieć wpływ na wszystkich użytkowników korzystających z tej polityki zasobów użytkownika, więc należy jej używać ostrożnie.",
+    "StorageSetting": "Ustawienie przechowywania"
   },
   "totp": {
     "TotpSetupCompleted": "Włączone 2FA",
@@ -1483,7 +1525,8 @@
   },
   "OpenVSCodeRemote": "Otwórz lokalny kod Visual Studio",
   "inputLimit": {
-    "4to64chars": "(4~64 znaki)"
+    "4to64chars": "(4~64 znaki)",
+    "4to32chars": "(4~32 znaki)"
   },
   "modelStore": {
     "Description": "Opis",
