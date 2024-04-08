@@ -552,7 +552,7 @@ class LocalLogger(AbstractLogger):
             log_handlers.append(file_handler)
         self.log_config = {
             "version": 1,
-            "disable_existing_loggers": True,
+            "disable_existing_loggers": False,
             "handlers": {
                 "null": {"class": "logging.NullHandler"},
             },
