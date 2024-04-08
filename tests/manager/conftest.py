@@ -183,6 +183,7 @@ def local_config(
             "password": "develove",
             "pool-size": 8,
             "pool-recycle": -1,
+            "pool-pre-ping": False,
             "max-overflow": 64,
             "lock-conn-timeout": 0,
         },
@@ -861,6 +862,7 @@ async def session_info(database_engine):
             max_vfolder_count=0,
             max_quota_scope_size=-1,
             max_session_count_per_model_session=10,
+            max_customized_image_count=10,
         )
         db_sess.add(user_resource_policy)
 

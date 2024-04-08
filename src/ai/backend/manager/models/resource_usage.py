@@ -229,6 +229,7 @@ class BaseResourceUsageGroup:
 class KernelResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
     # child_usage_group: dict = attrs.field(factory=dict)
+    agent: str
     kernel_id: UUID
     project_row: GroupRow
     session_row: SessionRow
@@ -238,6 +239,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
         return {
             **self.to_json_base(),
             "agents": list(self.total_usage.agent_ids),
+            "agent": self.agent,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -261,6 +263,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
             kernel_row=usage_group.kernel_row,
+            agent=usage_group.kernel_row.agent,
             **usage_group.to_map(),
         )
 

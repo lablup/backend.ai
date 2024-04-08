@@ -113,7 +113,8 @@
     "ATOMEnabled": "Đã bật NPU ATOM",
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
     "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel"
   },
   "session": {
     "launcher": {
@@ -254,12 +255,23 @@
       "EnvironmentVariableNamePatternError": "Tên biến phải bắt đầu bằng một chữ cái hoặc dấu gạch dưới và chỉ có thể chứa các chữ cái, số và dấu gạch dưới.",
       "EnvironmentVariableDuplicateName": "Tên biến này đã tồn tại.",
       "Template": "Mẫu phiên",
-      "EnableAutomaticShmem": "Bộ nhớ chia sẻ tự động",
+      "EnableAutomaticMiniumShmem": "Đặt bộ nhớ chia sẻ tối thiểu",
       "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước.",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Chỉ cho phép số nguyên khi kích thước cụm không nhỏ hơn 2.",
       "StartAfter": "Bắt đầu sau:",
-      "StartTimeDoesNotApply": "Nếu thời gian bắt đầu không được đặt, nó sẽ không được áp dụng."
+      "StartTimeDoesNotApply": "Nếu thời gian bắt đầu không được đặt, nó sẽ không được áp dụng.",
+      "MiniumAllocation": "Yêu cầu tối thiểu",
+      "MiniumAllocationTooltip": "Chọn làm yêu cầu tối thiểu cho môi trường chạy đã chọn",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Bạn đang sử dụng trình khởi chạy phiên \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Bỏ qua để xem xét",
+      "InteractiveModeDesc": "cho phép bạn tạo, kiểm tra và chạy mã tương tác thông qua sổ ghi chép jupyter, mã studio trực quan, v.v.",
+      "BatchModeDesc": "Bạn có thể chạy mã của mình với nhiều nút",
+      "AddEnvironmentVariable": "Thêm biến môi trường",
+      "EnvironmentVariableValueRequired": "Vui lòng nhập một giá trị.",
+      "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -312,12 +324,16 @@
     "Architecture": "Ngành kiến ​​​​trúc",
     "SessionType": "Loại phiên",
     "Validation": {
-      "EnterValidSessionName": "Nhập tên phiên hợp lệ",
+      "EnterValidSessionName": "Vui lòng nhập kết hợp ít nhất 4 chữ cái trong bảng chữ cái, hoặc số, hoặc dấu gạch ngang hoặc dấu gạch dưới.",
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
       "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
       "SessionNameTooLong64": "Vui lòng nhập 64 ký tự trở xuống.",
-      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 4 chữ cái, số, '.', '_' và '-'."
+      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 4 chữ cái, số, '.', '_' và '-'.",
+      "SessionNameTooShort": "Vui lòng nhập ít nhất 4 ký tự.",
+      "SessionNameShouldStartWith": "Nó phải bắt đầu bằng một chữ cái trong bảng chữ cái, một số hoặc '_'.",
+      "SessionNameShouldEndWith": "Nó phải kết thúc bằng một chữ cái trong bảng chữ cái, một số hoặc '_'.",
+      "SessionNameInvalidCharacter": "Phần giữa của tên chỉ được chứa các chữ cái trong bảng chữ cái, số và '_'."
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -377,7 +393,15 @@
     "CPU": "CPU",
     "MEM": "Ký ức",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (bộ nhớ)"
+    "GPU(MEM)": "GPU (bộ nhớ)",
+    "Agents": "Đại lý",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (bộ nhớ)",
+    "ConvertSessionToImage": "Chuyển đổi phiên thành hình ảnh",
+    "SessionName": "Tên phiên",
+    "SessionId": "Id phiên",
+    "EnvironmentAndVersion": "Môi trường và phiên bản",
+    "Tags": "Thẻ"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -411,7 +435,10 @@
     "EnterManually": "Nhập thủ công",
     "Download": "Tải xuống",
     "Clone": "Dòng vô tính",
-    "Config": "Cấu hình"
+    "Config": "Cấu hình",
+    "Next": "Kế tiếp",
+    "Previous": "Trước",
+    "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -537,7 +564,8 @@
     "Status": "Trạng thái",
     "NoUserToDisplay": "Không có người dùng để hiển thị",
     "EnableSudoSession": "Kích hoạt phiên sudo",
-    "MainAccessKey": "Khóa truy cập chính"
+    "MainAccessKey": "Khóa truy cập chính",
+    "InactivateTheFollowingUsers": "Vô hiệu hóa những người dùng sau."
   },
   "data": {
     "Folders": "Thư mục",
@@ -590,7 +618,7 @@
       "FolderRenamed": "Thư mục đã được đổi tên",
       "FolderNameMismatched": "Tên thư mục không khớp. Vui lòng kiểm tra xem có ký tự khoảng trắng trong trường nhập hay không.",
       "SameFileName": "Giá trị đầu vào giống với tên tệp cần cập nhật. Vui lòng thay đổi nó thành một tên khác.",
-      "FolderDeleted": "Thư mục đã bị xóa",
+      "FolderDeleted": "Thư mục {{ folderName }} đã bị xóa.",
       "FolderUpdated": "Đã cập nhật (các) tùy chọn thư mục",
       "FolderDisconnected": "Thư mục đã bị ngắt kết nối.",
       "FileRenamed": "Tệp được đổi tên",
@@ -617,7 +645,13 @@
       "CloneFolder": "Sao chép thư mục",
       "ShareFolder": "Chia sẻ thư mục",
       "ModifyPermissions": "Sửa đổi quyền",
-      "LeaveFolder": "Rời khỏi thư mục"
+      "LeaveFolder": "Rời khỏi thư mục",
+      "Restore": "Khôi phục",
+      "DeleteForever": "Xóa vĩnh viễn",
+      "FolderRestored": "Thư mục {{ folderName }} đã được khôi phục.",
+      "FolderDeletedForever": "Thư mục {{ folderName }} đã bị xóa vĩnh viễn.",
+      "MoveToTrashBin": "Di chuyển vào thùng rác",
+      "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác."
     },
     "explorer": {
       "Delete": "Xóa bỏ...",
@@ -668,7 +702,8 @@
       "SFTPSessionNotAvailable": "Phiên SFTP hiện không khả dụng",
       "StartingSSH/SFTPSession": "Đang bắt đầu phiên SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Đã đạt đến giới hạn số phiên tải lên đang chạy",
-      "NumberOfSFTPSessionsExceededBody": "Bạn đang chạy tất cả các phiên tải lên có sẵn mà bạn được phép tạo. \nVui lòng chấm dứt các phiên tải lên không sử dụng trước khi bắt đầu phiên mới."
+      "NumberOfSFTPSessionsExceededBody": "Bạn đang chạy tất cả các phiên tải lên có sẵn mà bạn được phép tạo. \nVui lòng chấm dứt các phiên tải lên không sử dụng trước khi bắt đầu phiên mới.",
+      "DownloadNotAllowed": "Không được phép tải xuống tập tin/thư mục trong thư mục này."
     },
     "invitation": {
       "NoValidEmails": "Không có email hợp lệ nào được nhập",
@@ -707,21 +742,24 @@
     "ModelStore": "Cửa hàng mô hình",
     "New": "Mới",
     "Add": "Thêm vào",
-    "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ."
+    "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "CẢNH BÁO: không thể hoàn tác thao tác này!",
       "LogDeletion": "Bạn có chắc chắn muốn xóa tất cả các thông báo nhật ký không?",
       "WillBeAppliedToNewSessions": "Bản cập nhật này sẽ được áp dụng cho các phiên mới.",
-      "Required": "Yêu cầu"
+      "Required": "Yêu cầu",
+      "DeleteForeverDesc": "CẢNH BÁO: các mục đã chọn sẽ bị xóa vĩnh viễn và bạn sẽ không thể khôi phục chúng."
     },
     "ask": {
       "DoYouWantToProceed": "Bạn có muốn tiếp tục?"
     },
     "title": {
       "LetsDouble-Check": "Hãy kiểm tra kỹ",
-      "Notice": "Để ý"
+      "Notice": "Để ý",
+      "DeleteForever": "Xóa vĩnh viễn?"
     },
     "ErrorOccurred": "Xảy ra lỗi",
     "error": {
@@ -1138,7 +1176,10 @@
     "OutOfRange": "Ngoài phạm vi.",
     "Plugins": "bổ sung",
     "OpenSourceCUDAGPUsupport": "Hỗ trợ GPU CUDA mã nguồn mở",
-    "ShowOnlyChanged": "Chỉ hiển thị các thay đổi"
+    "ShowOnlyChanged": "Chỉ hiển thị các thay đổi",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
+    "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel."
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1191,14 +1232,12 @@
     "LeaveService": "Rời khỏi dịch vụ",
     "DescConfirmLeave": "Để xác nhận, vui lòng nhập lại E-mail và mật khẩu của bạn.",
     "Password": "Mật khẩu",
-    "E-mail": "E-mail",
     "APIKey": "Mã API",
     "SecretKey": "Chìa khoá bí mật",
     "Endpoint": "Điểm cuối",
     "NotAUser": "Không phải là người dùng?",
     "LoginAnotherway": "Bạn muốn đăng nhập theo cách khác?",
     "SignUp": "Đăng ký",
-    "LoginWithE-mail": "Đăng nhập bằng E-mail",
     "LoginWithIAM": "Đăng nhập bằng IAM",
     "ClickToUseIAM": "Nhấp để sử dụng IAM",
     "ClickToUseID": "Nhấp để sử dụng ID",
@@ -1226,7 +1265,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Đăng nhập bằng SAML",
       "LoginWithRealm": "Đăng nhập bằng {{realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Đăng nhập bằng E-mail hoặc tên người dùng",
+    "E-mailorUsername": "Thư điện tử hoặc tên người dùng"
   },
   "signup": {
     "SignupBETA": "Đăng ký (chỉ dành cho lời mời thử nghiệm)",
@@ -1410,7 +1451,8 @@
     "ForUser": "Dành cho người dùng",
     "ForProject": "Dành cho dự án",
     "QuotaDoesNotSupported": "Phần phụ trợ lưu trữ này không hỗ trợ hạn ngạch.",
-    "BeCarefulToSetUserResourcePolicy": "Việc thay đổi chính sách tài nguyên có thể ảnh hưởng đến tất cả người dùng sử dụng chính sách tài nguyên người dùng đó, vì vậy hãy cẩn thận khi sử dụng chính sách đó."
+    "BeCarefulToSetUserResourcePolicy": "Việc thay đổi chính sách tài nguyên có thể ảnh hưởng đến tất cả người dùng sử dụng chính sách tài nguyên người dùng đó, vì vậy hãy cẩn thận khi sử dụng chính sách đó.",
+    "StorageSetting": "Cài đặt lưu trữ"
   },
   "modelService": {
     "TokenGenerated": "Mã thông báo được tạo",
@@ -1481,7 +1523,8 @@
   },
   "OpenVSCodeRemote": "Mở mã Visual Studio cục bộ",
   "inputLimit": {
-    "4to64chars": "(4~64 ký tự)"
+    "4to64chars": "(4~64 ký tự)",
+    "4to32chars": "(4~32 ký tự)"
   },
   "modelStore": {
     "Description": "Sự miêu tả",
