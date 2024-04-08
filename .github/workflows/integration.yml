@@ -50,7 +50,7 @@ jobs:
         source env-tester-user.sh
         ./backend.ai test run-cli user
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log
