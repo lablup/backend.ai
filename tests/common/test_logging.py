@@ -4,6 +4,8 @@ import threading
 import time
 from pathlib import Path
 
+import trafaret as t
+
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 test_log_config = {
@@ -20,10 +22,10 @@ test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
 log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
 
 
-def get_logger_thread():
-    for t in threading.enumerate():
-        if t.name == "Logger":
-            return t
+def get_logger_thread() -> threading.Thread | None:
+    for thread in threading.enumerate():
+        if thread.name == "Logger":
+            return thread
     return None
 
 
@@ -64,6 +66,21 @@ def test_logger_not_picklable():
     with logger:
         # The following line should not throw an error.
         log.warning("blizzard warning {}", NotPicklableClass())
+    assert not test_log_path.exists()
+    assert get_logger_thread() is None
+
+
+def test_logger_trafaret_dataerror():
+    test_log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_endpoint = f"ipc://{test_log_path}"
+    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    with logger:
+        # The following line should not throw an error.
+        try:
+            iv = t.Int()
+            iv.check("x")
+        except t.DataError:
+            log.exception("simulated dataerror")
     assert not test_log_path.exists()
     assert get_logger_thread() is None
 
