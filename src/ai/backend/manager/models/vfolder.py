@@ -1666,7 +1666,6 @@ class VFolderNode(graphene.ObjectType):
 
 
 class VFolderConnection(Connection):
-
     class Meta:
         node = VFolderNode
         description = "Added in 23.03.1."
@@ -1741,9 +1740,9 @@ async def delete_vfolders(
 
 
 class MoveToTrashVFolder(graphene.Mutation):
-
     class Meta:
         description = "Added in 23.03.1."
+
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
@@ -1784,9 +1783,9 @@ class MoveToTrashVFolder(graphene.Mutation):
 
 
 class RestoreVFolder(graphene.Mutation):
-
     class Meta:
         description = "Added in 23.03.1."
+
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
@@ -1827,9 +1826,9 @@ class RestoreVFolder(graphene.Mutation):
 
 
 class DeleteForeverVFolder(graphene.Mutation):
-
     class Meta:
         description = "Added in 23.03.1."
+
     class Arguments:
         vfolder_ids = graphene.List(graphene.UUID, required=True)
 
