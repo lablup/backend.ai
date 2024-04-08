@@ -59,7 +59,7 @@ You can optionally cross-build your executable by setting the `platforms` field 
 pex_binary(
     name="mycli-pex",
     entry_point="mycli.main",
-    platforms=["linux-x86_64-cp-311-cp311", "macosx-13.3-arm64-cp-311-cp311",]
+    platforms=["linux-x86_64-cp-312-cp312", "macosx-13.3-arm64-cp-312-cp312",]
     ...
 )
 
@@ -105,8 +105,8 @@ description = "An example FastAPI Lift application including using an external u
 [[lift.interpreters]]
 id = "cpython"
 provider = "PythonBuildStandalone"
-release = "20230507"
-version = "3.11.3"
+release = "20240224"
+version = "3.12.2"
 
 [[lift.files]]
 # Note the leading colon, which is required to reference the pex_binary dependency

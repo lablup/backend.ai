@@ -54,6 +54,7 @@ def downgrade():
     endpoint_tokens = sa.Table(
         "endpoint_tokens",
         metadata,
+        sa.Column("id", GUID, primary_key=True),
         sa.Column(
             "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
         ),
@@ -61,6 +62,8 @@ def downgrade():
     )
     endpoints = sa.Table(
         "endpoints",
+        metadata,
+        sa.Column("id", GUID, primary_key=True),
         sa.Column("model", GUID, sa.ForeignKey("vfolders.id", ondelete="SET NULL"), nullable=True),
         extend_existing=True,
     )

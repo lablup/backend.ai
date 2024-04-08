@@ -62,7 +62,7 @@ def _asyncio_run(coro, *, debug=False):
 if hasattr(asyncio, "run"):  # Python 3.7+
     asyncio_run = asyncio.run
 else:
-    asyncio_run = _asyncio_run
+    asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
 def asyncio_run_forever(server_context, *, debug=False):

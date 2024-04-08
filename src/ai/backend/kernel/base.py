@@ -31,9 +31,9 @@ from typing import (
 import janus
 import msgpack
 import zmq
-from async_timeout import timeout
-from jupyter_client import AsyncKernelClient, AsyncKernelManager
+from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
+from jupyter_client.manager import AsyncKernelManager
 
 from .compat import current_loop
 from .intrinsic import (
@@ -703,7 +703,7 @@ class BaseRunner(metaclass=ABCMeta):
         while True:
             new_health_status = HealthStatus.UNHEALTHY
             try:
-                async with timeout(health_check_info["max_wait_time"]):
+                async with asyncio.timeout(health_check_info["max_wait_time"]):
                     try:
                         resp = await asyncio.get_running_loop().run_in_executor(
                             None, urllib.request.urlopen, health_check_endpoint
@@ -814,7 +814,7 @@ class BaseRunner(metaclass=ABCMeta):
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
                         if not do_not_wait:
-                            with timeout(5.0):
+                            async with asyncio.timeout(5.0):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",

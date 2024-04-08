@@ -178,7 +178,7 @@ To (re-)generate the virtualenv(s), run:
 
     $ pants export --resolve=RESOLVE_NAME  # you may add multiple --resolve options
 
-You may display the available resolve names by (the command works with Python 3.11 or later):
+You may display the available resolve names by (the command works with Python 3.12 or later):
 
 .. code-block:: console
 
@@ -209,7 +209,7 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -259,7 +259,7 @@ Set the workspace settings for the Python extension for code navigation and auto
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.11.6/lib/python3.11/site-packages"]``
+     - ``["dist/export/python/virtualenvs/python-default/3.12.2/lib/python3.12/site-packages"]``
    * - ``python.analysis.importFormat``
      - ``"relative"``
    * - ``editor.formatOnSave``
@@ -275,11 +275,11 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["dist/export/python/virtualenvs/mypy/3.11.6/bin/python"]``
+     - ``["dist/export/python/virtualenvs/mypy/3.12.2/bin/python"]``
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.6/bin/python"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.12.2/bin/python"]``
    * - ``ruff.importStrategy``
      - ``"fromEnvironment"``
 
@@ -309,8 +309,8 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.6/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -328,11 +328,11 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.6/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.6/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.6/bin/python",
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.12.2/bin/python",
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.6/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
@@ -717,6 +717,21 @@ Making a new release
 
 * Push the commit and tag.  The GitHub Actions workflow will build the packages
   and publish them to PyPI.
+
+* When making a new major release, snapshot of prior release's final DB migration history 
+  should be dumped. This will later help to fill out missing gaps of DB revisions when 
+  upgrading outdated cluster. The output then should be committed to **next** major release.
+
+  .. code-block:: console
+    
+      $ ./backend.ai mgr schema dump-history > src/ai/backend/manager/models/alembic/revision_history/<version>.json
+
+  Suppose you are trying to create both fresh baked 24.09.0 and good old 24.03.10 releases.
+  In such cases you should first make a release of version 24.03.10, move back to latest branch, and then
+  execute code snippet above with `<version>` set as `24.03.10`, and release 24.09.0 including the dump.
+
+  To make workflow above effective, be aware that backporting DB revisions to older major releases will no longer 
+  be permitted after major release version is switched.
 
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -71,8 +71,8 @@ trafaret~=2.1
 treelib==1.6.1
 typeguard~=2.10
 typing_extensions~=4.3
-textual~=0.41
-uvloop~=0.17.0; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
+textual~=0.52.1
+uvloop~=0.19.0; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
 yarl>=1.8.2,<2.0,!=1.9.0,!=1.9.1,!=1.9.2
 zipstream-new~=1.1.8
 
@@ -91,7 +91,7 @@ types-PyYAML
 types-redis
 types-tabulate
 
-backend.ai-krunner-alpine==5.1.0
-backend.ai-krunner-static-gnu==4.1.1
+backend.ai-krunner-alpine==5.2.0
+backend.ai-krunner-static-gnu==4.2.0
 
 etcd-client-py==0.2.4
