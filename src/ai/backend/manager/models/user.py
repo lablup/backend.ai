@@ -992,10 +992,13 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
+
+        if props.purge_shared_vfolders:
+            await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, email)
+
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
 
     @classmethod
@@ -1018,7 +1021,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolder_invitations, vfolder_permissions, vfolders
+        from . import vfolder_invitations, vfolders
 
         # Gather target user's virtual folders' names.
         query = (
@@ -1031,14 +1034,8 @@ class PurgeUser(graphene.Mutation):
         # Migrate shared virtual folders.
         # If virtual folder's name collides with target user's folder,
         # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
-        )
-        query = (
-            sa.select([vfolders.c.id, vfolders.c.name])
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
+        query = sa.select([vfolders.c.id, vfolders.c.name]).where(
+            vfolders.c.user == deleted_user_uuid
         )
         migrate_updates = []
         async for row in await conn.stream(query):
@@ -1051,28 +1048,29 @@ class PurgeUser(graphene.Mutation):
             # Target user will be the new owner, and it does not make sense to have
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
+            delete_vfolder_invitation_query = sa.delete(vfolder_invitations).where(
                 (vfolder_invitations.c.invitee == target_user_email)
                 & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
             )
-            await conn.execute(delete_query)
-            delete_query = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.user == target_user_uuid)
-                & (vfolder_permissions.c.vfolder.in_(migrate_vfolder_ids))
+            await conn.execute(delete_vfolder_invitation_query)
+            delete_vfolder_permission_query = sa.delete(vfolders).where(
+                (vfolders.c.user == target_user_uuid)
+                & (vfolders.c.reference_id.in_(migrate_vfolder_ids))
             )
-            await conn.execute(delete_query)
+            await conn.execute(delete_vfolder_permission_query)
 
             rowcount = 0
-            for item in migrate_updates:
-                update_query = (
+            for vfolder_to_migrate in migrate_updates:
+                # Question: 그룹에 대한 처리를 추가해야 하지 않을지?
+                owner_update_query = (
                     sa.update(vfolders)
                     .values(
                         user=target_user_uuid,
-                        name=item["vname"],
+                        name=vfolder_to_migrate["vname"],
                     )
-                    .where(vfolders.c.id == item["vid"])
+                    .where(vfolders.c.id == vfolder_to_migrate["vid"])
                 )
-                result = await conn.execute(update_query)
+                result = await conn.execute(owner_update_query)
                 rowcount += result.rowcount
             if rowcount > 0:
                 log.info(
@@ -1088,8 +1086,8 @@ class PurgeUser(graphene.Mutation):
     async def delete_vfolders(
         cls,
         engine: ExtendedAsyncSAEngine,
-        user_uuid: UUID,
         storage_manager: StorageSessionManager,
+        email: str,
     ) -> int:
         """
         Delete user's all virtual folders as well as their physical data.
@@ -1099,16 +1097,18 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
         async with engine.begin_session() as conn:
+            # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
             await conn.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
+                sa.delete(vfolders).where(
+                    (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
+                ),
             )
             result = await conn.execute(
                 sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
-                .select_from(vfolders)
-                .where(vfolders.c.user == user_uuid),
+                .where(vfolders.c.creator == email),
             )
             target_vfs = result.fetchall()
 
@@ -1125,7 +1125,7 @@ class PurgeUser(graphene.Mutation):
             raise
         deleted_count = len(target_vfs)
         if deleted_count > 0:
-            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
+            log.info("deleted {0} user's virtual folders (user: {1})", deleted_count, email)
         return deleted_count
 
     @classmethod
