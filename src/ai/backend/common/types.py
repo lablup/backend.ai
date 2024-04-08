@@ -884,6 +884,15 @@ class QuotaScopeID:
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict({
+            t.Key("scope_type"): tx.Enum(QuotaScopeType),
+            t.Key("scope_id"): tx.UUID,
+        })
+
 
 class VFolderID:
     quota_scope_id: QuotaScopeID | None
@@ -904,14 +913,13 @@ class VFolderID:
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
 
-        return t.Tuple(QuotaScopeID(), tx.UUID(), tx.UUID())
+        return t.Tuple(tx.QuotaScopeID(), tx.UUID(), tx.UUID() | t.Null)
 
     def __init__(
         self,
         quota_scope_id: QuotaScopeID | str | None,
         folder_id: uuid.UUID,
-        # reference_id: uuid.UUID | None = None,
-        reference_id: uuid.UUID | None,  # To check all `VFolderID` usage by running type checking
+        reference_id: uuid.UUID | None = None  # To check all `VFolderID` usage by running type checking
     ) -> None:
         self.folder_id = folder_id
         self.reference_id = reference_id or folder_id
@@ -932,7 +940,7 @@ class VFolderID:
 
     @classmethod
     def from_str(cls, value: str) -> VFolderID:
-        pieces = value.split("/")
+        pieces: list[str | None] = cast(list[str | None], value.split("/"))
         if len(pieces) == 2:
             # for old vFolder ID without quota scope ID
             pieces.insert(0, None)
