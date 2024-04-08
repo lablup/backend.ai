@@ -919,7 +919,8 @@ class VFolderID:
         self,
         quota_scope_id: QuotaScopeID | str | None,
         folder_id: uuid.UUID,
-        reference_id: uuid.UUID | None = None  # To check all `VFolderID` usage by running type checking
+        reference_id: uuid.UUID
+        | None = None,  # To check all `VFolderID` usage by running type checking
     ) -> None:
         self.folder_id = folder_id
         self.reference_id = reference_id or folder_id

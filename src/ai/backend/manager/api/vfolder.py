@@ -314,7 +314,11 @@ def vfolder_check_exists(
             query = (
                 sa.select("*")
                 .select_from(vfolders)
-                .where((vfolders.c.user == user_uuid) & (vfolders.c.name == folder_name) & (vfolders.c.reference_id.is_(None)))
+                .where(
+                    (vfolders.c.user == user_uuid)
+                    & (vfolders.c.name == folder_name)
+                    & (vfolders.c.reference_id.is_(None))
+                )
             )
             try:
                 result = await conn.execute(query)
@@ -2067,7 +2071,8 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Do not share to users who have already been shared the folder.
         query = sa.select(vfolders).where(
-            (vfolders.c.id == vf_info["id"]) & (vfolders.c.user.in_(users_to_share) & (vfolders.c.reference_id.isnot(None))),
+            (vfolders.c.id == vf_info["id"])
+            & (vfolders.c.user.in_(users_to_share) & (vfolders.c.reference_id.isnot(None))),
         )
         result = await conn.execute(query)
         users_not_to_share = [u.user for u in result.fetchall()]

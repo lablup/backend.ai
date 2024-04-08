@@ -1107,8 +1107,9 @@ class PurgeUser(graphene.Mutation):
                 ),
             )
             result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
-                .where(vfolders.c.creator == email),
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(
+                    vfolders.c.creator == email
+                ),
             )
             target_vfs = result.fetchall()
 
