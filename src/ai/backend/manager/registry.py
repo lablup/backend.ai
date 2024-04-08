@@ -139,7 +139,14 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from .defs import (
+    DEFAULT_IMAGE_ARCH,
+    DEFAULT_MIN_MEM_SHARED_MEM_RATIO,
+    DEFAULT_ROLE,
+    DEFAULT_SHARED_MEMORY_SIZE,
+    INTRINSIC_SLOTS,
+    MIN_MEM_SHARED_MEM_RATIO_KEY,
+)
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1194,11 +1201,12 @@ class AgentRegistry:
 
             # Shared memory.
             # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
-            shmem = BinarySize.from_str(
-                resource_opts.get("shmem")
-                or labels.get("ai.backend.resource.preferred.shmem")
-                or DEFAULT_SHARED_MEMORY_SIZE
-            )
+            raw_shmem: str | None = resource_opts.get("shmem")
+            if raw_shmem is None:
+                raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
+            if raw_shmem is None:
+                raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
+            shmem = BinarySize.from_str(raw_shmem)
             resource_opts["shmem"] = shmem
 
             # Sanitize user input: does it have resource config?
@@ -1253,7 +1261,14 @@ class AgentRegistry:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check if the user has allocated an "imbalanced" shared memory amount.
-            if shmem >= requested_slots["mem"]:
+            raw_min_mem_shmem_ratio = await self.shared_config.etcd.get(
+                MIN_MEM_SHARED_MEM_RATIO_KEY
+            )
+            if raw_min_mem_shmem_ratio is None:
+                min_mem_shmem_ratio = DEFAULT_MIN_MEM_SHARED_MEM_RATIO
+            else:
+                min_mem_shmem_ratio = Decimal(raw_min_mem_shmem_ratio)
+            if Decimal(requested_slots["mem"]) / Decimal(shmem) <= min_mem_shmem_ratio:
                 raise InvalidAPIParameters(
                     "Shared memory should be less than the main memory. (s:{}, m:{})".format(
                         str(shmem), str(BinarySize(requested_slots["mem"]))
