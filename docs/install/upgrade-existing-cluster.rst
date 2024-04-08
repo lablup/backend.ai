@@ -78,10 +78,10 @@ To plan the upgrade, first check following facts:
 
 Example of allowed upgrade paths
 ~~~~~~~~~~~~~~~~~~~~~
-* **23.09.10** -> 24.03.0
-* **23.09.10** -> 24.03.5
-* 23.09.9 -> **23.09.10** -> 24.03.0
-* 23.03.11 -> 23.09.0 -> 23.09.1 -> ... -> **23.09.10** -> 24.03.0
+* **23.09.10 (latest in the previous major)** -> 24.03.0
+* **23.09.10 (latest in the previous major)** -> 24.03.5
+* 23.09.9 -> **23.09.10 (latest in the previous major)** -> 24.03.0
+* 23.03.11 -> 23.09.0 -> 23.09.1 -> ... -> **23.09.10 (latest in the previous major)** -> 24.03.0
 * ...
 
 Example of forbidden upgrade paths
