@@ -522,7 +522,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
     Delete an existing user. This action cannot be undone.
 
     \b
-    NAME: Name of a domain to delete.
+    EMAIL: Email of user to delete.
     """
     with Session() as session:
         try:
