@@ -113,7 +113,8 @@
     "IPUEnabled": "IPU NPU 사용중",
     "ATOMEnabled": "ATOM NPU 사용중",
     "WarboyEnabled": "Warboy NPU 사용중",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 사용중"
   },
   "session": {
     "launcher": {
@@ -126,7 +127,9 @@
       "StartNewSession": "새 세션 시작",
       "SessionType": "세션 타입",
       "BatchMode": "Batch",
+      "BatchModeDesc": "여러 노드 클러스터로 코드를 실행합니다.",
       "InteractiveMode": "Interactive",
+      "InteractiveModeDesc": "주피터 노트북, 비주얼 스튜디오 코드 등을 통해 코드를 인터랙티브하게 생성, 테스트, 실행할 수 있게 해줍니다.",
       "BatchModeConfig": "Batch 모드 설정",
       "ScheduleTime": "시작 시간 설정 (옵션)",
       "ScheduleTimeSimple": "시작 시간 설정",
@@ -187,6 +190,7 @@
       "LaunchConfirmationDialog": "코드 및 데이터를 계속 유지하거나 다른 공동 작업자들과 공유하기 위해서는 데이터 & 폴더 메뉴에서 스토리지 폴더를 생성하신 후, 자원을 시작할 때 해당 폴더를 마운트하고 그 안에 보관하시면 됩니다.",
       "Launch": "시작",
       "ConfirmAndLaunch": "검토 및 시작",
+      "SkipToConfirmAndLaunch": "검토로 건너뛰기",
       "Accelerator": "가속기",
       "CustomResourceApplied": "사용자 설정 자원이 할당됨",
       "StartImportedNotebook": "가져온 노트북 열기",
@@ -208,6 +212,7 @@
       "DescSetEnv": "<p>사용자가 기본 환경 변수를 설정하고 Backend.AI 에서도 자체적인 동작을 위하여 이름이 같은 환경 변수를 설정한 경우, Backend.AI가 설정하는 값이 우선 적용됩니다.</p><p style='color:var(--paper-red-400);'>세션 런쳐 다이얼로그를 띄울 때마다 입력한 값은 모두 초기화됩니다.<br />이러한 설정은 환경 변수와 값 입력란이 각각 비어있지 않은 경우에만 전달됩니다.</p>",
       "EnvironmentVariableTitle": "우선 순위: 컨테이너와 Backend.AI 환경 변수",
       "EnvironmentVariable": "환경 변수",
+      "AddEnvironmentVariable": "환경 변수 추가",
       "EnvironmentVariableValue": "값",
       "EnvironmentVariableConfigurationDone": "환경 변수가 설정되었습니다.",
       "EnvironmentVariablePaneTitle": "추가될 환경 변수 (옵션)",
@@ -245,7 +250,7 @@
       "Enable": "활성화",
       "Network": "네트워크",
       "preopen": "사전 개방 포트",
-      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
+      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원({{amount}})보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
       "ErrorCanNotExceedRemaining": "남아있는 자원({{amount}})보다 크게 설정할 수 없습니다.",
       "Template": "세션 템플릿",
       "TemplateAndHistory": "템플릿 및 최근기록",
@@ -255,11 +260,19 @@
       "EnterEnvironmentVariable": "변수 이름 입력해주세요.",
       "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
       "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다.",
-      "EnableAutomaticShmem": "자동 공유메모리 설정",
+      "EnableAutomaticMiniumShmem": "최소 공유메모리 설정",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "클러스터 크기가 2 이상인 경우 정수만 허용됩니다.",
       "StartAfter": "다음 이후에 시작:",
-      "StartTimeDoesNotApply": "시작 시간을 설정하지 않으면 적용되지 않습니다."
+      "StartTimeDoesNotApply": "시작 시간을 설정하지 않으면 적용되지 않습니다.",
+      "MiniumAllocation": "최소 요구사항 할당",
+      "MiniumAllocationTooltip": "선택한 실행환경에서 요구되는 최소 요구사항으로 선택",
+      "NeoSwitchDescription": "현재 \"{{launcher}}\" 세션 런처를 사용중입니다.",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "EnvironmentVariableValueRequired": "값을 입력해주세요.",
+      "PleaseCompleteForm": "양식이 완성되지 않았거나 오류가 포함되어 있습니다. 입력 내용을 확인해주세요.",
+      "NeedToCorrectForm": "수정 버튼을 눌러 입력하신 내용을 확인해주세요."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -326,10 +339,14 @@
     "Validation": {
       "SessionNameRequired": "세션 이름을 입력해주세요",
       "SluggedStrings": "최소 4자 이상의 고유문자열로 입력해주세요",
-      "EnterValidSessionName": "올바른 세션 이름을 입력해주세요",
+      "EnterValidSessionName": "영문, 숫자, 하이픈, 밑줄 4자 이상 조합하여 입력해주세요.",
       "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다",
       "SessionNameTooLong64": "64자 이하로 입력해주세요.",
-      "PleaseFollowSessionNameRule": "최소 4자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요."
+      "PleaseFollowSessionNameRule": "최소 4자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요.",
+      "SessionNameTooShort": "4자 이상 입력해주세요.",
+      "SessionNameShouldStartWith": "알파벳 대소문자, 숫자 또는 '_' 로 시작해야 합니다.",
+      "SessionNameShouldEndWith": "알파벳 대소문자, 숫자, '_'로 끝나야 합니다.",
+      "SessionNameInvalidCharacter": "이름의 중간에는 알파벳 대소문자, 숫자, '_', '.', '-'만 포함할 수 있습니다."
     },
     "AlreadyTerminatingSession": "이미 종료중인 세션입니다",
     "CommitSession": "세션을 이미지로 커밋하기",
@@ -377,7 +394,15 @@
     "CPU": "CPU",
     "MEM": "메모리",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU(메모리)"
+    "GPU(MEM)": "GPU(메모리)",
+    "Agents": "실행노드",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU(메모리)",
+    "ConvertSessionToImage": "세션을 이미지로 변환",
+    "SessionName": "세션 이름",
+    "SessionId": "세션 ID",
+    "EnvironmentAndVersion": "환경 및 버전",
+    "Tags": "태그"
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -465,7 +490,10 @@
     "OK": "확인",
     "Download": "다운로드",
     "Clone": "복사",
-    "Config": "설정"
+    "Config": "설정",
+    "Next": "다음",
+    "Previous": "이전",
+    "PushToImage": "세션을 사용자 정의된 이미지로 푸시"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -626,7 +654,8 @@
     "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
     "ModifyUserDetail": "사용자 상세 정보 수정",
     "EnableSudoSession": "sudo 세션 허용",
-    "MainAccessKey": "기본 액세스 키"
+    "MainAccessKey": "기본 액세스 키",
+    "InactivateTheFollowingUsers": "다음 사용자를 비활성화합니다."
   },
   "data": {
     "Folders": "폴더",
@@ -691,7 +720,7 @@
       "FolderRenamed": "폴더 이름이 변경되었습니다",
       "FolderNameMismatched": "폴더 이름을 정확하게 입력하세요. 입력 칸에 공백문자가 있는지 확인해주세요.",
       "SameFileName": "입력한 파일 명이 기존 파일 명과 같습니다. 다른 이름으로 변경해주세요.",
-      "FolderDeleted": "폴더가 삭제되었습니다",
+      "FolderDeleted": "{{ folderName }} 폴더가 삭제되었습니다.",
       "FolderUpdated": "폴더 정보가 갱신되었습니다",
       "FolderDisconnected": "초대된 폴더와의 연결이 해제되었습니다.",
       "FileRenamed": "파일명이 변경되었습니다",
@@ -715,7 +744,13 @@
       "CloneFolder": "폴더 클론",
       "LeaveFolder": "초대된 폴더 나가기",
       "ShareFolder": "폴더 공유하기",
-      "ModifyPermissions": "권한 수정"
+      "ModifyPermissions": "권한 수정",
+      "Restore": "복원",
+      "DeleteForever": "영구 삭제",
+      "FolderRestored": "{{ folderName }} 폴더가 복원되었습니다.",
+      "FolderDeletedForever": "{{ folderName }} 폴더가 완전히 삭제되었습니다.",
+      "MoveToTrashBin": "휴지통으로 이동",
+      "MovedToTrashBin": "{{ folderName }} 폴더가 휴지통으로 이동되었습니다."
     },
     "explorer": {
       "Delete": "삭제",
@@ -766,7 +801,8 @@
       "StartingSSH/SFTPSession": "SFTP 서버 시작",
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
-      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요."
+      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
+      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. "
     },
     "invitation": {
       "NoValidEmails": "정상적인 이메일을 입력해주세요",
@@ -796,21 +832,24 @@
     "ModelStore": "모델 스토어",
     "New": "새로운",
     "Add": "추가",
-    "CloningIsOnlyPossibleSameHost": "현재 폴더 복사는 동일한 호스트간에만 가능합니다."
+    "CloningIsOnlyPossibleSameHost": "현재 폴더 복사는 동일한 호스트간에만 가능합니다.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "주의: 이 동작은 취소할 수 없습니다!",
       "LogDeletion": "정말로 모든 로그를 삭제하시겠습니까?",
       "WillBeAppliedToNewSessions": "이 변경사항은 새 세션부터 적용됩니다.",
-      "Required": "필수 입력입니다."
+      "Required": "필수 입력입니다.",
+      "DeleteForeverDesc": "경고: 선택한 항목은 완전히 삭제되며 복원할 수 없습니다."
     },
     "ask": {
       "DoYouWantToProceed": "계속 진행하시겠습니까?"
     },
     "title": {
       "LetsDouble-Check": "한 번 더 확인합시다",
-      "Notice": "안내"
+      "Notice": "안내",
+      "DeleteForever": "완전히 삭제하시겠습니까?"
     },
     "ErrorOccurred": "문제가 발생했습니다",
     "error": {
@@ -1224,10 +1263,13 @@
     "RequireIPUPlugin": "Backend.AI IPU 플러그인이 필요합니다.",
     "RequireATOMPlugin": "Backend.AI ATOM 플러그인이 필요합니다.",
     "Warboysupport": "Warboy 지원",
-    "DescWarboysupport": "Backend.AI Warboy 플러그인이 필요합니다.",
+    "DescWarboysupport": "Furiosa Warboy 가속기를 사용합니다.",
     "RequireWarboyPlugin": "Backend.AI Warboy 플러그인이 필요합니다.",
     "OpenSourceCUDAGPUsupport": "오픈소스 CUDA GPU 지원",
-    "ShowOnlyChanged": "수정 사항만 표시"
+    "ShowOnlyChanged": "수정 사항만 표시",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Hyperaccel LPU 가속기를 사용합니다.",
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU 플러그인이 필요합니다."
   },
   "notification": {
     "SuccessfullyUpdated": "성공적으로 수정되었습니다.",
@@ -1280,14 +1322,12 @@
     "LeaveService": "서비스 탈퇴",
     "DescConfirmLeave": "확인을 위해 E-mail 및 비밀번호를 다시 입력해주세요.",
     "Password": "비밀번호",
-    "E-mail": "E-mail",
     "APIKey": "접근키",
     "SecretKey": "비밀키",
     "Endpoint": "엔드포인트",
     "NotAUser": "아직 가입 전이면",
     "LoginAnotherway": "다른 방식으로 로그인하기",
     "SignUp": "가입하기",
-    "LoginWithE-mail": "E-mail로 로그인",
     "LoginWithIAM": "IAM으로 로그인",
     "ClickToUseIAM": "IAM 사용",
     "ClickToUseID": "ID 사용",
@@ -1315,7 +1355,9 @@
       "LoginWithSAML": "SAML 로그인",
       "LoginWithRealm": "{{ realmName }} 로그인"
     },
-    "EndpointStartWith": "http:// 혹은 https:// 로 시작해야 합니다."
+    "EndpointStartWith": "http:// 혹은 https:// 로 시작해야 합니다.",
+    "LoginWithE-mailorUsername": "이메일 또는 사용자 이름으로 로그인",
+    "E-mailorUsername": "이메일 또는 사용자 이름"
   },
   "signup": {
     "SignupBETA": "가입 (베타 초대 대상)",
@@ -1458,7 +1500,8 @@
     "2048chars": "(최대 길이 2048자)"
   },
   "inputLimit": {
-    "4to64chars": "(4~64자)"
+    "4to64chars": "(4~64자)",
+    "4to32chars": "(4~32자)"
   },
   "explorer": {
     "ValueRequired": "값이 필요합니다.",

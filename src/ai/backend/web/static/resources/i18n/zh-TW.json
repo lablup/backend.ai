@@ -113,7 +113,8 @@
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。"
   },
   "session": {
     "launcher": {
@@ -255,11 +256,22 @@
       "EnvironmentVariableNamePatternError": "变量名必须以字母或下划线开头，且只能包含字母、数字和下划线。",
       "EnvironmentVariableDuplicateName": "已经存在的变量名。",
       "Template": "会议模板",
-      "EnableAutomaticShmem": "自动共享内存",
+      "EnableAutomaticMiniumShmem": "设置最小共享内存",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "當簇大小不小於 2 時，只允許使用整數。",
       "StartAfter": "之後開始：",
-      "StartTimeDoesNotApply": "如果未設定開始時間，則不適用。"
+      "StartTimeDoesNotApply": "如果未設定開始時間，則不適用。",
+      "MiniumAllocation": "最低要求",
+      "MiniumAllocationTooltip": "选择所选运行环境的最低要求",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "您正在使用\"{{launcher}}\"会话启动器。",
+      "SkipToConfirmAndLaunch": "跳过评论",
+      "InteractiveModeDesc": "允许您通过 jupyter notebook、visual studio code 等交互式创建、测试和运行代码。",
+      "BatchModeDesc": "您可以使用多个节点和集群运行代码，以扩展您的想法",
+      "AddEnvironmentVariable": "添加环境变量",
+      "EnvironmentVariableValueRequired": "请输入数值。",
+      "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -312,12 +324,16 @@
     "Architecture": "建筑学",
     "SessionType": "会话类型",
     "Validation": {
-      "EnterValidSessionName": "输入有效的会话名称",
+      "EnterValidSessionName": "請輸入至少 4 個字母、數字、連字號或底線的組合。",
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
       "SessionNameAlreadyExist": "会话名称已存在",
       "SessionNameTooLong64": "請輸入不超過 64 個字元。",
-      "PleaseFollowSessionNameRule": "請輸入至少 4 個字母、數字、「.」、「_」和「-」的組合字元。"
+      "PleaseFollowSessionNameRule": "請輸入至少 4 個字母、數字、「.」、「_」和「-」的組合字元。",
+      "SessionNameTooShort": "请输入至少 4 个字符。",
+      "SessionNameShouldStartWith": "",
+      "SessionNameShouldEndWith": "必须以字母、数字或\"_\"结尾。",
+      "SessionNameInvalidCharacter": "名字中间只能包含字母、数字和\"_\"。"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -377,7 +393,15 @@
     "CPU": "中央处理器",
     "MEM": "内存",
     "GPU": "GPU",
-    "GPU(MEM)": "图形处理器（内存）"
+    "GPU(MEM)": "GPU（内存）",
+    "Agents": "代理商",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU（内存）",
+    "ConvertSessionToImage": "將會話轉換為圖像",
+    "SessionName": "會話名稱",
+    "SessionId": "會話 ID",
+    "EnvironmentAndVersion": "環境及版本",
+    "Tags": "標籤"
   },
   "button": {
     "Cancel": "取消",
@@ -411,7 +435,10 @@
     "EnterManually": "手动输入",
     "Download": "下载",
     "Clone": "克隆",
-    "Config": "配置"
+    "Config": "配置",
+    "Next": "下一页",
+    "Previous": "上一页",
+    "PushToImage": "將會話推送到自訂鏡像"
   },
   "agent": {
     "Endpoint": "端點",
@@ -537,7 +564,8 @@
     "Status": "现状",
     "NoUserToDisplay": "无用户显示",
     "EnableSudoSession": "啟用 sudo 會話",
-    "MainAccessKey": "主存取密鑰"
+    "MainAccessKey": "主存取密鑰",
+    "InactivateTheFollowingUsers": "停用以下用户。"
   },
   "data": {
     "Folders": "文件夾",
@@ -590,7 +618,7 @@
       "FolderRenamed": "文件夾重命名",
       "FolderNameMismatched": "文件夾名稱不匹配。請檢查輸入字段中是否有空格字符。",
       "SameFileName": "輸入值與要更新的文件名相同。請將其更改為其他名稱。",
-      "FolderDeleted": "文件夾已刪除",
+      "FolderDeleted": "{{ folderName }} 資料夾已被刪除。",
       "FolderUpdated": "文件夾選項已更新",
       "FolderDisconnected": "文件夾已斷開連接。",
       "FileRenamed": "文件重命名",
@@ -617,7 +645,13 @@
       "CloneFolder": "克隆文件夹",
       "ShareFolder": "共享文件夹",
       "ModifyPermissions": "修改权限",
-      "LeaveFolder": "离开文件夹"
+      "LeaveFolder": "离开文件夹",
+      "Restore": "恢復",
+      "DeleteForever": "永久刪除",
+      "FolderRestored": "{{ folderName }} 資料夾已恢復。",
+      "FolderDeletedForever": "{{ folderName }} 資料夾已永久刪除。",
+      "MoveToTrashBin": "移至垃圾箱",
+      "MovedToTrashBin": "{{ folderName }} 資料夾已移至垃圾箱。"
     },
     "explorer": {
       "Delete": "刪除...",
@@ -668,7 +702,8 @@
       "SFTPSessionNotAvailable": "SFTP 会话现在不可用",
       "StartingSSH/SFTPSession": "开始 SFTP 会话...",
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
-      "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。"
+      "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
+      "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。"
     },
     "invitation": {
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -707,21 +742,24 @@
     "ModelStore": "模型店",
     "New": "新的",
     "Add": "添加",
-    "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主機上進行。"
+    "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主機上進行。",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "警告：這無法撤消！",
       "LogDeletion": "您確定要刪除所有日誌消息嗎？",
       "WillBeAppliedToNewSessions": "此更新將應用於新會話。",
-      "Required": "需要"
+      "Required": "需要",
+      "DeleteForeverDesc": "警告：所選項目將永久刪除，並且您將無法恢復它們。"
     },
     "ask": {
       "DoYouWantToProceed": "您要繼續嗎？"
     },
     "title": {
       "LetsDouble-Check": "讓我們仔細檢查",
-      "Notice": "通知"
+      "Notice": "通知",
+      "DeleteForever": "永久刪除？"
     },
     "ErrorOccurred": "錯誤發生",
     "error": {
@@ -1138,7 +1176,10 @@
     "OutOfRange": "超出范围。",
     "Plugins": "外掛",
     "OpenSourceCUDAGPUsupport": "開源 CUDA GPU 支援",
-    "ShowOnlyChanged": "僅顯示更改"
+    "ShowOnlyChanged": "僅顯示更改",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
+    "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1191,14 +1232,12 @@
     "LeaveService": "離開服務",
     "DescConfirmLeave": "要確認，請再次輸入您的電子郵件和密碼。",
     "Password": "密碼",
-    "E-mail": "電子郵件",
     "APIKey": "API 密鑰",
     "SecretKey": "密鑰",
     "Endpoint": "端點",
     "NotAUser": "不是用戶？",
     "LoginAnotherway": "想以其他方式登錄？",
     "SignUp": "註冊",
-    "LoginWithE-mail": "使用電子郵件登錄",
     "LoginWithIAM": "使用 IAM 登錄",
     "ClickToUseIAM": "單擊以使用 IAM",
     "ClickToUseID": "單擊以使用 ID",
@@ -1226,7 +1265,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "使用 SAML 登录",
       "LoginWithRealm": "使用 {{ realmName }} 登录"
-    }
+    },
+    "LoginWithE-mailorUsername": "使用電子郵件或使用者名稱登入",
+    "E-mailorUsername": "電子郵件或使用者名稱"
   },
   "signup": {
     "SignupBETA": "註冊（僅限 Beta 版邀請）",
@@ -1410,7 +1451,8 @@
     "ForUser": "用户",
     "ForProject": "项目",
     "QuotaDoesNotSupported": "该存储后端不支持配额。",
-    "BeCarefulToSetUserResourcePolicy": "更改资源策略会影响使用该用户资源策略的所有用户，因此请谨慎使用。"
+    "BeCarefulToSetUserResourcePolicy": "更改资源策略会影响使用该用户资源策略的所有用户，因此请谨慎使用。",
+    "StorageSetting": "儲存設定"
   },
   "modelService": {
     "TokenGenerated": "生成的令牌",
@@ -1481,7 +1523,8 @@
   },
   "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
   "inputLimit": {
-    "4to64chars": "（4 至 64 个字符）"
+    "4to64chars": "（4 至 64 个字符）",
+    "4to32chars": "(4~32個字元)"
   },
   "modelStore": {
     "Description": "描述",
