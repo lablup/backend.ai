@@ -206,7 +206,7 @@ class Mutations(graphene.ObjectType):
     modify_image = ModifyImage.Field()
     forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
     forget_image = ForgetImage.Field()
-    untag_image_from_registry = UntagImageFromRegistry.Field(description="Added since 24.03.1")
+    untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
@@ -348,7 +348,7 @@ class Queries(graphene.ObjectType):
 
     image = graphene.Field(
         Image,
-        id=graphene.String(),
+        id=graphene.String(description="Added in 24.03.1"),
         reference=graphene.String(),
         architecture=graphene.String(default_value=DEFAULT_IMAGE_ARCH),
     )

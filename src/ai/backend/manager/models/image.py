@@ -939,7 +939,7 @@ class ForgetImage(graphene.Mutation):
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Added since 24.03.1"""
+    """Added in 24.03.1"""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
