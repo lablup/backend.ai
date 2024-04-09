@@ -237,7 +237,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         try:
                             if not image_info["tags"] or len(image_info["tags"]) == 0:
                                 skip_reason = "no tag"
-                                return
+                                continue
                             tag = image_info["tags"][0]["name"]
                             match image_info["manifest_media_type"]:
                                 case self.MEDIA_TYPE_OCI_INDEX:
