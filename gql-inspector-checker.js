@@ -68,7 +68,7 @@ module.exports = (props) => {
         change.criticality.reason =
           'New arguments must include a description with a version number in the format "Added in XX.XX.X."';
         change.message =
-          'New arguments must include a description with a version number in the format "XX.XX.X.", ' +
+          'New arguments must include a description with a version number in the format "Added in XX.XX.X.", ' +
           change.message;
       }
     }

@@ -113,10 +113,17 @@
     "IPUEnabled": "IPU NPU Diaktifkan",
     "ATOMEnabled": "ATOM NPU Diaktifkan",
     "WarboyEnabled": "Warboy NPU Diaktifkan",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan"
   },
   "session": {
     "launcher": {
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Anda menggunakan peluncur sesi \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Loncat ke ulasan",
+      "InteractiveModeDesc": "memungkinkan Anda untuk membuat, menguji, dan menjalankan kode secara interaktif melalui jupyter notebook, kode visual studio, dll.",
+      "BatchModeDesc": "Anda dapat menjalankan kode Anda dengan beberapa node & cluster untuk menskalakan ide Anda",
+      "AddEnvironmentVariable": "Menambahkan variabel lingkungan",
       "Sessions": "Sesi",
       "Project": "Proyek",
       "UserResourceLimit": "Batas Sumber Daya Pengguna",
@@ -259,7 +266,9 @@
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Hanya bilangan bulat yang diperbolehkan jika ukuran cluster tidak kurang dari 2.",
       "StartAfter": "Mulai setelah:",
-      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku."
+      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku.",
+      "PreviousLauncher": "Classic",
+      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -322,8 +331,12 @@
     "Batch": "Batch",
     "Architecture": "Arsitektur",
     "Validation": {
+      "SessionNameTooShort": "Masukkan setidaknya 4 karakter.",
+      "SessionNameShouldStartWith": "Nama tersebut harus dimulai dengan huruf alfabet, angka, atau '_'.",
+      "SessionNameShouldEndWith": "Nama tersebut harus diakhiri dengan huruf alfabet, angka, atau '_'.",
+      "SessionNameInvalidCharacter": "Bagian tengah nama hanya boleh berisi huruf alfabet, angka, dan '_'.",
       "SessionNameRequired": "Nama sesi harus diisi",
-      "EnterValidSessionName": "Masukkan nama sesi yang valid",
+      "EnterValidSessionName": "Silakan masukkan kombinasi minimal 4 huruf alfabet, atau angka, atau tanda hubung, atau garis bawah.",
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
       "SluggedStrings": "String yang disumbat (>3 karakter)",
       "SessionNameTooLong64": "Silakan masukkan 64 karakter atau kurang.",
@@ -377,7 +390,14 @@
     "CPU": "CPU",
     "MEM": "Memori",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memori)"
+    "GPU(MEM)": "GPU (memori)",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memori)",
+    "ConvertSessionToImage": "Ubah Sesi menjadi Gambar",
+    "SessionName": "Nama Sesi",
+    "SessionId": "Id Sesi",
+    "EnvironmentAndVersion": "Lingkungan dan Versi",
+    "Tags": "Tag"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -411,7 +431,10 @@
     "OK": "BAIKLAH.",
     "Download": "Unduh",
     "Clone": "Clone",
-    "Config": "Konfigurasi"
+    "Config": "Konfigurasi",
+    "Next": "Berikutnya",
+    "Previous": "Sebelumnya",
+    "PushToImage": "Sesi dorong ke gambar yang disesuaikan"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -537,7 +560,8 @@
     "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
     "EnableSudoSession": "Aktifkan sesi sudo",
-    "MainAccessKey": "Kunci Akses Utama"
+    "MainAccessKey": "Kunci Akses Utama",
+    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut."
   },
   "data": {
     "Folders": "Folder",
@@ -590,7 +614,7 @@
       "FolderRenamed": "Folder telah diganti nama",
       "FolderNameMismatched": "Nama folder tidak cocok. Silakan periksa apakah ada karakter spasi di bidang input atau tidak.",
       "SameFileName": "Nilai input sama dengan nama file yang akan diperbarui. Silakan ganti dengan nama lain.",
-      "FolderDeleted": "Folder dihapus",
+      "FolderDeleted": "Folder {{ folderName }} telah dihapus.",
       "FolderUpdated": "Opsi folder diperbarui",
       "FolderDisconnected": "Koneksi folder telah terputus.",
       "FileRenamed": "File sudah diganti nama",
@@ -617,7 +641,12 @@
       "CloneFolder": "Folder klon",
       "LeaveFolder": "Tinggalkan folder",
       "ShareFolder": "Folder berbagi",
-      "ModifyPermissions": "Memodifikasi izin"
+      "ModifyPermissions": "Memodifikasi izin",
+      "Restore": "Memulihkan",
+      "DeleteForever": "Hapus selamanya",
+      "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
+      "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
+      "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah."
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -707,21 +736,24 @@
     "ModelStore": "Toko Model",
     "New": "Baru",
     "Add": "Menambahkan",
-    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama."
+    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "PERINGATAN: ini tidak dapat dibatalkan!",
       "LogDeletion": "Anda yakin ingin menghapus semua pesan log?",
       "WillBeAppliedToNewSessions": "Pembaruan ini akan diterapkan ke sesi baru.",
-      "Required": "Diperlukan"
+      "Required": "Diperlukan",
+      "DeleteForeverDesc": "PERINGATAN: item yang dipilih akan dihapus selamanya dan Anda tidak dapat memulihkannya."
     },
     "ask": {
       "DoYouWantToProceed": "Apakah Anda ingin lanjut?"
     },
     "title": {
       "LetsDouble-Check": "Mari Periksa Kembali",
-      "Notice": "Pemberitahuan"
+      "Notice": "Pemberitahuan",
+      "DeleteForever": "Hapus selamanya?"
     },
     "ErrorOccurred": "Terjadi Galat",
     "error": {
@@ -1138,7 +1170,10 @@
     "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy.",
     "Plugins": "Plugin",
     "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka",
-    "ShowOnlyChanged": "Hanya Tampilan yang Berubah"
+    "ShowOnlyChanged": "Hanya Tampilan yang Berubah",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1191,14 +1226,12 @@
     "LeaveService": "Tinggalkan Layanan",
     "DescConfirmLeave": "Untuk konfirmasi, silakan ketik kembali e-mail dan password Anda.",
     "Password": "Kata sandi",
-    "E-mail": "E-mail",
     "APIKey": "Kunci API",
     "SecretKey": "Kunci rahasia",
     "Endpoint": "Titik akhir",
     "NotAUser": "Bukan pengguna?",
     "LoginAnotherway": "Ingin login dengan cara lain?",
     "SignUp": "Daftar",
-    "LoginWithE-mail": "Masuk dengan E-mail",
     "LoginWithIAM": "Masuk dengan IAM",
     "ClickToUseIAM": "Klik untuk Menggunakan IAM",
     "ClickToUseID": "Klik untuk Menggunakan ID",
@@ -1226,7 +1259,9 @@
     },
     "EndpointInfo": "Tentang Endpoint",
     "DescEndpoint": "<p>Dalam API ENDPOINT, URL server Web Backend.AI, yang meneruskan permintaan ke Manajer, harus dimasukkan.</p> <p>misalnya, http://127.0.0.1:8090/</p> <p>",
-    "EndpointStartWith": "Titik akhir harus dimulai dengan http:// atau https://."
+    "EndpointStartWith": "Titik akhir harus dimulai dengan http:// atau https://.",
+    "LoginWithE-mailorUsername": "Masuk Dengan Email atau Nama Pengguna",
+    "E-mailorUsername": "Email atau nama pengguna"
   },
   "signup": {
     "SignupBETA": "Pendaftaran (khusus undangan Beta)",
@@ -1387,7 +1422,8 @@
     "RequireOTP": "Tulis OTP."
   },
   "inputLimit": {
-    "4to64chars": "(4 ~ 64 karakter)"
+    "4to64chars": "(4 ~ 64 karakter)",
+    "4to32chars": "(4~32 karakter)"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1421,7 +1457,8 @@
     "ForUser": "Untuk Pengguna",
     "ForProject": "Untuk Proyek",
     "QuotaDoesNotSupported": "Backend penyimpanan ini tidak mendukung kuota.",
-    "BeCarefulToSetUserResourcePolicy": "Mengubah kebijakan sumber daya dapat memengaruhi semua pengguna yang menggunakan kebijakan sumber daya pengguna tersebut, jadi gunakanlah dengan hati-hati."
+    "BeCarefulToSetUserResourcePolicy": "Mengubah kebijakan sumber daya dapat memengaruhi semua pengguna yang menggunakan kebijakan sumber daya pengguna tersebut, jadi gunakanlah dengan hati-hati.",
+    "StorageSetting": "Pengaturan Penyimpanan"
   },
   "modelService": {
     "EditModelService": "Layanan Edit Model",
