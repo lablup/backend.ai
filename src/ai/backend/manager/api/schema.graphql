@@ -31,7 +31,7 @@ type Queries {
     """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
-  image(reference: String!, architecture: String = "x86_64"): Image
+  image(id: String, reference: String, architecture: String = "x86_64"): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
 
   """Added since 24.03.0"""
@@ -997,6 +997,7 @@ type Mutations {
   """Added since 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+  untag_image_from_registry(id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
@@ -1318,6 +1319,11 @@ type ForgetImageById {
 }
 
 type ForgetImage {
+  ok: Boolean
+  msg: String
+}
+
+type UntagImageFromRegistry {
   ok: Boolean
   msg: String
 }
