@@ -997,6 +997,8 @@ type Mutations {
   """Added since 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Added since 24.03.1"""
   untag_image_from_registry(id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
@@ -1323,6 +1325,7 @@ type ForgetImage {
   msg: String
 }
 
+"""Added since 24.03.1"""
 type UntagImageFromRegistry {
   ok: Boolean
   msg: String
