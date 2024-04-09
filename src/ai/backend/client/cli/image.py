@@ -84,7 +84,7 @@ def forget(reference_or_id, arch):
                 )
             sys.exit(ExitCode.FAILURE)
         try:
-            # result = session.Image.untag_image_from_registry(image_id)
+            result = session.Image.untag_image_from_registry(image_id)
             result = session.Image.forget_image_by_id(image_id)
         except Exception as e:
             print_error(e)
