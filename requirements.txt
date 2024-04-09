@@ -93,4 +93,4 @@ types-tabulate
 backend.ai-krunner-alpine==5.2.0
 backend.ai-krunner-static-gnu==4.2.0
 
-etcd-client-py==0.2.4
+etcd-client-py==0.3.0
