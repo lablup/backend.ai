@@ -30,6 +30,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
     """
     with Session() as session:
         try:
+            fields: tuple
             if customized:
                 fields = (
                     image_fields["customized_image_name"],
@@ -39,6 +40,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
                     image_fields["architecture"],
                     image_fields["tag"],
                     image_fields["size_bytes"],
+                    image_fields["customized_image_owner_email"],
                 )
                 items = session.Image.list_customized(fields=fields)
             else:

@@ -4,6 +4,7 @@ from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
     CustomizedImageNameOutputFormatter,
+    CustomizedImageOwnerEmailOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
     InlineRoutingFormatter,
@@ -102,6 +103,12 @@ image_fields = FieldSet([
         "Customized Image Name",
         alt_name="customized_image_name",
         formatter=CustomizedImageNameOutputFormatter(),
+    ),
+    FieldSpec(
+        "labels { key value }",
+        "Customized Image Owner",
+        alt_name="customized_image_owner_email",
+        formatter=CustomizedImageOwnerEmailOutputFormatter(),
     ),
 ])
 
