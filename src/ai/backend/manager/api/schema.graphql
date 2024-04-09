@@ -161,6 +161,9 @@ type ComputeContainer implements Item {
   idx: Int
   role: String
   hostname: String
+
+  """Added in 24.03.1."""
+  kernel_id: UUID
   cluster_idx: Int
   local_rank: Int
   cluster_role: String
