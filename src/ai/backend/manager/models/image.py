@@ -36,7 +36,6 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
-from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
@@ -624,11 +623,11 @@ class Image(graphene.ObjectType):
         id: UUID,
     ) -> Image:
         async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(session, id)
+            row = await ImageRow.get(session, id, load_aliases=True)
             if not row:
                 raise ImageNotFound
 
-        return await cls.from_row(ctx, row)
+            return await cls.from_row(ctx, row)
 
     @classmethod
     async def load_item(
@@ -958,6 +957,8 @@ class UntagImageFromRegistry(graphene.Mutation):
         info: graphene.ResolveInfo,
         id: str,
     ) -> ForgetImage:
+        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
         log.info("remove image from registry {0} by API request", id)
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]

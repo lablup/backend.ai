@@ -63,7 +63,7 @@ class Image(BaseFunction):
         Fetches the information about registered image in this cluster.
         """
         q = (
-            "query($reference: String, $architecure: string) {"
+            "query($reference: String!, $architecture: String!) {"
             "  image(reference: $reference, architecture: $architecture) {"
             "    $fields"
             "  }"
@@ -87,7 +87,7 @@ class Image(BaseFunction):
         """
         Fetches the information about registered image in this cluster.
         """
-        q = "query($id: String) {" "  image(id: $id) {" "    $fields" "  }" "}"
+        q = "query($id: String!) {" "  image(id: $id) {" "    $fields" "  }" "}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "id": id,
