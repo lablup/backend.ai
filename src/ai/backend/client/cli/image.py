@@ -21,6 +21,19 @@ def image() -> None:
     """
 
 
+def get_image_id(
+    session: Session,
+    name_or_id: str,
+    architecture: str | None = None,
+) -> str:
+    try:
+        session.Image.get_by_id(name_or_id, fields=[image_fields["id"]])
+        return name_or_id
+    except Exception:
+        image = session.Image.get(name_or_id, architecture, fields=[image_fields["id"]])
+        return image["id"]
+
+
 @image.command()
 @pass_ctx_obj
 @click.option("--customized", is_flag=True, help="Get images customized by user only")
@@ -61,16 +74,10 @@ def forget(reference_or_id, arch):
 
     REFERENCE_OR_ID: Canonical string of image (<registry>/<project>/<name>:<tag>)"""
     with Session() as session:
+        image_id = get_image_id(session, reference_or_id, architecture=arch)
         try:
-            try:
-                result = session.Image.forget_image_by_id(reference_or_id)
-            except Exception:
-                if not arch:
-                    print_fail(
-                        "`arch` option should be set when removing image via its reference string"
-                    )
-                    sys.exit(ExitCode.FAILURE)
-                result = session.Image.forget_image(reference_or_id, arch)
+            result = session.Image.untag_image_from_registry(image_id)
+            result = session.Image.forget_image_by_id(image_id)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

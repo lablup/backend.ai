@@ -12,6 +12,7 @@ import yarl
 from ai.backend.common.docker import arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import ImageRef
 
 from .base import (
     BaseContainerRegistry,
@@ -125,6 +126,34 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
 
 class HarborRegistry_v2(BaseContainerRegistry):
+    async def untag(
+        self,
+        image: ImageRef,
+    ) -> None:
+        project, repository = image.name.split("/", maxsplit=1)
+        base_url = (
+            self.registry_url
+            / "api"
+            / "v2.0"
+            / "projects"
+            / project
+            / "repositories"
+            / repository
+            / "artifacts"
+            / image.tag
+        )
+        rqst_args = {}
+        if self.credentials:
+            rqst_args["auth"] = aiohttp.BasicAuth(
+                self.credentials["username"],
+                self.credentials["password"],
+            )
+        async with self.prepare_client_session() as (url, sess):
+            async with sess.delete(
+                (base_url / "tags" / image.tag), allow_redirects=False, **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
