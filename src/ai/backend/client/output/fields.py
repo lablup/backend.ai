@@ -3,8 +3,7 @@ from __future__ import annotations
 from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
-    CustomizedImageNameOutputFormatter,
-    CustomizedImageOwnerEmailOutputFormatter,
+    CustomizedImageOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
     InlineRoutingFormatter,
@@ -100,15 +99,9 @@ image_fields = FieldSet([
     FieldSpec("labels { key value }", "labels"),
     FieldSpec(
         "labels { key value }",
-        "Customized Image Name",
-        alt_name="customized_image_name",
-        formatter=CustomizedImageNameOutputFormatter(),
-    ),
-    FieldSpec(
-        "labels { key value }",
-        "Customized Image Owner",
-        alt_name="customized_image_owner_email",
-        formatter=CustomizedImageOwnerEmailOutputFormatter(),
+        "Customized Image Info",
+        alt_name="customized_image",
+        formatter=CustomizedImageOutputFormatter(),
     ),
 ])
 

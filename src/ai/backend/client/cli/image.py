@@ -47,14 +47,13 @@ def list(ctx: CLIContext, customized: bool) -> None:
             fields: tuple
             if customized:
                 fields = (
-                    image_fields["customized_image_name"],
                     image_fields["id"],
                     image_fields["name"],
                     image_fields["registry"],
                     image_fields["architecture"],
                     image_fields["tag"],
                     image_fields["size_bytes"],
-                    image_fields["customized_image_owner_email"],
+                    image_fields["customized_image"],
                 )
                 items = session.Image.list_customized(fields=fields)
             else:
