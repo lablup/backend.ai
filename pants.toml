@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0.dev4"
+pants_version = "2.21.0.dev6"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -10,7 +10,6 @@ backend_packages = [
     "pants.backend.experimental.python.lint.ruff.format",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
-    # "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
     "scie",
