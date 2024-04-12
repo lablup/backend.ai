@@ -183,6 +183,10 @@ jobs:
       env:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Clean up test containers
+      run: |
+        CIDS="$(docker ps -a --filter label=bai-test-container-type --format "{{.ID}}")"
+        [ "$CIDS" != '' ] && echo "$CIDS" | xargs docker rm -f || true
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
