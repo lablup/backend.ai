@@ -39,8 +39,8 @@ type Queries {
   ): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
 
-  """Added since 24.03.0"""
-  customized_images: [Image]
+  """Added since 24.03.1"""
+  customized_images: [ImageNode]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
