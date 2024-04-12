@@ -113,7 +113,8 @@
     "ATOMEnabled": "ATOM NPU使用中",
     "WarboyEnabled": "Warboy NPU使用中",
     "DownloadWebUIApp": "Backend.AI Web UIアプリのダウンロード",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました"
   },
   "session": {
     "launcher": {
@@ -255,11 +256,22 @@
       "EnvironmentVariableNamePatternError": "変数名は文字またはアンダースコアで始まり、文字、数字、アンダースコアのみを含むことができます。",
       "EnvironmentVariableDuplicateName": "既に存在する変数名です。",
       "Template": "セッションテンプレート",
-      "EnableAutomaticShmem": "自動共有メモリー",
+      "EnableAutomaticMiniumShmem": "最小共有メモリの設定",
       "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "クラスター サイズが 2 以上の場合は、整数のみが許可されます。",
       "StartAfter": "次の後に開始します:",
-      "StartTimeDoesNotApply": "開始時間が設定されていない場合は適用されません。"
+      "StartTimeDoesNotApply": "開始時間が設定されていない場合は適用されません。",
+      "MiniumAllocation": "最低条件",
+      "MiniumAllocationTooltip": "選択した実行環境の最小要件として選択する。",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "あなたは「{{launcher}}」セッション・ランチャーを使用しています。",
+      "SkipToConfirmAndLaunch": "レビューへスキップ",
+      "InteractiveModeDesc": "jupyterノートブックやビジュアル・スタジオ・コードなどを使って、インタラクティブにコードを作成、テスト、実行できる。",
+      "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
+      "AddEnvironmentVariable": "環境変数の追加",
+      "EnvironmentVariableValueRequired": "値を入力してください。",
+      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -312,12 +324,16 @@
     "Architecture": "アーキテクチャ",
     "SessionType": "セッションタイプ",
     "Validation": {
-      "EnterValidSessionName": "正しいセッション名を入力してください",
+      "EnterValidSessionName": "アルファベット、数字、ハイフン、アンダースコアを 4 文字以上組み合わせて入力してください。",
       "SessionNameRequired": "セッション名を入力してください",
       "SluggedStrings": "最低4文字以上の固有の文字列で入力してください。",
       "SessionNameAlreadyExist": "同じ名前のセッションが既にあります",
       "SessionNameTooLong64": "64文字以下で入力してください。",
-      "PleaseFollowSessionNameRule": "少なくとも4文字以上の文字、数字、「.」、「_」、「-」の組み合わせで入力してください。"
+      "PleaseFollowSessionNameRule": "少なくとも4文字以上の文字、数字、「.」、「_」、「-」の組み合わせで入力してください。",
+      "SessionNameTooShort": "4文字以上入力してください。",
+      "SessionNameShouldStartWith": "アルファベット、数字、または'_'で始まっていなければならない。",
+      "SessionNameShouldEndWith": "アルファベット、数字、または'_'で終わっていなければならない。",
+      "SessionNameInvalidCharacter": "名前の真ん中にはアルファベット、数字、'_'しか入れられません。"
     },
     "Interactive": "インタラクティブ",
     "Batch": "バッチ",
@@ -377,7 +393,15 @@
     "CPU": "CPU",
     "MEM": "メモリ",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU(メモリ)"
+    "GPU(MEM)": "GPU(メモリ)",
+    "Agents": "エージェント",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU(メモリ)",
+    "ConvertSessionToImage": "セッションをイメージに変換",
+    "SessionName": "セッション名",
+    "SessionId": "セッションID",
+    "EnvironmentAndVersion": "環境とバージョン",
+    "Tags": "タグ"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -411,7 +435,10 @@
     "EnterManually": "直接入力する",
     "Download": "ダウンロード",
     "Clone": "クローン",
-    "Config": "コンフィグ"
+    "Config": "コンフィグ",
+    "Next": "次のページ",
+    "Previous": "前へ",
+    "PushToImage": "セッションをカスタマイズされたイメージにプッシュする"
   },
   "agent": {
     "Endpoint": "終点",
@@ -537,7 +564,8 @@
     "Status": "状態",
     "NoUserToDisplay": "ユーザー情報がありません。",
     "EnableSudoSession": "sudoセッションを有効にする",
-    "MainAccessKey": "メインアクセスキー"
+    "MainAccessKey": "メインアクセスキー",
+    "InactivateTheFollowingUsers": "以下のユーザーを無効化します。"
   },
   "data": {
     "Folders": "フォルダー",
@@ -590,7 +618,7 @@
       "FolderRenamed": "フォルダの名前が変更されました",
       "FolderNameMismatched": "フォルダ名が一致しません。入力フィールドにスペース文字があるかどうかを確認してください。",
       "SameFileName": "入力値は、更新するファイル名と同じです。別の名前に変更してください。",
-      "FolderDeleted": "フォルダが削除されました",
+      "FolderDeleted": "{{ folderName }} フォルダが削除されました。",
       "FolderUpdated": "フォルダオプションが更新されました",
       "FolderDisconnected": "フォルダが切断されました。",
       "FileRenamed": "ファイルの名前が変更されました",
@@ -617,7 +645,13 @@
       "CloneFolder": "フォルダクローン",
       "ShareFolder": "フォルダの共有",
       "ModifyPermissions": "権限修正",
-      "LeaveFolder": "招待されたフォルダを出る"
+      "LeaveFolder": "招待されたフォルダを出る",
+      "Restore": "復元する",
+      "DeleteForever": "永久に削除",
+      "FolderRestored": "{{ folderName }} フォルダが復元されました。",
+      "FolderDeletedForever": "{{ folderName }} フォルダは完全に削除されました。",
+      "MoveToTrashBin": "ゴミ箱に移動",
+      "MovedToTrashBin": "{{ folderName }} フォルダーはゴミ箱に移動されました。"
     },
     "explorer": {
       "Delete": "削除...",
@@ -668,7 +702,8 @@
       "SFTPSessionNotAvailable": "現在、SFTPセッションの使用ができません。",
       "StartingSSH/SFTPSession": "SFTPサーバー起動",
       "NumberOfSFTPSessionsExceededTitle": "生成可能なアップロードセッション数の制限に達しました。",
-      "NumberOfSFTPSessionsExceededBody": "設定されたアップロードセッション数を超えてセッションを作成しようとしています。続行する前に未使用のアップロードセッションを停止してください。"
+      "NumberOfSFTPSessionsExceededBody": "設定されたアップロードセッション数を超えてセッションを作成しようとしています。続行する前に未使用のアップロードセッションを停止してください。",
+      "DownloadNotAllowed": "このフォルダーではファイル/フォルダーのダウンロードは許可されていません。"
     },
     "invitation": {
       "NoValidEmails": "有効なメールが入力されていません",
@@ -707,21 +742,24 @@
     "ModelStore": "模型店",
     "New": "新しい",
     "Add": "追加",
-    "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。"
+    "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "警告：これは元に戻せません！",
       "LogDeletion": "すべてのログメッセージを削除してもよろしいですか？",
       "WillBeAppliedToNewSessions": "このアップデートは、新しいセッションに適用されます。",
-      "Required": "必須入力です。"
+      "Required": "必須入力です。",
+      "DeleteForeverDesc": "警告: 選択したアイテムは完全に削除され、復元することはできません。"
     },
     "ask": {
       "DoYouWantToProceed": "続行しますか？"
     },
     "title": {
       "LetsDouble-Check": "再確認しましょう",
-      "Notice": "ご案内"
+      "Notice": "ご案内",
+      "DeleteForever": "永久に削除しますか?"
     },
     "ErrorOccurred": "エラーが発生しました",
     "error": {
@@ -1138,7 +1176,10 @@
     "OutOfRange": "入力範囲外です。",
     "Plugins": "プラグイン",
     "OpenSourceCUDAGPUsupport": "オープンソースのCUDA GPUのサポート",
-    "ShowOnlyChanged": "表示のみの変更"
+    "ShowOnlyChanged": "表示のみの変更",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1191,14 +1232,12 @@
     "LeaveService": "サービスを終了する",
     "DescConfirmLeave": "確認するには、メールアドレスとパスワードをもう一度入力してください。",
     "Password": "パスワード",
-    "E-mail": "Eメール",
     "APIKey": "APIキー",
     "SecretKey": "シークレットキー",
     "Endpoint": "終点",
     "NotAUser": "ユーザーではありませんか？",
     "LoginAnotherway": "別の方法でログインしたいですか？",
     "SignUp": "サインアップ",
-    "LoginWithE-mail": "電子メールでログイン",
     "LoginWithIAM": "IAMでログイン",
     "ClickToUseIAM": "クリックしてIAMを使用する",
     "ClickToUseID": "クリックしてIDを使用",
@@ -1226,7 +1265,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "SAMLログイン",
       "LoginWithRealm": "{{ realmName }}ログイン"
-    }
+    },
+    "LoginWithE-mailorUsername": "電子メールまたはユーザー名でログイン",
+    "E-mailorUsername": "メールアドレスまたはユーザ名"
   },
   "signup": {
     "SignupBETA": "サインアップ（ベータ版の招待のみ）",
@@ -1464,7 +1505,8 @@
     "ForUser": "ユーザー",
     "ForProject": "プロジェクト",
     "QuotaDoesNotSupported": "このストレージバックエンドは可用量設定をサポートしていません。",
-    "BeCarefulToSetUserResourcePolicy": "リソースポリシーを変更すると、そのリソースポリシーを使用しているすべてのユーザーに影響を与える可能性がありますので、慎重に使用してください。"
+    "BeCarefulToSetUserResourcePolicy": "リソースポリシーを変更すると、そのリソースポリシーを使用しているすべてのユーザーに影響を与える可能性がありますので、慎重に使用してください。",
+    "StorageSetting": "ストレージ設定"
   },
   "totp": {
     "TotpSetupCompleted": "二要素認証が有効になりました。",
@@ -1481,7 +1523,8 @@
   },
   "OpenVSCodeRemote": "ローカルVisual Studio Codeを開く",
   "inputLimit": {
-    "4to64chars": "(4～64文字)"
+    "4to64chars": "(4～64文字)",
+    "4to32chars": "(4~32文字)"
   },
   "modelStore": {
     "Description": "説明",
