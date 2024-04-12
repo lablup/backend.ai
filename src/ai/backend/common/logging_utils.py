@@ -27,7 +27,7 @@ class BraceStyleAdapter(logging.LoggerAdapter):
     def log(self, level, msg, *args, **kwargs):
         if self.isEnabledFor(level):
             msg, kwargs = self.process(msg, kwargs)
-            self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
+            self.logger._log(level, BraceMessage(msg, args), (), stacklevel=2, **kwargs)
 
 
 def enforce_debug_logging(loggers: Iterable[str]) -> None:
