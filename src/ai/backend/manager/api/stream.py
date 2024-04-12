@@ -40,7 +40,7 @@ import zmq
 import zmq.asyncio
 from aiohttp import web
 from aiotools import adefer, apartial
-from etcd_client import GRpcStatusCode, GRpcStatusError
+from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -700,10 +700,10 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                     await shared_config.etcd.get("config/idle/app-streaming-packet-timeout")
                     or "5m",
                 )
-            except GRpcStatusError as e:
+            except GRPCStatusError as e:
                 err_detail = e.args[0]
 
-                if err_detail["code"] == GRpcStatusCode.Unavailable:
+                if err_detail["code"] == GRPCStatusCode.Unavailable:
                     log.warning(
                         "stream_conn_tracker_gc(): error while connecting to Etcd server,"
                         " retrying..."
