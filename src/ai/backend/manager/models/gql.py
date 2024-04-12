@@ -71,6 +71,7 @@ from .image import (
     ForgetImageById,
     Image,
     ImageLoadFilter,
+    ImageNode,
     ModifyImage,
     PreloadImage,
     RescanImages,
@@ -359,7 +360,7 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(),
     )
 
-    customized_images = graphene.List(Image, description="Added since 24.03.0")
+    customized_images = graphene.List(ImageNode, description="Added since 24.03.1")
 
     user = graphene.Field(
         User,
@@ -1038,15 +1039,15 @@ class Queries(graphene.ObjectType):
     async def resolve_customized_images(
         root: Any,
         info: graphene.ResolveInfo,
-    ) -> Sequence[Image]:
+    ) -> Sequence[ImageNode]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        items = await ImageNode.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
-            items = await Image.filter_allowed(
+            items = await ImageNode.filter_allowed(
                 info.context,
                 items,
                 client_domain,
