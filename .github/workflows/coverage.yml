@@ -54,8 +54,8 @@ jobs:
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.coverage.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.

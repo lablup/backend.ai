@@ -6,7 +6,8 @@ from typing import Any, Callable, Iterator, List, Mapping, Optional, Sequence
 from tabulate import tabulate
 
 from ai.backend.client.cli.pagination import echo_via_pager, get_preferred_page_size, tabulate_items
-from ai.backend.client.cli.pretty import print_error, print_fail
+from ai.backend.client.cli.pretty import print_done, print_error, print_fail
+from ai.backend.common.types import ResultSet
 
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
@@ -61,6 +62,27 @@ class ConsoleOutputHandler(BaseOutputHandler):
                         if k in field_map
                     ],
                     headers=("Field", "Value"),
+                )
+            )
+
+    def print_result_set(
+        self,
+        result_set: ResultSet,
+    ) -> None:
+        if result_set["success"]:
+            print_done("Successfully created:")
+            print(
+                tabulate(
+                    map(lambda item: [item["item"]], result_set["success"]),
+                    tablefmt="plain",
+                )
+            )
+        if result_set["failed"]:
+            print_fail("Failed to create:")
+            print(
+                tabulate(
+                    map(lambda item: [item["item"], item["msg"]], result_set["failed"]),
+                    tablefmt="plain",
                 )
             )
 

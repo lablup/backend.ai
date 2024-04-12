@@ -80,7 +80,15 @@ class QTreeQuotaModel(BaseQuotaModel):
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         self.netapp_client.check_job_result(result, [])
         if options is not None:
-            await self.update_quota_scope(quota_scope_id, options)
+            result = await self.netapp_client.set_quota_rule(
+                self.svm_id,
+                self.volume_id,
+                qspath.name,
+                options,
+            )
+            self.netapp_client.check_job_result(result, [])
+            result = await self.netapp_client.enable_quota(self.volume_id)
+            self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     async def describe_quota_scope(
         self,
@@ -97,15 +105,13 @@ class QTreeQuotaModel(BaseQuotaModel):
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        result = await self.netapp_client.set_quota_rule(
+        result = await self.netapp_client.update_quota_rule(
             self.svm_id,
             self.volume_id,
             qspath.name,
             config,
         )
         self.netapp_client.check_job_result(result, [])
-        result = await self.netapp_client.enable_quota(self.volume_id)
-        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     # FIXME: How do we implement unset_quota() for NetApp?
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
@@ -212,10 +218,11 @@ class XCPFSOpModel(BaseFSOpModel):
 
     def scan_tree(
         self,
-        target_path: Path,
-        recursive=False,
+        path: Path,
+        *,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
-        target_relpath = target_path.relative_to(self.mount_path)
+        target_relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         # Use a custom formatting
         scan_cmd = [
@@ -263,7 +270,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     if entry_type == DirEntryType.SYMLINK:
                         try:
                             symlink_dst = Path(item_abspath).resolve()
-                            symlink_dst = symlink_dst.relative_to(target_path)
+                            symlink_dst = symlink_dst.relative_to(path)
                         except (ValueError, RuntimeError):
                             pass
                         else:
@@ -319,9 +326,9 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def scan_tree_usage(
         self,
-        target_path: Path,
+        path: Path,
     ) -> TreeUsage:
-        target_relpath = target_path.relative_to(self.mount_path)
+        target_relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         total_size = 0
         total_count = 0
@@ -367,9 +374,9 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def scan_tree_size(
         self,
-        target_path: Path,
+        path: Path,
     ) -> BinarySize:
-        usage = await self.scan_tree_usage(target_path)
+        usage = await self.scan_tree_usage(path)
         return BinarySize(usage.used_bytes)
 
 
@@ -418,6 +425,8 @@ class NetAppVolume(BaseVolume):
             self.ontap_endpoint,
             self.config["netapp_ontap_user"],
             self.config["netapp_ontap_password"],
+            self.local_config["storage-proxy"]["user"],
+            self.local_config["storage-proxy"]["group"],
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]

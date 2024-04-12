@@ -7,7 +7,7 @@ on:
 
 jobs:
   pr-number-assign:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null && github.event.pull_request.merged == false }}
     uses: ./.github/workflows/pr-number-assign.yml
     secrets:
       WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT }}
@@ -26,7 +26,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.12"
         check-latest: true
     - name: Install dependencies
       run: |

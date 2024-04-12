@@ -163,7 +163,7 @@ class ThresholdOperator(enum.Enum):
     OR = "or"
 
 
-class RemainingTimeType(str, enum.Enum):
+class RemainingTimeType(enum.StrEnum):
     GRACE_PERIOD = "grace_period"
     EXPIRE_AFTER = "expire_after"
 

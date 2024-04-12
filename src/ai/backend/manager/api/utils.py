@@ -13,6 +13,7 @@ import uuid
 from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -31,9 +32,9 @@ from typing import (
 import sqlalchemy as sa
 import trafaret as t
 import yaml
-from aiohttp import web, web_response
+from aiohttp import web
 from aiohttp.typedefs import Handler
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
@@ -212,6 +213,10 @@ def check_api_params(
     return wrap
 
 
+class BaseResponseModel(BaseModel):
+    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
+
+
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
@@ -226,16 +231,16 @@ THandlerFuncWithParam: TypeAlias = Callable[
 
 
 def ensure_stream_response_type(
-    response: TResponseModel | list | TAnyResponse,
+    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
+        case BaseResponseModel(status=status):
+            return web.json_response(response.model_dump(mode="json"), status=status)
         case BaseModel():
             return web.json_response(response.model_dump(mode="json"))
         case list():
-            return web.json_response(
-                TypeAdapter(list[TResponseModel]).dump_python(response, mode="json")
-            )
-        case web_response.StreamResponse():
+            return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
+        case web.StreamResponse():
             return response
         case _:
             raise RuntimeError(f"Unsupported response type ({type(response)})")

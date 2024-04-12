@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pprint import pprint
 from typing import TYPE_CHECKING
 
 import click
@@ -80,9 +79,12 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 AgentId(agent_id),
                 invoke_timeout=timeout,
             ) as rpc:
-                result = await rpc.call.gather_hwinfo()
-                print(f"Retrieved ag:{agent_id} hardware information as a health check:")
-                pprint(result)
+                result = await rpc.call.ping("pong")
+                print(f"Received response from ag:{agent_id}: {result}")
+                # FIXME: Use gather_hwinfo() when we implement get_node_hwinfo() of CPUPlugin and MemoryPlugin like below.
+                # result = await rpc.call.gather_hwinfo()
+                # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
+                # pprint(result)
         except asyncio.TimeoutError:
             log.error("Timeout occurred while reading the response from ag:{}", agent_id)
         except Exception:

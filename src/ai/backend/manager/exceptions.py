@@ -25,6 +25,29 @@ class InvalidArgument(Exception):
     pass
 
 
+class RPCError(RuntimeError):
+    """
+    An exception class to represent any error caused in RPC functions.
+    """
+
+    __slots__ = (
+        "agent_id",
+        "agent_addr",
+        "extra_msg",
+    )
+
+    def __init__(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+        extra_msg: str,
+    ) -> None:
+        super().__init__(agent_id, agent_addr, extra_msg)
+        self.agent_id = agent_id
+        self.agent_addr = agent_addr
+        self.extra_msg = extra_msg
+
+
 class AgentError(RuntimeError):
     """
     A dummy exception class to distinguish agent-side errors passed via

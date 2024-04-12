@@ -3,13 +3,13 @@ import logging
 import logging.config
 import logging.handlers
 import os
-import pickle
 import pprint
 import socket
 import ssl
 import sys
 import threading
 import time
+import traceback
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from contextvars import ContextVar
@@ -18,11 +18,13 @@ from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
 import coloredlogs
+import graypy
 import trafaret as t
 import yarl
 import zmq
 from pythonjsonlogger.jsonlogger import JsonFormatter
-from tblib import pickling_support
+
+from ai.backend.common import msgpack
 
 from . import config
 from . import validators as tx
@@ -88,6 +90,8 @@ logging_config_iv = t.Dict({
         t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
         t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
         t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
+        t.Key("fqdn", default=True): t.Bool,
+        t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -168,13 +172,6 @@ class LogstashHandler(logging.Handler):
         tags = set()
         extra_data = dict()
 
-        if record.exc_info:
-            tags.add("has_exception")
-            if self.formatter:
-                extra_data["exception"] = self.formatter.formatException(record.exc_info)
-            else:
-                extra_data["exception"] = logging._defaultFormatter.formatException(record.exc_info)
-
         # This log format follows logstash's event format.
         log = OrderedDict([
             ("@timestamp", datetime.now().isoformat()),
@@ -196,25 +193,85 @@ class LogstashHandler(logging.Handler):
             self._sock.sendall(json.dumps(log).encode("utf-8"))
 
 
+def format_exception(self, ei):
+    s = "".join(ei)
+    if s[-1:] == "\n":
+        s = s[:-1]
+    return s
+
+
+class SerializedExceptionFormatter(logging.Formatter):
+    def formatException(self, ei) -> str:
+        return format_exception(self, ei)
+
+
+class GELFTLSHandler(graypy.GELFTLSHandler):
+    ssl_ctx: ssl.SSLContext
+
+    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs):
+        """Initialize the GELFTLSHandler
+
+        :param host: GELF TLS input host.
+        :type host: str
+
+        :param port: GELF TLS input port.
+        :type port: int
+
+        :param validate: If :obj:`True`, validate the Graylog server's
+            certificate. In this case specifying ``ca_certs`` is also
+            required.
+        :type validate: bool
+
+        :param ca_certs: Path to CA bundle file.
+        :type ca_certs: str
+        """
+
+        super().__init__(host, port=port, validate=validate, **kwargs)
+        self.ssl_ctx = ssl.create_default_context(capath=ca_certs)
+        if not validate:
+            self.ssl_ctx.check_hostname = False
+            self.ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    def makeSocket(self, timeout=1):
+        """Create a TLS wrapped socket"""
+        plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        if hasattr(plain_socket, "settimeout"):
+            plain_socket.settimeout(timeout)
+
+        wrapped_socket = self.ssl_ctx.wrap_socket(
+            plain_socket,
+            server_hostname=self.host,
+        )
+        wrapped_socket.connect((self.host, self.port))
+
+        return wrapped_socket
+
+
 def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
-    try:
-        import graypy
-    except ImportError:
-        return None
     drv_config = config["graylog"]
-    graylog_handler = graypy.GELFTLSHandler(
-        host=drv_config["host"],
-        port=drv_config["port"],
-        validate=drv_config["ssl-verify"],
-        ca_certs=drv_config["ca-certs"],
-        keyfile=drv_config["keyfile"],
-        certfile=drv_config["certfile"],
-    )
+    graylog_params = {
+        "host": drv_config["host"],
+        "port": drv_config["port"],
+        "validate": drv_config["ssl-verify"],
+        "ca_certs": drv_config["ca-certs"],
+        "keyfile": drv_config["keyfile"],
+        "certfile": drv_config["certfile"],
+    }
+    if drv_config["localname"]:
+        graylog_params["localname"] = drv_config["localname"]
+    else:
+        graylog_params["fqdn"] = drv_config["fqdn"]
+
+    graylog_handler = GELFTLSHandler(**graylog_params)
     graylog_handler.setLevel(config["level"])
     return graylog_handler
 
 
 class ConsoleFormatter(logging.Formatter):
+    def formatException(self, ei) -> str:
+        return format_exception(self, ei)
+
     def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
         ct = self.converter(record.created)  # type: ignore
         if datefmt:
@@ -226,6 +283,9 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class CustomJsonFormatter(JsonFormatter):
+    def formatException(self, ei) -> str:
+        return format_exception(self, ei)
+
     def add_fields(
         self,
         log_record: dict[str, Any],  # the manipulated entry object
@@ -241,6 +301,12 @@ class CustomJsonFormatter(JsonFormatter):
             log_record["level"] = loglevel.upper()
         else:
             log_record["level"] = record.levelname.upper()
+
+
+class ColorizedFormatter(coloredlogs.ColoredFormatter):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        coloredlogs.logging.Formatter.formatException = format_exception
 
 
 class pretty:
@@ -264,7 +330,7 @@ def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
     if colored is None:
         colored = sys.stderr.isatty()
     if colored:
-        console_formatter = coloredlogs.ColoredFormatter(
+        console_formatter = ColorizedFormatter(
             log_formats[drv_config["format"]],
             datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
             field_styles={
@@ -322,6 +388,9 @@ def log_worker(
     logstash_handler = None
     graylog_handler = None
 
+    # For future references: when implementing new kind of logging adapters,
+    # make sure to adapt our custom `Formatter.formatException()` approach;
+    # Otherwise it won't print out EXCEPTION level log (along with the traceback).
     if "console" in logging_config["drivers"]:
         console_handler = setup_console_log_handler(logging_config)
 
@@ -338,8 +407,11 @@ def log_worker(
             myhost="hostname",  # TODO: implement
         )
         logstash_handler.setLevel(logging_config["level"])
+        logstash_handler.setFormatter(SerializedExceptionFormatter())
     if "graylog" in logging_config["drivers"]:
         graylog_handler = setup_graylog_handler(logging_config)
+        assert graylog_handler is not None
+        graylog_handler.setFormatter(SerializedExceptionFormatter())
 
     zctx = zmq.Context()
     agg_sock = zctx.socket(zmq.PULL)
@@ -353,19 +425,10 @@ def log_worker(
             data = agg_sock.recv()
             if not data:
                 return
-            try:
-                rec = pickle.loads(data)
-            except (pickle.PickleError, TypeError):
-                # We have an unpickling error.
-                # Change into a self-created log record with exception info.
-                rec = logging.makeLogRecord({
-                    "name": __name__,
-                    "msg": "Cannot unpickle the log record (raw data: %r)",
-                    "levelno": logging.ERROR,
-                    "levelname": "error",
-                    "args": (data,),  # attach the original data for inspection
-                    "exc_info": sys.exc_info(),
-                })
+            unpacked_data = msgpack.unpackb(data)
+            if not unpacked_data:
+                break
+            rec = logging.makeLogRecord(unpacked_data)
             if rec is None:
                 break
             if console_handler:
@@ -422,39 +485,22 @@ class RelayHandler(logging.Handler):
             self._fallback(record)
             return
         # record may be None to signal shutdown.
+        if record:
+            log_body = {
+                "name": record.name,
+                "pathname": record.pathname,
+                "lineno": record.lineno,
+                "msg": record.getMessage(),
+                "levelno": record.levelno,
+                "levelname": record.levelname,
+            }
+            if record.exc_info:
+                log_body["exc_info"] = traceback.format_exception(*record.exc_info)
+        else:
+            log_body = None
         try:
-            if record is not None and record.exc_info is not None:
-                pickling_support.install(record.exc_info[1])
-            pickled_rec = pickle.dumps(record)
-        except (
-            pickle.PickleError,
-            TypeError,
-            ImportError,  # when "Python is likely to be shutting down"
-        ):
-            # We have a pickling error.
-            # Change it into a self-created picklable log record with exception info.
-            if record is not None:
-                exc_info: Any
-                if isinstance(record.exc_info, tuple):
-                    exc_info = (
-                        PickledException,
-                        PickledException(repr(record.exc_info[1])),  # store stringified repr
-                        record.exc_info[2],
-                    )
-                else:
-                    exc_info = record.exc_info
-                record = logging.makeLogRecord({
-                    "name": record.name,
-                    "pathname": record.pathname,
-                    "lineno": record.lineno,
-                    "msg": record.getMessage(),
-                    "levelno": record.levelno,
-                    "levelname": record.levelname,
-                    "exc_info": exc_info,
-                })
-            pickled_rec = pickle.dumps(record)
-        try:
-            self._sock.send(pickled_rec)
+            serialized_record = msgpack.packb(log_body)
+            self._sock.send(serialized_record)
         except zmq.ZMQError:
             self._fallback(record)
 
@@ -506,7 +552,7 @@ class LocalLogger(AbstractLogger):
             log_handlers.append(file_handler)
         self.log_config = {
             "version": 1,
-            "disable_existing_loggers": True,
+            "disable_existing_loggers": False,
             "handlers": {
                 "null": {"class": "logging.NullHandler"},
             },
@@ -592,8 +638,6 @@ class Logger(AbstractLogger):
         }
 
     def __enter__(self):
-        tx.fix_trafaret_pickle_support()  # monkey-patch for pickling trafaret.DataError
-        pickling_support.install()  # enable pickling of tracebacks
         self.log_config["handlers"]["relay"] = {
             "class": "ai.backend.common.logging.RelayHandler",
             "level": self.logging_config["level"],

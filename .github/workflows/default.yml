@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -52,8 +52,6 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
-    - name: Check forbidden cross imports
-      run: pants dependencies '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -73,16 +71,16 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.lint.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -136,15 +134,15 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.check.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -160,7 +158,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: maxnowack/local-cache@v1
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -209,10 +207,10 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -292,7 +290,7 @@ jobs:
         cd dist-local-proxy
         ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: local-proxy
         path: dist-local-proxy/*
@@ -311,15 +309,15 @@ jobs:
       run: |
         rm -rf dist/src.*/
     - name: Upload scies
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: scies
+        name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -385,20 +383,15 @@ jobs:
         done
         ls -lh dist
     - name: Upload wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels
-        path: dist/*.whl
-    - name: Upload source tarballs
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*.tar.gz
+        path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.deploy.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
   build-sbom:
@@ -433,22 +426,23 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: scies
+        pattern: scies-*
         path: dist
+        merge-multiple: true
     - name: Download local-proxy
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: local-proxy
         path: dist
     - name: Download SBOM report
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: SBOM report
         path: dist
@@ -470,7 +464,7 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels, make-final-release]
+    needs: [make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
@@ -512,7 +506,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist
