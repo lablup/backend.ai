@@ -773,6 +773,44 @@ class ImageNode(graphene.ObjectType):
                 raise ValueError(f"Image not found (id: {image_id})")
             return cls.from_row(image_row)
 
+    @classmethod
+    async def load_all(
+        cls,
+        ctx: GraphQueryContext,
+        *,
+        filters: set[ImageLoadFilter] = set(),
+    ) -> Sequence[Image]:
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await ImageRow.list(session, load_aliases=True)
+        items: list[Image] = [
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+        ]
+
+        return items
+
+    @staticmethod
+    async def filter_allowed(
+        ctx: GraphQueryContext,
+        items: Sequence[Image],
+        domain_name: str,
+    ) -> Sequence[Image]:
+        from .domain import domains
+
+        async with ctx.db.begin() as conn:
+            query = (
+                sa.select([domains.c.allowed_docker_registries])
+                .select_from(domains)
+                .where(domains.c.name == domain_name)
+            )
+            result = await conn.execute(query)
+            allowed_docker_registries = result.scalar()
+
+        filtered_items: list[Image] = [
+            item for item in items if item.registry in allowed_docker_registries
+        ]
+
+        return filtered_items
+
 
 class PreloadImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -859,6 +897,7 @@ class ForgetImageById(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = ImageNode()
 
     @staticmethod
     async def mutate(
@@ -889,7 +928,7 @@ class ForgetImageById(graphene.Mutation):
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImageById(ok=True, msg="")
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class ForgetImage(graphene.Mutation):
@@ -905,6 +944,7 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = ImageNode()
 
     @staticmethod
     async def mutate(
@@ -935,7 +975,7 @@ class ForgetImage(graphene.Mutation):
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImage(ok=True, msg="")
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -952,6 +992,7 @@ class UntagImageFromRegistry(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = ImageNode()
 
     @staticmethod
     async def mutate(
@@ -988,7 +1029,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
 
-        return ForgetImage(ok=True, msg="")
+        return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class AliasImage(graphene.Mutation):
