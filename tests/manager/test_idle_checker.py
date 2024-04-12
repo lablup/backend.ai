@@ -8,6 +8,7 @@ import pytest
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerHost,
@@ -17,6 +18,9 @@ from ai.backend.manager.idle import (
     calculate_remaining_time,
     init_idle_checkers,
 )
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.server import (
     background_task_ctx,
     database_ctx,
@@ -108,7 +112,6 @@ async def new_user_grace_period_checker(
         },
         "enabled": "",
     }
-    kernel = {"user_created_at": user_created_at}
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -120,7 +123,9 @@ async def new_user_grace_period_checker(
     )
     try:
         await checker_host.start()
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
+        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
+            user_created_at
+        )
     finally:
         await checker_host.shutdown()
 
@@ -150,6 +155,7 @@ async def network_timeout_idle_checker(
     # test 1
     # remaining time is positive and no grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
@@ -163,13 +169,12 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -185,11 +190,11 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         should_alive = await network_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            session, checker_host._db, policy, checker_host._redis_live
         )
         remaining = await network_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -203,6 +208,7 @@ async def network_timeout_idle_checker(
     # test 2
     # remaining time is negative and no grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=30).timestamp()
@@ -216,13 +222,12 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -238,11 +243,11 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         should_alive = await network_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            session, checker_host._db, policy, checker_host._redis_live
         )
         remaining = await network_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -256,6 +261,7 @@ async def network_timeout_idle_checker(
     # test 3
     # remaining time is positive with new user grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
@@ -272,14 +278,12 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -295,12 +299,14 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
+        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
+            user_created_at
+        )
         should_alive = await network_idle_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -318,6 +324,7 @@ async def network_timeout_idle_checker(
     # test 4
     # remaining time is negative with new user grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=50).timestamp()
@@ -334,14 +341,12 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -357,12 +362,14 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
+        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
+            user_created_at
+        )
         should_alive = await network_idle_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -401,7 +408,7 @@ async def session_lifetime_checker(
     # test 1
     # remaining time is positive and no grace period
     session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
+    session_created_at = datetime(2020, 3, 1, 12, 30, second=0)
     max_session_lifetime = 30
     now = datetime(2020, 3, 1, 12, 30, second=10)
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
@@ -410,13 +417,8 @@ async def session_lifetime_checker(
         "checkers": {},
         "enabled": "",
     }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
+    session = SessionRow(id=session_id, created_at=session_created_at)
+    policy = KeyPairResourcePolicyRow(max_session_lifetime=max_session_lifetime)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -431,7 +433,7 @@ async def session_lifetime_checker(
         session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
 
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -448,7 +450,7 @@ async def session_lifetime_checker(
     # test 2
     # remaining time is negative and no grace period
     session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
+    session_created_at = datetime(2020, 3, 1, 12, 30, second=0)
     max_session_lifetime = 30
     now = datetime(2020, 3, 1, 12, 30, second=50)
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
@@ -457,13 +459,8 @@ async def session_lifetime_checker(
         "checkers": {},
         "enabled": "",
     }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
+    session = SessionRow(id=session_id, created_at=session_created_at)
+    policy = KeyPairResourcePolicyRow(max_session_lifetime=max_session_lifetime)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -478,7 +475,7 @@ async def session_lifetime_checker(
         session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
 
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -495,7 +492,7 @@ async def session_lifetime_checker(
     # test 3
     # remaining time is positive with new user grace period
     session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=10)
+    session_created_at = datetime(2020, 3, 1, 12, 30, second=10)
     user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
     max_session_lifetime = 10
     now = datetime(2020, 3, 1, 12, 30, second=25)
@@ -508,14 +505,8 @@ async def session_lifetime_checker(
         },
         "enabled": "",
     }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
+    session = SessionRow(id=session_id, created_at=session_created_at)
+    policy = KeyPairResourcePolicyRow(max_session_lifetime=max_session_lifetime)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -528,10 +519,12 @@ async def session_lifetime_checker(
     try:
         await checker_host.start()
         session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
+        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
+            user_created_at
+        )
 
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -549,7 +542,7 @@ async def session_lifetime_checker(
     # test 4
     # remaining time is negative with new user grace period
     session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=40)
+    session_created_at = datetime(2020, 3, 1, 12, 30, second=40)
     user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
     max_session_lifetime = 10
     now = datetime(2020, 3, 1, 12, 30, second=55)
@@ -562,14 +555,8 @@ async def session_lifetime_checker(
         },
         "enabled": "",
     }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
+    session = SessionRow(id=session_id, created_at=session_created_at)
+    policy = KeyPairResourcePolicyRow(max_session_lifetime=max_session_lifetime)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
@@ -582,10 +569,12 @@ async def session_lifetime_checker(
     try:
         await checker_host.start()
         session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
+        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
+            user_created_at
+        )
 
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
+            session,
             checker_host._db,
             policy,
             checker_host._redis_live,
@@ -712,7 +701,7 @@ async def utilization_idle_checker(
     kernel_id = KernelId(uuid4())
     timewindow = 30
     initial_grace_period = 100
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
+    session_created_at = datetime(2020, 3, 1, 12, 30, second=0)
     now = datetime(2020, 3, 1, 12, 30, second=10)
     expected = timedelta(seconds=120).total_seconds()
 
@@ -730,16 +719,10 @@ async def utilization_idle_checker(
             "pct": "10.0",
         },
     }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
+    session = SessionRow(
+        id=session_id, created_at=session_created_at, occupying_slots=occupied_slots
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=timewindow)
 
     resource_thresholds = {
         "cpu_util": {"average": "0"},
@@ -775,7 +758,7 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            session, checker_host._db, policy, checker_host._redis_live
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -792,7 +775,7 @@ async def utilization_idle_checker(
     # remaining time is positive with utilization.
     session_id = SessionId(uuid4())
     kernel_id = KernelId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
+    datetime(2020, 3, 1, 12, 30, second=0)
     now = datetime(2020, 3, 1, 12, 30, second=10)
     initial_grace_period = 0
     timewindow = 15
@@ -812,16 +795,10 @@ async def utilization_idle_checker(
             "pct": "10.0",
         },
     }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
+    session = SessionRow(
+        id=session_id, created_at=session_created_at, occupying_slots=occupied_slots
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=timewindow)
 
     resource_thresholds = {
         "cpu_util": {"average": "0"},
@@ -857,7 +834,7 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            session, checker_host._db, policy, checker_host._redis_live
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -876,7 +853,7 @@ async def utilization_idle_checker(
     kernel_id = KernelId(uuid4())
     timewindow = 15
     initial_grace_period = 0
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
+    datetime(2020, 3, 1, 12, 30, second=0)
     now = datetime(2020, 3, 1, 12, 30, second=50)
     expected = -1
 
@@ -894,16 +871,10 @@ async def utilization_idle_checker(
             "pct": "10.0",
         },
     }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
+    session = SessionRow(
+        id=session_id, created_at=session_created_at, occupying_slots=occupied_slots
+    )
+    policy = KeyPairResourcePolicyRow(idle_timeout=timewindow)
 
     resource_thresholds = {
         "cpu_util": {"average": "0"},
@@ -939,7 +910,7 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            session, checker_host._db, policy, checker_host._redis_live
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
