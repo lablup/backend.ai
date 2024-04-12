@@ -1043,18 +1043,18 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await ImageNode.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
-            items = await ImageNode.filter_allowed(
+            items = await Image.filter_allowed(
                 info.context,
                 items,
                 client_domain,
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return items
+        return [ImageNode.from_legacy_image(i) for i in items]
 
     @staticmethod
     async def resolve_images(

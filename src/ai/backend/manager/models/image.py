@@ -762,6 +762,23 @@ class ImageNode(graphene.ObjectType):
         )
 
     @classmethod
+    def from_legacy_image(cls, row: Image) -> ImageNode:
+        return cls(
+            id=row.id,
+            name=row.name,
+            humanized_name=row.humanized_name,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.digest,
+            labels=row.labels,
+            size_bytes=row.size_bytes,
+            resource_limits=row.resource_limits,
+            supported_accelerators=row.supported_accelerators,
+        )
+
+    @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
         graph_ctx: GraphQueryContext = info.context
 
@@ -772,44 +789,6 @@ class ImageNode(graphene.ObjectType):
             if image_row is None:
                 raise ValueError(f"Image not found (id: {image_id})")
             return cls.from_row(image_row)
-
-    @classmethod
-    async def load_all(
-        cls,
-        ctx: GraphQueryContext,
-        *,
-        filters: set[ImageLoadFilter] = set(),
-    ) -> Sequence[Image]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(session, load_aliases=True)
-        items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
-        ]
-
-        return items
-
-    @staticmethod
-    async def filter_allowed(
-        ctx: GraphQueryContext,
-        items: Sequence[Image],
-        domain_name: str,
-    ) -> Sequence[Image]:
-        from .domain import domains
-
-        async with ctx.db.begin() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == domain_name)
-            )
-            result = await conn.execute(query)
-            allowed_docker_registries = result.scalar()
-
-        filtered_items: list[Image] = [
-            item for item in items if item.registry in allowed_docker_registries
-        ]
-
-        return filtered_items
 
 
 class PreloadImage(graphene.Mutation):
