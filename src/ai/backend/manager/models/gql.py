@@ -1747,15 +1747,23 @@ class Queries(graphene.ObjectType):
     async def resolve_compute_container(
         root: Any,
         info: graphene.ResolveInfo,
-        container_id: str,
+        id: str,
+        *,
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
     ) -> ComputeContainer:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
         # by other users and in other groups.
         # Let's just protect the domain/user boundary here.
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.detail")
-        return await loader.load(container_id)
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "ComputeContainer.detail",
+            domain_name=domain_name,
+            access_key=access_key,
+        )
+        return await loader.load(id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
