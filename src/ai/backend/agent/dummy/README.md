@@ -9,10 +9,12 @@ dummy agents do not run `sync_container_lifecycles()`.
 
 # How to use
 ## Set `agent.toml`
+Check `configs/agent/sample-dummy-config.toml` for full content.
 ```toml
-# File name "agent.toml"
+# File name "agent1.toml"
 [agent]
 mode = "dummy" # or backend = "dummy"
+...
 
 [agent.intrinsic.cpu]
 core-indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -62,14 +64,14 @@ list-files = 0.1
 ```
 
 Then run agent.
-```
-./backend.ai ag start-server --debug -f agent.toml
+```sh
+./backend.ai ag start-server --debug -f agent1.toml
 ```
 
 ## How to run multiple agents
 If you want to run multiple dummy agents in one machine, you need multiple "agent.toml" files. Copy and paste the original "agent.toml" file and change `rpc-listen-addr`, `agent-sock-port`, `id` and `pid-file`.
 
-```
+```toml
 # File name "agent2.toml"
 [agent]
 mode = "dummy"
@@ -82,7 +84,7 @@ var-base-path = "var/lib/backend.ai"
 ...
 ```
 Then run agent.
-```
+```sh
 ./backend.ai ag start-server --debug -f agent2.toml
 ```
 

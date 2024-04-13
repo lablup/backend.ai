@@ -15,7 +15,7 @@ pid-file = "./agent.pid"
 event-loop = "uvloop"
 ipc-base-path = "/tmp/backend.ai/ipc"
 var-base-path = "var/lib/backend.ai"
-# allow-compute-plugins = ["ai.backend.accelerator.mock.plugin"]
+allow-compute-plugins = ["ai.backend.accelerator.mock.plugin"]
 image-commit-path = "./tmp/backend.ai/commit/"
 cohabiting-storage-proxy = true
 
