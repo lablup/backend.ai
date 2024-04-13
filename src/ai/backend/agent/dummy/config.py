@@ -18,6 +18,7 @@ dummy_local_config = t.Dict({
         }),
         t.Key("delay"): t.Dict({
             t.Key("scan-image", default=0.1): tx.Delay,
+            t.Key("push-image", default=1.0): tx.Delay,
             t.Key("pull-image", default=1.0): tx.Delay,
             t.Key("destroy-kernel", default=1.0): tx.Delay,
             t.Key("clean-kernel", default=1.0): tx.Delay,
