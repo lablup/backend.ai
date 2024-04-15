@@ -884,16 +884,20 @@ class ForgetImageById(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> ForgetImageById:
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
         log.info("forget image {0} by API request", image_id)
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            try:
-                _image_id = UUID(image_id)
-            except ValueError:
-                raise ObjectNotFound("image")
-
             image_row = await ImageRow.get(session, _image_id)
             if not image_row:
                 raise ObjectNotFound("image")
@@ -977,16 +981,25 @@ class UntagImageFromRegistry(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        id: str,
+        image_id: str,
     ) -> ForgetImage:
         from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 
-        log.info("remove image from registry {0} by API request", id)
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("remove image from registry {0} by API request", str(_image_id))
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, UUID(id))
+            image_row = await ImageRow.get(session, _image_id)
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:
