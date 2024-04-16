@@ -951,8 +951,7 @@ def main(
             case AgentBackend.DOCKER:
                 config.check(raw_cfg, docker_extra_config_iv)
             case AgentBackend.DUMMY:
-                dummy_cfg, _ = config.read_from_file(None, "agent.dummy")
-                cfg["dummy"] = config.check(dummy_cfg, dummy_local_config)
+                cfg["dummy"] = config.check(cfg["backend"]["dummy"], dummy_local_config)
             case AgentBackend.KUBERNETES:
                 if cfg["container"]["scratch-type"] == "k8s-nfs" and (
                     cfg["container"]["scratch-nfs-address"] is None

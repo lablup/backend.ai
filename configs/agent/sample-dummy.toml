@@ -1,0 +1,123 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 8121 }
+user = ""
+password = ""
+
+
+[agent]
+mode = "dummy"
+rpc-listen-addr = { host = "127.0.0.1", port = 6011 }
+agent-sock-port = 6007
+id = "i-dummy-agent1"
+scaling-group = "default"
+pid-file = "./agent.pid"
+event-loop = "uvloop"
+ipc-base-path = "/tmp/backend.ai/ipc"
+var-base-path = "var/lib/backend.ai"
+# allow-compute-plugins = ["ai.backend.accelerator.mock.plugin"]
+image-commit-path = "./tmp/backend.ai/commit/"
+cohabiting-storage-proxy = true
+
+
+[container]
+port-range = [30000, 31000]
+kernel-uid = -1
+kernel-gid = -1
+bind-host = "127.0.0.1"
+sandbox-type = "docker"
+scratch-type = "hostdir"
+scratch-root = "./scratches"
+scratch-size = "1G"
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "agent.log"
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = false
+
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+affinity-policy = "INTERLEAVED"
+
+
+# Set backend-specific configs under [backend] namespace
+
+# Set dummy agent's intrinsic resource spec.
+[backend.dummy.agent.intrinsic.cpu]
+core-indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+[backend.dummy.agent.intrinsic.memory]
+size = 50000000000
+
+
+# Set latency of dummy agent's tasks.
+[backend.dummy.agent.delay]
+scan-image = 0.1
+pull-image = 0.1
+destroy-kernel = 0.1
+clean-kernel = 0.1
+create-network = 0.1
+destroy-network = 0.1
+
+
+# Set latency of dummy agent's kernel creation task.
+[backend.dummy.kernel-creation-ctx.delay]
+prepare-scratch = 0.1
+prepare-ssh = 0.1
+spawn = 0.1
+start-container = 2.0
+mount-krunner = 0.1
+
+
+# Set dummy agent's image list.
+[backend.dummy.agent.image]
+already-have = {'cr.backend.ai/multiarch/python:3.9-ubuntu20.04' = ''}
+need-to-pull = []
+missing = []
+
+
+# Set dummy kernel's details.
+[backend.dummy.kernel]
+use-fake-code-runner = true
+
+
+# Set latency of dummy kernel's tasks.
+[backend.dummy.kernel.delay]
+check-status = 0.1
+get-completions = 0.1
+get-logs = 0.1
+interrupt-kernel = 0.1
+start-service = 0.1
+start-model-service = 0.1
+shutdown-service = 0.1
+commit = 10.0
+get-service-apps = 0.1
+accept-file = 0.1
+download-file = 0.1
+download-single = 0.1
+list-files = 0.1
