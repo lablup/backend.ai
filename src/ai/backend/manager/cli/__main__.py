@@ -131,7 +131,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
             ),
             *psql_args,
         ]
-        subprocess.call(cmd)
+        subprocess.run(cmd)
         return
     # Use the container to start the psql client command
     log.info(f"using the db container {container_name} ...")
@@ -148,7 +148,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         local_config["db"]["name"],
         *psql_args,
     ]
-    subprocess.call(cmd)
+    subprocess.run(cmd)
 
 
 @main.command()
