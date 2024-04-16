@@ -1557,8 +1557,8 @@ async def delete_vfolders(
     reporter: ProgressReporter | None = None,
 ) -> None:
     async def _task(reporter: ProgressReporter | None):
-        row_deletion_infos: list[VFolderDeletionInfo] = []
-        failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+        folders_to_be_deleted: list[VFolderDeletionInfo] = []
+        folders_failed_to_delete: list[tuple[VFolderDeletionInfo, str]] = []
         for vfolder_info in requested_vfolders:
             folder_id, host_name = vfolder_info
             proxy_name, volume_name = storage_manager.split_host(host_name)
@@ -1576,39 +1576,39 @@ async def delete_vfolders(
                     pass
             except (VFolderOperationFailed, InvalidAPIParameters) as e:
                 if e.status == 404:
-                    row_deletion_infos.append(vfolder_info)
+                    folders_to_be_deleted.append(vfolder_info)
                     progress_msg = f"VFolder not found in storage, transit status to DELETE_COMPLETE (id: {folder_id})"
                 else:
                     err_str = repr(e)
-                    failed_deletion.append((vfolder_info, err_str))
+                    folders_failed_to_delete.append((vfolder_info, err_str))
                     progress_msg = (
                         f"Delete failed (id: {folder_id}, status: {e.status}, e: {err_str})"
                     )
                     log_level = LogLevel.ERROR
             except Exception as e:
                 err_str = repr(e)
-                failed_deletion.append((vfolder_info, err_str))
+                folders_failed_to_delete.append((vfolder_info, err_str))
                 progress_msg = f"Delete failed (id: {folder_id}, e: {err_str})"
                 log_level = LogLevel.ERROR
             else:
-                row_deletion_infos.append(vfolder_info)
+                folders_to_be_deleted.append(vfolder_info)
                 progress_msg = f"Delete succeeded (id: {folder_id})"
             if reporter is not None:
                 await reporter.update(1, message=progress_msg, log_level=log_level)
-        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in folders_to_be_deleted)
         log.debug("Successfully deleted vfolders {}", [str(x) for x in vfolder_ids])
 
-        if row_deletion_infos:
+        if folders_to_be_deleted:
             await update_vfolder_status(
                 db,
                 vfolder_ids,
                 VFolderOperationStatus.DELETE_COMPLETE,
                 do_log=False,
             )
-        if failed_deletion:
+        if folders_failed_to_delete:
             await update_vfolder_status(
                 db,
-                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
+                [vfid.vfolder_id.folder_id for vfid, _ in folders_failed_to_delete],
                 VFolderOperationStatus.DELETE_ERROR,
                 do_log=False,
             )
