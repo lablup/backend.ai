@@ -316,7 +316,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matirx.os }}-pants.deploy.log
+        name: ${{ matrix.os }}-pants.deploy.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
