@@ -156,7 +156,7 @@ class GPFSVolume(BaseVolume):
         return GPFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
-            self.local_config["storage-proxy"]["delete-concurrency"],
+            self.local_config["storage-proxy"]["directory-delete-concurrency"],
             self.api_client,
             self.fs,
         )

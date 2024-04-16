@@ -24,6 +24,10 @@ event-loop = "uvloop"
 # Settings it zero means no limit.
 scandir-limit = 1000
 
+# The maximum number of directory(tree) delete concurrency that can be deleted from one storage-proxy process.
+# Should be larger than 1.
+directory-delete-concurrency = 20
+
 # The maximum allowed size of a single upload session.
 max-upload-size = "100g"
 

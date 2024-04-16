@@ -118,7 +118,7 @@ async def volume(
         {
             "storage-proxy": {
                 "scandir-limit": 1000,
-                "delete-concurrency": 20,
+                "directory-delete-concurrency": 20,
             },
         },
         volume_path,
