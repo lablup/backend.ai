@@ -6,10 +6,11 @@ import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp
+import aiohttp.client_exceptions
 import aiotools
 import yarl
 
-from ai.backend.common.docker import arch_name_aliases
+from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -125,6 +126,45 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
 
 class HarborRegistry_v2(BaseContainerRegistry):
+    async def untag(
+        self,
+        image: ImageRef,
+    ) -> None:
+        project, repository = image.name.split("/", maxsplit=1)
+        base_url = (
+            self.registry_url
+            / "api"
+            / "v2.0"
+            / "projects"
+            / project
+            / "repositories"
+            / repository
+            / "artifacts"
+            / image.tag
+        )
+        username = self.registry_info["username"]
+        if username is not None:
+            self.credentials["username"] = username
+        password = self.registry_info["password"]
+        if password is not None:
+            self.credentials["password"] = password
+
+        async with self.prepare_client_session() as (url, sess):
+            rqst_args = {}
+            if self.credentials:
+                rqst_args["auth"] = aiohttp.BasicAuth(
+                    self.credentials["username"],
+                    self.credentials["password"],
+                )
+
+            async with sess.delete(base_url, allow_redirects=False, **rqst_args) as resp:
+                try:
+                    resp.raise_for_status()
+                except aiohttp.client_exceptions.ClientError:
+                    content = await resp.json()
+                    log.warn("response body: {}", content)
+                    raise
+
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
