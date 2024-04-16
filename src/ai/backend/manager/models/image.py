@@ -880,8 +880,6 @@ class ForgetImageById(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
-    """ "ASDASD"""
-
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
