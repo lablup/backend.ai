@@ -34,15 +34,6 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def event_loop():
-    # uvloop.install()
-    loop = asyncio.new_event_loop()
-    # setup_child_watcher()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session", autouse=True)
 def test_ns():
     return f"test-{secrets.token_hex(8)}"
 
