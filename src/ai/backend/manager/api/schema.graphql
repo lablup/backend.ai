@@ -1326,12 +1326,16 @@ input ResourceLimitInput {
 type ForgetImageById {
   ok: Boolean
   msg: String
+
+  """Added since 24.03.1."""
   image: ImageNode
 }
 
 type ForgetImage {
   ok: Boolean
   msg: String
+
+  """Added since 24.03.1."""
   image: ImageNode
 }
 
@@ -1339,6 +1343,8 @@ type ForgetImage {
 type UntagImageFromRegistry {
   ok: Boolean
   msg: String
+
+  """Added since 24.03.1."""
   image: ImageNode
 }
 
