@@ -200,7 +200,7 @@ class DockerKernel(AbstractKernel):
                 try:
                     if canonical:
                         if ":" in canonical:
-                            repo, tag = canonical.split(":", maxsplit=2)
+                            repo, tag = canonical.rsplit(":", maxsplit=1)
                         else:
                             repo, tag = canonical, "latest"
                         log.debug("tagging image as {}:{}", repo, tag)
