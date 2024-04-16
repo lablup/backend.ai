@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.1rc1 (2024-04-17)
+
+### Features
+* Improve exception logging stability by pre-formatting exception objects instead of pickling/unpickling them ([#1759](https://github.com/lablup/backend.ai/issues/1759))
+* Introduce `mgr schema dump-history` and `mgr schema apply-missing-revisions` command to ease the major upgrade involving deviation of database migration histories ([#2002](https://github.com/lablup/backend.ai/issues/2002))
+* Update `image forget` CLI command to untag image from registry before forgetting it from the database ([#2010](https://github.com/lablup/backend.ai/issues/2010))
+* Update `etcd-client-py` to 0.3.0 ([#2014](https://github.com/lablup/backend.ai/issues/2014))
+
+### Deprecations
+* Remove no longer used `env-tester-{admin,user,user2}.sh` scripts and all references ([#1956](https://github.com/lablup/backend.ai/issues/1956))
+
+### Fixes
+* Fix DDN command output handling when exceeding quotas. ([#1901](https://github.com/lablup/backend.ai/issues/1901))
+* Sync mismatch between `kernels.session_name` and `sessions.name` and fix session-rename API to update `session_name` of sibling kernels atomically. ([#1985](https://github.com/lablup/backend.ai/issues/1985))
+* Fix `compute_container` GraphQL query resolver functions. ([#2012](https://github.com/lablup/backend.ai/issues/2012))
+* Fix harbor v2 image scanner skipping importing rest of the artifacts when any of the item does not include tag ([#2015](https://github.com/lablup/backend.ai/issues/2015))
+* Let external log viewers display more accurate, meaningful stack frames of logger invocations. ([#2019](https://github.com/lablup/backend.ai/issues/2019))
+
+
 ## 24.03.0 (2024-04-06)
 No significant changes.
 
