@@ -413,7 +413,7 @@ addr = { host = "127.0.0.1", port = 6099 }
 
 # Set dummy agent's image list.
 # [dummy.agent.image]
-# already-have = []
+# already-have = {'cr.backend.ai/multiarch/python:3.9-ubuntu20.04' = ''}
 # need-to-pull = []
 # missing = []
 
