@@ -878,7 +878,7 @@ class ForgetImageById(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = graphene.Field(ImageNode)
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
@@ -929,7 +929,7 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = graphene.Field(ImageNode)
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
@@ -977,7 +977,7 @@ class UntagImageFromRegistry(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = graphene.Field(ImageNode)
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
