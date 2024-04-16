@@ -999,6 +999,8 @@ type Mutations {
 
   """Added since 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
+
+  """"ASDASD"""
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
@@ -1320,6 +1322,7 @@ type ForgetImageById {
   msg: String
 }
 
+""""ASDASD"""
 type ForgetImage {
   ok: Boolean
   msg: String
