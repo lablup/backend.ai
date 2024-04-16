@@ -74,6 +74,8 @@ __all__ = (
     "PreloadImage",
     "RescanImages",
     "ForgetImage",
+    "ForgetImageById",
+    "UntagImageFromRegistry",
     "ModifyImage",
     "AliasImage",
     "DealiasImage",
@@ -876,7 +878,7 @@ class ForgetImageById(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = ImageNode()
+    image = graphene.Field(ImageNode)
 
     @staticmethod
     async def mutate(
@@ -927,7 +929,7 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = ImageNode()
+    image = graphene.Field(ImageNode)
 
     @staticmethod
     async def mutate(
@@ -971,18 +973,18 @@ class UntagImageFromRegistry(graphene.Mutation):
     )
 
     class Arguments:
-        id = graphene.String(required=True)
+        image_id = graphene.String(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    image = ImageNode()
+    image = graphene.Field(ImageNode)
 
     @staticmethod
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
-    ) -> ForgetImage:
+    ) -> UntagImageFromRegistry:
         from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 
         _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
@@ -1010,7 +1012,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                     not customized_image_owner
                     or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
-                    return ForgetImage(ok=False, msg="Forbidden")
+                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
             registry_info = await ctx.shared_config.get_container_registry(
                 image_row.image_ref.registry
@@ -1021,7 +1023,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
 
-        return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class AliasImage(graphene.Mutation):
