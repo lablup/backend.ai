@@ -150,13 +150,19 @@ class SubFieldOutputFormatter(OutputFormatter):
         return super().format_json(value[self._subfield_name], field)
 
 
-class CustomizedImageNameOutputFormatter(OutputFormatter):
+class CustomizedImageOutputFormatter(OutputFormatter):
     def _get_name(self, labels: Any) -> str:
         customized_name = [
             label["value"] for label in labels if label["key"] == "ai.backend.customized-image.name"
         ]
         assert len(customized_name) == 1
-        return customized_name[0]
+        owner_email = [
+            label["value"]
+            for label in labels
+            if label["key"] == "ai.backend.customized-image.user.email"
+        ]
+        assert len(owner_email) == 1
+        return f"{customized_name[0]} (Owner: {owner_email[0]})"
 
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return super().format_console(self._get_name(value), field)

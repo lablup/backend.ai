@@ -19,6 +19,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.head_ref }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)

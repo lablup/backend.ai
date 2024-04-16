@@ -71,10 +71,12 @@ from .image import (
     ForgetImageById,
     Image,
     ImageLoadFilter,
+    ImageNode,
     ModifyImage,
     PreloadImage,
     RescanImages,
     UnloadImage,
+    UntagImageFromRegistry,
 )
 from .kernel import (
     ComputeContainer,
@@ -209,6 +211,7 @@ class Mutations(graphene.ObjectType):
     modify_image = ModifyImage.Field()
     forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
     forget_image = ForgetImage.Field()
+    untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
@@ -357,7 +360,8 @@ class Queries(graphene.ObjectType):
 
     image = graphene.Field(
         Image,
-        reference=graphene.String(required=True),
+        id=graphene.String(description="Added in 24.03.1"),
+        reference=graphene.String(),
         architecture=graphene.String(default_value=DEFAULT_IMAGE_ARCH),
     )
 
@@ -367,7 +371,7 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(),
     )
 
-    customized_images = graphene.List(Image, description="Added since 24.03.0")
+    customized_images = graphene.List(ImageNode, description="Added since 24.03.1")
 
     user = graphene.Field(
         User,
@@ -1014,13 +1018,23 @@ class Queries(graphene.ObjectType):
     async def resolve_image(
         root: Any,
         info: graphene.ResolveInfo,
-        reference: str,
-        architecture: str,
+        *,
+        id: str | None = None,
+        reference: str | None = None,
+        architecture: str | None = None,
     ) -> Image:
+        """Loads image information by its ID or reference information. Either ID or reference/architecture pair must be provided."""
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        item = await Image.load_item(info.context, reference, architecture)
+        if id:
+            item = await Image.load_item_by_id(info.context, uuid.UUID(id))
+        else:
+            if not (reference and architecture):
+                raise InvalidAPIParameters(
+                    "reference/architecture and id can't be omitted at the same time!"
+                )
+            item = await Image.load_item(info.context, reference, architecture)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1036,7 +1050,7 @@ class Queries(graphene.ObjectType):
     async def resolve_customized_images(
         root: Any,
         info: graphene.ResolveInfo,
-    ) -> Sequence[Image]:
+    ) -> Sequence[ImageNode]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1051,7 +1065,7 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return items
+        return [ImageNode.from_legacy_image(i) for i in items]
 
     @staticmethod
     async def resolve_images(
