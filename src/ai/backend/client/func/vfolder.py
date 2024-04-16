@@ -296,8 +296,7 @@ class VFolder(BaseFunction):
     async def restore(self):
         return await self._restore()
 
-    @api_function
-    async def delete_forever(self) -> Mapping[str, Any]:
+    async def _delete_forever(self) -> Mapping[str, Any]:
         if self.id is None:
             vfolder_id = await self._get_id_by_name()
             self.id = vfolder_id
@@ -307,6 +306,17 @@ class VFolder(BaseFunction):
         })
         async with rqst.fetch():
             return {}
+
+    @api_function
+    async def delete_trash(self) -> Mapping[str, Any]:
+        """
+        Deprecated, use `delete_forever()`.
+        """
+        return await self._delete_forever()
+
+    @api_function
+    async def delete_forever(self) -> Mapping[str, Any]:
+        return await self._delete_forever()
 
     @api_function
     async def rename(self, new_name):

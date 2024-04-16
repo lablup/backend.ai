@@ -185,6 +185,24 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
+def delete_trash(name):
+    """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
+    This operation is irreversible!
+    This command is deprecated, use `delete_forever`.
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).delete_forever()
+            print_done("Delete task started.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
 def delete_forever(name):
     """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
