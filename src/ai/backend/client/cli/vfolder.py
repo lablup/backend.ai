@@ -186,9 +186,8 @@ def purge(name):
 @vfolder.command()
 @click.argument("name", type=str)
 def delete_trash(name):
-    """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
+    """This command is deprecated, use `delete_forever`. Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
-    This command is deprecated, use `delete_forever`.
 
     NAME: Name of a virtual folder.
     """
