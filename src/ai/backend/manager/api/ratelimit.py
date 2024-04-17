@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from decimal import Decimal
-from typing import Final, Iterable, Tuple
+from typing import Final, Iterable, Tuple, cast
 
 import attrs
 from aiohttp import web
@@ -14,6 +14,7 @@ from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
+from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
@@ -54,8 +55,8 @@ async def rlim_middleware(
     now = Decimal(time.time()).quantize(_time_prec)
     rr = app_ctx.redis_rlim
     if request["is_authorized"]:
-        rate_limit = request["keypair"]["rate_limit"]
-        access_key = request["keypair"]["access_key"]
+        rate_limit = cast(int, request["keypair"]["rate_limit"])
+        access_key = cast(str, request["keypair"]["access_key"])
         ret = await redis_helper.execute_script(
             rr,
             "ratelimit",
@@ -78,8 +79,8 @@ async def rlim_middleware(
     else:
         # No checks for rate limiting for non-authorized queries.
         response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
+        response.headers["X-RateLimit-Limit"] = str(DEFAULT_KEYPAIR_RATE_LIMIT // 10)
+        response.headers["X-RateLimit-Remaining"] = str(DEFAULT_KEYPAIR_RATE_LIMIT // 10)
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
 
