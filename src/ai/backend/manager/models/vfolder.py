@@ -849,7 +849,7 @@ async def prepare_vfolder_mounts(
 
 
 async def update_vfolder_status(
-    db_conn: SAConnection,
+    engine: ExtendedAsyncSAEngine,
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
     do_log: bool = True,
@@ -864,22 +864,23 @@ async def update_vfolder_status(
     now = datetime.now(tzutc())
 
     async def _update() -> None:
-        query = (
-            sa.update(vfolders)
-            .values(
-                status=update_status,
-                status_changed=now,
-                status_history=sql_json_merge(
-                    vfolders.c.status_history,
-                    (),
-                    {
-                        update_status.name: now.isoformat(),
-                    },
-                ),
+        async with engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(
+                    status=update_status,
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        vfolders.c.status_history,
+                        (),
+                        {
+                            update_status.name: now.isoformat(),
+                        },
+                    ),
+                )
+                .where(cond)
             )
-            .where(cond)
-        )
-        await db_conn.execute(query)
+            await db_session.execute(query)
 
     await execute_with_retry(_update)
     if do_log:
@@ -1026,7 +1027,7 @@ async def initiate_vfolder_clone(
 
 
 async def initiate_vfolder_deletion(
-    db_conn: SAConnection,
+    db_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_ptask_group: aiotools.PersistentTaskGroup,
@@ -1039,7 +1040,7 @@ async def initiate_vfolder_deletion(
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
-        db_conn, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
+        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
     row_deletion_infos: list[VFolderDeletionInfo] = []
@@ -1073,12 +1074,12 @@ async def initiate_vfolder_deletion(
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
             await update_vfolder_status(
-                db_conn, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
             )
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             await update_vfolder_status(
-                db_conn,
+                db_engine,
                 [vfid.vfolder_id for vfid, _ in failed_deletion],
                 VFolderOperationStatus.DELETE_ERROR,
                 do_log=False,

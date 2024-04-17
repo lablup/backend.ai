@@ -62,7 +62,7 @@ from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
-from .utils import execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -668,16 +668,16 @@ class PurgeGroup(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        db_conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         group_id: uuid.UUID,
     ) -> int:
         """
         Delete group's all virtual folders as well as their physical data.
 
-        :param db_conn: DB connection
-        :param group_id: group's UUID to delete virtual folders
+        :param engine: DB engine
         :param storage_manager: storage manager
+        :param group_id: group's UUID to delete virtual folders
 
         :return: number of deleted rows
         """
@@ -689,15 +689,16 @@ class PurgeGroup(graphene.Mutation):
             .where(vfolders.c.group == group_id)
         )
 
-        result = await db_conn.execute(query)
-        target_vfs = result.fetchall()
-        delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-        result = await db_conn.execute(delete_query)
+        async with engine.begin_session() as db_conn:
+            result = await db_conn.execute(query)
+            target_vfs = result.fetchall()
+            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
+            result = await db_conn.execute(delete_query)
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
-                db_conn,
+                engine,
                 storage_manager,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_ptask_group,

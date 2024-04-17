@@ -2084,7 +2084,6 @@ async def share(request: web.Request, params: Any) -> web.Response:
             ).fetchone()
 
             shared_vfolder = {k: v for k, v in dict(vfolder).items() if v is not None}
-            print("shared_vfolder!!", shared_vfolder)
 
             # Question: 프로젝트 타입의 레코드를 공유하는 경우는 어떻게 처리?
             # 현재는 user와 group이 동시에 있을 수 없기 때문에 아래 로직에서 깨짐.
@@ -2231,11 +2230,11 @@ async def _delete(
             permission=VFolderHostPermission.DELETE,
         )
 
-        await update_vfolder_status(
-            conn,
-            (entry["id"],),
-            VFolderOperationStatus.DELETE_PENDING,
-        )
+    await update_vfolder_status(
+        root_ctx.db,
+        (entry["id"],),
+        VFolderOperationStatus.DELETE_PENDING,
+    )
 
 
 class DeleteRequestModel(BaseModel):
@@ -2418,7 +2417,7 @@ async def delete_from_trash_bin(
     await ensure_vfolder_status(
         request, VFolderAccessStatus.HARD_DELETABLE, folder_id_or_name=folder_id
     )
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.db.begin_session() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2444,14 +2443,14 @@ async def delete_from_trash_bin(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-        folder_host = entry["host"]
-        # fs-level deletion may fail or take longer time
-        await initiate_vfolder_deletion(
-            conn,
-            root_ctx.storage_manager,
-            [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
-            app_ctx.storage_ptask_group,
-        )
+    folder_host = entry["host"]
+    # fs-level deletion may fail or take longer time
+    await initiate_vfolder_deletion(
+        root_ctx.db,
+        root_ctx.storage_manager,
+        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
+        app_ctx.storage_ptask_group,
+    )
 
     return web.Response(status=204)
 
@@ -2582,7 +2581,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 
         # fs-level mv may fail or take longer time
         # but let's complete the db transaction to reflect that it's deleted.
-        await update_vfolder_status(conn, (entry["id"],), VFolderOperationStatus.READY)
+        await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
 
     return web.Response(status=204)
 

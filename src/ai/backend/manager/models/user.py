@@ -25,6 +25,7 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
@@ -1087,14 +1088,14 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        db_conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         email: str,
     ) -> int:
         """
         Delete user's all virtual folders as well as their physical data.
 
-        :param db_conn: DB connection
+        :param engine: DB engine
         :param storage_manager: storage session manager
         :param email: user's UUID to delete virtual folders
 
@@ -1102,23 +1103,24 @@ class PurgeUser(graphene.Mutation):
         """
         from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
-        # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
-        await db_conn.execute(
-            sa.delete(vfolders).where(
-                (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
-            ),
-        )
-        result = await db_conn.execute(
-            sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(
-                vfolders.c.creator == email
-            ),
-        )
-        target_vfs = result.fetchall()
+        async with engine.begin_session() as conn:
+            # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
+            await conn.execute(
+                sa.delete(vfolders).where(
+                    (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
+                ),
+            )
+            result = await conn.execute(
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(
+                    vfolders.c.creator == email
+                ),
+            )
+            target_vfs = result.fetchall()
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
-                db_conn,
+                engine,
                 storage_manager,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_ptask_group,
