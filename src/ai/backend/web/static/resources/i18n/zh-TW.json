@@ -64,7 +64,8 @@
       "Data&Model": "數據",
       "InvalidBlankPassword": "輸入您的密碼",
       "InvalidBlankEmail": "輸入你的電子郵件信箱",
-      "DisMatchUserEmail": "使用者電子郵件不符"
+      "DisMatchUserEmail": "使用者電子郵件不符",
+      "MyEnvironments": "我的環境"
     },
     "YouAreOffline": "您現在離線",
     "YouAreOnline": "您現在在線",
@@ -814,7 +815,8 @@
     "PasswordsDoNotMatch": "密碼和確認不匹配。",
     "NoChangeMade": "未作改动",
     "Architecture": "建筑学",
-    "NoImageToDisplay": "无图像显示"
+    "NoImageToDisplay": "无图像显示",
+    "CustomizedImageSuccessfullyDeleted": "自訂圖片已成功刪除。"
   },
   "resourcePreset": {
     "ResourcePresets": "資源預設",
@@ -1399,7 +1401,8 @@
     "ResourcePolicyStillReferenced": "存在引用该资源策略的密钥对。",
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
-    "WrongAPIServerAddress": "错误的 API 服务器地址。"
+    "WrongAPIServerAddress": "错误的 API 服务器地址。",
+    "ReachedResourceLimitPleaseContact": "已達到您的資源限制。\n請聯絡管理員。"
   },
   "maxLength": {
     "64chars": "（最多 64 個字符）",

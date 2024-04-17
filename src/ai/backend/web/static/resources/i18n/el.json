@@ -64,7 +64,8 @@
       "Data&Model": "Δεδομένα",
       "InvalidBlankPassword": "Εισάγετε τον κωδικό σας",
       "InvalidBlankEmail": "Συμπληρώστε το email σας",
-      "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει"
+      "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
+      "MyEnvironments": "Τα περιβάλλοντα μου"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -814,7 +815,8 @@
     "PasswordsDoNotMatch": "Ο κωδικός πρόσβασης και η επιβεβαίωση δεν ταιριάζουν.",
     "NoChangeMade": "Δεν έγιναν αλλαγές",
     "Architecture": "Αρχιτεκτονική",
-    "NoImageToDisplay": "Δεν εμφανίζονται εικόνες"
+    "NoImageToDisplay": "Δεν εμφανίζονται εικόνες",
+    "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς."
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1399,7 +1401,8 @@
     "ResourcePolicyStillReferenced": "Υπάρχουν ζεύγη κλειδιών που παραπέμπουν σε αυτή την πολιτική πόρων.",
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
-    "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API."
+    "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
+    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",

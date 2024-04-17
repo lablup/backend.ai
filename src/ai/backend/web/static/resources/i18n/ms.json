@@ -64,7 +64,8 @@
       "Data&Model": "Data",
       "InvalidBlankPassword": "Masukkan kata laluan anda",
       "InvalidBlankEmail": "Masukkan emel anda",
-      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan"
+      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan",
+      "MyEnvironments": "Persekitaran Saya"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -795,7 +796,8 @@
     "PasswordsDoNotMatch": "Kata Laluan dan Pengesahan tidak sepadan.",
     "NoChangeMade": "Tiada perubahan dibuat",
     "Architecture": "Seni bina",
-    "NoImageToDisplay": "Tiada Imej untuk dipaparkan"
+    "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
+    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1380,7 +1382,8 @@
     "UserHasNoGroup": "Pengguna tidak mempunyai kumpulan. \nSila hubungi pentadbir untuk membetulkannya.",
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
-    "WrongAPIServerAddress": "Alamat pelayan API salah."
+    "WrongAPIServerAddress": "Alamat pelayan API salah.",
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
