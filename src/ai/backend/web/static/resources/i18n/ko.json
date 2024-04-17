@@ -64,7 +64,8 @@
       "Data&Model": "데이터 & 모델",
       "InvalidBlankEmail": "E-mail을 입력하세요.",
       "InvalidBlankPassword": "패스워드를 입력하세요.",
-      "DisMatchUserEmail": "사용자 E-mail이 일치하지 않습니다."
+      "DisMatchUserEmail": "사용자 E-mail이 일치하지 않습니다.",
+      "MyEnvironments": "나의 실행 환경"
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -904,7 +905,8 @@
     "ProblemOccurred": "문제가 발생했습니다.",
     "PasswordsDoNotMatch": "변경할 비밀번호와 비밀번호 확인란의 값이 일치해야 합니다.",
     "NoChangeMade": "변경된 부분이 없습니다.",
-    "Architecture": "아키텍쳐"
+    "Architecture": "아키텍쳐",
+    "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다."
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -1489,7 +1491,8 @@
     "InvalidSignupToken": "잘못된 가입 토큰입니다",
     "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
-    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다."
+    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
+    "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",

@@ -64,7 +64,8 @@
     "UpdateError": "Päivitysvirhe",
     "UserHasNoGroup": "Käyttäjällä ei ole ryhmää. Ota yhteyttä ylläpitäjään sen korjaamiseksi.",
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
-    "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu."
+    "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
+    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään."
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
@@ -457,7 +458,8 @@
     "Status": "Tila",
     "SuccessfullyModified": "Muutettu onnistuneesti",
     "TakesTime": ". Se vie aikaa, joten ota kuppi kahvia!",
-    "Version": "Versio"
+    "Version": "Versio",
+    "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -1504,7 +1506,8 @@
       "Data&Model": "Data",
       "InvalidBlankPassword": "Syötä salasanasi",
       "InvalidBlankEmail": "Syötä sähköpostiosoitteesi",
-      "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää"
+      "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
+      "MyEnvironments": "Omat ympäristöt"
     }
   },
   "modelStore": {
