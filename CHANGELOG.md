@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.2rc2 (2024-04-17)
+No significant changes.
+
+
 ## 24.03.2rc1 (2024-04-17)
 No significant changes.
 
