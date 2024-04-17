@@ -855,11 +855,12 @@ async def update_vfolder_status(
     do_log: bool = True,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    cond = sa.or_(vfolders.c.id.in_(vfolder_ids), vfolders.c.reference_id.in_(vfolder_ids))
+
     if vfolder_info_len == 0:
         return None
     elif vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
+        cond = sa.or_(vfolders.c.id == vfolder_ids[0], vfolders.c.reference_id == vfolder_ids[0])
 
     now = datetime.now(tzutc())
 
@@ -943,7 +944,10 @@ async def initiate_vfolder_clone(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
+    source_vf_cond = sa.or_(
+        vfolders.c.id == vfolder_info.source_vfolder_id.folder_id,
+        vfolders.c.reference_id == vfolder_info.source_vfolder_id.folder_id,
+    )
 
     async def _update_status() -> None:
         async with db_engine.begin_session() as db_session:
