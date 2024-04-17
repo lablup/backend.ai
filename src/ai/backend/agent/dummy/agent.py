@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    cast,
 )
 
 from ai.backend.common.docker import ImageRef
@@ -42,7 +43,9 @@ from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, MountInfo
-from .config import dummy_local_config
+from .config import Agent as DummyAgentLocalConfig
+from .config import KernelCreationCtxDelay as KernCreationCtxDelay
+from .config import LocalConfig as DummyLocalConfig
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
 
@@ -52,7 +55,7 @@ if TYPE_CHECKING:
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
-    dummy_config: Mapping[str, Any]
+    dummy_config: DummyLocalConfig
 
     def __init__(
         self,
@@ -65,7 +68,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
-        dummy_config: Mapping[str, Any],
+        dummy_config: DummyLocalConfig,
     ) -> None:
         super().__init__(
             kernel_id,
@@ -78,7 +81,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             restarting=restarting,
         )
         self.dummy_config = dummy_config
-        self.creation_ctx_config = self.dummy_config["kernel-creation-ctx"]
+        self.creation_ctx_delay = cast(KernCreationCtxDelay, self.dummy_config.kernel_creation_ctx)
 
     async def get_extra_envs(self) -> Mapping[str, str]:
         return {}
@@ -109,7 +112,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         return resource_spec, resource_opts
 
     async def prepare_scratch(self) -> None:
-        delay = self.creation_ctx_config["delay"]["prepare-scratch"]
+        delay = self.creation_ctx_delay.prepare_scratch
         await asyncio.sleep(delay)
 
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -119,7 +122,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         return
 
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
-        delay = self.creation_ctx_config["delay"]["prepare-ssh"]
+        delay = self.creation_ctx_delay.prepare_ssh
         await asyncio.sleep(delay)
 
     async def process_mounts(self, mounts: Sequence[Mount]):
@@ -158,7 +161,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         environ: Mapping[str, str],
         service_ports,
     ) -> DummyKernel:
-        delay = self.creation_ctx_config["delay"]["spawn"]
+        delay = self.creation_ctx_delay.spawn
         await asyncio.sleep(delay)
         return DummyKernel(
             self.kernel_id,
@@ -183,7 +186,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
-        delay = self.creation_ctx_config["delay"]["start-container"]
+        delay = self.creation_ctx_delay.start_container
         await asyncio.sleep(delay)
         return {
             "container_id": "",
@@ -202,14 +205,15 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
     ) -> None:
-        delay = self.creation_ctx_config["delay"]["mount-krunner"]
+        delay = self.creation_ctx_delay.mount_krunner
         await asyncio.sleep(delay)
 
 
 class DummyAgent(
     AbstractAgent[DummyKernel, DummyKernelCreationContext],
 ):
-    dummy_config: Mapping[str, Any]
+    dummy_config: DummyLocalConfig
+    dummy_agent_cfg: DummyAgentLocalConfig
 
     def __init__(
         self,
@@ -229,8 +233,8 @@ class DummyAgent(
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
         )
-        self.dummy_config = dummy_local_config.check(local_config["dummy"])
-        self.dummy_agent_cfg = self.dummy_config["agent"]
+        self.dummy_config = cast(DummyLocalConfig, local_config["dummy"])
+        self.dummy_agent_cfg = cast(DummyAgentLocalConfig, self.dummy_config.agent)
 
     async def execute(
         self,
@@ -267,24 +271,24 @@ class DummyAgent(
         )
 
     async def scan_images(self) -> Mapping[str, str]:
-        existing_imgs: dict[str, str] = self.dummy_agent_cfg["image"]["already-have"]
-        delay = self.dummy_agent_cfg["delay"]["scan-image"]
+        existing_imgs: dict[str, str] = self.dummy_agent_cfg.image.already_have
+        delay = self.dummy_agent_cfg.delay.scan_image
         await asyncio.sleep(delay)
         return existing_imgs
 
     async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
-        delay = self.dummy_agent_cfg["delay"]["push-image"]
+        delay = self.dummy_agent_cfg.delay.push_image
         await asyncio.sleep(delay)
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
-        delay = self.dummy_agent_cfg["delay"]["pull-image"]
+        delay = self.dummy_agent_cfg.delay.pull_image
         await asyncio.sleep(delay)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
         if (
-            existing_imgs := self.dummy_agent_cfg["image"]["already-have"]
+            existing_imgs := self.dummy_agent_cfg.image.already_have
         ) is not None and image_ref.canonical in existing_imgs:
             return True
         return False
@@ -315,7 +319,7 @@ class DummyAgent(
         kernel_id: KernelId,
         container_id: Optional[ContainerId],
     ) -> None:
-        delay = self.dummy_agent_cfg["delay"]["destroy-kernel"]
+        delay = self.dummy_agent_cfg.delay.destroy_kernel
         await asyncio.sleep(delay)
 
     async def clean_kernel(
@@ -324,15 +328,15 @@ class DummyAgent(
         container_id: Optional[ContainerId],
         restarting: bool,
     ) -> None:
-        delay = self.dummy_agent_cfg["delay"]["clean-kernel"]
+        delay = self.dummy_agent_cfg.delay.clean_kernel
         await asyncio.sleep(delay)
 
     async def create_local_network(self, network_name: str) -> None:
-        delay = self.dummy_agent_cfg["delay"]["create-network"]
+        delay = self.dummy_agent_cfg.delay.create_network
         await asyncio.sleep(delay)
 
     async def destroy_local_network(self, network_name: str) -> None:
-        delay = self.dummy_agent_cfg["delay"]["destroy-network"]
+        delay = self.dummy_agent_cfg.delay.destroy_network
         await asyncio.sleep(delay)
 
     async def restart_kernel__load_config(

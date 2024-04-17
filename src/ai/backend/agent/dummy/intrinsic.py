@@ -35,6 +35,7 @@ from ..stats import (
 )
 from .agent import Container
 from .compute_plugin import DummyComputePlugin, DummyDevice
+from .config import Intrinsic as IntrinsicConfig
 
 
 class CPUDevice(DummyDevice):
@@ -46,7 +47,7 @@ class CPUPlugin(DummyComputePlugin):
     Represents the CPU.
     """
 
-    resource_config: Mapping[str, Any]
+    resource_config: IntrinsicConfig
 
     config_watch_enabled = False
 
@@ -60,7 +61,7 @@ class CPUPlugin(DummyComputePlugin):
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
     ) -> None:
-        self.resource_config = local_config["dummy"]["agent"]["intrinsic"]
+        self.resource_config = cast(IntrinsicConfig, local_config["dummy"].agent.intrinsic)
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -82,7 +83,7 @@ class CPUPlugin(DummyComputePlugin):
         }
 
     async def list_devices(self) -> Collection[CPUDevice]:
-        cores = self.resource_config["cpu"]["core-indexes"]
+        cores = self.resource_config.cpu_core_indexes
         return [
             CPUDevice(
                 model_name=None,
@@ -221,7 +222,7 @@ class MemoryPlugin(DummyComputePlugin):
     Represents the main memory.
     """
 
-    resource_config: Mapping[str, Any]
+    resource_config: IntrinsicConfig
 
     config_watch_enabled = False
 
@@ -235,7 +236,7 @@ class MemoryPlugin(DummyComputePlugin):
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
     ) -> None:
-        self.resource_config = local_config["dummy"]["agent"]["intrinsic"]
+        self.resource_config = cast(IntrinsicConfig, local_config["dummy"].agent.intrinsic)
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -257,7 +258,7 @@ class MemoryPlugin(DummyComputePlugin):
         }
 
     async def list_devices(self) -> Collection[MemoryDevice]:
-        memory_size = self.resource_config["memory"]["size"]
+        memory_size = self.resource_config.memory_size
         return [
             MemoryDevice(
                 model_name=None,

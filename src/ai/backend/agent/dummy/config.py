@@ -1,66 +1,88 @@
-import trafaret as t
+from __future__ import annotations
 
-from ai.backend.common import validators as tx
+from pydantic import BaseModel, Field
 
-RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
-core_idx = {0, 1, 2, 3, 4}
+from ai.backend.common import typed_validators as tv
+
+default_core_idx = {0, 1, 2, 3, 4}
 
 
-dummy_local_config = t.Dict({
-    t.Key("agent"): t.Dict({
-        t.Key("intrinsic"): t.Dict({
-            t.Key("cpu"): t.Dict({
-                t.Key("core-indexes", default=core_idx): tx.ToSet,
-            }),
-            t.Key("memory"): t.Dict({
-                t.Key("size", default=34359738368): t.Int,
-            }),
-        }),
-        t.Key("delay"): t.Dict({
-            t.Key("scan-image", default=0.1): tx.Delay,
-            t.Key("push-image", default=1.0): tx.Delay,
-            t.Key("pull-image", default=1.0): tx.Delay,
-            t.Key("destroy-kernel", default=1.0): tx.Delay,
-            t.Key("clean-kernel", default=1.0): tx.Delay,
-            t.Key("create-network", default=1.0): tx.Delay,
-            t.Key("destroy-network", default=1.0): tx.Delay,
-        }),
-        t.Key("image"): t.Dict({
-            t.Key("already-have", default=None): t.Null
-            | t.Mapping(
-                t.String, t.String(allow_blank=True)
-            ),  # Key: a string of image canonical, Value: hash. it can be a random string.
-            t.Key("need-to-pull", default=None): t.Null
-            | t.List(t.String),  # A string list of image canonical
-            t.Key("missing", default=None): t.Null
-            | t.List(t.String),  # A string list of image canonical
-        }),
-    }),
-    t.Key("kernel-creation-ctx"): t.Dict({
-        t.Key("delay"): t.Dict({
-            t.Key("prepare-scratch", default=1.0): tx.Delay,
-            t.Key("prepare-ssh", default=1.0): tx.Delay,
-            t.Key("spawn", default=0.5): tx.Delay,
-            t.Key("start-container", default=2.0): tx.Delay,
-            t.Key("mount-krunner", default=1.0): tx.Delay,
-        })
-    }),
-    t.Key("kernel"): t.Dict({
-        t.Key("use-fake-code-runner", default=True): t.Bool,
-        t.Key("delay"): t.Dict({
-            t.Key("check-status", default=0.1): tx.Delay,
-            t.Key("get-completions", default=0.1): tx.Delay,
-            t.Key("get-logs", default=0.1): tx.Delay,
-            t.Key("interrupt-kernel", default=0.1): tx.Delay,
-            t.Key("start-service", default=0.1): tx.Delay,
-            t.Key("start-model-service", default=0.1): tx.Delay,
-            t.Key("shutdown-service", default=0.1): tx.Delay,
-            t.Key("commit", default=5.0): tx.Delay,
-            t.Key("get-service-apps", default=0.1): tx.Delay,
-            t.Key("accept-file", default=0.1): tx.Delay,
-            t.Key("download-file", default=0.1): tx.Delay,
-            t.Key("download-single", default=0.1): tx.Delay,
-            t.Key("list-files", default=0.1): tx.Delay,
-        }),
-    }),
-})
+class LocalConfig(BaseModel):
+    agent: Agent = Field(default_factory=lambda: Agent)
+    kernel_creation_ctx: KernelCreationCtxDelay = Field(
+        default_factory=lambda: KernelCreationCtxDelay
+    )
+    kernel: Kernel = Field(default_factory=lambda: Kernel)
+
+
+class Agent(BaseModel):
+    intrinsic: Intrinsic = Field(default_factory=lambda: Intrinsic)
+    delay: AgentDelay = Field(default_factory=lambda: AgentDelay)
+    image: Image = Field(default_factory=lambda: Image)
+    kernel_creation_ctx_delay: KernelCreationCtxDelay = Field(
+        default_factory=lambda: KernelCreationCtxDelay
+    )
+
+
+class Intrinsic(BaseModel):
+    cpu_core_indexes: set = Field(default_factory=lambda: default_core_idx)
+    memory_size: int = Field(default=34359738368)
+
+
+class AgentDelay(BaseModel):
+    scan_image: tv.RandomFloat = Field(default=0.1)
+    push_image: tv.RandomFloat = Field(default=1.0)
+    pull_image: tv.RandomFloat = Field(default=1.0)
+    destroy_kernel: tv.RandomFloat = Field(default=1.0)
+    clean_kernel: tv.RandomFloat = Field(default=1.0)
+    create_network: tv.RandomFloat = Field(default=1.0)
+    destroy_network: tv.RandomFloat = Field(default=1.0)
+
+
+class Image(BaseModel):
+    already_have: dict = Field(
+        default_factory=dict,
+        description="Key: a string of image canonical, Value: hash. it can be a random string",
+    )
+    need_to_pull: list = Field(
+        default_factory=list,
+        description="A string list of image canonical",
+    )
+    missing: list = Field(
+        default_factory=list,
+        description="A string list of image canonical",
+    )
+
+
+class KernelCreationCtxDelay(BaseModel):
+    prepare_scratch: tv.RandomFloat = Field(default=0.1)
+    prepare_ssh: tv.RandomFloat = Field(default=1.0)
+    spawn: tv.RandomFloat = Field(default=0.5)
+    start_container: tv.RandomFloat = Field(default=2.0)
+    mount_krunner: tv.RandomFloat = Field(default=1.0)
+
+
+class Kernel(BaseModel):
+    use_fake_code_runner: bool = Field(
+        default=True,
+        description="Create a DummyFakeCodeRunner when create a kernel. "
+        "A DummyFakeCodeRunner does not communicate anything through sockets, "
+        "while a DummyCodeRunner feeds and listens through its sockets.",
+    )
+    delay: KernelDelay = Field()
+
+
+class KernelDelay(BaseModel):
+    check_status: tv.RandomFloat = Field(default=0.1)
+    get_completions: tv.RandomFloat = Field(default=0.1)
+    get_logs: tv.RandomFloat = Field(default=0.1)
+    interrupt_kernel: tv.RandomFloat = Field(default=0.1)
+    start_service: tv.RandomFloat = Field(default=1.0)
+    start_model_service: tv.RandomFloat = Field(default=5.0)
+    shutdown_service: tv.RandomFloat = Field(default=0.1)
+    commit: tv.RandomFloat = Field(default=5.0)
+    get_service_apps: tv.RandomFloat = Field(default=0.1)
+    accept_file: tv.RandomFloat = Field(default=0.1)
+    download_file: tv.RandomFloat = Field(default=0.1)
+    download_single: tv.RandomFloat = Field(default=0.1)
+    list_files: tv.RandomFloat = Field(default=0.1)

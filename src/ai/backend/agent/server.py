@@ -77,7 +77,7 @@ from .config import (
     container_etcd_config_iv,
     docker_extra_config_iv,
 )
-from .dummy.config import dummy_local_config
+from .dummy.config import LocalConfig as DummyLocalConfig
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
@@ -951,7 +951,7 @@ def main(
             case AgentBackend.DOCKER:
                 config.check(raw_cfg, docker_extra_config_iv)
             case AgentBackend.DUMMY:
-                cfg["dummy"] = config.check(cfg["backend"]["dummy"], dummy_local_config)
+                cfg["dummy"] = DummyLocalConfig.model_validate(cfg["backend"]["dummy"])
             case AgentBackend.KUBERNETES:
                 if cfg["container"]["scratch-type"] == "k8s-nfs" and (
                     cfg["container"]["scratch-nfs-address"] is None
