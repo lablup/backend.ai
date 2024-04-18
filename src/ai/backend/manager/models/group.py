@@ -22,7 +22,6 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
@@ -567,29 +566,11 @@ class ModifyGroup(graphene.Mutation):
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
-        if props.user_update_mode not in (None, Undefined, "add", "remove"):
-            raise ValueError("invalid user_update_mode")
-        if not props.user_uuids:
-            props.user_update_mode = None
-        if not data and not user_data and props.user_update_mode in (None, Undefined):
+        if not data and not user_data:
             return cls(ok=False, msg="nothing to update", group=None)
 
         async def _do_mutate() -> ModifyGroup:
             async with graph_ctx.db.begin_session() as db_session:
-                # Using `user_update_mode` and `user_uuids` is deprecated
-                if props.user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
-                    await db_session.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-                elif props.user_update_mode == "remove":
-                    await db_session.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(props.user_uuids))
-                            & (association_groups_users.c.group_id == gid),
-                        ),
-                    )
-
                 add_users = user_data.get("add_users") or set()
                 remove_users = user_data.get("remove_users") or set()
                 if union := (add_users & remove_users):
