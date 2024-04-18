@@ -2839,21 +2839,21 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     )
 
     async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select([
-                vfolders.c.id,
-                vfolders.c.name,
-                vfolders.c.group,
-                vfolders.c.status,
-                vfolders.c.user.label("vfolder_user"),
-                users.c.email,
-            ])
-            .select_from(j)
-            .where(vfolders.c.reference_id.isnot(None))
-        )
+        query = sa.select([
+            vfolders.c.id,
+            vfolders.c.name,
+            vfolders.c.group,
+            vfolders.c.status,
+            vfolders.c.permission,
+            vfolders.c.user.label("vfolder_user"),
+            users.c.email,
+        ]).select_from(j)
 
         if target_vfid is not None:
-            query = query.where(vfolders.c.id == target_vfid)
+            query = query.where(vfolders.c.reference_id == target_vfid)
+        else:
+            query = query.where(vfolders.c.reference_id.isnot(None))
+
         result = await conn.execute(query)
         shared_list = result.fetchall()
     shared_info = []
@@ -2867,7 +2867,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             "owner": str(owner),
             "type": folder_type,
             "shared_to": {
-                "uuid": str(shared.user),
+                "uuid": str(shared.vfolder_user),
                 "email": shared.email,
             },
             "perm": shared.permission.value,
