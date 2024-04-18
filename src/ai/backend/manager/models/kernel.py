@@ -792,6 +792,7 @@ class ComputeContainer(graphene.ObjectType):
     idx = graphene.Int()  # legacy
     role = graphene.String()  # legacy
     hostname = graphene.String()  # legacy
+    kernel_id = graphene.UUID(description="Added in 24.03.1.")
     cluster_idx = graphene.Int()
     local_rank = graphene.Int()
     cluster_role = graphene.String()
@@ -839,6 +840,7 @@ class ComputeContainer(graphene.ObjectType):
         return {
             # identity
             "id": row.id,
+            "kernel_id": row.id,
             "idx": row.cluster_idx,
             "role": row.cluster_role,
             "hostname": row.cluster_hostname,
@@ -1004,8 +1006,8 @@ class ComputeContainer(graphene.ObjectType):
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(*DEFAULT_KERNEL_ORDERING)
-        async with ctx.db.begin_readonly_session() as conn:
-            return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
+        async with ctx.db.begin_readonly_session() as db_session:
+            return [cls.from_row(ctx, r) async for r in (await db_session.stream_scalars(query))]
 
     @classmethod
     async def batch_load_by_session(

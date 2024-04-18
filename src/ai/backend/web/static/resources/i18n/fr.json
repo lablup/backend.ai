@@ -64,7 +64,8 @@
       "Data&Model": "Données",
       "InvalidBlankPassword": "Tapez votre mot de passe",
       "InvalidBlankEmail": "Entrer votre Email",
-      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas"
+      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas",
+      "MyEnvironments": "Mes environnements"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -814,7 +815,8 @@
     "PasswordsDoNotMatch": "Le mot de passe et la confirmation ne correspondent pas.",
     "NoChangeMade": "Aucune modification n'a été apportée",
     "Architecture": "Architecture",
-    "NoImageToDisplay": "Pas d'images à afficher"
+    "NoImageToDisplay": "Pas d'images à afficher",
+    "CustomizedImageSuccessfullyDeleted": "Image personnalisée supprimée avec succès."
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1399,7 +1401,8 @@
     "ResourcePolicyStillReferenced": "Il existe des paires de clés qui font référence à cette politique de ressources.",
     "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
-    "WrongAPIServerAddress": "Mauvaise adresse du serveur API."
+    "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
+    "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",

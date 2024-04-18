@@ -292,7 +292,7 @@ jobs:
     - name: Upload local-proxy binaries
       uses: actions/upload-artifact@v4
       with:
-        name: local-proxy
+        name: local-proxy-${{ matrix.os }}
         path: dist-local-proxy/*
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
@@ -316,7 +316,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
-        name: pants.deploy.log
+        name: pants-${{ matrix.os }}.build-scies.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
@@ -390,7 +390,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
-        name: pants.deploy.log
+        name: pants.build-wheels.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
@@ -439,8 +439,9 @@ jobs:
     - name: Download local-proxy
       uses: actions/download-artifact@v4
       with:
-        name: local-proxy
+        pattern: local-proxy-*
         path: dist
+        merge-multiple: true
     - name: Download SBOM report
       uses: actions/download-artifact@v4
       with:
