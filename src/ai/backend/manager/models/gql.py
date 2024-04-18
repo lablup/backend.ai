@@ -1588,6 +1588,7 @@ class Queries(graphene.ObjectType):
             group_id=group_id,  # scope
             user_id=user_id,  # scope
             filter=filter,
+            with_shared_vfolders=False,
         )
         items = await VirtualFolder.load_slice(
             info.context,
@@ -1598,6 +1599,7 @@ class Queries(graphene.ObjectType):
             user_id=user_id,  # scope
             filter=filter,
             order=order,
+            with_shared_vfolders=False,
         )
         return VirtualFolderList(items, total_count)
 
@@ -1646,6 +1648,7 @@ class Queries(graphene.ObjectType):
             domain_name=domain_name,  # scope
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
+            with_shared_vfolders=False,
         )
         items = await VirtualFolder.load_slice(
             info.context,
@@ -1655,6 +1658,7 @@ class Queries(graphene.ObjectType):
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
             order=order,
+            with_shared_vfolders=False,
         )
         return VirtualFolderList(items, total_count)
 

@@ -967,6 +967,7 @@ class PurgeUser(graphene.Mutation):
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
 
+        # 아래 경우는 GhostUser 도입 후 처리
         # props.purge_shared_vfolders = True
 
         async def _pre_func(conn: SAConnection) -> None:
@@ -1000,7 +1001,6 @@ class PurgeUser(graphene.Mutation):
                 await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, email)
 
         delete_query = sa.delete(users).where(users.c.email == email)
-
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
 
     @classmethod

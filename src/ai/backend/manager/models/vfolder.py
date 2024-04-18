@@ -604,6 +604,7 @@ async def get_allowed_vfolder_hosts_by_user(
     )
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
+
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
@@ -903,6 +904,7 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
+    print("ensure_host_permission_allowed!! 1")
     allowed_hosts = await filter_host_allowed_permission(
         db_conn,
         allowed_vfolder_types=allowed_vfolder_types,
@@ -911,6 +913,7 @@ async def ensure_host_permission_allowed(
         domain_name=domain_name,
         group_id=group_id,
     )
+    print("ensure_host_permission_allowed allowed_hosts!!", allowed_hosts)
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
         raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
 
@@ -924,6 +927,7 @@ async def filter_host_allowed_permission(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> VFolderHostPermissionMap:
+    print("filter_host_allowed_permission!! 1")
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
@@ -1171,6 +1175,7 @@ class VirtualFolder(graphene.ObjectType):
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
     status = graphene.String()
+    reference_id = graphene.UUID(required=False)
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
@@ -1185,6 +1190,7 @@ class VirtualFolder(graphene.ObjectType):
 
         return cls(
             id=row["id"],
+            reference_id=row["reference_id"],
             host=row["host"],
             quota_scope_id=row["quota_scope_id"],
             name=row["name"],
@@ -1276,6 +1282,7 @@ class VirtualFolder(graphene.ObjectType):
         group_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
+        with_shared_vfolders: bool = False,
     ) -> int:
         from .group import groups
         from .user import users
@@ -1283,7 +1290,11 @@ class VirtualFolder(graphene.ObjectType):
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
+
         query = sa.select([sa.func.count()]).select_from(j)
+
+        if not with_shared_vfolders:
+            query = query.where(vfolders.c.reference_id.is_(None))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
@@ -1309,6 +1320,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
+        with_shared_vfolders: bool = False,
     ) -> Sequence[VirtualFolder]:
         from .group import groups
         from .user import users
@@ -1322,6 +1334,8 @@ class VirtualFolder(graphene.ObjectType):
             .limit(limit)
             .offset(offset)
         )
+        if not with_shared_vfolders:
+            query = query.where(vfolders.c.reference_id.is_(None))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
@@ -1429,10 +1443,11 @@ class VirtualFolder(graphene.ObjectType):
 
         query = (
             sa.select([sa.func.count()])
-            .select_from(shared_vfolders)
+            .select_from(vfolders)
             .where(
                 (vfolders.c.user == user_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.isnot(None))
             )
         )
         if domain_name is not None:
@@ -1598,7 +1613,7 @@ class VirtualFolderPermission(graphene.ObjectType):
             return None
         return cls(
             permission=row["permission"],
-            vfolder=row["vfolder"],
+            vfolder=row["id"],
             vfolder_name=row["name"],
             user=row["user"],
             user_email=row["email"],
@@ -1634,7 +1649,7 @@ class VirtualFolderPermission(graphene.ObjectType):
             .where(vfolders.c.reference_id.isnot(None))
         )
         if user_id is not None:
-            query = query.where(vfolders.c.user == user_id)
+            query = query.where((vfolders.c.user == user_id))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1660,7 +1675,11 @@ class VirtualFolderPermission(graphene.ObjectType):
             vfolders.c.user == users.c.uuid,
         )
         query = (
-            sa.select([vfolders.c.name, users.c.email]).select_from(j).limit(limit).offset(offset)
+            sa.select([vfolders, users.c.email])
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+            .where(vfolders.c.reference_id.isnot(None))
         )
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
