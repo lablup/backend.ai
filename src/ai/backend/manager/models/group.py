@@ -575,8 +575,8 @@ class ModifyGroup(graphene.Mutation):
                 remove_users = user_data.get("remove_users") or set()
                 if union := (add_users & remove_users):
                     raise ValueError(
-                        "Should be no duplicate user id in `add_users` and `remove_users`."
-                        f" (ids: {list(union)})"
+                        "Should be no user IDs included in both `add_users` and `remove_users`."
+                        f" (IDs: {list(union)})"
                     )
                 if add_users:
                     values = [{"user_id": uuid, "group_id": gid} for uuid in add_users]
