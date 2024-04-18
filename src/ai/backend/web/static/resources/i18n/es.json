@@ -64,7 +64,8 @@
     "UpdateError": "Error de actualización",
     "UserHasNoGroup": "El usuario no tiene grupo. Póngase en contacto con el administrador para solucionarlo.",
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
-    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación."
+    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
+    "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador."
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -457,7 +458,8 @@
     "Status": "Estado",
     "SuccessfullyModified": "Modificado con éxito",
     "TakesTime": ". Lleva tiempo, así que tómate un café.",
-    "Version": "Versión"
+    "Version": "Versión",
+    "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -1506,7 +1508,8 @@
       "Data&Model": "Datos",
       "InvalidBlankPassword": "Ingresa tu contraseña",
       "InvalidBlankEmail": "Introduce tu correo electrónico",
-      "DisMatchUserEmail": "El correo electrónico del usuario no coincide"
+      "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
+      "MyEnvironments": "Mis ambientes"
     }
   },
   "modelStore": {

@@ -64,7 +64,8 @@
       "Data&Model": "Dati",
       "InvalidBlankPassword": "Inserisci la tua password",
       "InvalidBlankEmail": "Inserisci il tuo indirizzo email",
-      "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde"
+      "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde",
+      "MyEnvironments": "I miei ambienti"
     },
     "YouAreOffline": "Ora sei offline",
     "YouAreOnline": "Ora sei online",
@@ -814,7 +815,8 @@
     "PasswordsDoNotMatch": "Password e conferma non coincidono.",
     "NoChangeMade": "Non sono state apportate modifiche",
     "Architecture": "Architettura",
-    "NoImageToDisplay": "Nessuna immagine da visualizzare"
+    "NoImageToDisplay": "Nessuna immagine da visualizzare",
+    "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo."
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -1399,7 +1401,8 @@
     "ResourcePolicyStillReferenced": "Esistono coppie di chiavi che fanno riferimento a questa politica delle risorse.",
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
-    "WrongAPIServerAddress": "Indirizzo del server API errato."
+    "WrongAPIServerAddress": "Indirizzo del server API errato.",
+    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore."
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
