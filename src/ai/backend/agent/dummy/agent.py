@@ -81,7 +81,9 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             restarting=restarting,
         )
         self.dummy_config = dummy_config
-        self.creation_ctx_delay = cast(KernCreationCtxDelay, self.dummy_config.kernel_creation_ctx)
+        self.creation_ctx_delay = cast(
+            KernCreationCtxDelay, self.dummy_config.kernel.creation_ctx_delay
+        )
 
     async def get_extra_envs(self) -> Mapping[str, str]:
         return {}
