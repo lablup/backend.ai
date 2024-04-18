@@ -1444,11 +1444,7 @@ class AgentRegistry:
             size=scheduled_session.cluster_size,
             replicas=replicas,
             network_name=network_name,
-            ssh_keypair=(
-                await self.create_cluster_ssh_keypair()
-                if scheduled_session.cluster_size > 1
-                else None
-            ),
+            ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),

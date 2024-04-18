@@ -1055,7 +1055,7 @@ class ClusterInfo(TypedDict):
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_name: Optional[str]
-    ssh_keypair: Optional[ClusterSSHKeyPair]
+    ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
 
