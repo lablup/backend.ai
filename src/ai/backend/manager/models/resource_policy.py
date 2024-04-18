@@ -71,6 +71,8 @@ keypair_resource_policies = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
     sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
+    sa.Column("max_pending_session_count", sa.Integer(), nullable=True),
+    sa.Column("max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True),
     sa.Column(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
     ),
@@ -99,6 +101,8 @@ user_resource_policies = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
+    sa.Column("max_session_count_per_model_session", sa.Integer(), nullable=False),
+    sa.Column("max_customized_image_count", sa.Integer(), nullable=False, default=3),
 )
 
 
@@ -106,10 +110,19 @@ class UserResourcePolicyRow(Base):
     __table__ = user_resource_policies
     users = relationship("UserRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
+    def __init__(
+        self,
+        name,
+        max_vfolder_count,
+        max_quota_scope_size,
+        max_session_count_per_model_session,
+        max_customized_image_count,
+    ) -> None:
         self.name = name
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
+        self.max_session_count_per_model_session = max_session_count_per_model_session
+        self.max_customized_image_count = max_customized_image_count
 
 
 project_resource_policies = sa.Table(
@@ -295,18 +308,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
-    max_vfolder_size = BigInt(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
-    max_quota_scope_size = BigInt(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -318,18 +322,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
-    max_vfolder_size = BigInt(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
-    max_quota_scope_size = BigInt(
-        required=False,
-        deprecation_reason="Deprecated since 23.09.4",
-    )
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
@@ -443,14 +438,18 @@ class UserResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of user vfolders.",
+        description="Added since 24.03.1. Limitation of the number of user vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of user vfolders."
     )
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
+    max_session_count_per_model_session = graphene.Int(
+        description="Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
+    )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+    )
 
     @classmethod
     def from_row(
@@ -466,6 +465,8 @@ class UserResourcePolicy(graphene.ObjectType):
             created_at=row.created_at,
             max_vfolder_count=row.max_vfolder_count,
             max_quota_scope_size=row.max_quota_scope_size,
+            max_session_count_per_model_session=row.max_session_count_per_model_session,
+            max_customized_image_count=row.max_customized_image_count,
         )
 
     @classmethod
@@ -523,23 +524,31 @@ class UserResourcePolicy(graphene.ObjectType):
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of user vfolders.",
+        description="Added since 24.03.1. Limitation of the number of user vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of user vfolders."
+    )
+    max_session_count_per_model_session = graphene.Int(
+        description="Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
+    )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
     )
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of user vfolders.",
+        description="Added since 24.03.1. Limitation of the number of user vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of user vfolders."
+    )
+    max_session_count_per_model_session = graphene.Int(
+        description="Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
+    )
+    max_customized_image_count = graphene.Int(
+        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
     )
 
 
@@ -567,7 +576,11 @@ class CreateUserResourcePolicy(graphene.Mutation):
         async def _do_mutate() -> UserResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
                 row = UserResourcePolicyRow(
-                    name, props.max_vfolder_count, props.max_quota_scope_size
+                    name,
+                    props.max_vfolder_count,
+                    props.max_quota_scope_size,
+                    props.max_session_count_per_model_session,
+                    props.max_customized_image_count,
                 )
                 sess.add(row)
                 await sess.flush()
@@ -602,6 +615,8 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
+        set_if_set(props, data, "max_session_count_per_model_session")
+        set_if_set(props, data, "max_customized_image_count")
         update_query = (
             sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
         )
@@ -638,12 +653,10 @@ class ProjectResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of project vfolders.",
+        description="Added since 24.03.1. Limitation of the number of project vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of project vfolders."
     )
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
 
@@ -719,23 +732,19 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of project vfolders.",
+        description="Added since 24.03.1. Limitation of the number of project vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of project vfolders."
     )
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
-        required=False,
-        description="Added since 24.03.0. Limitation of the number of project vfolders.",
+        description="Added since 24.03.1. Limitation of the number of project vfolders."
     )
     max_quota_scope_size = BigInt(
-        required=False,
-        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.1. Limitation of the quota size of project vfolders."
     )
 
 

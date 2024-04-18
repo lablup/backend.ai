@@ -8,12 +8,13 @@ import uuid
 import weakref
 from collections import defaultdict
 from typing import (
+    Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     DefaultDict,
     Final,
     Literal,
-    Optional,
     Set,
     Type,
     TypeAlias,
@@ -39,7 +40,7 @@ from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-TaskResult = Literal["bgtask_done", "bgtask_cancelled", "bgtask_failed"]
+TaskStatus = Literal["bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed"]
 BgtaskEvents: TypeAlias = (
     BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
 )
@@ -65,7 +66,11 @@ class ProgressReporter:
         self.current_progress = current_progress
         self.total_progress = total_progress
 
-    async def update(self, increment: Union[int, float] = 0, message: str = None):
+    async def update(
+        self,
+        increment: Union[int, float] = 0,
+        message: str | None = None,
+    ) -> None:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
         # due to interleaving at await statements below.
@@ -98,7 +103,7 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[[ProgressReporter], Awaitable[Optional[str]]]
+BackgroundTask = Callable[[ProgressReporter], Awaitable[str | None]]
 
 
 class BackgroundTaskManager:
@@ -141,6 +146,43 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
+        async with sse_response(request) as resp:
+            try:
+                async for event, extra_data in self.poll_bgtask_event(task_id):
+                    body: dict[str, Any] = {
+                        "task_id": str(event.task_id),
+                        "message": event.message,
+                    }
+                    match event:
+                        case BgtaskUpdatedEvent():
+                            body["current_progress"] = event.current_progress
+                            body["total_progress"] = event.total_progress
+                            await resp.send(json.dumps(body), event=event.name, retry=5)
+                        case BgtaskDoneEvent():
+                            if extra_data:
+                                body.update(extra_data)
+                                await resp.send(
+                                    json.dumps(body), event="bgtask_" + extra_data["status"]
+                                )
+                            else:
+                                await resp.send("{}", event="bgtask_done")
+                            await resp.send("{}", event="server_close")
+                        case BgtaskCancelledEvent() | BgtaskFailedEvent():
+                            await resp.send("{}", event="server_close")
+            except:
+                log.exception("")
+                raise
+            finally:
+                return resp
+
+    async def poll_bgtask_event(
+        self,
+        task_id: uuid.UUID,
+    ) -> AsyncIterator[tuple[BgtaskEvents, dict]]:
+        """
+        RHS of return tuple will be filled with extra informations when needed
+        (e.g. progress information of task when callee is trying to poll information of already completed one)
+        """
         tracker_key = f"bgtask.{task_id}"
         redis_producer = self.event_producer.redis_client
         task_info = await redis_helper.execute(
@@ -149,60 +191,37 @@ class BackgroundTaskManager:
             encoding="utf-8",
         )
 
-        log.debug("task info: {}", task_info)
         if task_info is None:
             # The task ID is invalid or represents a task completed more than 24 hours ago.
             raise ValueError("No such background task.")
 
         if task_info["status"] != "started":
             # It is an already finished task!
-            async with sse_response(request) as resp:
-                try:
-                    body = {
-                        "task_id": str(task_id),
-                        "status": task_info["status"],
-                        "current_progress": task_info["current"],
-                        "total_progress": task_info["total"],
-                        "message": task_info["msg"],
-                    }
-                    await resp.send(json.dumps(body), event=f"task_{task_info['status']}")
-                finally:
-                    await resp.send("{}", event="server_close")
-            return resp
+            yield (
+                BgtaskDoneEvent(task_id, message=task_info["msg"]),
+                {
+                    "status": task_info["status"],
+                    "current_progress": task_info["current"],
+                    "total_progress": task_info["total"],
+                },
+            )
+            return
 
         # It is an ongoing task.
         my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
         async with self.dict_lock:
             self.task_update_queues[task_id].add(my_queue)
         try:
-            async with sse_response(request) as resp:
+            while True:
+                event = await my_queue.get()
                 try:
-                    while True:
-                        event = await my_queue.get()
-                        try:
-                            if event is sentinel:
-                                break
-                            if task_id != event.task_id:
-                                continue
-                            body = {
-                                "task_id": str(task_id),
-                                "message": event.message,
-                            }
-                            if isinstance(event, BgtaskUpdatedEvent):
-                                body["current_progress"] = event.current_progress
-                                body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
-                            if (
-                                isinstance(event, BgtaskDoneEvent)
-                                or isinstance(event, BgtaskFailedEvent)
-                                or isinstance(event, BgtaskCancelledEvent)
-                            ):
-                                await resp.send("{}", event="server_close")
-                                break
-                        finally:
-                            my_queue.task_done()
+                    if event is sentinel:
+                        break
+                    if task_id != event.task_id:
+                        continue
+                    yield event, {}
                 finally:
-                    return resp
+                    my_queue.task_done()
         finally:
             self.task_update_queues[task_id].remove(my_queue)
             async with self.dict_lock:
@@ -212,7 +231,7 @@ class BackgroundTaskManager:
     async def start(
         self,
         func: BackgroundTask,
-        name: str = None,
+        name: str | None = None,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -246,23 +265,23 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
-        task_name: Optional[str],
+        task_name: str | None,
         **kwargs,
     ) -> None:
-        task_result: TaskResult
+        task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
-        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[
-            BgtaskFailedEvent
-        ] = BgtaskDoneEvent
+        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
+            BgtaskDoneEvent
+        )
         try:
             message = await func(reporter, **kwargs) or ""
-            task_result = "bgtask_done"
+            task_status = "bgtask_done"
         except asyncio.CancelledError:
-            task_result = "bgtask_cancelled"
+            task_status = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
         except Exception as e:
-            task_result = "bgtask_failed"
+            task_status = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
@@ -275,7 +294,7 @@ class BackgroundTaskManager:
                 await pipe.hset(
                     tracker_key,
                     mapping={
-                        "status": task_result[len("bgtask_") :],  # strip "bgtask_"
+                        "status": task_status.removeprefix("bgtask_"),
                         "msg": message,
                         "last_update": str(time.time()),
                     },
@@ -290,7 +309,7 @@ class BackgroundTaskManager:
                     message=message,
                 ),
             )
-            log.info("Task {} ({}): {}", task_id, task_name or "", task_result)
+            log.info("Task {} ({}): {}", task_id, task_name or "", task_status)
 
     async def shutdown(self) -> None:
         join_tasks = []

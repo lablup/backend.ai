@@ -81,7 +81,7 @@ class AsyncNode(Node):
     """
 
     class Meta:
-        name = "AsyncNode"
+        name = "Node"
 
     @classmethod
     def Field(cls, *args, **kwargs):

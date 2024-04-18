@@ -8,7 +8,9 @@ from io import IOBase
 from pathlib import Path
 from typing import Any, Optional
 
-from etcetra.client import EtcdCommunicator, EtcdConnectionManager
+from etcd_client import Client as EtcdClient
+from etcd_client import Communicator as EtcdCommunicator
+from etcd_client import EtcdLockOption
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.exceptions import LockError, LockNotOwnedError
@@ -124,7 +126,7 @@ class FileLock(AbstractDistributedLock):
         await self.acquire()
         return self
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info) -> Optional[bool]:
         self.release()
         return None
 
@@ -143,7 +145,7 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-    _con_mgr: Optional[EtcdConnectionManager]
+    _etcd_client: Optional[EtcdClient]
     _debug: bool
 
     lock_name: str
@@ -166,27 +168,32 @@ class EtcdLock(AbstractDistributedLock):
         self.etcd = etcd
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._etcd_client = None
 
     async def __aenter__(self) -> EtcdCommunicator:
-        self._con_mgr = self.etcd.etcd.with_lock(
-            self.lock_name,
-            timeout=self._timeout,
-            ttl=int(self._lifetime) if self._lifetime is not None else None,
+        self._etcd_client = self.etcd.etcd.with_lock(
+            EtcdLockOption(
+                lock_name=self.lock_name.encode("utf-8"),
+                timeout=self._timeout,
+                ttl=int(self._lifetime) if self._lifetime is not None else None,
+            ),
         )
-        assert (
-            self._con_mgr is not None
-        )  # FIXME: not required if with_lock() has an explicit return type.
-        communicator = await self._con_mgr.__aenter__()
+
+        etcd_communicator = await self._etcd_client.__aenter__()
+
         if self._debug:
             log.debug("etcd lock acquired")
-        return communicator
+
+        return etcd_communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._con_mgr is not None
-        await self._con_mgr.__aexit__(*exc_info)
+        assert self._etcd_client is not None
+        await self._etcd_client.__aexit__(*exc_info)
+
         if self._debug:
             log.debug("etcd lock released")
-        self._con_mgr = None
+
+        self._etcd_client = None
         return None
 
 

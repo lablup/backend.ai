@@ -40,18 +40,17 @@ from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
-from etcetra.types import WatchEventType
+from etcd_client import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
-from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
-    EventProducer,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
@@ -59,9 +58,9 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
-    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
+    ImageRegistry,
     KernelCreationConfig,
     KernelId,
     LogSeverity,
@@ -217,7 +216,6 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
-        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
@@ -337,13 +335,6 @@ class AgentRPCServer(aobject):
         for k, v in container_etcd_config.items():
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
-
-    async def init_background_task_manager(self):
-        event_producer = await EventProducer.new(
-            cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=REDIS_STREAM_DB,
-        )
-        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -608,20 +599,59 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         subdir: str,
-        filename: str,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
-        bgtask_mgr = self.local_config["background_task_manager"]
-        task_id = await bgtask_mgr.start(
-            self.agent.commit,
-            kernel_id=KernelId(UUID(kernel_id)),
-            subdir=subdir,
-            filename=filename,
-        )
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _commit(reporter: ProgressReporter) -> None:
+            await self.agent.commit(
+                reporter,
+                KernelId(UUID(kernel_id)),
+                subdir,
+                canonical=canonical,
+                filename=filename,
+                extra_labels=extra_labels,
+            )
+
+        task_id = await bgtask_mgr.start(_commit)
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(Path(subdir, filename)),
+            "path": str(Path(subdir, filename)) if filename else None,
+        }
+
+    @rpc_function
+    @collect_error
+    async def push_image(
+        self,
+        canonical: str,
+        architecture: str,
+        registry_conf: ImageRegistry,
+        *,
+        is_local: bool = False,
+    ) -> dict[str, Any]:
+        log.info("rpc::push_image(c:{})", canonical)
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _push_image(reporter: ProgressReporter) -> None:
+            await self.agent.push_image(
+                ImageRef(
+                    canonical,
+                    known_registries=["*"],
+                    is_local=is_local,
+                    architecture=architecture,
+                ),
+                registry_conf,
+            )
+
+        task_id = await bgtask_mgr.start(_push_image)
+        return {
+            "bgtask_id": str(task_id),
+            "canonical": canonical,
         }
 
     @rpc_function
@@ -868,15 +898,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
@@ -907,10 +937,10 @@ def main(
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
     if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        log_level = LogSeverity.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

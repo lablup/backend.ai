@@ -1,6 +1,6 @@
 import enum
 
 
-class AllocationModes(str, enum.Enum):
+class AllocationModes(enum.StrEnum):
     DISCRETE = "discrete"
     FRACTIONAL = "fractional"

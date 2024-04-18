@@ -104,7 +104,7 @@ model_definition_iv = t.Dict({
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
                 }),
             }),
-            t.Key("metadata"): t.Null
+            t.Key("metadata", default=None): t.Null
             | t.Dict({
                 t.Key("author", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("title", default=None): t.Null | t.String(allow_blank=True),
@@ -226,3 +226,12 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
         else:
             result[k] = v
     return result
+
+
+def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+    for k in key_path[:-1]:
+        if k not in table:
+            return
+        table = table[k]
+    if table.get(key_path[-1]) is None:
+        table[key_path[-1]] = value
