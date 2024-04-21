@@ -77,7 +77,7 @@ async def prepare_dotfiles(
         if dotfile_path in vfolder_kernel_paths:
             raise BackendError(
                 "There is a kernel-side path from vfolders that conflicts with "
-                f"a dotfile '{dotfile['path']}'.",
+                f"a dotfile '{dotfile["path"]}'.",
             )
 
     return internal_data

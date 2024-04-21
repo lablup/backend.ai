@@ -551,7 +551,7 @@ class SchedulerDispatcher(aobject):
                 case str():
                     hook_name = hook_result.src_plugin
                 case list():
-                    hook_name = f"({', '.join(hook_result.src_plugin)})"
+                    hook_name = f"({", ".join(hook_result.src_plugin)})"
                 case _:
                     hook_name = ""
 

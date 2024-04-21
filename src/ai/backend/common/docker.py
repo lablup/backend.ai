@@ -499,7 +499,7 @@ class ImageRef:
         for name in possible_names:
             ret[name] = self
         for name, ptags in itertools.product(possible_names, itertools.product(*possible_ptags)):
-            ret[f"{name}:{'-'.join(t for t in ptags if t)}"] = self
+            ret[f"{name}:{"-".join(t for t in ptags if t)}"] = self
         return ret
 
     @staticmethod

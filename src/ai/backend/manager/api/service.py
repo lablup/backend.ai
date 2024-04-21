@@ -480,8 +480,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         assert model_definition is not None
     except t.DataError as e:
         raise InvalidAPIParameters(
-            f"Failed to validate model definition from vFolder {folder_row['name']} (ID"
-            f" {folder_row['id']}): {e}",
+            f"Failed to validate model definition from vFolder {folder_row["name"]} (ID"
+            f" {folder_row["id"]}): {e}",
         ) from e
     except yaml.error.YAMLError as e:
         raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e

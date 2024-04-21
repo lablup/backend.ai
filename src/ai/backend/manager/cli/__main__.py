@@ -126,8 +126,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         cmd = [
             "psql",
             (
-                f"postgres://{local_config['db']['user']}:{local_config['db']['password']}"
-                f"@{local_config['db']['addr']}/{local_config['db']['name']}"
+                f"postgres://{local_config["db"]["user"]}:{local_config["db"]["password"]}"
+                f"@{local_config["db"]["addr"]}/{local_config["db"]["name"]}"
             ),
             *psql_args,
         ]
@@ -195,8 +195,8 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     assert secret_key is not None
-    print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
-    print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
+    print(f"Public Key: {public_key.decode("ascii")} (stored at {public_key_path})")
+    print(f"Secret Key: {secret_key.decode("ascii")} (stored at {secret_key_path})")
 
 
 @main.command()

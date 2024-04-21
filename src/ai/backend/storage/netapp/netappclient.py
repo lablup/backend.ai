@@ -190,7 +190,7 @@ class NetAppClient:
             if result["code"] in allowed_codes:
                 pass
             else:
-                raise NetAppClientError(f"{result['state']} [{result['code']}] {result['message']}")
+                raise NetAppClientError(f"{result["state"]} [{result["code"]}] {result["message"]}")
 
     async def get_volume_metadata(self, volume_id: VolumeID) -> Mapping[str, Any]:
         raise NotImplementedError
@@ -490,7 +490,7 @@ class NetAppClient:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "patch",
-            f"/api/storage/quota/rules/{record['uuid']}",
+            f"/api/storage/quota/rules/{record["uuid"]}",
             data={
                 "space": {
                     "hard_limit": config.limit_bytes,
@@ -525,7 +525,7 @@ class NetAppClient:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "delete",
-            f"/api/storage/quota/rules/{record['uuid']}",
+            f"/api/storage/quota/rules/{record["uuid"]}",
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])

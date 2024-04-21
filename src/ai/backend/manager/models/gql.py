@@ -342,7 +342,7 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+                f"Added since 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
             ),
         ),
     )
@@ -2085,7 +2085,7 @@ class Queries(graphene.ObjectType):
         qsid = QuotaScopeID.parse(quota_scope_id)
         volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
         for host, volume in volumes_by_host:
-            if f"{host}:{volume['name']}" == storage_host_name:
+            if f"{host}:{volume["name"]}" == storage_host_name:
                 break
         else:
             raise ValueError(f"storage volume {storage_host_name} does not exist")

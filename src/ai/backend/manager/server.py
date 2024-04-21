@@ -244,7 +244,7 @@ async def exception_middleware(
         resp = await handler(request)
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:

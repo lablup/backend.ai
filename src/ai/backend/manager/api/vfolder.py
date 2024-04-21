@@ -787,7 +787,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap({
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
@@ -796,7 +796,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         default_host = None
 
     volume_info = {
-        f"{proxy_name}:{volume_data['name']}": {
+        f"{proxy_name}:{volume_data["name"]}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
             "usage": await fetch_exposed_volume_fields(
@@ -810,7 +810,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             ),
         }
         for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        if f"{proxy_name}:{volume_data["name"]}" in allowed_hosts
     }
 
     resp = {
@@ -832,7 +832,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
         access_key,
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in all_hosts:
         default_host = None
@@ -2070,7 +2070,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_in_vfolder_group)}",
+                f" {",".join(users_not_in_vfolder_group)}",
                 object_name="user",
             )
 
@@ -3013,7 +3013,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
     all_mounts = [volume_data["path"] for proxy_name, volume_data in all_volumes]
     all_vfolder_hosts = [
-        f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes
     ]
     resp: MutableMapping[str, Any] = {
         "manager": {

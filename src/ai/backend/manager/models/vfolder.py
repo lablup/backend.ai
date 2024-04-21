@@ -807,7 +807,7 @@ async def prepare_vfolder_mounts(
             # Normal vfolders
             kernel_path_raw = requested_vfolder_dstpaths.get(key)
             if kernel_path_raw is None:
-                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+                kernel_path = PurePosixPath(f"/home/work/{vfolder["name"]}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
@@ -818,7 +818,7 @@ async def prepare_vfolder_mounts(
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
                     if vfolder["permission"] == VFolderPermission.READ_ONLY:
                         raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder["permission"].value}' mode, "
                             f"but attempted with '{requested_perm.value}' mode."
                         )
                     mount_perm = requested_perm
