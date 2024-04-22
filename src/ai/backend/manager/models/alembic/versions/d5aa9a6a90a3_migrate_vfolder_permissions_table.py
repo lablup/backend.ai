@@ -11,7 +11,6 @@ import uuid
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.manager.models.base import (
@@ -229,8 +228,8 @@ def downgrade():
             autoincrement=False,
             nullable=True,
         ),
-        sa.Column("vfolder", postgresql.UUID(), autoincrement=False, nullable=False),
-        sa.Column("user", postgresql.UUID(), autoincrement=False, nullable=False),
+        sa.Column("vfolder", pgsql.UUID(), autoincrement=False, nullable=False),
+        sa.Column("user", pgsql.UUID(), autoincrement=False, nullable=False),
         sa.ForeignKeyConstraint(["user"], ["users.uuid"], name="fk_vfolder_permissions_user_users"),
         sa.ForeignKeyConstraint(
             ["vfolder"],

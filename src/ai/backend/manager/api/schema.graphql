@@ -510,6 +510,8 @@ type VirtualFolder implements Item {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """Added in 24.09.0."""
   reference_id: UUID
 }
 
