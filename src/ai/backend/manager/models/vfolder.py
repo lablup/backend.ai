@@ -1293,9 +1293,7 @@ class VirtualFolder(graphene.ObjectType):
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
-
         query = sa.select([sa.func.count()]).select_from(j)
-
         if not with_shared_vfolders:
             query = query.where(vfolders.c.reference_id.is_(None))
         if domain_name is not None:
