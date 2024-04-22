@@ -89,7 +89,7 @@ __all__: Sequence[str] = (
     "vfolders",
     "vfolder_invitations",
     "shared_vfolders_view",
-    "SharedVFolders",
+    "SharedVFoldersView",
     "VirtualFolder",
     "VFolderOwnershipType",
     "VFolderInvitationState",
@@ -343,7 +343,7 @@ shared_vfolders_view = create_view(
 )
 
 
-class SharedVFolders(Base):
+class SharedVFoldersView(Base):
     __table__ = shared_vfolders_view
 
 

@@ -95,7 +95,7 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry
-from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES, SharedVFolders
+from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES, SharedVFoldersView
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -2070,8 +2070,9 @@ async def share(request: web.Request, params: Any) -> web.Response:
             )
 
         # Do not share to users who have already been shared the folder.
-        query = sa.select(SharedVFolders).where(
-            (SharedVFolders.id == vf_info["id"]) & (SharedVFolders.user.in_(users_to_share)),
+        query = sa.select(SharedVFoldersView).where(
+            (SharedVFoldersView.id == vf_info["id"])
+            & (SharedVFoldersView.user.in_(users_to_share)),
         )
         result = await conn.execute(query)
         users_not_to_share = [u.user for u in result.fetchall()]
@@ -2093,7 +2094,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
                 "reference_id": vfolder.id.hex,
             })
 
-            query = sa.insert(SharedVFolders, shared_vfolder)
+            query = sa.insert(SharedVFoldersView, shared_vfolder)
             await conn.execute(query)
 
         # Update existing vfolder_permission(s).
@@ -2171,8 +2172,9 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
             raise ObjectNotFound(object_name="user(s).")
 
         # Delete vfolder_permission(s).
-        query = sa.delete(SharedVFolders).where(
-            (SharedVFolders.id == vf_info["id"]) & (SharedVFolders.user.in_(users_to_unshare))
+        query = sa.delete(SharedVFoldersView).where(
+            (SharedVFoldersView.id == vf_info["id"])
+            & (SharedVFoldersView.user.in_(users_to_unshare))
         )
         await conn.execute(query)
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
@@ -2631,8 +2633,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         perm,
     )
     async with root_ctx.db.begin() as conn:
-        query = sa.delete(SharedVFolders).where(
-            (vfolders.c.id == vfolder_id) & (vfolders.c.user == user_uuid)
+        query = sa.delete(SharedVFoldersView).where(
+            (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_uuid)
         )
         await conn.execute(query)
     resp = {"msg": "left the shared vfolder"}
@@ -2909,13 +2911,15 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     async with root_ctx.db.begin() as conn:
         if perm is not None:
             query = (
-                sa.update(SharedVFolders)
+                sa.update(SharedVFoldersView)
                 .values(permission=perm)
-                .where((SharedVFolders.id == vfolder_id) & (SharedVFolders.user == user_uuid))
+                .where(
+                    (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_uuid)
+                )
             )
         else:
-            query = sa.delete(SharedVFolders).where(
-                (SharedVFolders.id == vfolder_id) & (SharedVFolders.user == user_uuid)
+            query = sa.delete(SharedVFoldersView).where(
+                (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_uuid)
             )
 
         await conn.execute(query)
@@ -3426,8 +3430,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             )
             await conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
-            query = sa.delete(SharedVFolders).where(
-                (SharedVFolders.id == vfolder_id) & (SharedVFolders.user == user_info.uuid)
+            query = sa.delete(SharedVFoldersView).where(
+                (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_info.uuid)
             )
             await conn.execute(query)
 
