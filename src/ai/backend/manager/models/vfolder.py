@@ -518,28 +518,6 @@ async def query_accessible_vfolders(
         )
         await _append_entries(query, is_owner)
 
-        # Override permissions, if exists, for group vfolders.
-        query = (
-            sa.select(vfolders)
-            .select_from(j)
-            .where(
-                # Question: 아래 로직은 user가 이 공유 폴더에 접근 권한이 있는지는 검사하지 않음.
-                (vfolders.c.group.in_(group_ids)) & (vfolders.c.reference_id.isnot(None)),
-            )
-        )
-        if extra_vf_conds is not None:
-            query = query.where(extra_vf_conds)
-        if extra_vf_user_conds is not None:
-            query = query.where(extra_vf_user_conds)
-        result = await conn.execute(query)
-        overriding_permissions: dict = {row.vfolder: row.permission for row in result}
-        for entry in entries:
-            if (
-                entry["id"] in overriding_permissions
-                and entry["ownership_type"] == VFolderOwnershipType.GROUP
-            ):
-                entry["permission"] = overriding_permissions[entry["id"]]
-
     return entries
 
 
