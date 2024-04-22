@@ -510,6 +510,7 @@ type VirtualFolder implements Item {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+  reference_id: UUID
 }
 
 type ComputeSession implements Item {
