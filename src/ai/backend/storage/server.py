@@ -102,7 +102,7 @@ async def server_main(
             raise e
 
         event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if local_config["storage-proxy"]["use-experimental-redis-event-dispatcher"]:
+        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
             event_dispatcher_cls = ExperimentalEventDispatcher
         else:
             event_dispatcher_cls = EventDispatcher

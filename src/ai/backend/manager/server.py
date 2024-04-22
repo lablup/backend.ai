@@ -402,7 +402,7 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-    if root_ctx.local_config["manager"]["use-experimental-redis-event-dispatcher"]:
+    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
         event_dispatcher_cls = ExperimentalEventDispatcher
     else:
         event_dispatcher_cls = EventDispatcher

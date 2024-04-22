@@ -620,7 +620,7 @@ class AbstractAgent(
         self.container_lifecycle_queue = asyncio.Queue()
 
         event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if self.local_config["agent"]["use-experimental-redis-event-dispatcher"]:
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
             event_dispatcher_cls = ExperimentalEventDispatcher
         else:
             event_dispatcher_cls = EventDispatcher
