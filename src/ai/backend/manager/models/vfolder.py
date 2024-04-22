@@ -1152,7 +1152,7 @@ class VirtualFolder(graphene.ObjectType):
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
     status = graphene.String()
-    reference_id = graphene.UUID(required=False)
+    reference_id = graphene.UUID(required=False, description="Added in 24.09.0")
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
