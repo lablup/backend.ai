@@ -208,6 +208,7 @@ async def connect_database(
         major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
+
     await version_check_db.dispose()
 
     db = create_async_engine(

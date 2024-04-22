@@ -173,7 +173,7 @@ class VFolderInvitationFactory(ModelFactory):
 
 
 class VFolderPermissionFactory(ModelFactory):
-    model = models.shared_vfolders
+    model = models.shared_vfolders_view
 
     def get_creation_defaults(self, **kwargs):
         return {

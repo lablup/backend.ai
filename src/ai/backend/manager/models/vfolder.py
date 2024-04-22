@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.models.view_utils import create_view
 
 from ..api.exceptions import (
     InvalidAPIParameters,
@@ -77,7 +78,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge, view
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -87,7 +88,8 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     "vfolders",
     "vfolder_invitations",
-    "shared_vfolders",
+    "shared_vfolders_view",
+    "SharedVFolders",
     "VirtualFolder",
     "VFolderOwnershipType",
     "VFolderInvitationState",
@@ -336,9 +338,13 @@ vfolder_invitations = sa.Table(
     ),
 )
 
-shared_vfolders = view(
-    "shared_vfolders", metadata, sa.select(vfolders).where(vfolders.c.reference_id.isnot(None))
+shared_vfolders_view = create_view(
+    "shared_vfolders_view", sa.select(vfolders).where(vfolders.c.reference_id.isnot(None)), metadata
 )
+
+
+class SharedVFolders(Base):
+    __table__ = shared_vfolders_view
 
 
 class VFolderRow(Base):
@@ -904,7 +910,6 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
-    print("ensure_host_permission_allowed!! 1")
     allowed_hosts = await filter_host_allowed_permission(
         db_conn,
         allowed_vfolder_types=allowed_vfolder_types,
@@ -913,7 +918,6 @@ async def ensure_host_permission_allowed(
         domain_name=domain_name,
         group_id=group_id,
     )
-    print("ensure_host_permission_allowed allowed_hosts!!", allowed_hosts)
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
         raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
 
@@ -927,7 +931,6 @@ async def filter_host_allowed_permission(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> VFolderHostPermissionMap:
-    print("filter_host_allowed_permission!! 1")
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
