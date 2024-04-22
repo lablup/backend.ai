@@ -2080,18 +2080,17 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Create vfolder_permission record.
         for _user in users_to_share:
-            vfolder = (
+            original_vfolder = (
                 await conn.execute(sa.select(vfolders).where(vfolders.c.id == vf_info["id"]))
             ).fetchone()
 
-            shared_vfolder = {k: v for k, v in dict(vfolder).items() if v is not None}
+            shared_vfolder = {k: v for k, v in dict(original_vfolder).items() if v is not None}
 
-            # Question: 프로젝트 타입의 레코드를 공유하는 경우는 어떻게 처리?
-            # 현재는 user와 group이 동시에 있을 수 없기 때문에 아래 로직에서 깨짐.
+            # TODO: Handle group type vfolder sharing.
             shared_vfolder.update({
                 "id": uuid.uuid4().hex,
                 "user": _user,
-                "reference_id": vfolder.id.hex,
+                "reference_id": original_vfolder.id.hex,
             })
 
             query = sa.insert(SharedVFoldersView, shared_vfolder)

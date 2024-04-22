@@ -408,8 +408,6 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
-        # 퍼미션 추가 -> 이건 왜 주석 처리 되 있지..?
-        # vfolders.c.permission,
     ]
 
     async def _append_entries(_query, _is_owner=True):
@@ -521,13 +519,12 @@ async def query_accessible_vfolders(
         await _append_entries(query, is_owner)
 
         # Override permissions, if exists, for group vfolders.
-
-        # Question: vfolders.group과 vfolder.user는 둘 중 하나만 존재하도록 ck 걸려 있으므로 이 코드는 말이 되지 않음.
         query = (
             sa.select(vfolders)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolders.c.user == user_uuid),
+                # Question: 아래 로직은 user가 이 공유 폴더에 접근 권한이 있는지는 검사하지 않음.
+                (vfolders.c.group.in_(group_ids)) & (vfolders.c.reference_id.isnot(None)),
             )
         )
         if extra_vf_conds is not None:
@@ -610,7 +607,6 @@ async def get_allowed_vfolder_hosts_by_user(
     )
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
-
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(

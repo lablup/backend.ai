@@ -967,9 +967,7 @@ class PurgeUser(graphene.Mutation):
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
 
-        # 아래 경우는 GhostUser 도입 후 처리
-        # props.purge_shared_vfolders = True
-
+        # purge_shared_vfolders가 True인 경우는 GhostUser 도입 PR에서 처리
         async def _pre_func(conn: SAConnection) -> None:
             user_uuid = await conn.scalar(
                 sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
@@ -1064,7 +1062,6 @@ class PurgeUser(graphene.Mutation):
 
             rowcount = 0
             for vfolder_to_migrate in migrate_updates:
-                # Question: 그룹에 대한 처리를 추가해야 하지 않을지?
                 owner_update_query = (
                     sa.update(vfolders)
                     .values(
