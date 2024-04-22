@@ -62,7 +62,7 @@ from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .utils import execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -659,7 +659,7 @@ class PurgeGroup(graphene.Mutation):
                 raise RuntimeError(
                     "Group has some active session. Terminate them first to proceed removal.",
                 )
-            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, gid)
             await cls.delete_kernels(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
@@ -668,15 +668,16 @@ class PurgeGroup(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        engine: ExtendedAsyncSAEngine,
-        group_id: uuid.UUID,
+        db_conn: SAConnection,
         storage_manager: StorageSessionManager,
+        group_id: uuid.UUID,
     ) -> int:
         """
         Delete group's all virtual folders as well as their physical data.
 
-        :param conn: DB connection
+        :param db_conn: DB connection
         :param group_id: group's UUID to delete virtual folders
+        :param storage_manager: storage manager
 
         :return: number of deleted rows
         """
@@ -687,18 +688,18 @@ class PurgeGroup(graphene.Mutation):
             .select_from(vfolders)
             .where(vfolders.c.group == group_id)
         )
-        async with engine.begin_session() as db_conn:
-            result = await db_conn.execute(query)
-            target_vfs = result.fetchall()
-            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-            result = await db_conn.execute(delete_query)
+
+        result = await db_conn.execute(query)
+        target_vfs = result.fetchall()
+        delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
+        result = await db_conn.execute(delete_query)
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
-                engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                db_conn,
                 storage_manager,
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_ptask_group,
             )
         except VFolderOperationFailed as e:
@@ -718,7 +719,7 @@ class PurgeGroup(graphene.Mutation):
         """
         Delete all kernels run from the target groups.
 
-        :param conn: DB connection
+        :param db_conn: DB connection
         :param group_id: group's UUID to delete kernels
 
         :return: number of deleted rows

@@ -77,7 +77,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge, view
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -87,6 +87,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     "vfolders",
     "vfolder_invitations",
+    "shared_vfolders",
     "VirtualFolder",
     "VFolderOwnershipType",
     "VFolderInvitationState",
@@ -333,6 +334,10 @@ vfolder_invitations = sa.Table(
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     ),
+)
+
+shared_vfolders = view(
+    "shared_vfolders", metadata, sa.select(vfolders).where(vfolders.c.reference_id.isnot(None))
 )
 
 
@@ -844,7 +849,7 @@ async def prepare_vfolder_mounts(
 
 
 async def update_vfolder_status(
-    engine: ExtendedAsyncSAEngine,
+    db_conn: SAConnection,
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
     do_log: bool = True,
@@ -859,23 +864,22 @@ async def update_vfolder_status(
     now = datetime.now(tzutc())
 
     async def _update() -> None:
-        async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
+        query = (
+            sa.update(vfolders)
+            .values(
+                status=update_status,
+                status_changed=now,
+                status_history=sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        update_status.name: now.isoformat(),
+                    },
+                ),
             )
-            await db_session.execute(query)
+            .where(cond)
+        )
+        await db_conn.execute(query)
 
     await execute_with_retry(_update)
     if do_log:
@@ -1022,9 +1026,9 @@ async def initiate_vfolder_clone(
 
 
 async def initiate_vfolder_deletion(
-    db_engine: ExtendedAsyncSAEngine,
-    requested_vfolders: Sequence[VFolderDeletionInfo],
+    db_conn: SAConnection,
     storage_manager: StorageSessionManager,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_ptask_group: aiotools.PersistentTaskGroup,
 ) -> int:
     vfolder_info_len = len(requested_vfolders)
@@ -1035,7 +1039,7 @@ async def initiate_vfolder_deletion(
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
+        db_conn, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
     row_deletion_infos: list[VFolderDeletionInfo] = []
@@ -1069,12 +1073,12 @@ async def initiate_vfolder_deletion(
             vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
             await update_vfolder_status(
-                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+                db_conn, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
             )
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             await update_vfolder_status(
-                db_engine,
+                db_conn,
                 [vfid.vfolder_id for vfid, _ in failed_deletion],
                 VFolderOperationStatus.DELETE_ERROR,
                 do_log=False,
@@ -1420,11 +1424,10 @@ class VirtualFolder(graphene.ObjectType):
 
         query = (
             sa.select([sa.func.count()])
-            .select_from(vfolders)
+            .select_from(shared_vfolders)
             .where(
                 (vfolders.c.user == user_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.reference_id.isnot(None)),
             )
         )
         if domain_name is not None:

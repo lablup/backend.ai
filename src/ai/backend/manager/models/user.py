@@ -49,7 +49,6 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
-from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -967,6 +966,8 @@ class PurgeUser(graphene.Mutation):
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
 
+        # props.purge_shared_vfolders = True
+
         async def _pre_func(conn: SAConnection) -> None:
             user_uuid = await conn.scalar(
                 sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
@@ -994,10 +995,10 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_sessions(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
-        delete_query = sa.delete(users).where(users.c.email == email)
+            if props.purge_shared_vfolders:
+                await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, email)
 
-        if props.purge_shared_vfolders:
-            await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, email)
+        delete_query = sa.delete(users).where(users.c.email == email)
 
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
 
@@ -1018,6 +1019,7 @@ class PurgeUser(graphene.Mutation):
         :param conn: DB connection
         :param deleted_user_uuid: user's UUID who will be deleted
         :param target_user_uuid: user's UUID who will get the ownership of virtual folders
+        :param target_user_email: user's email who will get the ownership of virtual folders
 
         :return: number of deleted rows
         """
@@ -1085,40 +1087,40 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        engine: ExtendedAsyncSAEngine,
+        db_conn: SAConnection,
         storage_manager: StorageSessionManager,
         email: str,
     ) -> int:
         """
         Delete user's all virtual folders as well as their physical data.
 
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete virtual folders
+        :param db_conn: DB connection
+        :param storage_manager: storage session manager
+        :param email: user's UUID to delete virtual folders
 
         :return: number of deleted rows
         """
         from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
-        async with engine.begin_session() as conn:
-            # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
-            await conn.execute(
-                sa.delete(vfolders).where(
-                    (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
-                ),
-            )
-            result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(
-                    vfolders.c.creator == email
-                ),
-            )
-            target_vfs = result.fetchall()
+        # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
+        await db_conn.execute(
+            sa.delete(vfolders).where(
+                (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
+            ),
+        )
+        result = await db_conn.execute(
+            sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(
+                vfolders.c.creator == email
+            ),
+        )
+        target_vfs = result.fetchall()
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
-                engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                db_conn,
                 storage_manager,
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_ptask_group,
             )
         except VFolderOperationFailed as e:

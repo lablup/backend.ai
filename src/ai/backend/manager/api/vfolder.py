@@ -95,7 +95,7 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry
-from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES
+from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES, shared_vfolders
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -614,15 +614,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # Here we grant creator the permission to alter VFolder contents
 
             if group_type == ProjectType.MODEL_STORE:
-                vfolder_perm = dict(insert_values)
-                vfolder_perm.update({
+                shared_vfolder = {k: v for k, v in dict(insert_values).items() if v is not None}
+                shared_vfolder.update({
                     "id": uuid.uuid4().hex,
                     "reference_id": vfid.folder_id.hex,
                     "permission": VFolderPermission.OWNER_PERM,
                     "user": request["user"]["uuid"],
                 })
 
-                query = sa.insert(vfolders, vfolder_perm)
+                query = sa.insert(vfolders, shared_vfolder)
                 await conn.execute(query)
         except sa.exc.DataError:
             raise InvalidAPIParameters
@@ -1904,16 +1904,16 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             raise VFolderAlreadyExists
 
         # Create permission vfolder record between the vfolder and the invitee.
-        vfolder_perm = dict(target_vfolder)
+        shared_vfolder = {k: v for k, v in dict(target_vfolder).items() if v is not None}
 
-        vfolder_perm.update({
+        shared_vfolder.update({
             "id": uuid.uuid4().hex,
             "user": user_uuid,
             "permission": VFolderPermission(invitation.permission),
             "reference_id": target_vfolder.id.hex,
         })
 
-        query = sa.insert(vfolders, vfolder_perm)
+        query = sa.insert(vfolders, shared_vfolder)
         await conn.execute(query)
 
         # Clear used invitation.
@@ -2070,9 +2070,8 @@ async def share(request: web.Request, params: Any) -> web.Response:
             )
 
         # Do not share to users who have already been shared the folder.
-        query = sa.select(vfolders).where(
-            (vfolders.c.id == vf_info["id"])
-            & (vfolders.c.user.in_(users_to_share) & (vfolders.c.reference_id.isnot(None))),
+        query = sa.select(shared_vfolders).where(
+            (shared_vfolders.c.id == vf_info["id"]) & (shared_vfolders.c.user.in_(users_to_share)),
         )
         result = await conn.execute(query)
         users_not_to_share = [u.user for u in result.fetchall()]
@@ -2084,16 +2083,18 @@ async def share(request: web.Request, params: Any) -> web.Response:
                 await conn.execute(sa.select(vfolders).where(vfolders.c.id == vf_info["id"]))
             ).fetchone()
 
-            vfolder_perm = dict(vfolder)
+            shared_vfolder = {k: v for k, v in dict(vfolder).items() if v is not None}
+            print("shared_vfolder!!", shared_vfolder)
+
             # Question: 프로젝트 타입의 레코드를 공유하는 경우는 어떻게 처리?
             # 현재는 user와 group이 동시에 있을 수 없기 때문에 아래 로직에서 깨짐.
-            vfolder_perm.update({
+            shared_vfolder.update({
                 "id": uuid.uuid4().hex,
                 "user": _user,
                 "reference_id": vfolder.id.hex,
             })
 
-            query = sa.insert(vfolders, vfolder_perm)
+            query = sa.insert(shared_vfolders, shared_vfolder)
             await conn.execute(query)
 
         # Update existing vfolder_permission(s).
@@ -2171,10 +2172,8 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
             raise ObjectNotFound(object_name="user(s).")
 
         # Delete vfolder_permission(s).
-        query = sa.delete(vfolders).where(
-            (vfolders.c.id == vf_info["id"])
-            & (vfolders.c.user.in_(users_to_unshare))
-            & (vfolders.c.reference_id.isnot(None)),
+        query = sa.delete(shared_vfolders).where(
+            (shared_vfolders.c.id == vf_info["id"]) & (shared_vfolders.c.user.in_(users_to_unshare))
         )
         await conn.execute(query)
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
@@ -2232,11 +2231,11 @@ async def _delete(
             permission=VFolderHostPermission.DELETE,
         )
 
-    await update_vfolder_status(
-        root_ctx.db,
-        (entry["id"],),
-        VFolderOperationStatus.DELETE_PENDING,
-    )
+        await update_vfolder_status(
+            conn,
+            (entry["id"],),
+            VFolderOperationStatus.DELETE_PENDING,
+        )
 
 
 class DeleteRequestModel(BaseModel):
@@ -2445,14 +2444,15 @@ async def delete_from_trash_bin(
         # query_accesible_vfolders returns list
         entry = entries[0]
 
-    folder_host = entry["host"]
-    # fs-level deletion may fail or take longer time
-    await initiate_vfolder_deletion(
-        root_ctx.db,
-        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
-        root_ctx.storage_manager,
-        app_ctx.storage_ptask_group,
-    )
+        folder_host = entry["host"]
+        # fs-level deletion may fail or take longer time
+        await initiate_vfolder_deletion(
+            conn,
+            root_ctx.storage_manager,
+            [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
+            app_ctx.storage_ptask_group,
+        )
+
     return web.Response(status=204)
 
 
@@ -2580,9 +2580,10 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot restore the vfolder that is not owned by myself.")
 
-    # fs-level mv may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
+        # fs-level mv may fail or take longer time
+        # but let's complete the db transaction to reflect that it's deleted.
+        await update_vfolder_status(conn, (entry["id"],), VFolderOperationStatus.READY)
+
     return web.Response(status=204)
 
 
@@ -2631,10 +2632,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         perm,
     )
     async with root_ctx.db.begin() as conn:
-        query = sa.delete(vfolders).where(
-            (vfolders.c.id == vfolder_id)
-            & (vfolders.c.user == user_uuid)
-            & (vfolders.c.reference_id.isnot(None))
+        query = sa.delete(shared_vfolders).where(
+            (vfolders.c.id == vfolder_id) & (vfolders.c.user == user_uuid)
         )
         await conn.execute(query)
     resp = {"msg": "left the shared vfolder"}
@@ -2909,19 +2908,13 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     async with root_ctx.db.begin() as conn:
         if perm is not None:
             query = (
-                sa.update(vfolders)
+                sa.update(shared_vfolders)
                 .values(permission=perm)
-                .where(
-                    (vfolders.c.id == vfolder_id)
-                    & (vfolders.c.user == user_uuid)
-                    & (vfolders.c.reference_id.isnot(None))
-                )
+                .where((shared_vfolders.c.id == vfolder_id) & (shared_vfolders.c.user == user_uuid))
             )
         else:
-            query = sa.delete(vfolders).where(
-                (vfolders.c.id == vfolder_id)
-                & (vfolders.c.user == user_uuid)
-                & (vfolders.c.reference_id.isnot(None))
+            query = sa.delete(shared_vfolders).where(
+                (vfolders.c.id == vfolder_id) & (vfolders.c.user == user_uuid)
             )
         await conn.execute(query)
     resp = {"msg": "shared vfolder permission updated"}
@@ -3431,10 +3424,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             )
             await conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
-            query = sa.delete(vfolders).where(
-                (vfolders.c.id == vfolder_id)
-                & (vfolders.c.user == user_info.uuid)
-                & (vfolders.c.reference_id.isnot(None))
+            query = sa.delete(shared_vfolders).where(
+                (shared_vfolders.c.id == vfolder_id) & (shared_vfolders.c.user == user_info.uuid)
             )
             await conn.execute(query)
 
