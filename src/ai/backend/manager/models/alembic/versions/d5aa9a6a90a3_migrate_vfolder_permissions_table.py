@@ -1,7 +1,7 @@
 """Migrate vfolder_permissions to vfolders
 
 Revision ID: d5aa9a6a90a3
-Revises: 857b763b8618
+Revises: dddf9be580f5
 Create Date: 2024-04-22 04:44:01.999156
 
 """
@@ -25,7 +25,7 @@ from ai.backend.manager.models.view_utils import CreateView, DropView
 
 # revision identifiers, used by Alembic.
 revision = "d5aa9a6a90a3"
-down_revision = "857b763b8618"
+down_revision = "dddf9be580f5"
 branch_labels = None
 depends_on = None
 
