@@ -1101,14 +1101,12 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
+        from . import SharedVFoldersView, VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
 
         async with engine.begin_session() as conn:
             # Note: user_uuid는 마이그레이션 된 이후이므로 creator 컬럼을 확인해 지워야 함.
             await conn.execute(
-                sa.delete(vfolders).where(
-                    (vfolders.c.creator == email) & (vfolders.c.reference_id.isnot(None))
-                ),
+                sa.delete(SharedVFoldersView).where((SharedVFoldersView.creator == email)),
             )
             result = await conn.execute(
                 sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id]).where(

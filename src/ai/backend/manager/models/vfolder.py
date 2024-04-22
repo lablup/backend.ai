@@ -1446,11 +1446,10 @@ class VirtualFolder(graphene.ObjectType):
 
         query = (
             sa.select([sa.func.count()])
-            .select_from(vfolders)
+            .select_from(SharedVFoldersView)
             .where(
-                (vfolders.c.user == user_id)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.reference_id.isnot(None))
+                (SharedVFoldersView.user == user_id)
+                & (SharedVFoldersView.ownership_type == VFolderOwnershipType.USER)
             )
         )
         if domain_name is not None:
@@ -1646,13 +1645,9 @@ class VirtualFolderPermission(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(vfolders)
-            .where(vfolders.c.reference_id.isnot(None))
-        )
+        query = sa.select([sa.func.count()]).select_from(SharedVFoldersView)
         if user_id is not None:
-            query = query.where((vfolders.c.user == user_id))
+            query = query.where((SharedVFoldersView.user == user_id))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
