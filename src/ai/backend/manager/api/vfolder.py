@@ -2384,10 +2384,6 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
             raise InvalidAPIParameters(f"No such vfolder (name: {folder_name})")
         # query_accesible_vfolders returns list
         entry = entries[0]
-        # Check if the user has permission to delete the vfolder.
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise VFolderPermissionError()
-
     return CompactVFolderInfoModel(id=entry["id"], name=folder_name)
 
 
