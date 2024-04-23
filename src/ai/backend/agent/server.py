@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
+import json
 import logging
 import logging.config
 import os
@@ -10,6 +11,7 @@ import os.path
 import shutil
 import signal
 import sys
+from collections import OrderedDict, defaultdict
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -193,6 +195,7 @@ class AgentRPCServer(aobject):
     agent_addr: str
 
     _stop_signal: signal.Signals
+    debug_server_task: asyncio.Task
 
     def __init__(
         self,
@@ -275,12 +278,67 @@ class AgentRPCServer(aobject):
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
         log.info("started handling RPC requests at {}", rpc_addr)
 
+        debug_socket_path = (
+            self.local_config["agent"]["ipc-base-path"] / "agent-registry-snapshot.sock"
+        )
+        server = await asyncio.start_unix_server(
+            self.status_snapshot_request_handler, debug_socket_path.as_posix()
+        )
+
+        async def _debug_server_task():
+            try:
+                async with server:
+                    await server.serve_forever()
+            except Exception:
+                log.exception("_debug_server_task():")
+                raise
+
+        self.debug_server_task = asyncio.create_task(_debug_server_task())
+
         await self.etcd.put("ip", rpc_addr.host, scope=ConfigScopes.NODE)
         watcher_port = utils.nmget(self.local_config, "watcher.service-addr.port", None)
         if watcher_port is not None:
             await self.etcd.put("watcher_port", watcher_port, scope=ConfigScopes.NODE)
 
         await self.update_status("running")
+
+    async def status_snapshot_request_handler(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        def _ensure_serializable(o) -> Any:
+            match o:
+                case dict() | defaultdict() | OrderedDict():
+                    return {_ensure_serializable(k): _ensure_serializable(v) for k, v in o.items()}
+                case list():
+                    return [_ensure_serializable(e) for e in o]
+                case set():
+                    return set([_ensure_serializable(e) for e in o])
+                case tuple():
+                    return tuple([_ensure_serializable(e) for e in o])
+                case _:
+                    return str(o)
+
+        try:
+            if self.agent:
+                snapshot = {
+                    "registry": {
+                        str(kern_id): _ensure_serializable(kern.__getstate__())
+                        for kern_id, kern in self.agent.kernel_registry.items()
+                    },
+                    "allocs": {
+                        str(computer): _ensure_serializable(
+                            dict(computer_ctx.alloc_map.allocations)
+                        )
+                        for computer, computer_ctx in self.agent.computers.items()
+                    },
+                }
+                writer.write(json.dumps(snapshot, ensure_ascii=False, indent=2).encode())
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            log.exception("status_snapshot_request_handler():")
+            raise
 
     async def detect_manager(self):
         log.info("detecting the manager...")
@@ -345,6 +403,8 @@ class AgentRPCServer(aobject):
     async def __aexit__(self, *exc_info) -> None:
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
+        self.debug_server_task.cancel()
+        await self.debug_server_task
         await self.agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()

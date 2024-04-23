@@ -292,7 +292,8 @@ class VFolder(BaseFunction):
         rqst.set_json({
             "id": self.id.hex,
         })
-        return {}
+        async with rqst.fetch():
+            return {}
 
     @api_function
     async def rename(self, new_name):
