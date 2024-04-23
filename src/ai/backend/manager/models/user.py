@@ -1054,11 +1054,16 @@ class PurgeUser(graphene.Mutation):
                 & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
             )
             await conn.execute(delete_vfolder_invitation_query)
-            delete_vfolder_permission_query = sa.delete(vfolders).where(
+
+            delete_shared_vfolder_from_target_user_query = sa.delete(vfolders).where(
                 (vfolders.c.user == target_user_uuid)
                 & (vfolders.c.reference_id.in_(migrate_vfolder_ids))
             )
-            await conn.execute(delete_vfolder_permission_query)
+            await conn.execute(delete_shared_vfolder_from_target_user_query)
+            delete_original_vfolders_from_deleted_user_query = sa.delete(vfolders).where(
+                (vfolders.c.user == deleted_user_uuid) & (vfolders.c.reference_id.isnot(None))
+            )
+            await conn.execute(delete_original_vfolders_from_deleted_user_query)
 
             rowcount = 0
             for vfolder_to_migrate in migrate_updates:
