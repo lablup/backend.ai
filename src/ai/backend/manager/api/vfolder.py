@@ -333,7 +333,8 @@ class CreateRequestModel(BaseModel):
         validation_alias=AliasChoices("perm", "permission"),
         description=f"Permission that apply to vfolder. One of {[perm.value for perm in VFolderPermission]}.",
     )
-    unmanaged_path: str = Field(
+    unmanaged_path: str | None = Field(
+        default=None,
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         description="Path of vfolder that is not belong to any host. (Admin only)",
     )
@@ -2209,7 +2210,7 @@ class CompactVFolderInfoModel(BaseResponseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_api_params_handler(IDRequestModel)
-async def get_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
+async def get_id_by_name(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
 
     folder_name = params.name
@@ -3405,7 +3406,7 @@ def create_app(default_cors_options):
     cors.add(root_resource.add_route("GET", list_folders))
     cors.add(root_resource.add_route("DELETE", delete))
     cors.add(add_route("GET", "/info", get_info))
-    cors.add(add_route("GET", "/id", get_id))
+    cors.add(add_route("GET", "/id", get_id_by_name))
     cors.add(add_route("GET", "/hosts", list_hosts))
     cors.add(add_route("GET", "/all-hosts", list_all_hosts))
     cors.add(add_route("GET", "/allowed-types", list_allowed_types))
@@ -3427,6 +3428,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", "/purge", purge))
     cors.add(add_route("POST", "/restore-from-trash-bin", restore))
     cors.add(add_route("POST", "/delete-from-trash-bin", delete_from_trash_bin))
+    cors.add(add_route("DELETE", "/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("GET", "/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
     cors.add(add_route("GET", "/invitations/list", invitations))

@@ -127,7 +127,7 @@ from .utils import (
     catch_unexpected,
     check_api_params,
     get_access_key_scopes,
-    pydantic_params_api_handler,
+    pydantic_api_params_handler,
     undefined,
 )
 
@@ -1033,7 +1033,7 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(ConvertSessionToImageRequesteModel)
+@pydantic_api_params_handler(ConvertSessionToImageRequesteModel)
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
