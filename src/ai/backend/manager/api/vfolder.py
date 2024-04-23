@@ -882,7 +882,7 @@ async def list_allowed_types(request: web.Request) -> web.Response:
 async def get_info(
     request: web.Request, params: IDBasedRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     resp: Dict[str, Any] = {}
     folder_name = row["name"]
@@ -1006,7 +1006,7 @@ class RenameRequestModel(IDBasedRequestModel):
 async def rename_vfolder(
     request: web.Request, params: RenameRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     old_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1074,14 +1074,18 @@ class UpdateRequestModel(IDBasedRequestModel):
 async def update_vfolder_options(
     request: web.Request, params: UpdateRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
+        query = (
+            sa.select([vfolders.c.host])
+            .select_from(vfolders)
+            .where(vfolders.c.id == params.vfolder_id)
+        )
         folder_host = await conn.scalar(query)
         await ensure_host_permission_allowed(
             conn,
@@ -1105,7 +1109,11 @@ async def update_vfolder_options(
 
     if len(updated_fields) > 0:
         async with root_ctx.db.begin() as conn:
-            query = sa.update(vfolders).values(**updated_fields).where(vfolders.c.id == row["id"])
+            query = (
+                sa.update(vfolders)
+                .values(**updated_fields)
+                .where(vfolders.c.id == params.vfolder_id)
+            )
             await conn.execute(query)
     return web.Response(status=201)
 
@@ -1123,7 +1131,7 @@ class MkdirRequestModel(IDBasedRequestModel):
 @pydantic_api_params_handler(MkdirRequestModel)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 async def mkdir(request: web.Request, params: MkdirRequestModel, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1141,7 +1149,7 @@ async def mkdir(request: web.Request, params: MkdirRequestModel, row: VFolderRow
         "folder/file/mkdir",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpath": params.path,
             "parents": params.parents,
             "exist_ok": params.exist_ok,
@@ -1170,7 +1178,7 @@ class CreateDownloadSessionRequestModel(IDBasedRequestModel):
 async def create_download_session(
     request: web.Request, params: CreateDownloadSessionRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{}, path:{})"
     log_args = (
@@ -1203,7 +1211,7 @@ async def create_download_session(
         "folder/file/download",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpath": params.path,
             "unmanaged_path": unmanaged_path if unmanaged_path else None,
         },
@@ -1228,7 +1236,7 @@ class CreateUploadSessionRequestModel(IDBasedRequestModel):
 async def create_upload_session(
     request: web.Request, params: CreateUploadSessionRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1257,7 +1265,7 @@ async def create_upload_session(
         "folder/file/upload",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpath": params.path,
             "size": params.size,
         },
@@ -1282,7 +1290,7 @@ class RenameFileRequestModel(IDBasedRequestModel):
 async def rename_file(
     request: web.Request, params: RenameFileRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1316,7 +1324,7 @@ async def rename_file(
         "folder/file/rename",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpath": params.target_path,
             "new_name": params.new_name,
         },
@@ -1337,7 +1345,7 @@ class MoveFileRequestModel(IDBasedRequestModel):
 async def move_file(
     request: web.Request, params: MoveFileRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1356,7 +1364,7 @@ async def move_file(
         "folder/file/move",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "src_relpath": params.src,
             "dst_relpath": params.dst,
         },
@@ -1377,7 +1385,7 @@ class DeleteFileRequestModel(IDBasedRequestModel):
 async def delete_files(
     request: web.Request, params: DeleteFileRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1397,7 +1405,7 @@ async def delete_files(
         "folder/file/delete",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpaths": params.files,
             "recursive": recursive,
         },
@@ -1417,7 +1425,7 @@ class ListFileRequestModel(IDBasedRequestModel):
 async def list_files(
     request: web.Request, params: ListFileRequestModel, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
@@ -1435,7 +1443,7 @@ async def list_files(
         "folder/file/list",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "vfid": str(VFolderID(row["quota_scope_id"], params.vfolder_id)),
             "relpath": params.path,
         },
     ) as (_, storage_resp):
@@ -1507,8 +1515,11 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
 
 
 class UpdateInvitationRequestModel(BaseModel):
+    inv_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("inv_id", "invId", "invitation_id", "invitationId"),
+        description="VFolder Invitation ID",
+    )
     permission: VFolderPermission = Field(
-        default=None,
         validation_alias=AliasChoices(
             "permission",
             "perm",
@@ -1528,7 +1539,7 @@ async def update_invitation(
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    inv_id = request.match_info["inv_id"]
+    inv_id = params.inv_id
     perm = params.permission
     log.info(
         "VFOLDER.UPDATE_INVITATION (email:{}, ak:{}, inv:{})",
@@ -1911,12 +1922,12 @@ async def share(request: web.Request, params: ShareRequestModel) -> web.Response
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
     log.info(
         "VFOLDER.SHARE (email:{}, ak:{}, vf:{}, perm:{}, users:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
         params.perm,
         ",".join(params.emails),
     )
@@ -1932,7 +1943,7 @@ async def share(request: web.Request, params: ShareRequestModel) -> web.Response
             .select_from(vfolders)
             .where(
                 (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
-                & (vfolders.c.name == folder_name),
+                & (vfolders.c.id == folder_id),
             )
         )
         result = await conn.execute(query)
@@ -1940,7 +1951,7 @@ async def share(request: web.Request, params: ShareRequestModel) -> web.Response
         if len(vf_infos) < 1:
             raise VFolderNotFound("Only project folders are directly sharable.")
         if len(vf_infos) > 1:
-            raise InternalServerError(f"Multiple project folders found: {folder_name}")
+            raise InternalServerError(f"Multiple project folders found: {folder_id}")
         vf_info = vf_infos[0]
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
@@ -2033,12 +2044,12 @@ async def unshare(request: web.Request, params: UnshareRequestModel) -> web.Resp
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
     log.info(
         "VFOLDER.UNSHARE (email:{}, ak:{}, vf:{}, users:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
         ",".join(params.emails),
     )
     user_uuid = request["user"]["uuid"]
@@ -2051,7 +2062,7 @@ async def unshare(request: web.Request, params: UnshareRequestModel) -> web.Resp
             .select_from(vfolders)
             .where(
                 (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
-                & (vfolders.c.name == folder_name),
+                & (vfolders.c.id == folder_id),
             )
         )
         result = await conn.execute(query)
@@ -2059,7 +2070,7 @@ async def unshare(request: web.Request, params: UnshareRequestModel) -> web.Resp
         if len(vf_infos) < 1:
             raise VFolderNotFound("Only project folders are directly unsharable.")
         if len(vf_infos) > 1:
-            raise InternalServerError(f"Multiple project folders found: {folder_name}")
+            raise InternalServerError(f"Multiple project folders found: {folder_id}")
         vf_info = vf_infos[0]
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
@@ -2469,7 +2480,7 @@ async def leave(request: web.Request, params: LeaveRequestModel, row: VFolderRow
 
     Cannot leave a group vfolder or a vfolder that the requesting user owns.
     """
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
 
@@ -2478,7 +2489,7 @@ async def leave(request: web.Request, params: LeaveRequestModel, row: VFolderRow
     user_role = request["user"]["role"]
     rqst_user_uuid = request["user"]["uuid"]
     shared_user_uuid = params.shared_user_uuid
-    vfolder_id = row["id"]
+    vfolder_id = params.vfolder_id
     perm = row["permission"]
 
     if shared_user_uuid:
@@ -2533,7 +2544,7 @@ class CloneRequestModel(IDBasedRequestModel):
 @pydantic_api_params_handler(CloneRequestModel)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 async def clone(request: web.Request, params: CloneRequestModel, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params.vfolder_id)
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2552,7 +2563,7 @@ async def clone(request: web.Request, params: CloneRequestModel, row: VFolderRow
         params.permission.value,
     )
     source_folder_host = row["host"]
-    source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
+    source_folder_id = VFolderID(row["quota_scope_id"], params.vfolder_id)
     target_folder_host = params.folder_host
     if not target_folder_host:
         target_folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
@@ -3430,7 +3441,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", "/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("DELETE", "/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("GET", "/invitations/list-sent", list_sent_invitations))
-    cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
+    cors.add(add_route("POST", "/invitations/update", update_invitation))
     cors.add(add_route("GET", "/invitations/list", invitations))
     cors.add(add_route("POST", "/invitations/accept", accept_invitation))
     cors.add(add_route("DELETE", "/invitations/delete", delete_invitation))
