@@ -17,6 +17,10 @@ class ResourceError(ValueError):
     pass
 
 
+class InvalidArgumentError(RuntimeError):
+    pass
+
+
 class UnsupportedResource(ResourceError):
     pass
 

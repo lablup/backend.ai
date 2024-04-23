@@ -923,7 +923,7 @@ class SessionRow(Base):
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] = [],
+        eager_loading_op: list[Any] | None = None,
     ) -> SessionRow:
         """
         Retrieve the session information by session's UUID,
@@ -939,9 +939,10 @@ class SessionRow(Base):
         :param kernel_loading_strategy: Determines JOIN strategy of `kernels` relation when fetching session rows.
         :param eager_loading_op: Extra loading operators to be passed directly to `match_sessions()` API.
         """
+        _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend([
+                _eager_loading_op.extend([
                     noload("*"),
                     selectinload(SessionRow.kernels).options(
                         noload("*"),
@@ -951,7 +952,7 @@ class SessionRow(Base):
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend([
+                _eager_loading_op.extend([
                     noload("*"),
                     selectinload(kernel_rel).options(
                         noload("*"),
@@ -965,7 +966,7 @@ class SessionRow(Base):
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            eager_loading_op=eager_loading_op,
+            eager_loading_op=_eager_loading_op,
         )
         if not session_list:
             raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
@@ -992,11 +993,12 @@ class SessionRow(Base):
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy=KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] = [],
+        eager_loading_op: list[Any] | None = None,
     ) -> Iterable[SessionRow]:
+        _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend([
+                _eager_loading_op.extend([
                     noload("*"),
                     selectinload(SessionRow.kernels).options(
                         noload("*"),
@@ -1006,7 +1008,7 @@ class SessionRow(Base):
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend([
+                _eager_loading_op.extend([
                     noload("*"),
                     selectinload(kernel_rel).options(
                         noload("*"),
@@ -1020,7 +1022,7 @@ class SessionRow(Base):
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            eager_loading_op=eager_loading_op,
+            eager_loading_op=_eager_loading_op,
         )
         try:
             return session_list
@@ -1191,6 +1193,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
+    requested_slots = graphene.JSONString(description="Added in 24.03.0")
 
     # statistics
     num_queries = BigInt()
@@ -1259,6 +1262,7 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
         }
@@ -1372,6 +1376,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
@@ -1401,6 +1406,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),

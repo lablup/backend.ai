@@ -748,6 +748,7 @@ def main(
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     cfg = config.check(raw_cfg, config_iv)
+    config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
 
     if ctx.invoked_subcommand is None:
         cfg["webserver"]["pid-file"].write_text(str(os.getpid()))

@@ -587,9 +587,17 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> Succes
             open_to_public=params.open_to_public,
         )
         db_sess.add(endpoint)
-        await db_sess.commit()
+        await db_sess.flush()
+        endpoint_id = endpoint.id
 
-    return SuccessResponseModel()
+    return ServeInfoModel(
+        endpoint_id=endpoint_id,
+        name=params.service_name,
+        desired_session_count=params.desired_session_count,
+        active_routes=[],
+        service_endpoint=None,
+        is_public=params.open_to_public,
+    )
 
 
 class TryStartResponseModel(BaseModel):

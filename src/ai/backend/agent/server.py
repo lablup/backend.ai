@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
+import json
 import logging
 import logging.config
 import os
@@ -10,6 +11,7 @@ import os.path
 import shutil
 import signal
 import sys
+from collections import OrderedDict, defaultdict
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -47,11 +49,10 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
-from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
-    EventProducer,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
@@ -59,9 +60,9 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
-    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
+    ImageRegistry,
     KernelCreationConfig,
     KernelId,
     LogSeverity,
@@ -194,6 +195,7 @@ class AgentRPCServer(aobject):
     agent_addr: str
 
     _stop_signal: signal.Signals
+    debug_server_task: asyncio.Task
 
     def __init__(
         self,
@@ -217,7 +219,6 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
-        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
@@ -277,12 +278,67 @@ class AgentRPCServer(aobject):
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
         log.info("started handling RPC requests at {}", rpc_addr)
 
+        debug_socket_path = (
+            self.local_config["agent"]["ipc-base-path"] / "agent-registry-snapshot.sock"
+        )
+        server = await asyncio.start_unix_server(
+            self.status_snapshot_request_handler, debug_socket_path.as_posix()
+        )
+
+        async def _debug_server_task():
+            try:
+                async with server:
+                    await server.serve_forever()
+            except Exception:
+                log.exception("_debug_server_task():")
+                raise
+
+        self.debug_server_task = asyncio.create_task(_debug_server_task())
+
         await self.etcd.put("ip", rpc_addr.host, scope=ConfigScopes.NODE)
         watcher_port = utils.nmget(self.local_config, "watcher.service-addr.port", None)
         if watcher_port is not None:
             await self.etcd.put("watcher_port", watcher_port, scope=ConfigScopes.NODE)
 
         await self.update_status("running")
+
+    async def status_snapshot_request_handler(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        def _ensure_serializable(o) -> Any:
+            match o:
+                case dict() | defaultdict() | OrderedDict():
+                    return {_ensure_serializable(k): _ensure_serializable(v) for k, v in o.items()}
+                case list():
+                    return [_ensure_serializable(e) for e in o]
+                case set():
+                    return set([_ensure_serializable(e) for e in o])
+                case tuple():
+                    return tuple([_ensure_serializable(e) for e in o])
+                case _:
+                    return str(o)
+
+        try:
+            if self.agent:
+                snapshot = {
+                    "registry": {
+                        str(kern_id): _ensure_serializable(kern.__getstate__())
+                        for kern_id, kern in self.agent.kernel_registry.items()
+                    },
+                    "allocs": {
+                        str(computer): _ensure_serializable(
+                            dict(computer_ctx.alloc_map.allocations)
+                        )
+                        for computer, computer_ctx in self.agent.computers.items()
+                    },
+                }
+                writer.write(json.dumps(snapshot, ensure_ascii=False, indent=2).encode())
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            log.exception("status_snapshot_request_handler():")
+            raise
 
     async def detect_manager(self):
         log.info("detecting the manager...")
@@ -338,13 +394,6 @@ class AgentRPCServer(aobject):
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
 
-    async def init_background_task_manager(self):
-        event_producer = await EventProducer.new(
-            cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=REDIS_STREAM_DB,
-        )
-        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
-
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
 
@@ -354,6 +403,8 @@ class AgentRPCServer(aobject):
     async def __aexit__(self, *exc_info) -> None:
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
+        self.debug_server_task.cancel()
+        await self.debug_server_task
         await self.agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
@@ -608,20 +659,59 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         subdir: str,
-        filename: str,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
-        bgtask_mgr = self.local_config["background_task_manager"]
-        task_id = await bgtask_mgr.start(
-            self.agent.commit,
-            kernel_id=KernelId(UUID(kernel_id)),
-            subdir=subdir,
-            filename=filename,
-        )
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _commit(reporter: ProgressReporter) -> None:
+            await self.agent.commit(
+                reporter,
+                KernelId(UUID(kernel_id)),
+                subdir,
+                canonical=canonical,
+                filename=filename,
+                extra_labels=extra_labels,
+            )
+
+        task_id = await bgtask_mgr.start(_commit)
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(Path(subdir, filename)),
+            "path": str(Path(subdir, filename)) if filename else None,
+        }
+
+    @rpc_function
+    @collect_error
+    async def push_image(
+        self,
+        canonical: str,
+        architecture: str,
+        registry_conf: ImageRegistry,
+        *,
+        is_local: bool = False,
+    ) -> dict[str, Any]:
+        log.info("rpc::push_image(c:{})", canonical)
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _push_image(reporter: ProgressReporter) -> None:
+            await self.agent.push_image(
+                ImageRef(
+                    canonical,
+                    known_registries=["*"],
+                    is_local=is_local,
+                    architecture=architecture,
+                ),
+                registry_conf,
+            )
+
+        task_id = await bgtask_mgr.start(_push_image)
+        return {
+            "bgtask_id": str(task_id),
+            "canonical": canonical,
         }
 
     @rpc_function

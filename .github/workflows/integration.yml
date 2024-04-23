@@ -45,12 +45,10 @@ jobs:
       shell: 'script -q -e -c "bash {0}"'
       run: |
         ./scripts/install-dev.sh
-        source env-tester-admin.sh
         ./backend.ai test run-cli admin
-        source env-tester-user.sh
         ./backend.ai test run-cli user
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log

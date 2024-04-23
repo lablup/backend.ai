@@ -37,7 +37,8 @@
     "Using": "Käyttämällä",
     "WarboyEnabled": "Warboy NPU käytössä",
     "connectingToCluster": "Yhteyden muodostaminen Backend.AI-klusteriin...",
-    "reserved": "varattu"
+    "reserved": "varattu",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU käytössä"
   },
   "error": {
     "WrongAPIServerAddress": "Väärä API-palvelimen osoite.",
@@ -63,7 +64,8 @@
     "UpdateError": "Päivitysvirhe",
     "UserHasNoGroup": "Käyttäjällä ei ole ryhmää. Ota yhteyttä ylläpitäjään sen korjaamiseksi.",
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
-    "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu."
+    "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
+    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään."
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
@@ -127,7 +129,13 @@
     "Share": "Jaa",
     "Unset": "Unset",
     "Update": "Päivitys",
-    "Yes": "Kyllä"
+    "Yes": "Kyllä",
+    "Clone": "Klooni",
+    "Download": "ladata",
+    "Config": "Config",
+    "Next": "Seuraava",
+    "Previous": "Edellinen",
+    "PushToImage": "Työnnä istunto mukautettuun kuvaan"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -205,7 +213,9 @@
       "PolicyName": "Vakuutuksen nimi Pakollinen.",
       "ValidationFailed": "Validointi epäonnistui"
     },
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Ota sudo-istunto käyttöön",
+    "MainAccessKey": "Pääkäyttöavain",
+    "InactivateTheFollowingUsers": "Poista seuraavat käyttäjät käytöstä."
   },
   "data": {
     "Allowslettersnumbersand-_": "Sallii kirjaimet, numerot ja -_",
@@ -294,7 +304,8 @@
       "UseNewFileExtension": "Käytä",
       "ValueRequired": "Arvo vaaditaan",
       "ValueShouldBeStarted": "Polun tulee alkaa kirjaimella .(piste) tai vain kirjaimilla ja numeroilla.",
-      "WritePermissionRequiredInUploadFiles": "Tiedoston (tiedostojen) lataaminen edellyttää kirjoitusoikeutta."
+      "WritePermissionRequiredInUploadFiles": "Tiedoston (tiedostojen) lataaminen edellyttää kirjoitusoikeutta.",
+      "DownloadNotAllowed": "Tiedoston/kansion lataaminen ei ole sallittua tässä kansiossa."
     },
     "folders": {
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
@@ -311,7 +322,7 @@
       "FileRenamed": "Tiedosto nimetty uudelleen",
       "FolderCloned": "Kloonattu kansio",
       "FolderCreated": "Kansio luotu",
-      "FolderDeleted": "Kansio poistettu",
+      "FolderDeleted": "Kansio {{ folderName }} on poistettu.",
       "FolderDisconnected": "Kansio on katkaistu.",
       "FolderInfo": "Info",
       "FolderNameMismatched": "Kansion nimi ei täsmää. Tarkista, onko syöttökentässä välilyönti vai ei.",
@@ -347,7 +358,13 @@
       "TypeFolderNameToDelete": "Kirjoita poistettavan kansion nimi",
       "TypeFolderNameToLeave": "Kirjoita poistuvan kansion nimi",
       "TypeNewFolderName": "Kirjoita uuden kansion nimi",
-      "View": "Näytä"
+      "View": "Näytä",
+      "MoveToTrashBin": "Siirrä roskakoriin",
+      "MovedToTrashBin": "Kansio {{ folderName }} on siirretty roskakoriin.",
+      "DeleteForever": "Poista ikuisesti",
+      "Restore": "Palauttaa",
+      "FolderRestored": "Kansio {{ folderName }} on palautettu.",
+      "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi."
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
@@ -371,28 +388,16 @@
       "StatusOfSelectedHost": "Valitun isännän tila",
       "used": "käytetty"
     },
-    "SearchByName": "Hae nimellä"
+    "SearchByName": "Hae nimellä",
+    "ModelStore": "Mallikauppa",
+    "Add": "Lisätä",
+    "CloningIsOnlyPossibleSameHost": "Tällä hetkellä kloonaus on mahdollista vain samassa isännässä.",
+    "New": "Uusi",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
-    "ErrorOccurred": "Tapahtunut virhe",
-    "ask": {
-      "DoYouWantToProceed": "Haluatteko jatkaa?"
-    },
-    "error": {
-      "Error": "Virhe"
-    },
-    "hide": {
-      "DonotShowThisAgain": "Älä näytä tätä enää."
-    },
-    "title": {
-      "LetsDouble-Check": "Tupla-tarkistetaan",
-      "Notice": "Ilmoitus"
-    },
     "warning": {
-      "CannotBeUndone": "VAROITUS: tätä ei voi perua!",
-      "LogDeletion": "Haluatko varmasti poistaa kaikki lokiviestit?",
-      "Required": "Vaadittu",
-      "WillBeAppliedToNewSessions": "Tätä päivitystä sovelletaan uusiin istuntoihin."
+      "DeleteForeverDesc": "VAROITUS: valitut kohteet poistetaan pysyvästi, etkä voi palauttaa niitä."
     }
   },
   "eduapi": {
@@ -453,7 +458,8 @@
     "Status": "Tila",
     "SuccessfullyModified": "Muutettu onnistuneesti",
     "TakesTime": ". Se vie aikaa, joten ota kuppi kahvia!",
-    "Version": "Versio"
+    "Version": "Versio",
+    "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -476,7 +482,10 @@
     "Username": "Käyttäjätunnus",
     "cores": "ytimet",
     "None": "Ei ole",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Kuva",
+    "All": "Kaikki",
+    "InProgress": "Käynnissä",
+    "Session": "Istunto"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -490,15 +499,15 @@
     "GetAndRunNotebook": "Tuo ja suorita",
     "GetToFolder": "Siirry kansioon",
     "GitHubURL": "GitHub URL",
-    "GithubAPIEtcError": "Github-palvelimen ongelma.",
-    "GithubAPILimitError": "Github API-rajoitusvirhe.",
-    "GithubInternalError": "Githubin sisäinen virhe.",
-    "GitlabDefaultBranch": "Gitlab Branchin nimi",
-    "GitlabRepoWillBeFolder": "Tuodut Gitlab-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
-    "GitlabURL": "Gitlabin URL-osoite",
+    "GithubAPIEtcError": "GitHub-palvelimen ongelma.",
+    "GithubAPILimitError": "GitHub API-rajoitusvirhe.",
+    "GithubInternalError": "GitHubin sisäinen virhe.",
+    "GitlabDefaultBranch": "GitLab Branchin nimi",
+    "GitlabRepoWillBeFolder": "Tuodut GitLab-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
+    "GitlabURL": "GitLabin URL-osoite",
     "ImportFinished": "Tuonti valmis.",
-    "ImportGithubRepo": "Tuo Github-repositoriosta",
-    "ImportGitlabRepo": "Tuo Gitlab-repositoriosta",
+    "ImportGithubRepo": "Tuo GitHub-repositoriosta",
+    "ImportGitlabRepo": "Tuo GitLab-repositoriosta",
     "ImportNotebook": "Tuo muistikirja",
     "NoNotebookCode": "Muistikirjan osoite on tyhjä. Syötä voimassa oleva muistikirjan koodi kopioidaksesi virkamerkkikoodin.",
     "NoSuitableResourceFoundOnGivenURL": "Annetusta URL-osoitteesta ei löytynyt sopivaa resurssia.",
@@ -550,7 +559,8 @@
     "UsesSSL": "Käyttää SSL:ää"
   },
   "inputLimit": {
-    "4to64chars": "(4~64 merkkiä)"
+    "4to64chars": "(4~64 merkkiä)",
+    "4to32chars": "(4-32 merkkiä)"
   },
   "language": {
     "English": "English",
@@ -591,7 +601,6 @@
     "DescChangePasswordEmail": "Jos haluat lähettää sähköpostiviestin salasanasi vaihtamiseksi, kirjoita sähköpostiosoitteesi ja paina SEND-painiketta.",
     "DescConfirmLeave": "Vahvistaaksesi, kirjoita sähköpostiosoitteesi ja salasanasi uudelleen.",
     "DescEndpoint": "<p>API ENDPOINT -kenttään tulee syöttää Backend.AI-verkkopalvelimen URL-osoite, joka välittää pyynnön Managerille.</p><p>esim. http://127.0.0.1:8090/</p>",
-    "E-mail": "Sähköposti",
     "EmailSendButton": "Lähetä",
     "Endpoint": "Loppupiste",
     "EndpointHistory": "Loppupisteen historia",
@@ -603,7 +612,6 @@
     "LeaveService": "Jätä palvelu",
     "Login": "Kirjaudu sisään",
     "LoginAnotherway": "Haluatko kirjautua sisään toisella tavalla?",
-    "LoginWithE-mail": "Kirjaudu sisään sähköpostilla",
     "LoginWithIAM": "Kirjaudu sisään IAM:n avulla",
     "NoEndpointSaved": "Päätepistettä ei ole tallennettu.",
     "NotAUser": "Etkö ole käyttäjä?",
@@ -620,7 +628,9 @@
       "LoginWithSAML": "Kirjautuminen SAML:llä"
     },
     "TooManyAttempt": "Kirjautumisyrityksiä oli liikaa. Kirjautumisyritykset on estetty jonkin aikaa.",
-    "UpdatePasswordMessage": "Kirjoita sähköpostiosoitteesi ja uusi salasana ja paina sitten Päivitä-painiketta."
+    "UpdatePasswordMessage": "Kirjoita sähköpostiosoitteesi ja uusi salasana ja paina sitten Päivitä-painiketta.",
+    "LoginWithE-mailorUsername": "Kirjaudu sisään sähköpostilla tai käyttäjätunnuksella",
+    "E-mailorUsername": "Sähköpostiosoite tai käyttäjätunnus"
   },
   "logs": {
     "ErrorMessage": "Virheilmoitus",
@@ -634,7 +644,9 @@
     "RequestUrl": "Pyyntö Url",
     "Status": "Tila",
     "TimeStamp": "Aikaleima",
-    "UpTo3000Logs": "(Enintään 3000 viimeisintä lokia)"
+    "UpTo3000Logs": "(Enintään 3000 viimeisintä lokia)",
+    "ShowOnlyError": "Vain näyttövirhe",
+    "SearchLogs": "Hakulokit"
   },
   "maintenance": {
     "CleanupImages": "Siivous Kuvat",
@@ -709,13 +721,24 @@
     "TokenGenerationFailed": "Tokenin luominen epäonnistui. yritä uudelleen.",
     "TrafficRatio": "Liikennesuhde",
     "YouAreAboutToTerminate": "Olet lopettamassa",
-    "resources": "Resurssit"
+    "resources": "Resurssit",
+    "Owner": "Omistaja",
+    "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle.",
+    "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui.",
+    "FailedToUpdateService": "Palvelun päivittäminen epäonnistui.",
+    "ServiceCreated": "Mallipalvelun {{ name }} luominen onnistui.",
+    "ServiceUpdated": "Mallipalvelun {{ name }} päivitys onnistui.",
+    "ServiceTerminated": "Mallipalvelu {{ name }} on lopetettu onnistuneesti."
   },
   "notification": {
     "Initializing": "Aloitetaan...",
     "SeeDetail": "Katso lisätietoja",
     "SuccessfullyUpdated": "Päivitetty onnistuneesti",
-    "Visit": "Käy osoitteessa"
+    "Visit": "Käy osoitteessa",
+    "NoNotification": "Ei ilmoitusta.",
+    "Notifications": "Ilmoitukset",
+    "ClearNotifications": "Tyhjennä ilmoitukset",
+    "AreYouSureToClearAllNotifications": "Oletko varma, että tyhjennät kaikki ilmoitukset?"
   },
   "pipeline": {
     "Component": {
@@ -787,7 +810,8 @@
     "UpdatingRegistryInfo": "Rekisteritietojen päivittäminen...",
     "Username": "Käyttäjätunnus",
     "UsernameOptional": "Käyttäjätunnus (valinnainen)",
-    "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?"
+    "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?",
+    "DescURLFormat": "Virheellinen URL-tyyppi"
   },
   "resourceGroup": {
     "Active": "Aktiivinen",
@@ -966,12 +990,16 @@
     "VSCodeRemoteNoticeSSHConfig": "Jos haluat luoda saumattoman yhteyden Visual Studio Code -ohjelmistolle etälaskentaistuntoon, luo tai muokkaa $HOME/.ssh/config-tiedostoa ja lisää seuraava lohko.",
     "VSCodeRemotePasswordTitle": "Visual Studio Code SSH-etäsalasana",
     "Validation": {
-      "EnterValidSessionName": "Syötä kelvollinen istunnon nimi",
+      "EnterValidSessionName": "Anna vähintään neljän aakkosten kirjaimen tai numeron tai yhdysviivan tai alaviivan yhdistelmä.",
       "SessionNameAlreadyExist": "Istunnon nimi on jo olemassa",
       "SessionNameRequired": "Istunnon nimi vaaditaan",
       "SluggedStrings": "Slugged-merkkijonot (>3 merkkiä)",
       "SessionNameTooLong64": "Anna enintään 64 merkkiä.",
-      "PleaseFollowSessionNameRule": "Kirjoita vähintään 4 kirjaimen, numeroiden, '.', '_' ja '-' yhdistelmä."
+      "PleaseFollowSessionNameRule": "Kirjoita vähintään 4 kirjaimen, numeroiden, '.', '_' ja '-' yhdistelmä.",
+      "SessionNameTooShort": "Kirjoita vähintään 4 merkkiä.",
+      "SessionNameShouldStartWith": "Sen on alettava aakkosilla, numerolla tai '_'.",
+      "SessionNameShouldEndWith": "Sen on päätyttävä aakkosiin, numeroon tai '_'.",
+      "SessionNameInvalidCharacter": "Nimen keskellä voi olla vain aakkosia, numeroita ja '_'."
     },
     "XRDPconnection": "RDP-yhteys",
     "applauncher": {
@@ -1112,29 +1140,53 @@
       "Network": "Verkko",
       "Enable": "ota käyttöön",
       "StartTimeMustBeInTheFuture": "Alkamisajan on oltava nykyisen kellonajan jälkeen.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Jos asetat sen suuremmaksi kuin tällä hetkellä käytettävissä olevat resurssit, istunnon luominen viivästyy jonossa, kunnes se tulee saataville.",
+      "SessionName": "Istunnon nimi",
+      "ResetFormConfirm": "Haluatko nollata kaikki tietosi?",
+      "TemplateAndHistory": "Mallit",
+      "ScheduleTimeSimple": "Aseta aloitusaika",
       "ResourceAllocationPerContainer": "Resurssien jakaminen konttia kohti",
       "NumberOfContainer": "Säiliön numero",
       "EnterEnvironmentVariable": "Syötä muuttujan nimi",
       "EnvironmentVariableNamePatternError": "Muuttujan nimen on alettava kirjaimella tai alleviivauksella, ja se voi sisältää vain kirjaimia, numeroita ja alleviivauksia.",
-      "EnvironmentVariableDuplicateName": "Muuttujan nimi, joka on jo olemassa."
+      "EnvironmentVariableDuplicateName": "Muuttujan nimi, joka on jo olemassa.",
+      "ErrorCanNotExceedRemaining": "Ei voida asettaa suuremmaksi kuin jäljellä olevat resurssit ({{amount}}).",
+      "EnableAutomaticMiniumShmem": "Aseta jaetun muistin vähimmäismäärä",
+      "Template": "Istuntomalli",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Vain kokonaisluku on sallittu, kun klusterin koko on vähintään 2.",
+      "StartAfter": "Aloita sen jälkeen:",
+      "StartTimeDoesNotApply": "Jos aloitusaikaa ei ole asetettu, se ei ole voimassa.",
+      "MiniumAllocation": "Vähimmäisvaatimukset",
+      "MiniumAllocationTooltip": "Valitse valitun käyttöympäristön vähimmäisvaatimukseksi seuraavat tiedot",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Käytät \"{{launcher}}\"-istunnon käynnistintä.",
+      "SkipToConfirmAndLaunch": "Siirry arvosteluun",
+      "InteractiveModeDesc": "voit luoda, testata ja ajaa koodia vuorovaikutteisesti jupyter notebookin, visual studio code -ohjelman jne. avulla.",
+      "BatchModeDesc": "Voit ajaa koodisi useiden solmujen ja klustereiden kanssa ideasi skaalaamiseksi.",
+      "AddEnvironmentVariable": "Lisää ympäristömuuttujia",
+      "EnvironmentVariableValueRequired": "Anna arvo.",
+      "PleaseCompleteForm": "Lomake on puutteellinen tai sisältää virheitä. Tarkista syöttämäsi tiedot."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
     "MEM": "Muisti",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (muisti)"
+    "GPU(MEM)": "GPU (muisti)",
+    "Agents": "Agentit",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (muisti)",
+    "ConvertSessionToImage": "Muunna istunto kuvaksi",
+    "SessionName": "Istunnon nimi",
+    "SessionId": "Istunnon tunniste",
+    "EnvironmentAndVersion": "Ympäristö ja versio",
+    "Tags": "Tunnisteet"
   },
   "settings": {
     "ATOMsupport": "ATOM",
     "AllowAgentSideRegistration": "Salli agenttipuolen rekisteröinti",
     "CUDAGPUdisabledByFGPUsupport": "Ei käytössä, koska järjestelmä käyttää Fractional GPU -lisäosaa.",
-    "CUDAGPUsupport": "CUDA GPU-tuki",
     "Config": "Config",
     "ConfigPerJobSchduler": "Ajastimen asetukset",
     "ConfigPerJobSchdulerDescription": "Aikatauluttaja-asetuksen arvot ovat oletusarvoja, joita käytetään, kun kussakin resurssiryhmässä ei ole aikatauluttaja-asetusta. Jos resurssiryhmäkohtainen asetus on olemassa, tätä arvoa ei oteta huomioon.",
@@ -1192,7 +1244,12 @@
       "digest": "Digest",
       "none": "Ei ole",
       "tag": "Tag"
-    }
+    },
+    "OpenSourceCUDAGPUsupport": "Avoimen lähdekoodin CUDA GPU-tuki",
+    "ShowOnlyChanged": "Vain näyttö muuttuu",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Käytä Hyperaccel LPU -kiihdytintä.",
+    "RequireHyperaccelLPUPlugin": "Vaatii Backend.AI Hyperaccel LPU -laajennuksen."
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1280,7 +1337,8 @@
       "SelectProject": "Valitse projekti",
       "SelectUser": "Etsi ja valitse Käyttäjä",
       "UnsetCustomSettings": "Mukautettujen asetusten poistaminen"
-    }
+    },
+    "StorageSetting": "Tallennusasetus"
   },
   "totp": {
     "ConfirmTotpRemovalBody": "Oletko varma, ettet halua käyttää kaksitekijätodennusta?",
@@ -1291,7 +1349,9 @@
     "TotpSetupCompleted": "Käytössä 2FA",
     "TotpSetupNotAvailable": "Kaksitekijätodennusta ei voi ottaa käyttöön.",
     "TurnOffTotp": "Ota kaksitekijätodennus pois käytöstä",
-    "TypeInAuthKey": "Vaihtoehtoisesti voit kirjoittaa alla olevan todennuskoodin manuaalisesti."
+    "TypeInAuthKey": "Vaihtoehtoisesti voit kirjoittaa alla olevan todennuskoodin manuaalisesti.",
+    "EnterConfirmationCode": "Anna nyt autentikaattorin luoma OTP vahvistaaksesi.",
+    "RequireOTP": "Kirjoita OTP."
   },
   "update": {
     "NewWebUIVersionAvailable": "Uusi versio on saatavilla:"
@@ -1356,7 +1416,14 @@
     "SSHKeypairManagement": "SSH-avainparin hallinta",
     "SessionTerminationDialog": "Istunnon lopettamista ei voi peruuttaa. Haluatko jatkaa istunnon lopettamista?",
     "ShellEnvironments": "Shell-ympäristöt",
-    "UseCompactSidebar": "Käytä kompakti sivupalkki oletusarvoisesti"
+    "UseCompactSidebar": "Käytä kompakti sivupalkki oletusarvoisesti",
+    "DescMyKeypairInfo": "Katso avainparini tiedot",
+    "MyKeypairInfo": "Avainparini tiedot",
+    "DarkMode": "Tumma tila",
+    "LightMode": "Valotila",
+    "UseSystemSetting": "Käytä järjestelmäasetuksia",
+    "DescThemeMode": "Mukauta miltä Backend.AI WebUI näyttää laitteessasi.",
+    "ThemeMode": "Teematila"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -1434,9 +1501,49 @@
       "Update": "Päivitys",
       "UserCredentials&Policies": "Käyttäjien valtakirjat ja käytännöt",
       "Users": "Käyttäjät",
-      "WelcomeMessage": "Tervetuloa,",
-      "WelcomeMessage_2": " .",
-      "YouMushChangeYourPassword": "On suositeltavaa vaihtaa salasana säännöllisesti turvallisuussyistä. Koska salasanasi viimeisimmästä vaihtamisesta on kulunut tietty aika, sinun on vaihdettava se, jotta voit jatkaa palvelun käyttöä."
+      "WelcomeMessage": "Tervetuloa, {{ userName }}.",
+      "YouMushChangeYourPassword": "On suositeltavaa vaihtaa salasana säännöllisesti turvallisuussyistä. Koska salasanasi viimeisimmästä vaihtamisesta on kulunut tietty aika, sinun on vaihdettava se, jotta voit jatkaa palvelun käyttöä.",
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Syötä salasanasi",
+      "InvalidBlankEmail": "Syötä sähköpostiosoitteesi",
+      "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
+      "MyEnvironments": "Omat ympäristöt"
     }
+  },
+  "modelStore": {
+    "category": "Kategoria",
+    "Author": "Tekijä",
+    "Category": "Kategoria",
+    "CloneAsFolder": "Kloonaa kansioksi",
+    "CloneInfo": "Se kloonataan käyttäjätyypin kansioksi.",
+    "CloneSuccess": "Kloonipyyntö on lähetetty onnistuneesti.",
+    "Created": "Luotu",
+    "Description": "Kuvaus",
+    "FilterByName": "Suodata nimen mukaan",
+    "Framework": "puitteet",
+    "Label": "Label",
+    "HealthCheck": "Terveystarkastus",
+    "LastModified": "Viimeksi muokattu",
+    "MaxRetries": "Max Uudelleenyritykset",
+    "Metadata": "Metatiedot",
+    "MinResource": "Vähimmäisresurssi",
+    "Model": "Malli",
+    "ModelPath": "Mallin polku",
+    "Path": "Polku",
+    "Port": "Portti",
+    "PreStartActions": "Aloitustoiminnot",
+    "SearchModels": "Hae malleja",
+    "ServiceDetails": "Palvelun tiedot",
+    "StartCommand": "Käynnistä komento",
+    "Task": "Tehtävä",
+    "Version": "Versio"
+  },
+  "table": {
+    "SettingTable": "Kattaus",
+    "SelectColumnToDisplay": "Valitse näytettävät sarakkeet",
+    "SearchTableColumn": "Hae taulukon sarakkeita"
+  },
+  "setting": {
+    "SearchPlaceholder": "Kirjoita hakutermi"
   }
 }

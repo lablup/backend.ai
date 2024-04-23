@@ -260,12 +260,12 @@ def check_api_params(
 
 
 class BaseResponseModel(BaseModel):
-    status: Annotated[int, Field(strict=True, ge=100, lt=600)] = 200
+    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseResponseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 TPydanticResponse: TypeAlias = TResponseModel | list
 THandlerFuncWithoutParam: TypeAlias = Callable[
@@ -277,11 +277,13 @@ THandlerFuncWithParam: TypeAlias = Callable[
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | list[TResponseModel] | web.StreamResponse,
+    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case BaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
+        case BaseModel():
+            return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
