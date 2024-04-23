@@ -2209,7 +2209,7 @@ async def _delete(
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters(
-                "Cannot delete the vfolder because you don't have delete permission."
+                "Cannot delete the vfolder because you don't have delete permission over the vfolder."
             )
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
@@ -2448,7 +2448,7 @@ async def delete_from_trash_bin(
         # Check if the user has permission to delete the vfolder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters(
-                "Cannot delete the vfolder because you don't have delete permission."
+                "Cannot delete the vfolder because you don't have delete permission over the vfolder."
             )
 
     folder_host = entry["host"]
