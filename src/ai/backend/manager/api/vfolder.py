@@ -3430,7 +3430,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             await conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
             query = sa.delete(SharedVFoldersView).where(
-                (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_info.uuid)
+                (SharedVFoldersView.reference_id == vfolder_id)
+                & (SharedVFoldersView.user == user_info.uuid)
             )
             await conn.execute(query)
 
