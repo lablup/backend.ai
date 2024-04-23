@@ -119,8 +119,6 @@ from .resource import get_watcher_info
 from .utils import (
     BaseResponseModel,
     get_user_scopes_by_email,
-    # check_api_params,
-    # get_user_scopes,
     pydantic_api_params_handler,
 )
 
