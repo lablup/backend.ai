@@ -1133,13 +1133,13 @@ input ModifyGroupInput {
   is_active: Boolean
   domain_name: String
   total_resource_slots: JSONString
-  user_update_mode: String @deprecated(reason: "Deprecated since 24.03.3. Use `add_users` and `remove_users` fields")
-  user_uuids: [String] @deprecated(reason: "Deprecated since 24.03.3. Use `add_users` and `remove_users` fields")
+  user_update_mode: String @deprecated(reason: "Deprecated since 24.09.0. Use `add_users` and `remove_users` fields")
+  user_uuids: [String] @deprecated(reason: "Deprecated since 24.09.0. Use `add_users` and `remove_users` fields")
 
-  """Added in 24.03.3. ID array of the users to be added to the group."""
+  """Added in 24.09.0. ID array of the users to be added to the group."""
   add_users: [String]
 
-  """Added in 24.03.3. ID array of the users to be removed from the group."""
+  """Added in 24.09.0. ID array of the users to be removed from the group."""
   remove_users: [String]
   allowed_vfolder_hosts: JSONString
   integration_id: String
