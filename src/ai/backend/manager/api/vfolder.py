@@ -34,11 +34,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    Field,
-)
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -117,12 +113,7 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import (
-    BaseResponseModel,
-    check_api_params,
-    get_user_scopes,
-    pydantic_params_api_handler,
-)
+from .utils import BaseResponseModel, check_api_params, get_user_scopes, pydantic_params_api_handler
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -2191,10 +2182,12 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
+    allow_privileged_access = True if user_role == UserRole.SUPERADMIN or UserRole.ADMIN else False
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=allow_privileged_access,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
