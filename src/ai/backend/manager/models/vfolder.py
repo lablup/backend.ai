@@ -1565,10 +1565,13 @@ class VirtualFolder(graphene.ObjectType):
 
 
 class VirtualFolderList(graphene.ObjectType):
+    items = graphene.List(VirtualFolder, required=True)
+
     class Meta:
         interfaces = (PaginatedList,)
 
-    items = graphene.List(VirtualFolder, required=True)
+    class Arguments:
+        with_shared_vfolders = graphene.Boolean()
 
 
 class VirtualFolderPermission(graphene.ObjectType):

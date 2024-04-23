@@ -2418,7 +2418,7 @@ async def delete_from_trash_bin(
     await ensure_vfolder_status(
         request, VFolderAccessStatus.HARD_DELETABLE, folder_id_or_name=folder_id
     )
-    async with root_ctx.db.begin_session() as conn:
+    async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2452,7 +2452,6 @@ async def delete_from_trash_bin(
         [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         app_ctx.storage_ptask_group,
     )
-
     return web.Response(status=204)
 
 
@@ -2580,10 +2579,9 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot restore the vfolder that is not owned by myself.")
 
-        # fs-level mv may fail or take longer time
-        # but let's complete the db transaction to reflect that it's deleted.
-        await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
-
+    # fs-level mv may fail or take longer time
+    # but let's complete the db transaction to reflect that it's deleted.
+    await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
     return web.Response(status=204)
 
 
@@ -2834,12 +2832,11 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         request["user"]["email"],
         access_key,
     )
-    j = vfolders.join(
-        users,
-        vfolders.c.user == users.c.uuid,
-    )
-
     async with root_ctx.db.begin() as conn:
+        j = vfolders.join(
+            users,
+            vfolders.c.user == users.c.uuid,
+        )
         query = sa.select([
             vfolders.c.id,
             vfolders.c.name,
@@ -2849,12 +2846,10 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             vfolders.c.user.label("vfolder_user"),
             users.c.email,
         ]).select_from(j)
-
         if target_vfid is not None:
             query = query.where(vfolders.c.reference_id == target_vfid)
         else:
             query = query.where(vfolders.c.reference_id.isnot(None))
-
         result = await conn.execute(query)
         shared_list = result.fetchall()
     shared_info = []
@@ -2893,7 +2888,6 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     If params['perm'] is None, remove user's permission for the vfolder.
     """
     root_ctx: RootContext = request.app["_root.context"]
-
     access_key = request["keypair"]["access_key"]
     vfolder_id = params["vfolder"]
     user_uuid = params["user"]
@@ -2906,7 +2900,6 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
-
     async with root_ctx.db.begin() as conn:
         if perm is not None:
             query = (
@@ -2920,7 +2913,6 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
             query = sa.delete(SharedVFoldersView).where(
                 (SharedVFoldersView.id == vfolder_id) & (SharedVFoldersView.user == user_uuid)
             )
-
         await conn.execute(query)
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=200)

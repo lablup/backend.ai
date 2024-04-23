@@ -110,12 +110,15 @@ class VFolder(BaseFunction):
         page_size: int = 20,
         filter: str = None,
         order: str = None,
+        with_shared_vfolders: bool = True,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
 
         :param group: Fetch vfolders in a specific group.
         :param fields: Additional per-vfolder query fields to fetch.
+        :param order: Order of the results.
+        :param with_shared_vfolders: Include shared vfolders in the result.
         """
         return await fetch_paginated_result(
             "vfolder_list",
@@ -123,6 +126,7 @@ class VFolder(BaseFunction):
                 "group_id": (group, "UUID"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
+                "with_shared_vfolders": (with_shared_vfolders, "Boolean"),
             },
             fields,
             page_offset=page_offset,

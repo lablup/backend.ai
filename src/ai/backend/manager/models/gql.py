@@ -517,6 +517,7 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
+        with_shared_vfolders=graphene.Boolean(),
     )
 
     # super-admin only
@@ -1578,6 +1579,7 @@ class Queries(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
+        with_shared_vfolders: bool = True,
     ) -> VirtualFolderList:
         # TODO: adopt the generic queryfilter language
         total_count = await VirtualFolder.load_count(
@@ -1586,7 +1588,7 @@ class Queries(graphene.ObjectType):
             group_id=group_id,  # scope
             user_id=user_id,  # scope
             filter=filter,
-            with_shared_vfolders=False,
+            with_shared_vfolders=with_shared_vfolders,
         )
         items = await VirtualFolder.load_slice(
             info.context,
@@ -1597,7 +1599,7 @@ class Queries(graphene.ObjectType):
             user_id=user_id,  # scope
             filter=filter,
             order=order,
-            with_shared_vfolders=False,
+            with_shared_vfolders=with_shared_vfolders,
         )
         return VirtualFolderList(items, total_count)
 
