@@ -113,7 +113,6 @@ from .exceptions import (
     VFolderFilterStatusNotAvailable,
     VFolderNotFound,
     VFolderOperationFailed,
-    VFolderPermissionError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -2209,7 +2208,9 @@ async def _delete(
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+            raise InvalidAPIParameters(
+                "Cannot delete the vfolder because you don't have delete permission."
+            )
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
             async with root_ctx.db._begin_session(conn) as sess:
@@ -2446,7 +2447,9 @@ async def delete_from_trash_bin(
         entry = entries[0]
         # Check if the user has permission to delete the vfolder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise VFolderPermissionError()
+            raise InvalidAPIParameters(
+                "Cannot delete the vfolder because you don't have delete permission."
+            )
 
     folder_host = entry["host"]
     # fs-level deletion may fail or take longer time
@@ -2516,7 +2519,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
         # query_accesible_vfolders returns list
         entry = entries[0]
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+            raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
