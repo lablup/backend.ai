@@ -121,7 +121,7 @@ from .utils import (
     BaseResponseModel,
     check_api_params,
     get_user_scopes,
-    pydantic_params_api_handler,
+    pydantic_api_params_handler,
 )
 
 if TYPE_CHECKING:
@@ -2250,7 +2250,7 @@ class DeleteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(DeleteRequestModel)
+@pydantic_api_params_handler(DeleteRequestModel)
 async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2346,7 +2346,7 @@ class CompactVFolderInfoModel(BaseResponseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(IDRequestModel)
+@pydantic_api_params_handler(IDRequestModel)
 async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2397,7 +2397,7 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 
 @auth_required
-@pydantic_params_api_handler(DeleteFromTrashRequestModel)
+@pydantic_api_params_handler(DeleteFromTrashRequestModel)
 async def delete_from_trash_bin(
     request: web.Request, params: DeleteFromTrashRequestModel
 ) -> web.Response:
@@ -2467,7 +2467,7 @@ class PurgeRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(PurgeRequestModel)
+@pydantic_api_params_handler(PurgeRequestModel)
 async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
     """
     Delete `delete-complete`d vfolder rows in DB
@@ -2529,7 +2529,7 @@ class RestoreRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(RestoreRequestModel)
+@pydantic_api_params_handler(RestoreRequestModel)
 async def restore(request: web.Request, params: RestoreRequestModel) -> web.Response:
     """
     Recover vfolder from trash bin, by changing status.
