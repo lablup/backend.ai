@@ -2112,6 +2112,7 @@ async def _delete(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2299,6 +2300,7 @@ async def delete_from_trash_bin(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2369,6 +2371,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2430,6 +2433,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         restore_targets = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
