@@ -517,7 +517,7 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
-        with_shared_vfolders=graphene.Boolean(description="Added in 24.03.0"),
+        with_shared_vfolders=graphene.Boolean(description="Added in 24.09.0"),
     )
 
     # super-admin only
