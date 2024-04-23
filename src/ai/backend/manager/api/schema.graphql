@@ -79,7 +79,7 @@ type Queries {
     group_id: UUID
     access_key: String
 
-    """Added in 24.03.0"""
+    """Added in 24.09.0"""
     with_shared_vfolders: Boolean
   ): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
