@@ -2519,6 +2519,8 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
