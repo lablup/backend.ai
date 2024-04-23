@@ -2191,12 +2191,11 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    allow_privileged_access = True if user_role == UserRole.SUPERADMIN or UserRole.ADMIN else False
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
-            allow_privileged_access=allow_privileged_access,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2427,6 +2426,7 @@ async def delete_from_trash_bin(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2497,6 +2497,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2558,6 +2559,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         restore_targets = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
