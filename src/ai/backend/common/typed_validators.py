@@ -163,7 +163,7 @@ class _SlugPydanticAnnotation:
     _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
     min_length: int | None = None
     max_length: int | None = None
-    allow_dot: bool = False
+    allow_dot_prefix: bool = False
 
     @classmethod
     def _validate(
@@ -176,7 +176,7 @@ class _SlugPydanticAnnotation:
             raise AssertionError(f"value is too long (max length {cls.max_length})")
 
         _val = value
-        if cls.allow_dot and value.startswith("."):
+        if cls.allow_dot_prefix and value.startswith("."):
             _val = value[1:]
         if not cls._rx_slug.search(_val):
             raise AssertionError(f"Given value is not valid slug. (value: {_val})")
@@ -199,7 +199,7 @@ class _SlugPydanticAnnotation:
 
 
 class _VFolderNamePydanticAnnotation(_SlugPydanticAnnotation):
-    allow_dot = True
+    allow_dot_prefix = True
 
 
 VFolderName = Annotated[str, _VFolderNamePydanticAnnotation]
