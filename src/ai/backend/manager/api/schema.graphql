@@ -70,7 +70,18 @@ type Queries {
   storage_volume(id: String): StorageVolume
   storage_volume_list(limit: Int!, offset: Int!, filter: String, order: String): StorageVolumeList
   vfolder(id: String): VirtualFolder
-  vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String, with_shared_vfolders: Boolean): VirtualFolderList
+  vfolder_list(
+    limit: Int!
+    offset: Int!
+    filter: String
+    order: String
+    domain_name: String
+    group_id: UUID
+    access_key: String
+
+    """Added in 24.03.0"""
+    with_shared_vfolders: Boolean
+  ): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_invited_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
