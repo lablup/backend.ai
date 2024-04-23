@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import secrets
+import time
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import graphene
@@ -19,12 +21,14 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .vfolder import VirtualFolder
 
+from ..api.ratelimit import _rlim_window, _time_prec
 from ..defs import RESERVED_DOTFILES
 from .base import (
     Base,
@@ -60,6 +64,15 @@ __all__: Sequence[str] = (
     "verify_dotfile_name",
 )
 
+_rolling_count_script = """
+local access_key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+if redis.call('EXISTS', access_key) == 1 then
+    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
+end
+return redis.call('ZCARD', access_key)
+"""
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
@@ -167,6 +180,7 @@ class KeyPair(graphene.ObjectType):
     last_used = GQLDateTime()
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
+    rolling_count = graphene.Int()
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
@@ -227,6 +241,21 @@ class KeyPair(graphene.ObjectType):
         if n is not None:
             return n
         return 0
+
+    async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        now = Decimal(time.time()).quantize(_time_prec)
+        redis_rlim = redis_helper.get_redis_object(
+            ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+        )
+        ret = await redis_helper.execute_script(
+            redis_rlim,
+            "rollingcount",
+            _rolling_count_script,
+            [self.access_key],
+            [str(now), str(_rlim_window)],
+        )
+        return int(ret) if ret is not None else 0
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
