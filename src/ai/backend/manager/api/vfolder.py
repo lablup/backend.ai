@@ -113,6 +113,7 @@ from .exceptions import (
     VFolderFilterStatusNotAvailable,
     VFolderNotFound,
     VFolderOperationFailed,
+    VFolderPermissionError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -2443,6 +2444,9 @@ async def delete_from_trash_bin(
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
+        # Check if the user has permission to delete the vfolder.
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise VFolderPermissionError()
 
     folder_host = entry["host"]
     # fs-level deletion may fail or take longer time
