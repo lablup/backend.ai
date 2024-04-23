@@ -58,6 +58,8 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
+    EndpointLifecycle,
+    EndpointRow,
     GroupRow,
     KernelStatus,
     ProjectResourcePolicyRow,
@@ -103,6 +105,7 @@ from .exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
+    ModelServiceDependencyNotCleared,
     ObjectNotFound,
     TooManyVFoldersFound,
     VFolderAlreadyExists,
@@ -115,9 +118,10 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import (
+    BaseResponseModel,
     check_api_params,
     get_user_scopes,
-    pydantic_api_params_handler,
+    pydantic_params_api_handler,
 )
 
 if TYPE_CHECKING:
@@ -129,9 +133,8 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseModel):
+class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
-    status: int = Field(default=200)
 
 
 async def ensure_vfolder_status(
@@ -345,7 +348,6 @@ def vfolder_check_exists(
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
         tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
         tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("quota", default=None): tx.BinarySize | t.Null,
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
@@ -580,7 +582,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
@@ -597,7 +598,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
+            "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
@@ -1251,18 +1252,20 @@ async def update_vfolder_options(
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict({
-        t.Key("path"): t.String,
+        t.Key("path"): t.String | t.List(t.String),
         t.Key("parents", default=True): t.ToBool,
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    if isinstance(params["path"], list) and len(params["path"]) > 50:
+        raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
-        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, path:{})",
+        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, paths:{})",
         request["user"]["email"],
         access_key,
         folder_name,
@@ -1280,9 +1283,14 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
         },
-    ):
-        pass
-    return web.Response(status=201)
+    ) as (_, storage_resp):
+        storage_reply = await storage_resp.json()
+        match storage_resp.status:
+            case 200 | 207:
+                return web.json_response(storage_reply, status=storage_resp.status)
+            # 422 will be wrapped as VFolderOperationFailed by storage_manager
+            case _:
+                raise RuntimeError("should not reach here")
 
 
 @auth_required
@@ -2204,6 +2212,17 @@ async def _delete(
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        # perform extra check to make sure records of alive model service not removed by foreign key rule
+        if entry["usage_mode"] == VFolderUsageMode.MODEL:
+            async with root_ctx.db._begin_session(conn) as sess:
+                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
+                if (
+                    len([
+                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
+                    ])
+                    > 0
+                ):
+                    raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
             conn,
@@ -2231,7 +2250,7 @@ class DeleteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_api_params_handler(DeleteRequestModel)
+@pydantic_params_api_handler(DeleteRequestModel)
 async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2320,14 +2339,14 @@ class IDRequestModel(BaseModel):
     )
 
 
-class CompactVFolderInfoModel(BaseModel):
+class CompactVFolderInfoModel(BaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_api_params_handler(IDRequestModel)
+@pydantic_params_api_handler(IDRequestModel)
 async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -2378,10 +2397,10 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 
 @auth_required
-@pydantic_api_params_handler(DeleteFromTrashRequestModel)
+@pydantic_params_api_handler(DeleteFromTrashRequestModel)
 async def delete_from_trash_bin(
     request: web.Request, params: DeleteFromTrashRequestModel
-) -> SuccessResponseModel:
+) -> web.Response:
     """
     Delete `delete-pending` vfolders in storage proxy
     """
@@ -2436,7 +2455,7 @@ async def delete_from_trash_bin(
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 class PurgeRequestModel(BaseModel):
@@ -2448,8 +2467,8 @@ class PurgeRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_api_params_handler(PurgeRequestModel)
-async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessResponseModel:
+@pydantic_params_api_handler(PurgeRequestModel)
+async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
     """
     Delete `delete-complete`d vfolder rows in DB
     """
@@ -2498,7 +2517,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> SuccessRespo
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 class RestoreRequestModel(BaseModel):
@@ -2510,8 +2529,8 @@ class RestoreRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_api_params_handler(RestoreRequestModel)
-async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessResponseModel:
+@pydantic_params_api_handler(RestoreRequestModel)
+async def restore(request: web.Request, params: RestoreRequestModel) -> web.Response:
     """
     Recover vfolder from trash bin, by changing status.
     """
@@ -2566,7 +2585,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> SuccessR
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
     await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
-    return SuccessResponseModel(status=204)
+    return web.Response(status=204)
 
 
 @auth_required

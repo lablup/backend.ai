@@ -1110,7 +1110,7 @@ async def update_vfolder_options(
 
 
 class MkdirRequestModel(IDBasedRequestModel):
-    path: list[str] = Field(description="Target path to make")
+    path: str | list[str] = Field(description="Target path to make")
     parents: bool = Field(default=True, description="Make parent's directory if not exists")
     exist_ok: bool = Field(
         default=False, description="Skip error if the target path already exsits."
@@ -1122,8 +1122,6 @@ class MkdirRequestModel(IDBasedRequestModel):
 @pydantic_api_params_handler(MkdirRequestModel)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 async def mkdir(request: web.Request, params: MkdirRequestModel, row: VFolderRow) -> web.Response:
-    if len(params.path) > 50:
-        raise InvalidAPIParameters("Too many directories specified.")
     await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, row["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = row["name"]
