@@ -448,21 +448,21 @@ class ModifyGroupInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(
-        deprecation_reason=("Deprecated since 24.03.3. Use `add_users` and `remove_users` fields")
+        deprecation_reason=("Deprecated since 24.09.0. Use `add_users` and `remove_users` fields")
     )
     user_uuids = graphene.List(
         lambda: graphene.String,
-        deprecation_reason=("Deprecated since 24.03.3. Use `add_users` and `remove_users` fields"),
+        deprecation_reason=("Deprecated since 24.09.0. Use `add_users` and `remove_users` fields"),
     )
     add_users = graphene.List(
         lambda: graphene.String,
         required=False,
-        description="Added in 24.03.3. ID array of the users to be added to the group.",
+        description="Added in 24.09.0. ID array of the users to be added to the group.",
     )
     remove_users = graphene.List(
         lambda: graphene.String,
         required=False,
-        description="Added in 24.03.3. ID array of the users to be removed from the group.",
+        description="Added in 24.09.0. ID array of the users to be removed from the group.",
     )
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
