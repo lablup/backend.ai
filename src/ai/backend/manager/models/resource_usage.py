@@ -102,6 +102,9 @@ class ResourceUsage:
             "gpu_allocated": self.gpu_allocated,
         }
 
+    def copy(self) -> ResourceUsage:
+        return attrs.evolve(self)
+
 
 def to_str(val: Any) -> Optional[str]:
     return str(val) if val is not None else None
@@ -178,21 +181,21 @@ class BaseResourceUsageGroup:
             "project_id": self.project_id,
             "project_name": self.project_name,
             "kernel_id": self.kernel_id,
-            "container_ids": self.container_ids,
+            "container_ids": self.container_ids.copy() if self.container_ids is not None else None,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
-            "last_stat": self.last_stat,
-            "extra_info": self.extra_info,
+            "last_stat": {**self.last_stat} if self.last_stat is not None else None,
+            "extra_info": {**self.extra_info} if self.extra_info is not None else None,
             "full_name": self.full_name,
-            "images": self.images,
-            "agents": self.agents,
+            "images": self.images.copy() if self.images is not None else None,
+            "agents": self.agents.copy() if self.agents is not None else None,
             "status": self.status,
             "status_info": self.status_info,
             "status_history": self.status_history,
             "cluster_mode": self.cluster_mode,
             "scheduled_at": self.scheduled_at,
-            "total_usage": self.total_usage,
+            "total_usage": self.total_usage.copy(),
         }
 
     def to_json_base(self) -> dict[str, Any]:
@@ -238,7 +241,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
             "agent": self.agent,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
@@ -285,7 +288,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -316,8 +319,6 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
-        if other.session_id != self.session_id:
-            return False
         if other.kernel_id is None:
             return False
         if other.kernel_id in self.child_usage_group:
@@ -387,8 +388,6 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
-        if other.project_id != self.project_id:
-            return False
         if other.session_id is None:
             return False
         if other.session_id not in self.child_usage_group:
