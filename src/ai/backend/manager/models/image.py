@@ -703,7 +703,7 @@ class Image(graphene.ObjectType):
                 case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.EXCLUDE_OPERATIONAL in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if label.value != f"user:{ctx.user['uuid']}":
+                    if label.value != f"user:{ctx.user["uuid"]}":
                         return False
                     is_customized_image = True
 
@@ -909,7 +909,7 @@ class ForgetImageById(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -956,7 +956,7 @@ class ForgetImage(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -1010,7 +1010,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
                 ):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 

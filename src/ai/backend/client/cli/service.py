@@ -109,7 +109,7 @@ def info(ctx: CLIContext, service_name_or_id: str):
             )
             print()
             for route in routes:
-                print(f"Route {route['routing_id']}: ")
+                print(f"Route {route["routing_id"]}: ")
                 ctx.output.print_item(
                     route,
                     _default_routing_fields,
@@ -610,7 +610,7 @@ def generate_token(ctx: CLIContext, service_name_or_id: str, duration: str, quie
             if quiet:
                 print(resp["token"])
             else:
-                print_done(f"Generated API token {resp['token']}")
+                print_done(f"Generated API token {resp["token"]}")
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)

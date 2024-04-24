@@ -297,7 +297,7 @@ class MockPlugin(AbstractComputePlugin):
                     init_kwargs["is_mig_device"] = dev_info["is_mig_device"]
                     if dev_info["is_mig_device"]:
                         init_kwargs["device_id"] = DeviceId(
-                            f"MIG-{dev_info['mother_uuid']}/{idx}/0"
+                            f"MIG-{dev_info["mother_uuid"]}/{idx}/0"
                         )
                     device_cls = CUDADevice
                 case _:
@@ -810,7 +810,7 @@ class MockPlugin(AbstractComputePlugin):
 
         device_format = self.device_formats[format_key]
         return {
-            "slot_name": f"{self.mock_config['slot_name']}.{format_key}",
+            "slot_name": f"{self.mock_config["slot_name"]}.{format_key}",
             "human_readable_name": device_format["human_readable_name"],
             "description": device_format["description"],
             "display_unit": device_format["display_unit"],

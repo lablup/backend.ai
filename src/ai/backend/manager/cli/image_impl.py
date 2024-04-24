@@ -246,7 +246,7 @@ async def validate_image_canonical(
                 for i, image_row in enumerate(image_rows):
                     if i > 0:
                         print("-" * 50)
-                    print(f"{'architecture':<40}: {image_row.architecture}")
+                    print(f"{"architecture":<40}: {image_row.architecture}")
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):

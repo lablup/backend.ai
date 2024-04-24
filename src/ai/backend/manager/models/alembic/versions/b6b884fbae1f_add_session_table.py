@@ -40,7 +40,7 @@ PAGE_SIZE = 100
 
 def default_hostname(context) -> str:
     params = context.get_current_parameters()
-    return f"{params['cluster_role']}{params['cluster_idx']}"
+    return f"{params["cluster_role"]}{params["cluster_idx"]}"
 
 
 def upgrade() -> None:

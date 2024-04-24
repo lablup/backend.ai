@@ -45,7 +45,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                         # skip legacy images
                         if item["name"].startswith("kernel-"):
                             continue
-                        yield f"{username}/{item['name']}"
+                        yield f"{username}/{item["name"]}"
                 else:
                     log.error(
                         "Failed to fetch repository list from {0} (status={1})",

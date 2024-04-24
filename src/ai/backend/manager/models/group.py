@@ -427,7 +427,7 @@ class GroupInput(graphene.InputObjectType):
         required=False,
         default_value="GENERAL",
         description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            f"Added since 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
         ),
     )
     description = graphene.String(required=False, default_value="")

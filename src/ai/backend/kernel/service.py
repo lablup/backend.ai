@@ -106,7 +106,7 @@ class ServiceParser:
                 action_impl = getattr(service_actions, action["action"])
             except AttributeError:
                 raise InvalidServiceDefinition(
-                    f"Service-def for {service_name} used invalid action: {action['action']}"
+                    f"Service-def for {service_name} used invalid action: {action["action"]}"
                 )
             ret = await action_impl(self.variables, **action["args"])
             if (ref := action.get("ref")) is not None:

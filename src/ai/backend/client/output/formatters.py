@@ -17,7 +17,7 @@ def format_stats(raw_stats: Optional[str], indent="") -> str:
     if raw_stats is None:
         return "(unavailable)"
     stats = json.loads(raw_stats)
-    text = "\n".join(f"- {k + ': ':18s}{v}" for k, v in stats.items())
+    text = "\n".join(f"- {k + ": ":18s}{v}" for k, v in stats.items())
     return "\n" + textwrap.indent(text, indent)
 
 
@@ -239,7 +239,7 @@ class AgentStatFormatter(OutputFormatter):
                 if metric["pct"] is None:
                     node_metric_bufs.append(f"{stat_key}: (calculating...) % ({num_cores} cores)")
                 else:
-                    node_metric_bufs.append(f"{stat_key}: {metric['pct']} % ({num_cores} cores)")
+                    node_metric_bufs.append(f"{stat_key}: {metric["pct"]} % ({num_cores} cores)")
             else:
                 binary = stat_key == "mem"
                 node_metric_bufs.append(f"{stat_key}: {format_value(metric, binary)}")
@@ -322,10 +322,10 @@ class ContainerListFormatter(NestedObjectFormatter):
         else:
             text = ""
             for item in value:
-                text += f"+ {item['id']}\n"
+                text += f"+ {item["id"]}\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), "    ")}"  # noqa
                     for f in field.subfields.values()
                     if f.field_name != "id"
                 )
@@ -340,10 +340,10 @@ class DependencyListFormatter(NestedObjectFormatter):
         else:
             text = ""
             for item in value:
-                text += f"+ {item['name']} ({item['id']})\n"
+                text += f"+ {item["name"]} ({item["id"]})\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), "    ")}"  # noqa
                     for f in field.subfields.values()
                     if f.field_name not in ("id", "name")
                 )

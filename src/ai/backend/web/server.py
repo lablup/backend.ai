@@ -761,7 +761,7 @@ def main(
             logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
             with logger:
                 setproctitle(
-                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
+                    f"backend.ai: webserver {cfg["service"]["ip"]}:{cfg["service"]["port"]}"
                 )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)

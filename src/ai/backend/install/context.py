@@ -574,8 +574,8 @@ class Context(metaclass=ABCMeta):
                     file=fp,
                 )
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+                print(f"export BACKEND_ACCESS_KEY={keypair["access_key"]}", file=fp)
+                print(f"export BACKEND_SECRET_KEY={keypair["secret_key"]}", file=fp)
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
             current_shell = os.environ.get("SHELL", "sh")
             user_data = json.loads(Path(user_path).read_bytes())
@@ -604,8 +604,8 @@ class Context(metaclass=ABCMeta):
                     f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
                     file=fp,
                 )
-                print(f"""echo 'Your email: {user['email']}'""", file=fp)
-                print(f"""echo 'Your password: {user['password']}'""", file=fp)
+                print(f"""echo 'Your email: {user["email"]}'""", file=fp)
+                print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")

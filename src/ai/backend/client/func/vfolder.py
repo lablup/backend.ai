@@ -495,7 +495,7 @@ class VFolder(BaseFunction):
                 input_file = open(base_path / file_path, "rb")
             else:
                 input_file = open(str(Path(file_path).relative_to(base_path)), "rb")
-            print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
+            print(f"Uploading {base_path / file_path} via {upload_info["url"]} ...")
             # TODO: refactor out the progress bar
             uploader = tus_client.async_uploader(
                 file_stream=input_file,

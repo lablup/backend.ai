@@ -182,8 +182,8 @@ async def upgrade_2_to_3(
 
     script = (
         "#! /bin/sh\n",
-        *[f"mkdir -p {m['dst_path'].parent}\n" for m in migration_informations],
-        *[f"mv {m['src_path']} {m['dst_path']}\n" for m in migration_informations],
+        *[f"mkdir -p {m["dst_path"].parent}\n" for m in migration_informations],
+        *[f"mv {m["src_path"]} {m["dst_path"]}\n" for m in migration_informations],
         f"echo 3 > {volume_id}/version.txt\n",
     )
     if outfile == "-":
