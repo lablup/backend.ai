@@ -478,6 +478,7 @@ type KeyPair implements Item {
   last_used: DateTime
   rate_limit: Int
   num_queries: Int
+  rolling_count: Int
   user: UUID
   projects: [String]
   ssh_public_key: String
