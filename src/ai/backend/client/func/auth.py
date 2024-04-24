@@ -1,9 +1,21 @@
-from typing import Optional
+import json
+from typing import Any, Optional
 
+from ..auth import encrypt_payload
 from ..request import Request
 from .base import BaseFunction, api_function
 
 __all__ = ("Auth",)
+
+
+def _put_secure_body(rqst: Request, data: Any) -> None:
+    if rqst.config.endpoint.scheme == "https":
+        rqst.set_json(data)
+    else:
+        rqst.headers["X-BackendAI-Encoded"] = "true"
+        raw_body = json.dumps(data).encode()
+        encoded_body = encrypt_payload(str(rqst.config.endpoint), raw_body)
+        rqst.set_content(encoded_body)
 
 
 class Auth(BaseFunction):
@@ -27,7 +39,7 @@ class Auth(BaseFunction):
         }
         if otp:
             body["otp"] = otp
-        rqst.set_json(body)
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             data = await resp.json()
             data["cookies"] = resp.raw_response.cookies
@@ -56,11 +68,12 @@ class Auth(BaseFunction):
         Update user's password. This API works only for account owner.
         """
         rqst = Request("POST", "/auth/update-password")
-        rqst.set_json({
+        body = {
             "old_password": old_password,
             "new_password": new_password,
             "new_password2": new_password2,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -75,12 +88,13 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/auth/update-password-no-auth")
-        rqst.set_json({
+        body = {
             "domain": domain,
             "username": user_id,
             "current_password": current_password,
             "new_password": new_password,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
 
@@ -95,10 +109,11 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/server/update-password-no-auth")
-        rqst.set_json({
+        body = {
             "username": user_id,
             "current_password": current_password,
             "new_password": new_password,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
