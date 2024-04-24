@@ -316,6 +316,8 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
+        if other.session_id != self.session_id:
+            return False
         if other.kernel_id is None:
             return False
         if other.kernel_id in self.child_usage_group:
@@ -385,6 +387,8 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
+        if other.project_id != self.project_id:
+            return False
         if other.session_id is None:
             return False
         if other.session_id not in self.child_usage_group:
