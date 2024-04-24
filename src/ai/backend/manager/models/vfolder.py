@@ -453,62 +453,73 @@ async def query_accessible_vfolders(
     entries: List[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        vfolders_with_users = vfolders.join(users, vfolders.c.user == users.c.uuid)
+
+        # Scan my owned vfolders if user is not admin or superadmin.
+        # If user is admin or superadmin, scan all user vfolders.
+        scan_owned_vfolder_query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(vfolders_with_users)
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.is_(None))
+            )
+        )
+
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
-            query = query.where(
-                (vfolders.c.user == user_uuid) & (vfolders.c.reference_id.is_(None))
+            scan_owned_vfolder_query = scan_owned_vfolder_query.where(
+                (vfolders.c.user == user_uuid)
             )
-        await _append_entries(query)
+
+        await _append_entries(scan_owned_vfolder_query)
 
         # Scan vfolders shared with me.
-        j = vfolders.join(
-            users,
-            vfolders.c.user == users.c.uuid,
-        )
-
-        query = (
+        scan_shared_vfolder_query = (
             sa.select(
                 vfolders_selectors + [vfolders.c.permission, users.c.email],
                 use_labels=True,
             )
-            .select_from(j)
+            .select_from(vfolders_with_users)
             .where(
                 (vfolders.c.user == user_uuid)
-                & (vfolders.c.reference_id.isnot(None))
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.isnot(None)),
             )
         )
+
         if extra_invited_vf_conds is not None:
-            query = query.where(extra_invited_vf_conds)
-        await _append_entries(query, _is_owner=False)
+            scan_shared_vfolder_query = scan_shared_vfolder_query.where(extra_invited_vf_conds)
+        await _append_entries(scan_shared_vfolder_query, _is_owner=False)
 
     if "group" in allowed_vfolder_types:
         # Scan group vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
-            query = (
+            select_group_ids_query = (
                 sa.select([groups.c.id])
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
-            result = await conn.execute(query)
+            result = await conn.execute(select_group_ids_query)
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
-            result = await conn.execute(query)
+            agus_with_users = sa.join(agus, users, agus.c.user_id == users.c.uuid)
+            select_group_ids_query = (
+                sa.select([agus.c.group_id])
+                .select_from(agus_with_users)
+                .where(agus.c.user_id == user_uuid)
+            )
+            result = await conn.execute(select_group_ids_query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
-        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+
+        vfolders_with_groups = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
-        ).select_from(j)
+        ).select_from(vfolders_with_groups)
+
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
@@ -516,7 +527,14 @@ async def query_accessible_vfolders(
         is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
+
+        reference_ids = (await conn.execute(sa.select(vfolders.c.reference_id))).scalars().all()
+
         await _append_entries(query, is_owner)
+
+        for entry in entries:
+            if entry["ownership_type"] == "group" and entry["id"] in reference_ids:
+                entries.remove(entry)
 
     return entries
 

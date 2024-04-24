@@ -612,7 +612,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
 
             # Here we grant creator the permission to alter VFolder contents
-
             if group_type == ProjectType.MODEL_STORE:
                 shared_vfolder = {k: v for k, v in dict(insert_values).items() if v is not None}
                 shared_vfolder.update({
@@ -2057,6 +2056,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         user_info = result.fetchall()
+
         users_to_share = [u["uuid"] for u in user_info]
         emails_to_share = [u["email"] for u in user_info]
         if len(user_info) < 1:
@@ -2078,7 +2078,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
         users_not_to_share = [u.user for u in result.fetchall()]
         users_to_share = list(set(users_to_share) - set(users_not_to_share))
 
-        # Create vfolder_permission record.
+        # Create vfolder_permission(s).
         for _user in users_to_share:
             original_vfolder = (
                 await conn.execute(sa.select(vfolders).where(vfolders.c.id == vf_info["id"]))
@@ -2086,11 +2086,11 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
             shared_vfolder = {k: v for k, v in dict(original_vfolder).items() if v is not None}
 
-            # TODO: Handle group type vfolder sharing.
             shared_vfolder.update({
                 "id": uuid.uuid4().hex,
-                "user": _user,
+                # "user": _user,
                 "reference_id": original_vfolder.id.hex,
+                "permission": params["permission"],
             })
 
             query = sa.insert(SharedVFoldersView, shared_vfolder)
@@ -2136,11 +2136,11 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin() as conn:
         # Get the group-type virtual folder.
         query = (
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
+            sa.select([SharedVFoldersView.id, SharedVFoldersView.host])
+            .select_from(SharedVFoldersView)
             .where(
-                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
-                & (vfolders.c.name == folder_name),
+                (SharedVFoldersView.ownership_type == VFolderOwnershipType.GROUP)
+                & (SharedVFoldersView.name == folder_name)
             )
         )
         result = await conn.execute(query)
@@ -2167,14 +2167,12 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         users_to_unshare = [u["uuid"] for u in result.fetchall()]
+
         if len(users_to_unshare) < 1:
             raise ObjectNotFound(object_name="user(s).")
 
         # Delete vfolder_permission(s).
-        query = sa.delete(SharedVFoldersView).where(
-            (SharedVFoldersView.id == vf_info["id"])
-            & (SharedVFoldersView.user.in_(users_to_unshare))
-        )
+        query = sa.delete(SharedVFoldersView).where((SharedVFoldersView.id == vf_info["id"]))
         await conn.execute(query)
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
 
