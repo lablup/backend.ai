@@ -68,11 +68,7 @@ from .base import (
     generate_sql_info_for_gql_connection,
     metadata,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -170,7 +166,7 @@ class VFolderOperationStatus(enum.StrEnum):
 
     DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
 
@@ -717,12 +713,14 @@ async def prepare_vfolder_mounts(
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
+    extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
+        DEAD_VFOLDER_STATUSES
+    )
     if requested_vfolder_names:
-        extra_vf_conds = vfolders.c.name.in_(
-            requested_vfolder_names.values()
-        ) | vfolders.c.name.startswith(".")
-    else:
-        extra_vf_conds = vfolders.c.name.startswith(".")
+        extra_vf_conds = extra_vf_conds | (
+            vfolders.c.name.in_(requested_vfolder_names.values())
+            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
+        )
     accessible_vfolders = await query_accessible_vfolders(
         conn,
         user_scope.user_uuid,
