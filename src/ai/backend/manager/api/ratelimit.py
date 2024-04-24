@@ -14,7 +14,6 @@ from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
-from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
@@ -79,8 +78,8 @@ async def rlim_middleware(
     else:
         # No checks for rate limiting for non-authorized queries.
         response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = str(DEFAULT_KEYPAIR_RATE_LIMIT // 10)
-        response.headers["X-RateLimit-Remaining"] = str(DEFAULT_KEYPAIR_RATE_LIMIT // 10)
+        response.headers["X-RateLimit-Limit"] = "1000"
+        response.headers["X-RateLimit-Remaining"] = "1000"
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
 
