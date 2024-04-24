@@ -713,13 +713,13 @@ async def prepare_vfolder_mounts(
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
+    extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
+        DEAD_VFOLDER_STATUSES
+    )
     if requested_vfolder_names:
-        extra_vf_conds = vfolders.c.name.in_(
-            requested_vfolder_names.values()
-        ) | vfolders.c.name.startswith(".") & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
-    else:
-        extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
-            DEAD_VFOLDER_STATUSES
+        extra_vf_conds = extra_vf_conds | (
+            vfolders.c.name.in_(requested_vfolder_names.values())
+            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
         )
     accessible_vfolders = await query_accessible_vfolders(
         conn,
