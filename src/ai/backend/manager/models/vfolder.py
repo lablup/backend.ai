@@ -68,11 +68,7 @@ from .base import (
     generate_sql_info_for_gql_connection,
     metadata,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -170,7 +166,7 @@ class VFolderOperationStatus(enum.StrEnum):
 
     DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
 
