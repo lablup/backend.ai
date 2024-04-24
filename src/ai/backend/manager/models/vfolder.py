@@ -450,9 +450,11 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan my owned vfolders.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(j)
+            .where(vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES))
+        )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -477,7 +479,8 @@ async def query_accessible_vfolders(
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)),
             )
         )
         if extra_invited_vf_conds is not None:
@@ -502,9 +505,11 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True)
+            .select_from(j)
+            .where(vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES))
+        )
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
@@ -524,7 +529,9 @@ async def query_accessible_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+                (vfolders.c.group.in_(group_ids))
+                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)),
             )
         )
         if extra_vf_conds is not None:
