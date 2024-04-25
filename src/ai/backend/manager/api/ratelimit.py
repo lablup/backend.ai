@@ -12,6 +12,7 @@ from aiotools import apartial
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.networking import get_client_ip
 from ai.backend.common.types import RedisConnectionInfo
 
 from .context import RootContext
@@ -27,19 +28,21 @@ _rlim_window: Final = 60 * 15
 # last-minute and first-minute bursts between the intervals.
 
 _rlim_script = """
-local access_key = KEYS[1]
+local id_type = KEYS[1]
+local id_value = KEYS[2]
+local namespaced_id = id_type .. ":" .. id_value
 local now = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
 local request_id = tonumber(redis.call('INCR', '__request_id'))
 if request_id >= 1e12 then
     redis.call('SET', '__request_id', 1)
 end
-if redis.call('EXISTS', access_key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
+if redis.call('EXISTS', namespaced_id) == 1 then
+    redis.call('ZREMRANGEBYSCORE', namespaced_id, 0, now - window)
 end
-redis.call('ZADD', access_key, now, tostring(request_id))
-redis.call('EXPIRE', access_key, window)
-return redis.call('ZCARD', access_key)
+redis.call('ZADD', namespaced_id, now, tostring(request_id))
+redis.call('EXPIRE', namespaced_id, window)
+return redis.call('ZCARD', namespaced_id)
 """
 
 
@@ -53,6 +56,7 @@ async def rlim_middleware(
     app_ctx: PrivateContext = app["ratelimit.context"]
     now = Decimal(time.time()).quantize(_time_prec)
     rr = app_ctx.redis_rlim
+
     if request["is_authorized"]:
         rate_limit = request["keypair"]["rate_limit"]
         access_key = request["keypair"]["access_key"]
@@ -60,7 +64,7 @@ async def rlim_middleware(
             rr,
             "ratelimit",
             _rlim_script,
-            [access_key],
+            ["access_key", access_key],
             [str(now), str(_rlim_window)],
         )
         if ret is None:
@@ -76,10 +80,38 @@ async def rlim_middleware(
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
     else:
-        # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
+        ip_address = get_client_ip(request)
+        assert ip_address is not None, "Client IP Address is not provided"
+
+        root_ctx: RootContext = app["_root.context"]
+        rate_limit = root_ctx.local_config["manager"]["anonymous-ratelimit"]
+
+        if rate_limit is None:
+            # No checks for rate limiting.
+            response = await handler(request)
+            # Arbitrary number for indicating no rate limiting.
+            response.headers["X-RateLimit-Limit"] = "1000"
+            response.headers["X-RateLimit-Remaining"] = "1000"
+        else:
+            ret = await redis_helper.execute_script(
+                rr,
+                "ratelimit",
+                _rlim_script,
+                ["ip", ip_address],
+                [str(now), str(_rlim_window)],
+            )
+            if ret is None:
+                remaining = rate_limit
+            else:
+                rolling_count = int(ret)
+                if rate_limit is not None and rolling_count > rate_limit:
+                    raise RateLimitExceeded
+                remaining = rate_limit - rolling_count
+
+            response = await handler(request)
+            response.headers["X-RateLimit-Limit"] = str(rate_limit)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
 

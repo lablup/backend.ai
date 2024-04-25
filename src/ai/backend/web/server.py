@@ -27,13 +27,14 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.networking import get_client_ip
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
-from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import fill_forwarding_hdrs_to_api_session
 from .config import config_iv
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
