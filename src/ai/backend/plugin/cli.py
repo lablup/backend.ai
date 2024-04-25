@@ -23,6 +23,7 @@ def main():
 @click.argument("group_name")
 def scan(group_name: str) -> None:
     colorama.init(autoreset=True)
+    ITALIC = "\x1b[3m"
     duplicate_count: dict[str, int] = defaultdict(int)
     src_style = {
         "buildscript": Fore.LIGHTYELLOW_EX,
@@ -30,7 +31,11 @@ def scan(group_name: str) -> None:
         "python-package": Fore.LIGHTBLUE_EX,
     }
     rows = []
-    headers = (f"{Style.BRIGHT}Source", "Name", f"Module Path{Style.RESET_ALL}")
+    headers = (
+        f"{ITALIC}Source{Style.RESET_ALL}",
+        f"{ITALIC}Name{Style.RESET_ALL}",
+        f"{ITALIC}Module Path{Style.RESET_ALL}",
+    )
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
         (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
@@ -54,4 +59,4 @@ def scan(group_name: str) -> None:
         ))
     print(tabulate.tabulate(display_rows, headers))
     if duplicate_count:
-        print(f"\n💥 {Fore.RED}{Style.BRIGHT}Detected duplicated entrypoint(s)!{Style.RESET_ALL}")
+        print(f"\n💥 {Fore.LIGHTRED_EX}Detected duplicated entrypoint(s)!{Style.RESET_ALL}")
