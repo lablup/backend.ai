@@ -478,7 +478,7 @@ def parse_resource_usage(
         disk_used=int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
         io_read=int(nmget(last_stat, "io_read.current", 0)),
         io_write=int(nmget(last_stat, "io_write.current", 0)),
-        device_type=device_type,
+        device_type={*device_type},
         smp=float(smp),
         gpu_mem_allocated=float(gpu_mem_allocated),
         gpu_allocated=float(gpu_allocated),
