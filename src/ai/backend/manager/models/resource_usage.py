@@ -103,7 +103,7 @@ class ResourceUsage:
         }
 
     def copy(self) -> ResourceUsage:
-        return attrs.evolve(self, nfs={*self.nfs})
+        return attrs.evolve(self, nfs={*self.nfs}, device_type={*self.device_type})
 
 
 def to_str(val: Any) -> Optional[str]:
