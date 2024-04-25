@@ -8,7 +8,7 @@ import colorama
 import tabulate
 from colorama import Fore, Style
 
-from ai.backend.plugin.entrypoint import (
+from .entrypoint import (
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_package_metadata,
     scan_entrypoint_from_plugin_checkouts,
