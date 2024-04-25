@@ -103,7 +103,7 @@ class ResourceUsage:
         }
 
     def copy(self) -> ResourceUsage:
-        return attrs.evolve(self)
+        return attrs.evolve(self, nfs={*self.nfs})
 
 
 def to_str(val: Any) -> Optional[str]:
@@ -468,7 +468,7 @@ def parse_resource_usage(
 
     return ResourceUsage(
         agent_ids={kernel.agent},
-        nfs=nfs,
+        nfs={*nfs},
         cpu_allocated=float(kernel.occupied_slots.get("cpu", 0)),
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
         mem_allocated=int(kernel.occupied_slots.get("mem", 0)),
