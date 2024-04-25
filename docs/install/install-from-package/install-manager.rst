@@ -18,17 +18,21 @@ If you want to install a specific version:
 
    $ pip install -U backend.ai-manager==${BACKEND_PKG_VERSION}
 
-For the first time, you need to generate rpc keypair. This keypair is used for authentication and encryption to our manager-to-agent RPC connections.
+You may need to generate an RPC keypair for the first setup. This key pair is used for authentication and encryption in our manager-to-agent RPC connections.
+Even if you don't intend to encrypt the RPC channel, the key pair should still be present.
+
 
 .. code-block:: console
 
    $ cd "${HOME}/manager"
-   $ mkdir -p fixtures/manager
-   $ backend.ai mgr generate-rpc-keypair fixtures/manager 'manager'
+   $ mkdir fixtures
+   $ backend.ai mgr generate-rpc-keypair fixtures 'manager'
 
    2024-04-23 12:06:31.913 INFO ai.backend.manager.cli [21024] Generating a RPC keypair...
-    Public Key: >B-mF}N{WygT92d&=Kceix$7cWzg!dT])rIc39=S (stored at fixtures/manager/manager.key)
-    Secret Key: g.4&?*b&0#oRRC9?DMO[SUXikjKZ7nYj!bzFJN92 (stored at fixtures/manager/manager.key_secret)
+    Public Key: >B-mF}N{WygT92d&=Kceix$7cWzg!dT])rIc39=S (stored at fixtures/manager.key)
+    Secret Key: g.4&?*b&0#oRRC9?DMO[SUXikjKZ7nYj!bzFJN92 (stored at fixtures/manager.key_secret)
+
+You generated an RPC keypair for the manager. The public key is stored in ``fixtures/manager.key`` and the secret key is stored in ``fixtures/manager.key_secret``.
 
 Local configuration
 -------------------
@@ -61,8 +65,8 @@ would be:
    # group = "bai"
    ssl-enabled = false
 
-   heartbeat-timeout = 30.0
-   rpc-auth-manager-keypair = "/home/bai/manager/fixtures/manager/manager.key_secret"
+   heartbeat-timeout = 40.0
+   rpc-auth-manager-keypair = "/home/bai/manager/fixtures/manager.key_secret"
    pid-file = "/home/bai/manager/manager.pid"
    disabled-plugins = []
    hide-agents = true
@@ -195,7 +199,7 @@ issuing SQL statement directly inside the PostgreSQL container:
 .. code-block:: console
 
    $ vfolder_host_val='{"bai-m1:local": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
-   $ docker exec -it bai-backendai-pg-active-1 psql -U postgres -d backend \
+   $ docker exec -it $(docker ps | grep backendai-pg | awk '{print $1}') psql -U postgres -d backend \
          -c "UPDATE domains SET allowed_vfolder_hosts = '${vfolder_host_val}' WHERE name = 'default';"
 
 
