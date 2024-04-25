@@ -1,7 +1,10 @@
+import itertools
 from collections import defaultdict
 
 import click
+import colorama
 import tabulate
+from colorama import Fore, Style
 
 from ai.backend.plugin.entrypoint import (
     scan_entrypoint_from_buildscript,
@@ -19,23 +22,36 @@ def main():
 @main.command()
 @click.argument("group_name")
 def scan(group_name: str) -> None:
+    colorama.init(autoreset=True)
     duplicate_count: dict[str, int] = defaultdict(int)
+    src_style = {
+        "buildscript": Fore.LIGHTYELLOW_EX,
+        "plugin-checkout": Fore.LIGHTGREEN_EX,
+        "python-package": Fore.LIGHTBLUE_EX,
+    }
     rows = []
-    headers = ("Source", "Name", "Module Path")
-    for entrypoint in scan_entrypoint_from_buildscript(group_name):
+    headers = (f"{Style.BRIGHT}Source", "Name", f"Module Path{Style.RESET_ALL}")
+    for source, entrypoint in itertools.chain(
+        (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
+        (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
+        (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
+    ):
         duplicate_count[entrypoint.name] += 1
-        rows.append(("buildscript", entrypoint.name, entrypoint.module))
-    for entrypoint in scan_entrypoint_from_plugin_checkouts(group_name):
-        duplicate_count[entrypoint.name] += 1
-        rows.append(("plugin-checkout", entrypoint.name, entrypoint.module))
-    for entrypoint in scan_entrypoint_from_package_metadata(group_name):
-        duplicate_count[entrypoint.name] += 1
-        rows.append(("python-package", entrypoint.name, entrypoint.module))
+        rows.append((source, entrypoint.name, entrypoint.module))
     if not rows:
         print(f"No plugins found for the entrypoint {group_name!r}")
         return
     rows.sort(key=lambda row: (row[2], row[1], row[0]))
-    print(tabulate.tabulate(rows, headers))
-    for name, count in duplicate_count.items():
-        if count > 1:
-            print(f"duplication detected for {name} ({count})")
+    display_rows = []
+    for source, name, module_path in rows:
+        name_style = Style.BRIGHT
+        if duplicate_count[name] > 1:
+            name_style = Fore.RED + Style.BRIGHT
+        display_rows.append((
+            f"{src_style[source]}{source}{Style.RESET_ALL}",
+            f"{name_style}{name}{Style.RESET_ALL}",
+            module_path,
+        ))
+    print(tabulate.tabulate(display_rows, headers))
+    if duplicate_count:
+        print(f"\n💥 {Fore.RED}{Style.BRIGHT}Detected duplicated entrypoint(s)!{Style.RESET_ALL}")
