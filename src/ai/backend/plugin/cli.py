@@ -64,9 +64,11 @@ def scan(group_name: str, format: FormatOptions) -> None:
                 f"{ITALIC}Module Path{Style.RESET_ALL}",
             )
             display_rows = []
+            has_duplicate = False
             for source, name, module_path in rows:
                 name_style = Style.BRIGHT
                 if duplicate_count[name] > 1:
+                    has_duplicate = True
                     name_style = Fore.RED + Style.BRIGHT
                 display_rows.append((
                     f"{src_style[source]}{source}{Style.RESET_ALL}",
@@ -74,7 +76,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
                     module_path,
                 ))
             print(tabulate.tabulate(display_rows, display_headers))
-            if duplicate_count:
+            if has_duplicate:
                 print(f"\n💥 {Fore.LIGHTRED_EX}Detected duplicated entrypoint(s)!{Style.RESET_ALL}")
         case FormatOptions.JSON:
             output_rows = []
