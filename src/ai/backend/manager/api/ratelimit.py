@@ -81,7 +81,7 @@ async def rlim_middleware(
         return response
     else:
         root_ctx: RootContext = app["_root.context"]
-        rate_limit = root_ctx.local_config["manager"]["anonymous-ratelimit"]
+        rate_limit = root_ctx.shared_config["anonymous_ratelimit"]
 
         ip_address = get_client_ip(request)
 
