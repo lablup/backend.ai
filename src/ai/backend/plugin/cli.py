@@ -34,6 +34,7 @@ def scan(group_name: str) -> None:
     if not rows:
         print(f"No plugins found for the entrypoint {group_name!r}")
         return
+    rows.sort(key=lambda row: (row[2], row[1], row[0]))
     print(tabulate.tabulate(rows, headers))
     for name, count in duplicate_count.items():
         if count > 1:
