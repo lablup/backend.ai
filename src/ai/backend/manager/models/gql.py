@@ -517,6 +517,7 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
+        with_shared_vfolders=graphene.Boolean(description="Added in 24.09.0"),
     )
 
     # super-admin only
@@ -913,7 +914,7 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            client_groups = await loader.load(client_user_id)
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -1578,6 +1579,7 @@ class Queries(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
+        with_shared_vfolders: bool = True,
     ) -> VirtualFolderList:
         # TODO: adopt the generic queryfilter language
         total_count = await VirtualFolder.load_count(
@@ -1586,6 +1588,7 @@ class Queries(graphene.ObjectType):
             group_id=group_id,  # scope
             user_id=user_id,  # scope
             filter=filter,
+            with_shared_vfolders=with_shared_vfolders,
         )
         items = await VirtualFolder.load_slice(
             info.context,
@@ -1596,6 +1599,7 @@ class Queries(graphene.ObjectType):
             user_id=user_id,  # scope
             filter=filter,
             order=order,
+            with_shared_vfolders=with_shared_vfolders,
         )
         return VirtualFolderList(items, total_count)
 
@@ -1644,6 +1648,7 @@ class Queries(graphene.ObjectType):
             domain_name=domain_name,  # scope
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
+            with_shared_vfolders=False,
         )
         items = await VirtualFolder.load_slice(
             info.context,
@@ -1653,6 +1658,7 @@ class Queries(graphene.ObjectType):
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
             order=order,
+            with_shared_vfolders=False,
         )
         return VirtualFolderList(items, total_count)
 

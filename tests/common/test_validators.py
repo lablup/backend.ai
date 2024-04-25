@@ -466,19 +466,22 @@ def test_url():
 def test_vfolder_id():
     iv = tx.VFolderID()
     value: VFolderID = iv.check(
-        "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1/f40ed400-5571-4a07-bc22-d557b7d44581"
+        "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
     )
     assert str(value.quota_scope_id) == "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1"
     assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    assert value.reference_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
     value = iv.check(
-        "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8/f40ed40055714a07bc22d557b7d44581"
+        "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8/f40ed40055714a07bc22d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
     )
     assert str(value.quota_scope_id) == "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8"
     assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    assert value.reference_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
     value2: VFolderID = iv.check(str(value))
     assert value2 == value
     assert str(value2.quota_scope_id) == "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8"
     assert value2.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    assert value2.reference_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check(None)
     with pytest.raises(t.DataError):
@@ -492,18 +495,30 @@ def test_vfolder_id():
     with pytest.raises(t.DataError):
         iv.check(":/x")
     with pytest.raises(t.DataError):
-        iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(ValueError, match="Invalid quota scope type"):
-        iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "abc:def/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("-abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "-abcdef/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("abcdef-/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "abcdef-/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("abcdef//f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "abcdef//f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("abc/def/f40ed400-5571-4a07-bc22-d557b7d44581")
+        iv.check(
+            "abc/def/f40ed400-5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581"
+        )
     with pytest.raises(t.DataError):
-        iv.check("user:/5571-4a07-bc22-d557b7d44581")
+        iv.check("user:/5571-4a07-bc22-d557b7d44581/f40ed400-5571-4a07-bc22-d557b7d44581")

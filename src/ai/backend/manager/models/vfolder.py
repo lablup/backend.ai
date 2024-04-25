@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.models.view_utils import create_view
 
 from ..api.exceptions import (
     InvalidAPIParameters,
@@ -83,7 +84,8 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     "vfolders",
     "vfolder_invitations",
-    "vfolder_permissions",
+    "shared_vfolders_view",
+    "SharedVFoldersView",
     "VirtualFolder",
     "VFolderOwnershipType",
     "VFolderInvitationState",
@@ -224,6 +226,9 @@ vfolders = sa.Table(
     "vfolders",
     metadata,
     IDColumn("id"),
+    sa.Column(
+        "reference_id", GUID, nullable=True, index=True
+    ),  # Used if the vfolder is invited/shared. null when it is not invited/shared
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
@@ -278,10 +283,6 @@ vfolders = sa.Table(
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
         name="ownership_type_match_with_user_or_group",
     ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -329,19 +330,13 @@ vfolder_invitations = sa.Table(
     ),
 )
 
-
-vfolder_permissions = sa.Table(
-    "vfolder_permissions",
-    metadata,
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
+shared_vfolders_view = create_view(
+    "shared_vfolders_view", sa.select(vfolders).where(vfolders.c.reference_id.isnot(None)), metadata
 )
+
+
+class SharedVFoldersView(Base):
+    __table__ = shared_vfolders_view
 
 
 class VFolderRow(Base):
@@ -389,6 +384,7 @@ async def query_accessible_vfolders(
     vfolders_selectors = [
         vfolders.c.name,
         vfolders.c.id,
+        vfolders.c.reference_id,
         vfolders.c.host,
         vfolders.c.quota_scope_id,
         vfolders.c.usage_mode,
@@ -404,8 +400,6 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
-        # vfolders.c.permission,
-        # users.c.email,
     ]
 
     async def _append_entries(_query, _is_owner=True):
@@ -424,6 +418,9 @@ async def query_accessible_vfolders(
             entries.append({
                 "name": row.vfolders_name,
                 "id": row.vfolders_id,
+                "reference_id": row.vfolders_reference_id
+                if "vfolders_reference_id" in row_keys
+                else None,
                 "host": row.vfolders_host,
                 "quota_scope_id": row.vfolders_quota_scope_id,
                 "usage_mode": row.vfolders_usage_mode,
@@ -448,63 +445,73 @@ async def query_accessible_vfolders(
     entries: List[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        vfolders_with_users = vfolders.join(users, vfolders.c.user == users.c.uuid)
+
+        # Scan my owned vfolders if user is not admin or superadmin.
+        # If user is admin or superadmin, scan all user vfolders.
+        scan_owned_vfolder_query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(vfolders_with_users)
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.is_(None))
+            )
+        )
+
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
-            query = query.where(vfolders.c.user == user_uuid)
-        await _append_entries(query)
+            scan_owned_vfolder_query = scan_owned_vfolder_query.where(
+                (vfolders.c.user == user_uuid)
+            )
+
+        await _append_entries(scan_owned_vfolder_query)
 
         # Scan vfolders shared with me.
-        j = vfolders.join(
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
-            isouter=True,
-        ).join(
-            users,
-            vfolders.c.user == users.c.uuid,
-            isouter=True,
-        )
-        query = (
+        scan_shared_vfolder_query = (
             sa.select(
-                vfolders_selectors + [vfolder_permissions.c.permission, users.c.email],
+                vfolders_selectors + [vfolders.c.permission, users.c.email],
                 use_labels=True,
             )
-            .select_from(j)
+            .select_from(vfolders_with_users)
             .where(
-                (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                (vfolders.c.user == user_uuid)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.isnot(None)),
             )
         )
+
         if extra_invited_vf_conds is not None:
-            query = query.where(extra_invited_vf_conds)
-        await _append_entries(query, _is_owner=False)
+            scan_shared_vfolder_query = scan_shared_vfolder_query.where(extra_invited_vf_conds)
+        await _append_entries(scan_shared_vfolder_query, _is_owner=False)
 
     if "group" in allowed_vfolder_types:
         # Scan group vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
-            query = (
+            select_group_ids_query = (
                 sa.select([groups.c.id])
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
-            result = await conn.execute(query)
+            result = await conn.execute(select_group_ids_query)
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
-            result = await conn.execute(query)
+            agus_with_users = sa.join(agus, users, agus.c.user_id == users.c.uuid)
+            select_group_ids_query = (
+                sa.select([agus.c.group_id])
+                .select_from(agus_with_users)
+                .where(agus.c.user_id == user_uuid)
+            )
+            result = await conn.execute(select_group_ids_query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
-        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+
+        vfolders_with_groups = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
-        ).select_from(j)
+        ).select_from(vfolders_with_groups)
+
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
@@ -512,33 +519,38 @@ async def query_accessible_vfolders(
         is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
+
         await _append_entries(query, is_owner)
 
-        # Override permissions, if exists, for group vfolders.
-        j = sa.join(
-            vfolders,
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
-        )
-        query = (
-            sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
-            .select_from(j)
-            .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+        original_group_vfolder_ids = (
+            (
+                await conn.execute(
+                    sa.select(vfolders.c.id).where(
+                        (
+                            vfolders.c.reference_id.is_(None)
+                            & (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                        )
+                    )
+                )
             )
+            .scalars()
+            .all()
         )
-        if extra_vf_conds is not None:
-            query = query.where(extra_vf_conds)
-        if extra_vf_user_conds is not None:
-            query = query.where(extra_vf_user_conds)
-        result = await conn.execute(query)
-        overriding_permissions: dict = {row.vfolder: row.permission for row in result}
+
         for entry in entries:
-            if (
-                entry["id"] in overriding_permissions
-                and entry["ownership_type"] == VFolderOwnershipType.GROUP
-            ):
-                entry["permission"] = overriding_permissions[entry["id"]]
+            if entry["reference_id"] in original_group_vfolder_ids:
+                # If the user is not the one whose permissions have been overridden, remove the referenced VFolder
+                if entry["user"] != str(user_uuid):
+                    entries.remove(entry)
+                # If the user is the one whose permissions have been overridden, find and remove the original VFolder
+                else:
+                    original_vfolder = list(
+                        filter(
+                            lambda entry2: entry["reference_id"] == entry2["id"],
+                            entries,
+                        )
+                    )[0]
+                    entries.remove(original_vfolder)
 
     return entries
 
@@ -767,7 +779,7 @@ async def prepare_vfolder_mounts(
             mount_base_path = PurePosixPath(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
-                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    VFolderID(vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]),
                     PurePosixPath(requested_vfolder_subpaths[key]),
                 ),
             )
@@ -783,7 +795,9 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
-                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                    "vfid": str(
+                        VFolderID(vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"])
+                    ),
                     "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
                 },
@@ -793,7 +807,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfid=VFolderID(
+                        vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]
+                    ),
                     vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
@@ -825,7 +841,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfid=VFolderID(
+                        vfolder["quota_scope_id"], vfolder["id"], vfolder["reference_id"]
+                    ),
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
@@ -854,11 +872,12 @@ async def update_vfolder_status(
     do_log: bool = True,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    cond = sa.or_(vfolders.c.id.in_(vfolder_ids), vfolders.c.reference_id.in_(vfolder_ids))
+
     if vfolder_info_len == 0:
         return None
     elif vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
+        cond = sa.or_(vfolders.c.id == vfolder_ids[0], vfolders.c.reference_id == vfolder_ids[0])
 
     now = datetime.now(tzutc())
 
@@ -942,7 +961,10 @@ async def initiate_vfolder_clone(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
+    source_vf_cond = sa.or_(
+        vfolders.c.id == vfolder_info.source_vfolder_id.folder_id,
+        vfolders.c.reference_id == vfolder_info.source_vfolder_id.folder_id,
+    )
 
     async def _update_status() -> None:
         async with db_engine.begin_session() as db_session:
@@ -970,6 +992,7 @@ async def initiate_vfolder_clone(
             async with db_engine.begin_session() as db_session:
                 insert_values = {
                     "id": target_folder_id.folder_id,
+                    "reference_id": None,
                     "name": vfolder_info.target_vfolder_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
@@ -1026,8 +1049,8 @@ async def initiate_vfolder_clone(
 
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
-    requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_ptask_group: aiotools.PersistentTaskGroup,
 ) -> int:
     vfolder_info_len = len(requested_vfolders)
@@ -1165,6 +1188,7 @@ class VirtualFolder(graphene.ObjectType):
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
     status = graphene.String()
+    reference_id = graphene.UUID(required=False, description="Added in 24.09.0")
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
@@ -1179,6 +1203,7 @@ class VirtualFolder(graphene.ObjectType):
 
         return cls(
             id=row["id"],
+            reference_id=row["reference_id"],
             host=row["host"],
             quota_scope_id=row["quota_scope_id"],
             name=row["name"],
@@ -1270,6 +1295,7 @@ class VirtualFolder(graphene.ObjectType):
         group_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
+        with_shared_vfolders: bool = False,
     ) -> int:
         from .group import groups
         from .user import users
@@ -1278,6 +1304,8 @@ class VirtualFolder(graphene.ObjectType):
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
         query = sa.select([sa.func.count()]).select_from(j)
+        if not with_shared_vfolders:
+            query = query.where(vfolders.c.reference_id.is_(None))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
@@ -1303,6 +1331,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
+        with_shared_vfolders: bool = False,
     ) -> Sequence[VirtualFolder]:
         from .group import groups
         from .user import users
@@ -1316,6 +1345,8 @@ class VirtualFolder(graphene.ObjectType):
             .limit(limit)
             .offset(offset)
         )
+        if not with_shared_vfolders:
+            query = query.where(vfolders.c.reference_id.is_(None))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
@@ -1421,19 +1452,12 @@ class VirtualFolder(graphene.ObjectType):
     ) -> int:
         from .user import users
 
-        j = vfolders.join(
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
-        ).join(
-            users,
-            vfolder_permissions.c.user == users.c.uuid,
-        )
         query = (
             sa.select([sa.func.count()])
-            .select_from(j)
+            .select_from(SharedVFoldersView)
             .where(
-                (vfolder_permissions.c.user == user_id)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                (SharedVFoldersView.user == user_id)
+                & (SharedVFoldersView.ownership_type == VFolderOwnershipType.USER)
             )
         )
         if domain_name is not None:
@@ -1461,18 +1485,16 @@ class VirtualFolder(graphene.ObjectType):
         from .user import users
 
         j = vfolders.join(
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
-        ).join(
             users,
-            vfolder_permissions.c.user == users.c.uuid,
+            vfolders.c.user == users.c.uuid,
         )
         query = (
             sa.select([vfolders, users.c.email])
             .select_from(j)
             .where(
-                (vfolder_permissions.c.user == user_id)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                (vfolders.c.user == user_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.reference_id.isnot(None)),
             )
             .limit(limit)
             .offset(offset)
@@ -1579,10 +1601,13 @@ class VirtualFolder(graphene.ObjectType):
 
 
 class VirtualFolderList(graphene.ObjectType):
+    items = graphene.List(VirtualFolder, required=True)
+
     class Meta:
         interfaces = (PaginatedList,)
 
-    items = graphene.List(VirtualFolder, required=True)
+    class Arguments:
+        with_shared_vfolders = graphene.Boolean()
 
 
 class VirtualFolderPermission(graphene.ObjectType):
@@ -1601,7 +1626,7 @@ class VirtualFolderPermission(graphene.ObjectType):
             return None
         return cls(
             permission=row["permission"],
-            vfolder=row["vfolder"],
+            vfolder=row["id"],
             vfolder_name=row["name"],
             user=row["user"],
             user_email=row["email"],
@@ -1631,14 +1656,9 @@ class VirtualFolderPermission(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from .user import users
-
-        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
-            users, users.c.uuid == vfolder_permissions.c.user
-        )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count()]).select_from(SharedVFoldersView)
         if user_id is not None:
-            query = query.where(vfolders.c.user == user_id)
+            query = query.where((SharedVFoldersView.user == user_id))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1659,14 +1679,16 @@ class VirtualFolderPermission(graphene.ObjectType):
     ) -> list[VirtualFolderPermission]:
         from .user import users
 
-        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
-            users, users.c.uuid == vfolder_permissions.c.user
+        j = vfolders.join(
+            users,
+            vfolders.c.user == users.c.uuid,
         )
         query = (
-            sa.select([vfolder_permissions, vfolders.c.name, users.c.email])
+            sa.select([vfolders, users.c.email])
             .select_from(j)
             .limit(limit)
             .offset(offset)
+            .where(vfolders.c.reference_id.isnot(None))
         )
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
@@ -2045,7 +2067,7 @@ class ModelCard(graphene.ObjectType):
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
         folder_name = vfolder_row.name
-        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
+        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id, vfolder_row.reference_id)
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
         async with graph_ctx.storage_manager.request(
             proxy_name,

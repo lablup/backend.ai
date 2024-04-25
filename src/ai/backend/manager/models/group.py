@@ -659,7 +659,7 @@ class PurgeGroup(graphene.Mutation):
                 raise RuntimeError(
                     "Group has some active session. Terminate them first to proceed removal.",
                 )
-            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, graph_ctx.storage_manager, gid)
             await cls.delete_kernels(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
@@ -669,13 +669,14 @@ class PurgeGroup(graphene.Mutation):
     async def delete_vfolders(
         cls,
         engine: ExtendedAsyncSAEngine,
-        group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
+        group_id: uuid.UUID,
     ) -> int:
         """
         Delete group's all virtual folders as well as their physical data.
 
-        :param conn: DB connection
+        :param engine: DB engine
+        :param storage_manager: storage manager
         :param group_id: group's UUID to delete virtual folders
 
         :return: number of deleted rows
@@ -687,6 +688,7 @@ class PurgeGroup(graphene.Mutation):
             .select_from(vfolders)
             .where(vfolders.c.group == group_id)
         )
+
         async with engine.begin_session() as db_conn:
             result = await db_conn.execute(query)
             target_vfs = result.fetchall()
@@ -697,8 +699,8 @@ class PurgeGroup(graphene.Mutation):
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_ptask_group,
             )
         except VFolderOperationFailed as e:
@@ -718,7 +720,7 @@ class PurgeGroup(graphene.Mutation):
         """
         Delete all kernels run from the target groups.
 
-        :param conn: DB connection
+        :param db_conn: DB connection
         :param group_id: group's UUID to delete kernels
 
         :return: number of deleted rows

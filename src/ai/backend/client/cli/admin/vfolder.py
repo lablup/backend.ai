@@ -109,6 +109,7 @@ def _list_cmd(docs: str = None):
                     page_size=pg_size,
                     filter=filter_,
                     order=order,
+                    with_shared_vfolders=True,
                 )
                 ctx.output.print_paginated_list(
                     fetch_func,
