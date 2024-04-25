@@ -2088,7 +2088,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
             shared_vfolder.update({
                 "id": uuid.uuid4().hex,
-                # "user": _user,
+                "user": _user,
                 "reference_id": original_vfolder.id.hex,
                 "permission": params["permission"],
             })

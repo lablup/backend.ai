@@ -287,10 +287,6 @@ vfolders = sa.Table(
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
         name="ownership_type_match_with_user_or_group",
     ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -528,13 +524,37 @@ async def query_accessible_vfolders(
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
 
-        reference_ids = (await conn.execute(sa.select(vfolders.c.reference_id))).scalars().all()
-
         await _append_entries(query, is_owner)
 
+        original_group_vfolder_ids = (
+            (
+                await conn.execute(
+                    sa.select(vfolders.c.id).where(
+                        (
+                            vfolders.c.reference_id.is_(None)
+                            & (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
         for entry in entries:
-            if entry["ownership_type"] == "group" and entry["id"] in reference_ids:
-                entries.remove(entry)
+            if entry["reference_id"] in original_group_vfolder_ids:
+                # If the user is not the one whose permissions have been overridden, remove the referenced VFolder
+                if entry["user"] != str(user_uuid):
+                    entries.remove(entry)
+                # If the user is the one whose permissions have been overridden, find and remove the original VFolder
+                else:
+                    original_vfolder = list(
+                        filter(
+                            lambda entry2: entry["reference_id"] == entry2["id"],
+                            entries,
+                        )
+                    )[0]
+                    entries.remove(original_vfolder)
 
     return entries
 

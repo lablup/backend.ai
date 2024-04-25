@@ -187,6 +187,7 @@ def upgrade():
     op.drop_table("vfolder_permissions")
     op.add_column("vfolders", sa.Column("reference_id", GUID(), nullable=True))
     op.create_index(op.f("ix_vfolders_reference_id"), "vfolders", ["reference_id"], unique=False)
+    op.drop_constraint("either_one_of_user_or_group", "vfolders", type_="check")
 
     for vfolder_permission_record in vfolder_permission_records:
         original_vfolder = db_connection.execute(
@@ -220,6 +221,11 @@ def downgrade():
 
     op.drop_index(op.f("ix_vfolders_reference_id"), table_name="vfolders")
     op.drop_column("vfolders", "reference_id")
+    op.create_check_constraint(
+        "either_one_of_user_or_group",
+        "vfolders",
+        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
+    )
     op.create_table(
         "vfolder_permissions",
         sa.Column(
