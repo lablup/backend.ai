@@ -270,7 +270,11 @@ manager_local_config_iv = (
             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("distributed-lock", default="pg_advisory"): t.Enum(
-                "filelock", "pg_advisory", "redlock", "etcd"
+                "filelock",
+                "pg_advisory",
+                "redlock",
+                "etcd",
+                "etcetra",
             ),
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
