@@ -45,6 +45,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
     ):
         duplicate_count[entrypoint.name] += 1
         rows.append((source, entrypoint.name, entrypoint.module))
+    rows.sort(key=lambda row: (row[2], row[1], row[0]))
     match format:
         case FormatOptions.CONSOLE:
             if not rows:
@@ -52,7 +53,6 @@ def scan(group_name: str, format: FormatOptions) -> None:
                 return
             colorama.init(autoreset=True)
             ITALIC = colorama.ansi.code_to_chars(3)
-            rows.sort(key=lambda row: (row[2], row[1], row[0]))
             src_style = {
                 "buildscript": Fore.LIGHTYELLOW_EX,
                 "plugin-checkout": Fore.LIGHTGREEN_EX,
