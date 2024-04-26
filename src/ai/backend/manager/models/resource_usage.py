@@ -267,7 +267,10 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             session_row=usage_group.session_row,
             kernel_row=usage_group.kernel_row,
             agent=usage_group.kernel_row.agent,
-            **usage_group.to_map(),
+            **{
+                **usage_group.to_map(),
+                "total_usage": ResourceUsage(),
+            },
         )
 
     def register_resource_group(
@@ -315,7 +318,10 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         return cls(
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
-            **usage_group.to_map(),
+            **{
+                **usage_group.to_map(),
+                "total_usage": ResourceUsage(),
+            },
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
@@ -381,6 +387,7 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
             "cluster_mode": None,
             "scheduled_at": None,
             "terminated_at": None,
+            "total_usage": ResourceUsage(),
         }
         return cls(
             project_row=usage_group.project_row,
