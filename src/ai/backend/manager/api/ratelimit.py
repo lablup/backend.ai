@@ -152,7 +152,7 @@ async def init(app: web.Application) -> None:
 @superadmin_required
 async def get_hot_anonymous_clients(request: web.Request) -> web.Response:
     """ """
-    log.info("GET_HOT_ANONYMOUS_CLIENTS ()")
+    log.info("RATELIMIT.GET_HOT_ANONYMOUS_CLIENTS ()")
     rlimit_ctx: RateLimitContext = request.app["ratelimit.context"]
     rr = rlimit_ctx.redis_rlim
     result: list[tuple[bytes, float]] = await redis_helper.execute(
