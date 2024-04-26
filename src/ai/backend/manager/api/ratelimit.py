@@ -151,7 +151,10 @@ async def init(app: web.Application) -> None:
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 async def get_hot_anonymous_clients(request: web.Request) -> web.Response:
-    """ """
+    """
+    Retrieve a dictionary of anonymous client IP addresses and their corresponding suspicion scores.
+    suspicion scores are based on the number of requests made by the client.
+    """
     log.info("RATELIMIT.GET_HOT_ANONYMOUS_CLIENTS ()")
     rlimit_ctx: RateLimitContext = request.app["ratelimit.context"]
     rr = rlimit_ctx.redis_rlim
