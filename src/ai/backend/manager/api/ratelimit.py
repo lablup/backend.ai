@@ -80,13 +80,12 @@ async def rlim_middleware(
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
     else:
-        ip_address = get_client_ip(request)
-        assert ip_address is not None, "Client IP Address is not provided"
-
         root_ctx: RootContext = app["_root.context"]
         rate_limit = root_ctx.local_config["manager"]["anonymous-ratelimit"]
 
-        if rate_limit is None:
+        ip_address = get_client_ip(request)
+
+        if not ip_address or rate_limit is None:
             # No checks for rate limiting.
             response = await handler(request)
             # Arbitrary number for indicating no rate limiting.
