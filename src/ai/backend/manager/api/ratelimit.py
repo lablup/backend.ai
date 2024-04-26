@@ -5,6 +5,7 @@ import time
 from decimal import Decimal
 from typing import Final, Iterable, Tuple
 
+import aiohttp_cors
 import attrs
 from aiohttp import web
 from aiotools import apartial
@@ -14,6 +15,8 @@ from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.networking import get_client_ip
 from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.manager.api.auth import superadmin_required
+from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
 
 from .context import RootContext
 from .exceptions import RateLimitExceeded
@@ -145,6 +148,21 @@ async def init(app: web.Application) -> None:
     )
 
 
+@server_status_required(READ_ALLOWED)
+@superadmin_required
+async def get_hot_anonymous_clients(request: web.Request) -> web.Response:
+    """ """
+    log.info("GET_HOT_ANONYMOUS_CLIENTS ()")
+    rlimit_ctx: RateLimitContext = request.app["ratelimit.context"]
+    rr = rlimit_ctx.redis_rlim
+    result: list[tuple[bytes, float]] = await redis_helper.execute(
+        rr, lambda r: r.zrange("suspicious_ips", 0, -1, withscores=True)
+    )
+    suspicious_ips = {k.decode(): v for k, v in dict(result).items()}
+
+    return web.json_response(suspicious_ips, status=200)
+
+
 async def shutdown(app: web.Application) -> None:
     app_ctx: RateLimitContext = app["ratelimit.context"]
     await redis_helper.execute(app_ctx.redis_rlim, lambda r: r.flushdb())
@@ -157,6 +175,10 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4)
     app["ratelimit.context"] = RateLimitContext()
+    app["prefix"] = "ratelimit"
+    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    add_route = app.router.add_route
+    cors.add(add_route("GET", "/hot_anonymous_clients", get_hot_anonymous_clients))
 
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
