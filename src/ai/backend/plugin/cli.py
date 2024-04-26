@@ -51,7 +51,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
                 print(f"No plugins found for the entrypoint {group_name!r}")
                 return
             colorama.init(autoreset=True)
-            ITALIC = "\x1b[3m"
+            ITALIC = colorama.ansi.code_to_chars(3)
             rows.sort(key=lambda row: (row[2], row[1], row[0]))
             src_style = {
                 "buildscript": Fore.LIGHTYELLOW_EX,
