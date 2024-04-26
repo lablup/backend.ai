@@ -6,7 +6,7 @@ __all__ = ("RateLimit",)
 
 class RateLimit(BaseFunction):
     """
-    Provides interactions with Anonymous Ratelimit.
+    Provides RateLimiting API functions.
     """
 
     @api_function
