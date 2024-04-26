@@ -43,19 +43,19 @@ end
 redis.call('ZADD', namespaced_id, now, tostring(request_id))
 redis.call('EXPIRE', namespaced_id, window)
 
-local visit_count = redis.call('ZCARD', namespaced_id)
+local rolling_count = redis.call('ZCARD', namespaced_id)
 
 if id_type == "ip" then
     local rate_limit = tonumber(ARGV[3])
     local score_threshold = rate_limit * 0.8
 
     -- Add IP to suspicious_ips only if count is greater than score_threshold
-    if visit_count >= score_threshold then
-        redis.call('ZADD', 'suspicious_ips', visit_count, id_value)
+    if rolling_count >= score_threshold then
+        redis.call('ZADD', 'suspicious_ips', rolling_count, id_value)
     end
 end
 
-return visit_count
+return rolling_count
 """
 
 
@@ -116,9 +116,9 @@ async def rlim_middleware(
                 remaining = rate_limit
             else:
                 rolling_count = int(ret)
-                if rate_limit is not None and rolling_count > rate_limit:
-                    raise RateLimitExceeded
                 remaining = rate_limit - rolling_count
+                if remaining < 0:
+                    raise RateLimitExceeded
 
             response = await handler(request)
             response.headers["X-RateLimit-Limit"] = str(rate_limit)
