@@ -207,6 +207,7 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -590,6 +591,9 @@ class SharedConfig(AbstractConfig):
             # TODO: provide a way to specify other scope prefixes
         }
         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+        self.etcetra_etcd = EtcetraAsyncEtcd(
+            etcd_addr, namespace, scope_prefix_map, credentials=credentials
+        )
 
     async def close(self) -> None:
         await self.etcd.close()
