@@ -66,8 +66,8 @@ would be:
    ssl-enabled = false
 
    heartbeat-timeout = 40.0
-   rpc-auth-manager-keypair = "/home/bai/manager/fixtures/manager.key_secret"
-   pid-file = "/home/bai/manager/manager.pid"
+   rpc-auth-manager-keypair = "fixtures/manager.key_secret"
+   pid-file = "manager.pid"
    disabled-plugins = []
    hide-agents = true
    # event-loop = "asyncio"
