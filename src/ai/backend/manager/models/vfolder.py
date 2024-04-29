@@ -90,7 +90,7 @@ __all__: Sequence[str] = (
     "VFolderPermission",
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
-    "VFolderAccessStatus",
+    "VFolderStatusSet",
     "DEAD_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
@@ -170,7 +170,7 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ERROR = "delete-error"
 
 
-class VFolderAccessStatus(enum.StrEnum):
+class VFolderStatusSet(enum.StrEnum):
     """
     Introduce virtual folder desired status for storage-proxy operations.
     Not added to db scheme  and determined only by current vfolder status.
@@ -448,7 +448,7 @@ async def query_accessible_vfolders(
     entries: List[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
+        # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
@@ -459,7 +459,7 @@ async def query_accessible_vfolders(
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
-        # Scan vfolders shared with me.
+        # Scan vfolders shared with requester.
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
