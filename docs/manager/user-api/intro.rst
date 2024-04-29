@@ -132,7 +132,7 @@ Writing new REST API
 Be advised that starting from 24.03, every new and updated REST APIs should adapt pydantic as its request and response validator. For starters our `service` API implementations can be a good boilerplate.
 
 .. note::
-   Do not adapt legacy trafaret approacy for fresh new REST APIs! This approach is deprecated.
+   Do not adapt legacy trafaret-based approach for fresh new REST APIs! This approach is deprecated.
 
 Use `ai.backend.manager.api.utils.pydantic_response_api_handler` as a function decorator for API handlers without request body or queryparam to consume. Otherwise adapt `ai.backend.manager.utils.pydantic_params_api_handler`.
 Every response data model should inherit `ai.backend.manager.api.utils.BaseResponseModel` as its parent class. To use arbitrary HTTP response status code other than 200, fill in `status` value of `BaseResponseModel`.
