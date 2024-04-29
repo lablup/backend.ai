@@ -200,7 +200,4 @@ class RootContext:
             await volume_obj.init()
             self.volumes[name] = volume_obj
 
-            try:
-                yield volume_obj
-            finally:
-                await volume_obj.shutdown()
+            yield volume_obj
