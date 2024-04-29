@@ -378,8 +378,13 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        *,
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Sequence[Group | None]]:
+        if type is None:
+            _type = [ProjectType.GENERAL]
+        else:
+            _type = type
         j = sa.join(
             groups,
             association_groups_users,
@@ -388,7 +393,7 @@ class Group(graphene.ObjectType):
         query = (
             sa.select([groups, association_groups_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
+            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
