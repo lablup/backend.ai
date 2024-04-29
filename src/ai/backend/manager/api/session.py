@@ -865,11 +865,11 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
-        status_info = await root_ctx.registry.get_commit_status(session)
+        statuses = await root_ctx.registry.get_commit_status([session.main_kernel.id])
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
     return web.json_response(resp, status=200)
 
 
