@@ -431,9 +431,7 @@ class GroupInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
-        description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
-        ),
+        description=("Added in 24.03.0."),
     )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
@@ -443,7 +441,7 @@ class GroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 
@@ -459,7 +457,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 
