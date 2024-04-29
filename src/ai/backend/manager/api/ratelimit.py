@@ -55,6 +55,12 @@ if id_type == "ip" then
     -- Add IP to suspicious_ips only if count is greater than score_threshold
     if rolling_count >= score_threshold then
         redis.call('ZADD', 'suspicious_ips', rolling_count, id_value)
+
+        local max_size = 1000
+        local current_size = redis.call('ZCARD', 'suspicious_ips')
+        if current_size > max_size then
+            redis.call('ZREMRANGEBYRANK', 'suspicious_ips', 0, 0)
+        end
     end
 end
 
