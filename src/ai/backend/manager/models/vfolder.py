@@ -69,11 +69,7 @@ from .base import (
     generate_sql_info_for_gql_connection,
     metadata,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -95,7 +91,7 @@ __all__: Sequence[str] = (
     "VFolderPermission",
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
-    "VFolderAccessStatus",
+    "VFolderStatusSet",
     "DEAD_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
@@ -175,7 +171,7 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ERROR = "delete-error"
 
 
-class VFolderAccessStatus(enum.StrEnum):
+class VFolderStatusSet(enum.StrEnum):
     """
     Introduce virtual folder desired status for storage-proxy operations.
     Not added to db scheme  and determined only by current vfolder status.
@@ -453,7 +449,7 @@ async def query_accessible_vfolders(
     entries: List[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
+        # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
@@ -464,7 +460,7 @@ async def query_accessible_vfolders(
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
-        # Scan vfolders shared with me.
+        # Scan vfolders shared with requester.
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
@@ -718,12 +714,14 @@ async def prepare_vfolder_mounts(
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
+    extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
+        DEAD_VFOLDER_STATUSES
+    )
     if requested_vfolder_names:
-        extra_vf_conds = vfolders.c.name.in_(
-            requested_vfolder_names.values()
-        ) | vfolders.c.name.startswith(".")
-    else:
-        extra_vf_conds = vfolders.c.name.startswith(".")
+        extra_vf_conds = extra_vf_conds | (
+            vfolders.c.name.in_(requested_vfolder_names.values())
+            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
+        )
     accessible_vfolders = await query_accessible_vfolders(
         conn,
         user_scope.user_uuid,

@@ -1444,16 +1444,25 @@ class AgentRegistry:
             size=scheduled_session.cluster_size,
             replicas=replicas,
             network_name=network_name,
-            ssh_keypair=(
-                await self.create_cluster_ssh_keypair()
-                if scheduled_session.cluster_size > 1
-                else None
-            ),
+            ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),
         )
+
+        async with self.db.begin_readonly_session() as db_sess:
+            uuid, email, username = (
+                await db_sess.execute(
+                    sa.select([UserRow.uuid, UserRow.email, UserRow.username]).where(
+                        UserRow.uuid == scheduled_session.user_uuid
+                    )
+                )
+            ).fetchone()
+
         scheduled_session.environ.update({
+            "BACKENDAI_USER_UUID": str(uuid),
+            "BACKENDAI_USER_EMAIL": email,
+            "BACKENDAI_USER_NAME": username,
             "BACKENDAI_SESSION_ID": str(scheduled_session.id),
             "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
             "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),

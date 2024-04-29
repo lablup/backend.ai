@@ -51,7 +51,7 @@ enable_resolves = true
 #   - Regenerate lockfiles
 #   - pyproject.toml: [tool.mypy].python_executable
 # * Let other developers do:
-#   - Run `./pants export` again
+#   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.12.2"]
 tailor_pex_binary_targets = false
