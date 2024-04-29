@@ -16,6 +16,31 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.3rc1 (2024-04-30)
+
+### Features
+* Allow self-ssh in single-node single-container compute sessions. ([#2032](https://github.com/lablup/backend.ai/issues/2032))
+* Allow agent to report its internal registry snapshot via UNIX domain socket server ([#2038](https://github.com/lablup/backend.ai/issues/2038))
+* Expose user info to environment variables ([#2043](https://github.com/lablup/backend.ai/issues/2043))
+* Deprecate the reliance on HTTP cookies for authenticating the pipeline service, switching to the use of HTTP headers instead ([#2051](https://github.com/lablup/backend.ai/issues/2051))
+* Bring back etcetra-backed Etcd as an option for ditributed lock backend ([#2079](https://github.com/lablup/backend.ai/issues/2079))
+* Cache volume objects in `RootContext.get_volume` ([#2081](https://github.com/lablup/backend.ai/issues/2081))
+
+### Fixes
+* Fix container commit not working on certain docker engine versions ([#2040](https://github.com/lablup/backend.ai/issues/2040))
+* add omitted request fetching from client to manager about deleting vfolder in trash bin. ([#2042](https://github.com/lablup/backend.ai/issues/2042))
+* Fix a buggy restriction on VFolder deletion due to wrong query condition ([#2055](https://github.com/lablup/backend.ai/issues/2055))
+* Fix wrong usage of dataloader in GQL group resolver. ([#2056](https://github.com/lablup/backend.ai/issues/2056))
+* Ensure that vfolders, including automount vfolders, are mounted during session creation only if their status is not set to "DEAD" (i.e., deleted). ([#2059](https://github.com/lablup/backend.ai/issues/2059))
+* Fix wrong calculation of resource usage ([#2062](https://github.com/lablup/backend.ai/issues/2062))
+* Fix VFolder file operation not working when user has been granted access to shared but deleted VFolder which has same name with the normal one ([#2072](https://github.com/lablup/backend.ai/issues/2072))
+* Add missing type argument in group query ([#2073](https://github.com/lablup/backend.ai/issues/2073))
+* Fix `compute_session_list` GQL query not responding on an abundant amount of sessions ([#2084](https://github.com/lablup/backend.ai/issues/2084))
+
+### Documentation Updates
+* Fix a typo in the `agent.toml` example of the package-based installation guide to have a duplicate double quote ([#2069](https://github.com/lablup/backend.ai/issues/2069))
+
+
 ## 24.03.2 (2024-04-17)
 * Improve exception logging stability by pre-formatting exception objects instead of pickling/unpickling them ([#1759](https://github.com/lablup/backend.ai/issues/1759))
 * Introduce `mgr schema dump-history` and `mgr schema apply-missing-revisions` command to ease the major upgrade involving deviation of database migration histories ([#2002](https://github.com/lablup/backend.ai/issues/2002))
