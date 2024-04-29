@@ -38,7 +38,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-coverage-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -52,7 +52,7 @@ jobs:
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:

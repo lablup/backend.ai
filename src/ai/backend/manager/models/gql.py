@@ -205,7 +205,7 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
-    forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
+    forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field()
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
@@ -323,6 +323,11 @@ class Queries(graphene.ObjectType):
         Group,
         id=graphene.UUID(required=True),
         domain_name=graphene.String(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=("Added in 24.03.0."),
+        ),
     )
 
     # Within a single domain, this will always return nothing or a single item,
@@ -341,9 +346,7 @@ class Queries(graphene.ObjectType):
         type=graphene.List(
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
-            description=(
-                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
-            ),
+            description=("Added in 24.03.0."),
         ),
     )
 
@@ -360,7 +363,7 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(),
     )
 
-    customized_images = graphene.List(ImageNode, description="Added since 24.03.1")
+    customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
 
     user = graphene.Field(
         User,
@@ -877,7 +880,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: uuid.UUID,
         *,
-        domain_name: str = None,
+        domain_name: str | None = None,
         type: list[str] = [ProjectType.GENERAL.name],
     ) -> Group:
         ctx: GraphQueryContext = info.context
@@ -913,7 +916,9 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            client_groups = [
+                group for group in await loader.load(client_user_id) if group.type in type
+            ]
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
