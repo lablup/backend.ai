@@ -16,6 +16,11 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.3rc2 (2024-04-30)
+### External Dependency Updates
+* Update the prebuilt webui to latest (24.03.3-rc.1)
+
+
 ## 24.03.3rc1 (2024-04-30)
 
 ### Features
