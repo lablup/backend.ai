@@ -16,22 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 24.03.3rc3 (2024-05-01)
-
-### Fixes
-* Fix VFolder invitation not accepted when inviting VFolder shares name with already deleted one ([#2093](https://github.com/lablup/backend.ai/issues/2093)) 
-
-### External Dependency Updates
-* Update the prebuilt webui to latest (24.03.3)
-
-
-## 24.03.3rc2 (2024-04-30)
-### External Dependency Updates
-* Update the prebuilt webui to latest (24.03.3-rc.1)
-
-
-## 24.03.3rc1 (2024-04-30)
-
+## 24.03.3 (2024-05-01)
 ### Features
 * Allow self-ssh in single-node single-container compute sessions. ([#2032](https://github.com/lablup/backend.ai/issues/2032))
 * Allow agent to report its internal registry snapshot via UNIX domain socket server ([#2038](https://github.com/lablup/backend.ai/issues/2038))
@@ -54,6 +39,17 @@ Changes
 ### Documentation Updates
 * Fix a typo in the `agent.toml` example of the package-based installation guide to have a duplicate double quote ([#2069](https://github.com/lablup/backend.ai/issues/2069))
 
+
+## 24.03.3rc3 (2024-05-01)
+No significant changes.
+
+
+## 24.03.3rc2 (2024-04-30)
+No significant changes.
+
+
+## 24.03.3rc1 (2024-04-30)
+No significant changes.
 
 ## 24.03.2 (2024-04-17)
 * Improve exception logging stability by pre-formatting exception objects instead of pickling/unpickling them ([#1759](https://github.com/lablup/backend.ai/issues/1759))
