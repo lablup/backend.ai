@@ -1009,7 +1009,8 @@
       "ConfirmAndRun": "Tarkistin ja aloitan",
       "NoExistingConnectionExample": "Ei yhteyttä Kopioitava esimerkki.",
       "Prepared": "Valmisteltu",
-      "SSHConnectionExampleClipboardCopy": "SSH-yhteys Esimerkki on kopioitu leikepöydälle."
+      "SSHConnectionExampleClipboardCopy": "SSH-yhteys Esimerkki on kopioitu leikepöydälle.",
+      "ConnectUrlIsNotValid": "Yhteyden URL-osoite ei kelpaa."
     },
     "core": "ydin",
     "exportCSV": "viedä CSV",
@@ -1167,7 +1168,8 @@
       "BatchModeDesc": "Voit ajaa koodisi useiden solmujen ja klustereiden kanssa ideasi skaalaamiseksi.",
       "AddEnvironmentVariable": "Lisää ympäristömuuttujia",
       "EnvironmentVariableValueRequired": "Anna arvo.",
-      "PleaseCompleteForm": "Lomake on puutteellinen tai sisältää virheitä. Tarkista syöttämäsi tiedot."
+      "PleaseCompleteForm": "Lomake on puutteellinen tai sisältää virheitä. Tarkista syöttämäsi tiedot.",
+      "FailedToStartNewSession": "Istunnon luominen epäonnistui. \nTarkista istuntosivun VALMIS-välilehti."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",

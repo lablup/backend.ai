@@ -273,7 +273,8 @@
       "NeoLauncher": "NEO",
       "EnvironmentVariableValueRequired": "값을 입력해주세요.",
       "PleaseCompleteForm": "양식이 완성되지 않았거나 오류가 포함되어 있습니다. 입력 내용을 확인해주세요.",
-      "NeedToCorrectForm": "수정 버튼을 눌러 입력하신 내용을 확인해주세요."
+      "NeedToCorrectForm": "수정 버튼을 눌러 입력하신 내용을 확인해주세요.",
+      "FailedToStartNewSession": "세션 생성에 실패했습니다. 세션 페이지의 '종료' 탭을 확인해 주세요."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -317,7 +318,8 @@
       "Prepared": "준비되었습니다",
       "App": "앱",
       "NoExistingConnectionExample": "복사할 접속 예제가 없습니다.",
-      "SSHConnectionExampleClipboardCopy": "SSH 접속 예제가 클립보드에 복사되었습니다."
+      "SSHConnectionExampleClipboardCopy": "SSH 접속 예제가 클립보드에 복사되었습니다.",
+      "ConnectUrlIsNotValid": "연결 URL이 유효하지 않습니다."
     },
     "TensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로",
     "InputTensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로를 입력하세요. 로그 디렉토리는 자동으로 생성되지 않는다는 점에 주의하십시오.",
