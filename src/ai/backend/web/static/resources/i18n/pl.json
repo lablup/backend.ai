@@ -274,7 +274,8 @@
       "BatchModeDesc": "Możesz uruchomić swój kod z wieloma węzłami i klastrami, aby skalować swój pomysł",
       "AddEnvironmentVariable": "Dodaj zmienne środowiskowe",
       "EnvironmentVariableValueRequired": "Wprowadź wartość.",
-      "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane."
+      "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane.",
+      "FailedToStartNewSession": "Utworzenie sesji nie powiodło się. \nSprawdź zakładkę „Skończone” na stronie sesji."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -308,7 +309,8 @@
       "Prepared": "Przygotowany",
       "NoExistingConnectionExample": "Brak przykładu połączenia do skopiowania.",
       "SSHConnectionExampleClipboardCopy": "Przykład połączenia SSH został skopiowany do schowka.",
-      "App": "Aplikacja"
+      "App": "Aplikacja",
+      "ConnectUrlIsNotValid": "Adres URL połączenia jest nieprawidłowy."
     },
     "TensorboardPath": "Katalog dziennika dla TensorBoard",
     "InputTensorboardPath": "Wprowadź katalog dziennika, do którego będzie się odwoływać TensorBoard. Pamiętaj, że katalog dziennika nie zostanie utworzony automatycznie.",

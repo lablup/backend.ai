@@ -272,7 +272,8 @@
       "BatchModeDesc": "Pode executar o seu código com vários nós e clusters para escalar a sua ideia",
       "AddEnvironmentVariable": "Adicionar variáveis de ambiente",
       "EnvironmentVariableValueRequired": "Introduzir um valor.",
-      "PleaseCompleteForm": "O formulário está incompleto ou contém erros. Por favor, verifique os seus dados."
+      "PleaseCompleteForm": "O formulário está incompleto ou contém erros. Por favor, verifique os seus dados.",
+      "FailedToStartNewSession": "Falha na criação da sessão. \nPor favor, verifique a guia 'Finalizado' na página da sessão."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -306,7 +307,8 @@
       "Prepared": "Preparado",
       "NoExistingConnectionExample": "Não há exemplo de ligação a copiar.",
       "SSHConnectionExampleClipboardCopy": "O exemplo de ligação SSH foi copiado para a área de transferência.",
-      "App": "Aplicação"
+      "App": "Aplicação",
+      "ConnectUrlIsNotValid": "O URL de conexão não é válido."
     },
     "TensorboardPath": "Diretório de registro para TensorBoard",
     "InputTensorboardPath": "Insira o diretório de registro ao qual o TensorBoard se referirá. Observe que o diretório de log não será criado automaticamente.",

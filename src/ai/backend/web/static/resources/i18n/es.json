@@ -1011,7 +1011,8 @@
       "ConfirmAndRun": "Lo he comprobado y voy a empezar",
       "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
       "Prepared": "Preparado",
-      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles."
+      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles.",
+      "ConnectUrlIsNotValid": "La URL de conexión no es válida."
     },
     "core": "núcleo",
     "exportCSV": "exportar CSV",
@@ -1169,7 +1170,8 @@
       "BatchModeDesc": "Puedes ejecutar tu código con múltiples nodos y clusters para escalar tu idea",
       "AddEnvironmentVariable": "Añadir variables de entorno",
       "EnvironmentVariableValueRequired": "Por favor, introduzca un valor.",
-      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos."
+      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos.",
+      "FailedToStartNewSession": "Error al crear la sesión. \nPor favor marque la pestaña 'TERMINADO' en la página de la sesión."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
