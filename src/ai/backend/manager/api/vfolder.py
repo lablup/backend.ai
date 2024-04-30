@@ -8,7 +8,7 @@ import math
 import stat
 import uuid
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -57,6 +57,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     ACTIVE_USER_STATUSES,
+    HARD_DELETED_VFOLDER_STATUSES,
     AgentStatus,
     EndpointLifecycle,
     EndpointRow,
@@ -74,6 +75,7 @@ from ..models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderStatusSet,
     agents,
@@ -93,10 +95,10 @@ from ..models import (
     verify_vfolder_name,
     vfolder_invitations,
     vfolder_permissions,
+    vfolder_status_map,
     vfolders,
 )
 from ..models.utils import execute_with_retry
-from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -135,47 +137,6 @@ P = ParamSpec("P")
 
 class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
-
-
-vfolder_status_map: dict[VFolderStatusSet, set[VFolderOperationStatus]] = {
-    VFolderStatusSet.READABLE: {
-        VFolderOperationStatus.READY,
-        VFolderOperationStatus.PERFORMING,
-        VFolderOperationStatus.CLONING,
-        VFolderOperationStatus.MOUNTED,
-        VFolderOperationStatus.ERROR,
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-    VFolderStatusSet.UPDATABLE: {
-        VFolderOperationStatus.READY,
-        VFolderOperationStatus.MOUNTED,
-    },
-    # if SOFT_DELETABLE access status is requested, only READY operation status is accepted.
-    VFolderStatusSet.SOFT_DELETABLE: {
-        VFolderOperationStatus.READY,
-    },
-    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
-    VFolderStatusSet.HARD_DELETABLE: {
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    VFolderStatusSet.RECOVERABLE: {
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    VFolderStatusSet.PURGABLE: {
-        VFolderOperationStatus.DELETE_COMPLETE,
-    },
-}
-
-
-class VFolderPermissionSetAlias(Enum):
-    READABLE = {
-        VFolderPermission.READ_ONLY,
-        VFolderPermission.READ_WRITE,
-        VFolderPermission.RW_DELETE,
-    }
-    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
-    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 async def check_vfolder_status(

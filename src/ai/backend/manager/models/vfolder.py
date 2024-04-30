@@ -108,6 +108,11 @@ __all__: Sequence[str] = (
     "update_vfolder_status",
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
+    "vfolder_status_map",
+    "DEAD_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "VFolderPermissionSetAlias",
 )
 
 
@@ -182,6 +187,47 @@ class VFolderStatusSet(enum.StrEnum):
     SOFT_DELETABLE = "soft-deletable"  # Able to move to `trash bin`
     HARD_DELETABLE = "hard-deletable"  # Able to delete vfolder in storage proxy
     PURGABLE = "purgable"  # Able to delete vfolder row in DB. The real data of vfolder should be deleted already.
+
+
+vfolder_status_map: dict[VFolderStatusSet, set[VFolderOperationStatus]] = {
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if SOFT_DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.SOFT_DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    VFolderStatusSet.HARD_DELETABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+}
+
+
+class VFolderPermissionSetAlias(enum.Enum):
+    READABLE = {
+        VFolderPermission.READ_ONLY,
+        VFolderPermission.READ_WRITE,
+        VFolderPermission.RW_DELETE,
+    }
+    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
+    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 SOFT_DELETED_VFOLDER_STATUSES = (
@@ -453,7 +499,7 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
             .select_from(j)
-            .where(vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE)
+            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.PURGABLE]))
         )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
@@ -480,7 +526,7 @@ async def query_accessible_vfolders(
             .where(
                 (vfolder_permissions.c.user == user_uuid)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.PURGABLE])),
             )
         )
         if extra_invited_vf_conds is not None:
@@ -529,7 +575,7 @@ async def query_accessible_vfolders(
             .where(
                 (vfolders.c.group.in_(group_ids))
                 & (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.PURGABLE])),
             )
         )
         if extra_vf_conds is not None:
