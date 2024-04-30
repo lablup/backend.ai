@@ -450,9 +450,11 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(j)
+            .where(vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE)
+        )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -477,7 +479,8 @@ async def query_accessible_vfolders(
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
             )
         )
         if extra_invited_vf_conds is not None:
