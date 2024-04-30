@@ -1441,16 +1441,25 @@ class AgentRegistry:
             size=scheduled_session.cluster_size,
             replicas=replicas,
             network_name=network_name,
-            ssh_keypair=(
-                await self.create_cluster_ssh_keypair()
-                if scheduled_session.cluster_size > 1
-                else None
-            ),
+            ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),
         )
+
+        async with self.db.begin_readonly_session() as db_sess:
+            uuid, email, username = (
+                await db_sess.execute(
+                    sa.select([UserRow.uuid, UserRow.email, UserRow.username]).where(
+                        UserRow.uuid == scheduled_session.user_uuid
+                    )
+                )
+            ).fetchone()
+
         scheduled_session.environ.update({
+            "BACKENDAI_USER_UUID": str(uuid),
+            "BACKENDAI_USER_EMAIL": email,
+            "BACKENDAI_USER_NAME": username,
             "BACKENDAI_SESSION_ID": str(scheduled_session.id),
             "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
             "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),
@@ -3137,17 +3146,19 @@ class AgentRegistry:
 
     async def get_commit_status(
         self,
-        session: SessionRow,
-    ) -> Mapping[str, str]:
-        kern_id = str(session.main_kernel.id)
-        key = f"kernel.{kern_id}.commit"
-        result: Optional[bytes] = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(key),
-        )
+        kernel_ids: Sequence[KernelId],
+    ) -> Mapping[KernelId, str]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for kernel_id in kernel_ids:
+                await pipe.get(f"kernel.{kernel_id}.commit")
+            return pipe
+
+        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+
         return {
-            "kernel": kern_id,
-            "status": str(result, "utf-8") if result is not None else CommitStatus.READY.value,
+            kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
+            for kernel_id, result in zip(kernel_ids, commit_statuses)
         }
 
     async def commit_session(

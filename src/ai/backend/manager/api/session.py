@@ -904,11 +904,11 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
-        status_info = await root_ctx.registry.get_commit_status(session)
+        statuses = await root_ctx.registry.get_commit_status([session.main_kernel.id])
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
     return web.json_response(resp, status=200)
 
 
@@ -1156,15 +1156,22 @@ async def convert_session_to_image(
                 is_local=base_image_ref.is_local,
             )
 
+            image_labels = {
+                "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
+                "ai.backend.customized-image.name": params.image_name,
+                "ai.backend.customized-image.id": customized_image_id,
+            }
+            match params.image_visibility:
+                case CustomizedImageVisibilityScope.USER:
+                    image_labels["ai.backend.customized-image.user.email"] = request["user"][
+                        "email"
+                    ]
+
             # commit image with new tag set
             resp = await root_ctx.registry.commit_session(
                 session,
                 new_image_ref,
-                extra_labels={
-                    "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
-                    "ai.backend.customized-image.name": params.image_name,
-                    "ai.backend.customized-image.id": customized_image_id,
-                },
+                extra_labels=image_labels,
             )
             async for event, _ in background_task_manager.poll_bgtask_event(
                 uuid.UUID(resp["bgtask_id"])

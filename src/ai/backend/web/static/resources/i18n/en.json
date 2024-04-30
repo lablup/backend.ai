@@ -64,7 +64,8 @@
       "Data&Model": "Data & Model",
       "InvalidBlankPassword": "Enter your password",
       "InvalidBlankEmail": "Enter your e-mail",
-      "DisMatchUserEmail": "User E-mail does not match"
+      "DisMatchUserEmail": "User E-mail does not match",
+      "MyEnvironments": "My Environments"
     },
     "YouAreOffline": "You are now offline",
     "YouAreOnline": "You are now online",
@@ -916,7 +917,8 @@
     "NoChangeMade": "No changes were made",
     "SuccessfullyModified": "Successfully modified",
     "ProblemOccurred": "Problem occurred",
-    "PasswordsDoNotMatch": "Password and Confirmation do not match."
+    "PasswordsDoNotMatch": "Password and Confirmation do not match.",
+    "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted."
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1503,7 +1505,8 @@
     "CannotSharePrivateAutomountFolder": "Cannot share automount vfolders in line with the policy.",
     "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s).",
     "APINotSupported": "API not supported. Requires latest version of Backend.AI manager.",
-    "ErrorFetchingExternalContent": "Error fetching external content:"
+    "ErrorFetchingExternalContent": "Error fetching external content:",
+    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator."
   },
   "maxLength": {
     "64chars": "(maximum 64 chars)",

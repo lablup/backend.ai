@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0.dev4"
+pants_version = "2.21.0.dev6"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -10,7 +10,6 @@ backend_packages = [
     "pants.backend.experimental.python.lint.ruff.format",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
-    # "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
     "scie",
@@ -52,7 +51,7 @@ enable_resolves = true
 #   - Regenerate lockfiles
 #   - pyproject.toml: [tool.mypy].python_executable
 # * Let other developers do:
-#   - Run `./pants export` again
+#   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.12.2"]
 tailor_pex_binary_targets = false

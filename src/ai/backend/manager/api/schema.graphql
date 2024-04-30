@@ -22,20 +22,31 @@ type Queries {
 
   """Added in 24.03.0."""
   group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
-  group(id: UUID!, domain_name: String): Group
+  group(
+    id: UUID!
+    domain_name: String
+
+    """Added in 24.03.0."""
+    type: [String] = ["GENERAL"]
+  ): Group
   groups_by_name(name: String!, domain_name: String): [Group]
   groups(
     domain_name: String
     is_active: Boolean
 
-    """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0."""
     type: [String] = ["GENERAL"]
   ): [Group]
-  image(reference: String!, architecture: String = "x86_64"): Image
+  image(
+    """Added in 24.03.1"""
+    id: String
+    reference: String
+    architecture: String = "x86_64"
+  ): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
 
-  """Added since 24.03.0"""
-  customized_images: [Image]
+  """Added in 24.03.1"""
+  customized_images: [ImageNode]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -161,6 +172,9 @@ type ComputeContainer implements Item {
   idx: Int
   role: String
   hostname: String
+
+  """Added in 24.03.1."""
+  kernel_id: UUID
   cluster_idx: Int
   local_rank: Int
   cluster_role: String
@@ -994,9 +1008,12 @@ type Mutations {
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Added in 24.03.1"""
+  untag_image_from_registry(image_id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
@@ -1096,7 +1113,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0."""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -1106,7 +1123,7 @@ input GroupInput {
   integration_id: String = ""
   resource_policy: String = "default"
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   container_registry: JSONString = "{}"
 }
 
@@ -1128,7 +1145,7 @@ input ModifyGroupInput {
   integration_id: String
   resource_policy: String
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   container_registry: JSONString = "{}"
 }
 
@@ -1315,11 +1332,26 @@ input ResourceLimitInput {
 type ForgetImageById {
   ok: Boolean
   msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
 }
 
 type ForgetImage {
   ok: Boolean
   msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 24.03.1"""
+type UntagImageFromRegistry {
+  ok: Boolean
+  msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
 }
 
 type AliasImage {
