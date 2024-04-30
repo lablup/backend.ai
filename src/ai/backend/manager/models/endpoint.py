@@ -1035,186 +1035,178 @@ class ModifyEndpoint(graphene.Mutation):
     ) -> "ModifyEndpoint":
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> ModifyEndpoint:
-            async with graph_ctx.db.begin_session() as db_session:
-                try:
-                    endpoint_row = await EndpointRow.get(
-                        db_session,
-                        endpoint_id,
-                        load_session_owner=True,
-                        load_model=True,
-                        load_routes=True,
+        async def _do_mutate(db_session: AsyncSession) -> ModifyEndpoint:
+            try:
+                endpoint_row = await EndpointRow.get(
+                    db_session,
+                    endpoint_id,
+                    load_session_owner=True,
+                    load_model=True,
+                    load_routes=True,
+                )
+                match graph_ctx.user["role"]:
+                    case UserRole.SUPERADMIN:
+                        pass
+                    case UserRole.ADMIN:
+                        domain_name = graph_ctx.user["domain_name"]
+                        if endpoint_row.domain != domain_name:
+                            raise EndpointNotFound
+                    case _:
+                        user_id = graph_ctx.user["uuid"]
+                        if endpoint_row.session_owner != user_id:
+                            raise EndpointNotFound
+            except NoResultFound:
+                raise EndpointNotFound
+
+            if (_newval := props.resource_slots) and _newval is not Undefined:
+                endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
+
+            if (_newval := props.resource_opts) and _newval is not Undefined:
+                endpoint_row.resource_opts = _newval
+
+            if (_newval := props.cluster_mode) and _newval is not Undefined:
+                endpoint_row.cluster_mode = _newval
+
+            if (_newval := props.cluster_size) and _newval is not Undefined:
+                endpoint_row.cluster_size = _newval
+
+            if (_newval := props.model_definition_path) and _newval is not Undefined:
+                endpoint_row.model_definition_path = _newval
+
+            if (_newval := props.desired_session_count) is not None and _newval is not Undefined:
+                endpoint_row.desired_session_count = _newval
+
+            if (_newval := props.resource_group) and _newval is not Undefined:
+                endpoint_row.resource_group = _newval
+
+            if (image := props.image) and image is not Undefined:
+                image_name = image["name"]
+                registry = image.get("registry") or ["*"]
+                arch = image.get("architecture")
+                if arch is not None:
+                    image_ref = ImageRef(image_name, registry, arch)
+                else:
+                    image_ref = ImageRef(
+                        image_name,
+                        registry,
                     )
-                    match graph_ctx.user["role"]:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = graph_ctx.user["domain_name"]
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = graph_ctx.user["uuid"]
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
-                except NoResultFound:
-                    raise EndpointNotFound
+                image_object = await ImageRow.resolve(db_session, [image_ref])
+                endpoint_row.image = image_object.id
 
-                if (_newval := props.resource_slots) and _newval is not Undefined:
-                    endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
+            session_owner: UserRow = endpoint_row.session_owner_row
 
-                if (_newval := props.resource_opts) and _newval is not Undefined:
-                    endpoint_row.resource_opts = _newval
+            conn = await db_session.connection()
+            assert conn
 
-                if (_newval := props.cluster_mode) and _newval is not Undefined:
-                    endpoint_row.cluster_mode = _newval
+            await ModelServicePredicateChecker.check_scaling_group(
+                conn,
+                endpoint_row.resource_group,
+                session_owner.main_access_key,
+                endpoint_row.domain,
+                endpoint_row.project,
+            )
 
-                if (_newval := props.cluster_size) and _newval is not Undefined:
-                    endpoint_row.cluster_size = _newval
+            def _get_vfolder_id(id_input: str) -> uuid.UUID:
+                _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
+                if not raw_vfolder_id:
+                    raw_vfolder_id = id_input
+                return uuid.UUID(raw_vfolder_id)
 
-                if (_newval := props.model_definition_path) and _newval is not Undefined:
-                    endpoint_row.model_definition_path = _newval
+            user_scope = UserScope(
+                domain_name=endpoint_row.domain,
+                group_id=endpoint_row.project,
+                user_uuid=session_owner.uuid,
+                user_role=session_owner.role,
+            )
 
-                if (
-                    _newval := props.desired_session_count
-                ) is not None and _newval is not Undefined:
-                    endpoint_row.desired_session_count = _newval
+            query = (
+                sa.select([keypair_resource_policies])
+                .select_from(keypair_resource_policies)
+                .where(keypair_resource_policies.c.name == session_owner.resource_policy)
+            )
+            result = await conn.execute(query)
 
-                if (_newval := props.resource_group) and _newval is not Undefined:
-                    endpoint_row.resource_group = _newval
-
-                if (image := props.image) and image is not Undefined:
-                    image_name = image["name"]
-                    registry = image.get("registry") or ["*"]
-                    arch = image.get("architecture")
-                    if arch is not None:
-                        image_ref = ImageRef(image_name, registry, arch)
-                    else:
-                        image_ref = ImageRef(
-                            image_name,
-                            registry,
-                        )
-                    image_object = await ImageRow.resolve(db_session, [image_ref])
-                    endpoint_row.image = image_object.id
-
-                session_owner: UserRow = endpoint_row.session_owner_row
-
-                conn = await db_session.connection()
-                assert conn
-
-                await ModelServicePredicateChecker.check_scaling_group(
+            resource_policy = result.first()
+            if (extra_mounts_input := props.extra_mounts) is not Undefined:
+                extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
+                extra_mounts = {
+                    _get_vfolder_id(m.vfolder_id): MountOptionModel(
+                        mount_destination=(
+                            m.mount_destination if m.mount_destination is not Undefined else None
+                        ),
+                        type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
+                        permission=(
+                            MountPermission(m.permission) if m.permission is not Undefined else None
+                        ),
+                    )
+                    for m in extra_mounts_input
+                }
+                vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
                     conn,
-                    endpoint_row.resource_group,
-                    session_owner.main_access_key,
-                    endpoint_row.domain,
-                    endpoint_row.project,
-                )
-
-                def _get_vfolder_id(id_input: str) -> uuid.UUID:
-                    _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
-                    if not raw_vfolder_id:
-                        raw_vfolder_id = id_input
-                    return uuid.UUID(raw_vfolder_id)
-
-                user_scope = UserScope(
-                    domain_name=endpoint_row.domain,
-                    group_id=endpoint_row.project,
-                    user_uuid=session_owner.uuid,
-                    user_role=session_owner.role,
-                )
-
-                query = (
-                    sa.select([keypair_resource_policies])
-                    .select_from(keypair_resource_policies)
-                    .where(keypair_resource_policies.c.name == session_owner.resource_policy)
-                )
-                result = await conn.execute(query)
-
-                resource_policy = result.first()
-                if (extra_mounts_input := props.extra_mounts) is not Undefined:
-                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
-                    extra_mounts = {
-                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
-                            mount_destination=(
-                                m.mount_destination
-                                if m.mount_destination is not Undefined
-                                else None
-                            ),
-                            type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
-                            permission=(
-                                MountPermission(m.permission)
-                                if m.permission is not Undefined
-                                else None
-                            ),
-                        )
-                        for m in extra_mounts_input
-                    }
-                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
-                        conn,
-                        graph_ctx.shared_config,
-                        graph_ctx.storage_manager,
-                        endpoint_row.model,
-                        endpoint_row.model_mount_destination,
-                        extra_mounts,
-                        user_scope,
-                        resource_policy,
-                    )
-                    endpoint_row.extra_mounts = vfolder_mounts
-
-                await ModelServicePredicateChecker.validate_model_definition(
+                    graph_ctx.shared_config,
                     graph_ctx.storage_manager,
-                    endpoint_row.model_row,
-                    endpoint_row.model_definition_path,
-                )
-
-                # from AgentRegistry.handle_route_creation()
-                await graph_ctx.registry.create_session(
-                    "",
-                    endpoint_row.image_row.name,
-                    endpoint_row.image_row.architecture,
+                    endpoint_row.model,
+                    endpoint_row.model_mount_destination,
+                    extra_mounts,
                     user_scope,
-                    session_owner.main_access_key,
                     resource_policy,
-                    SessionTypes.INFERENCE,
-                    {
-                        "mounts": [
-                            endpoint_row.model,
-                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
-                        ],
-                        "mount_map": {
-                            endpoint_row.model: endpoint_row.model_mount_destination,
-                            **{
-                                m.vfid.folder_id: m.kernel_path.as_posix()
-                                for m in endpoint_row.extra_mounts
-                            },
-                        },
-                        "mount_options": {
-                            m.vfid.folder_id: {"permission": m.mount_perm}
+                )
+                endpoint_row.extra_mounts = vfolder_mounts
+
+            await ModelServicePredicateChecker.validate_model_definition(
+                graph_ctx.storage_manager,
+                endpoint_row.model_row,
+                endpoint_row.model_definition_path,
+            )
+
+            # from AgentRegistry.handle_route_creation()
+            await graph_ctx.registry.create_session(
+                "",
+                endpoint_row.image_row.name,
+                endpoint_row.image_row.architecture,
+                user_scope,
+                session_owner.main_access_key,
+                resource_policy,
+                SessionTypes.INFERENCE,
+                {
+                    "mounts": [
+                        endpoint_row.model,
+                        *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
+                    ],
+                    "mount_map": {
+                        endpoint_row.model: endpoint_row.model_mount_destination,
+                        **{
+                            m.vfid.folder_id: m.kernel_path.as_posix()
                             for m in endpoint_row.extra_mounts
                         },
-                        "environ": endpoint_row.environ,
-                        "scaling_group": endpoint_row.resource_group,
-                        "resources": endpoint_row.resource_slots,
-                        "resource_opts": endpoint_row.resource_opts,
-                        "preopen_ports": None,
-                        "agent_list": None,
                     },
-                    ClusterMode[endpoint_row.cluster_mode],
-                    endpoint_row.cluster_size,
-                    bootstrap_script=endpoint_row.bootstrap_script,
-                    startup_command=endpoint_row.startup_command,
-                    tag=endpoint_row.tag,
-                    callback_url=endpoint_row.callback_url,
-                    sudo_session_enabled=session_owner.sudo_session_enabled,
-                    dry_run=True,
-                )
+                    "mount_options": {
+                        m.vfid.folder_id: {"permission": m.mount_perm}
+                        for m in endpoint_row.extra_mounts
+                    },
+                    "environ": endpoint_row.environ,
+                    "scaling_group": endpoint_row.resource_group,
+                    "resources": endpoint_row.resource_slots,
+                    "resource_opts": endpoint_row.resource_opts,
+                    "preopen_ports": None,
+                    "agent_list": None,
+                },
+                ClusterMode[endpoint_row.cluster_mode],
+                endpoint_row.cluster_size,
+                bootstrap_script=endpoint_row.bootstrap_script,
+                startup_command=endpoint_row.startup_command,
+                tag=endpoint_row.tag,
+                callback_url=endpoint_row.callback_url,
+                sudo_session_enabled=session_owner.sudo_session_enabled,
+                dry_run=True,
+            )
 
-                await db_session.commit()
+            await db_session.commit()
 
-                return ModifyEndpoint(
-                    True, "success", await Endpoint.from_row(graph_ctx, endpoint_row)
-                )
+            return ModifyEndpoint(True, "success", await Endpoint.from_row(graph_ctx, endpoint_row))
 
         return await gql_mutation_wrapper(
+            graph_ctx,
             cls,
             _do_mutate,
         )
