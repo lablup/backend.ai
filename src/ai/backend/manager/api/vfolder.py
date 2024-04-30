@@ -1913,7 +1913,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             .where(
                 ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
                 & (vfolders.c.name == target_vfolder.name)
-                & (vfolders.c.status.not_in_(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         result = await conn.execute(query)
@@ -2078,10 +2078,10 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if len(user_info) < 1:
             raise ObjectNotFound(object_name="user")
         if len(user_info) < len(params["emails"]):
-            users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
+            users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_in_vfolder_group)}",
+                f" {','.join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
