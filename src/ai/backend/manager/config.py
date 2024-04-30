@@ -473,7 +473,12 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
-    t.Key("anonymous_ratelimit", default=None): t.Null | t.ToInt,
+    t.Key("anonymous_ratelimiter", default=None): t.Null
+    | t.Dict({
+        t.Key("rlimit"): t.ToInt(),
+        t.Key("hot_clients_ips_maxsize", default=1000): t.Null | t.ToInt(),
+        t.Key("hot_clients_ips_threshold_ratio", default=0.8): t.Null | t.ToFloat(),
+    }),
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {
