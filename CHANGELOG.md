@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.3rc3 (2024-05-01)
+
+### Fixes
+* Fix VFolder invitation not accepted when inviting VFolder shares name with already deleted one ([#2093](https://github.com/lablup/backend.ai/issues/2093)) 
+
+### External Dependency Updates
+* Update the prebuilt webui to latest (24.03.3)
+
+
 ## 24.03.3rc2 (2024-04-30)
 ### External Dependency Updates
 * Update the prebuilt webui to latest (24.03.3-rc.1)
