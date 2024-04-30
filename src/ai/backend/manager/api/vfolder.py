@@ -98,7 +98,7 @@ from ..models import (
     vfolder_status_map,
     vfolders,
 )
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_txn_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -127,6 +127,8 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -3370,41 +3372,44 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     root_ctx: RootContext = request.app["_root.context"]
 
     allowed_hosts_by_user = VFolderHostPermissionMap()
-    async with root_ctx.db.begin_readonly() as conn:
-        j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
-        query = (
-            sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
-            .select_from(j)
-            .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
-        )
-        try:
-            result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
-        user_info = result.first()
+    async with root_ctx.db.connect() as conn:
+        async with conn.begin():
+            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+            query = (
+                sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
+                .select_from(j)
+                .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
+            )
+            try:
+                result = await conn.execute(query)
+            except sa.exc.DataError:
+                raise InvalidAPIParameters
+            user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")
         resource_policy_name = user_info.resource_policy
-        result = await conn.execute(
-            sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
-                keypair_resource_policies.c.name == resource_policy_name
+        async with conn.begin():
+            result = await conn.execute(
+                sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
+                    keypair_resource_policies.c.name == resource_policy_name
+                )
             )
-        )
         resource_policy = result.first()
-        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-            conn=conn,
-            resource_policy=resource_policy,
-            domain_name=user_info.domain_name,
-            user_uuid=user_info.uuid,
+
+        async with conn.begin():
+            allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+                conn=conn,
+                resource_policy=resource_policy,
+                domain_name=user_info.domain_name,
+                user_uuid=user_info.uuid,
+            )
+        log.info(
+            "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+            request["user"]["email"],
+            request["keypair"]["access_key"],
+            vfolder_id,
+            user_info.uuid,
         )
-    log.info(
-        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
-        request["user"]["email"],
-        request["keypair"]["access_key"],
-        vfolder_id,
-        user_info.uuid,
-    )
-    async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([vfolders.c.host])
             .select_from(vfolders)
@@ -3413,12 +3418,14 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
             )
         )
-        folder_host = await conn.scalar(query)
-    if folder_host not in allowed_hosts_by_user:
-        raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
+        async with conn.begin():
+            folder_host = await conn.scalar(query)
+            if folder_host not in allowed_hosts_by_user:
+                raise VFolderOperationFailed(
+                    "User to migrate vfolder needs an access to the storage host."
+                )
 
-    async def _update() -> None:
-        async with root_ctx.db.begin() as conn:
+        async def _update(_conn: SAConnection) -> None:
             # TODO: we need to implement migration from project to other project
             #       for now we only support migration btw user folder only
             # TODO: implement quota-scope migration and progress checks
@@ -3430,26 +3437,25 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
             )
-            await conn.execute(query)
+            await _conn.execute(query)
 
-    await execute_with_retry(_update)
+        await execute_with_txn_retry(_update, root_ctx.db.begin, conn)
 
-    async def _delete_vfolder_related_rows() -> None:
-        async with root_ctx.db.begin() as conn:
+        async def _delete_vfolder_related_rows(_conn: SAConnection) -> None:
             # delete vfolder_invitation if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_invitations).where(
                 (vfolder_invitations.c.invitee == user_email)
                 & (vfolder_invitations.c.vfolder == vfolder_id)
             )
-            await conn.execute(query)
+            await _conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_permissions).where(
                 (vfolder_permissions.c.vfolder == vfolder_id)
                 & (vfolder_permissions.c.user == user_info.uuid)
             )
-            await conn.execute(query)
+            await _conn.execute(query)
 
-    await execute_with_retry(_delete_vfolder_related_rows)
+        await execute_with_txn_retry(_delete_vfolder_related_rows, root_ctx.db.begin, conn)
 
     return web.json_response({}, status=200)
 
