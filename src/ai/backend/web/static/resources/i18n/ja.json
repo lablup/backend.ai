@@ -272,7 +272,8 @@
       "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
       "AddEnvironmentVariable": "環境変数の追加",
       "EnvironmentVariableValueRequired": "値を入力してください。",
-      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。"
+      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。",
+      "FailedToStartNewSession": "セッションの作成に失敗しました。\nセッションページの「終了しました」タブをご確認ください。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -306,7 +307,8 @@
       "Prepared": "準備",
       "NoExistingConnectionExample": "コピーする接続例がありません。",
       "SSHConnectionExampleClipboardCopy": "SSH接続例がクリップボードにコピーされました。",
-      "App": "アプリ"
+      "App": "アプリ",
+      "ConnectUrlIsNotValid": "接続 URL が無効です。"
     },
     "TensorboardPath": "TensorBoardのログディレクトリ",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",

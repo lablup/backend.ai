@@ -272,7 +272,8 @@
       "BatchModeDesc": "Anda boleh menjalankan kod anda dengan berbilang nod",
       "AddEnvironmentVariable": "Tambah pembolehubah persekitaran",
       "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
-      "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda."
+      "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -306,7 +307,8 @@
       "Prepared": "Bersedia",
       "NoExistingConnectionExample": "Tiada Contoh Sambungan untuk disalin.",
       "SSHConnectionExampleClipboardCopy": "Contoh Sambungan SSH telah disalin ke papan keratan.",
-      "App": "Aplikasi"
+      "App": "Aplikasi",
+      "ConnectUrlIsNotValid": "URL Sambung tidak sah."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Sila masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahawa direktori log tidak akan dibuat secara automatik ..",
