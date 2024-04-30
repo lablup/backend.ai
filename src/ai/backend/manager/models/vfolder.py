@@ -524,7 +524,9 @@ async def query_accessible_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+                (vfolders.c.group.in_(group_ids))
+                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
             )
         )
         if extra_vf_conds is not None:

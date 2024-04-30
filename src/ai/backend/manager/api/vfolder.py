@@ -1951,7 +1951,8 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             .select_from(j)
             .where(
                 ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
-                & (vfolders.c.name == target_vfolder.name),
+                & (vfolders.c.name == target_vfolder.name)
+                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
             )
         )
         result = await conn.execute(query)
