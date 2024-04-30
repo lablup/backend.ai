@@ -224,7 +224,7 @@ jobs:
         # linux-aarch64: aarch64 (self-hosted)
         # macos-12: intel
         # macos-13: apple silicon
-        os: [ubuntu-latest, macos-13-xlarge, macos-12-large]
+        os: [ubuntu-latest, linux-aarch64, macos-13-xlarge, macos-12-large]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
