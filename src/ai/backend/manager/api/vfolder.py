@@ -1913,7 +1913,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             .where(
                 ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
                 & (vfolders.c.name == target_vfolder.name)
-                & (vfolders.c.status != VFolderOperationStatus.DELETE_COMPLETE),
+                & (vfolders.c.status.not_in_(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         result = await conn.execute(query)
