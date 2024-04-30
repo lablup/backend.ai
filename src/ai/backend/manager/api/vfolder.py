@@ -2282,7 +2282,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
     )
 
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
-    await check_vfolder_status(row, VFolderStatusSet.SOFT_DELETABLE)
+    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
         await _delete(
             root_ctx,
@@ -2327,7 +2327,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
     rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
     for row in rows:
         try:
-            await check_vfolder_status(row, VFolderStatusSet.SOFT_DELETABLE)
+            await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
             break
         except VFolderFilterStatusFailed:
             continue
@@ -2433,7 +2433,7 @@ async def delete_from_trash_bin(
         folder_id,
     )
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
-    await check_vfolder_status(row, VFolderStatusSet.HARD_DELETABLE)
+    await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
