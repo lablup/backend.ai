@@ -181,6 +181,7 @@ def local_config(
             "name": test_db,
             "user": "postgres",
             "password": "develove",
+            "conn-timeout": 0,
             "pool-size": 8,
             "pool-recycle": -1,
             "pool-pre-ping": False,
