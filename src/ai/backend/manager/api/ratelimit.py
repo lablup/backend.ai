@@ -49,9 +49,9 @@ if id_type == "ip" then
     local rate_limit = tonumber(ARGV[3])
     local score_threshold = rate_limit * 0.8
 
-    -- Add IP to suspicious_ips only if count is greater than score_threshold
+    -- Add IP to hot_clients_ips only if count is greater than score_threshold
     if rolling_count >= score_threshold then
-        redis.call('ZADD', 'suspicious_ips', rolling_count, id_value)
+        redis.call('ZADD', 'hot_clients_ips', rolling_count, id_value)
     end
 end
 
