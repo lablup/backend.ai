@@ -11,7 +11,6 @@ refer
 
 .. code-block:: yaml
 
-   version: "3"
    x-base: &base
       logging:
          driver: "json-file"

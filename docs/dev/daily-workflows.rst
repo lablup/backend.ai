@@ -188,7 +188,7 @@ Similarly, you can export all virtualenvs at once:
 
 .. code-block:: console
 
-    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs ./pants export
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
@@ -718,19 +718,19 @@ Making a new release
 * Push the commit and tag.  The GitHub Actions workflow will build the packages
   and publish them to PyPI.
 
-* When making a new major release, snapshot of prior release's final DB migration history 
-  should be dumped. This will later help to fill out missing gaps of DB revisions when 
+* When making a new major release, snapshot of prior release's final DB migration history
+  should be dumped. This will later help to fill out missing gaps of DB revisions when
   upgrading outdated cluster. The output then should be committed to **next** major release.
 
   .. code-block:: console
-    
+
       $ ./backend.ai mgr schema dump-history > src/ai/backend/manager/models/alembic/revision_history/<version>.json
 
   Suppose you are trying to create both fresh baked 24.09.0 and good old 24.03.10 releases.
   In such cases you should first make a release of version 24.03.10, move back to latest branch, and then
   execute code snippet above with `<version>` set as `24.03.10`, and release 24.09.0 including the dump.
 
-  To make workflow above effective, be aware that backporting DB revisions to older major releases will no longer 
+  To make workflow above effective, be aware that backporting DB revisions to older major releases will no longer
   be permitted after major release version is switched.
 
 Backporting to legacy per-pkg repositories
