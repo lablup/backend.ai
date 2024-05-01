@@ -164,6 +164,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".auth",
     ".ratelimit",
     ".vfolder",
+    ".vfolder_legacy",
     ".admin",
     ".spec",
     ".service",
