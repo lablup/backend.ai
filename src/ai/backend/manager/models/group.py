@@ -377,8 +377,13 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        *,
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Sequence[Group | None]]:
+        if type is None:
+            _type = [ProjectType.GENERAL]
+        else:
+            _type = type
         j = sa.join(
             groups,
             association_groups_users,
@@ -387,7 +392,7 @@ class Group(graphene.ObjectType):
         query = (
             sa.select([groups, association_groups_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
+            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -425,9 +430,7 @@ class GroupInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
-        description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
-        ),
+        description=("Added in 24.03.0."),
     )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
@@ -437,7 +440,7 @@ class GroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 
@@ -468,7 +471,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 

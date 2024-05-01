@@ -269,7 +269,8 @@
       "StartAfter": "Mulai setelah:",
       "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku.",
       "PreviousLauncher": "Classic",
-      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda."
+      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSilakan periksa tab 'SELESAI' di halaman sesi."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -303,7 +304,8 @@
       "Prepared": "Siap",
       "App": "Aplikasi",
       "NoExistingConnectionExample": "Tidak Ada Koneksi Contoh untuk disalin.",
-      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard."
+      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard.",
+      "ConnectUrlIsNotValid": "URL koneksi tidak valid."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
