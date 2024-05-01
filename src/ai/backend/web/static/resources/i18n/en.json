@@ -285,7 +285,8 @@
       "InteractiveModeDesc": "allows you to create, test and run code interactively via jupyter notebook, visual studio code, etc.",
       "AddEnvironmentVariable": "Add environment variables",
       "EnvironmentVariableValueRequired": "Please enter a value.",
-      "PleaseCompleteForm": "Form is incomplete or contains errors. Please check your inputs."
+      "PleaseCompleteForm": "Form is incomplete or contains errors. Please check your inputs.",
+      "FailedToStartNewSession": "Session creation failed. Please check the 'FINISHED' tab on the session page."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -339,7 +340,8 @@
       "Prepared": "Prepared",
       "App": "App",
       "NoExistingConnectionExample": "No Connection Example to be copied.",
-      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard."
+      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard.",
+      "ConnectUrlIsNotValid": "Connect URL is not valid."
     },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",

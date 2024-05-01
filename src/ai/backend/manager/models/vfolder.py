@@ -6,7 +6,7 @@ import os.path
 import uuid
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence
 
 import aiohttp
 import aiotools
@@ -109,6 +109,11 @@ __all__: Sequence[str] = (
     "update_vfolder_status",
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
+    "vfolder_status_map",
+    "DEAD_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "VFolderPermissionSetAlias",
 )
 
 
@@ -173,16 +178,79 @@ class VFolderOperationStatus(enum.StrEnum):
 
 class VFolderStatusSet(enum.StrEnum):
     """
-    Introduce virtual folder desired status for storage-proxy operations.
-    Not added to db scheme  and determined only by current vfolder status.
+    Acts as an alias to represent set of VFolder statuses. Use this value as a key of
+    `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
     """
 
     READABLE = "readable"
+    """Represents VFolder in a normal (readable, mountable and clonable) state"""
+
+    MOUNTABLE = "mountable"
+    """Represents VFolder in a mountable state"""
+
     UPDATABLE = "updatable"
+    """Represents VFolder in idle (not performing active clone or removal) state"""
+
+    DELETABLE = "deletable"
+    """Simillar with UPDATABLE but does not allow VFolder in MOUNTED state"""
+
+    PURGABLE = "purgable"
+    """Represents VFolder located in trash bin. The meaning of `purge` here is
+    completely different between our VFolder `/purge` API so be sure not to confuse.
+    That API will be renamed any soon in a more self-representitive way."""
+
     RECOVERABLE = "recoverable"
-    SOFT_DELETABLE = "soft-deletable"  # Able to move to `trash bin`
-    HARD_DELETABLE = "hard-deletable"  # Able to delete vfolder in storage proxy
-    PURGABLE = "purgable"  # Able to delete vfolder row in DB. The real data of vfolder should be deleted already.
+    """alias of VFolderStatusSet.PURGABLE"""
+
+    INACCESSIBLE = "inaccessible"
+    """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+
+vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.MOUNTABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.INACCESSIBLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+}
+
+
+class VFolderPermissionSetAlias(enum.Enum):
+    READABLE = {
+        VFolderPermission.READ_ONLY,
+        VFolderPermission.READ_WRITE,
+        VFolderPermission.RW_DELETE,
+    }
+    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
+    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 SOFT_DELETED_VFOLDER_STATUSES = (
@@ -451,9 +519,11 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(j)
+            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
+        )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -478,7 +548,8 @@ async def query_accessible_vfolders(
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         if extra_invited_vf_conds is not None:
@@ -525,7 +596,9 @@ async def query_accessible_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+                (vfolders.c.group.in_(group_ids))
+                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         if extra_vf_conds is not None:
@@ -1031,6 +1104,7 @@ async def initiate_vfolder_deletion(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
 ) -> uuid.UUID | None:
+    """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)

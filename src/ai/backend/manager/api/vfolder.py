@@ -8,7 +8,7 @@ import math
 import stat
 import uuid
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -56,6 +56,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     ACTIVE_USER_STATUSES,
+    HARD_DELETED_VFOLDER_STATUSES,
     AgentStatus,
     EndpointLifecycle,
     EndpointRow,
@@ -73,6 +74,7 @@ from ..models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderStatusSet,
     agents,
@@ -92,10 +94,10 @@ from ..models import (
     verify_vfolder_name,
     vfolder_invitations,
     vfolder_permissions,
+    vfolder_status_map,
     vfolders,
 )
 from ..models.utils import execute_with_retry
-from ..models.vfolder import HARD_DELETED_VFOLDER_STATUSES
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -140,47 +142,6 @@ class BackgroundTaskResponseModel(BaseResponseModel):
     task_id: uuid.UUID | None = Field(
         description="Background task id. `None` when there is no vfolders to delete."
     )
-
-
-vfolder_status_map: dict[VFolderStatusSet, set[VFolderOperationStatus]] = {
-    VFolderStatusSet.READABLE: {
-        VFolderOperationStatus.READY,
-        VFolderOperationStatus.PERFORMING,
-        VFolderOperationStatus.CLONING,
-        VFolderOperationStatus.MOUNTED,
-        VFolderOperationStatus.ERROR,
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-    VFolderStatusSet.UPDATABLE: {
-        VFolderOperationStatus.READY,
-        VFolderOperationStatus.MOUNTED,
-    },
-    # if SOFT_DELETABLE access status is requested, only READY operation status is accepted.
-    VFolderStatusSet.SOFT_DELETABLE: {
-        VFolderOperationStatus.READY,
-    },
-    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
-    VFolderStatusSet.HARD_DELETABLE: {
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    VFolderStatusSet.RECOVERABLE: {
-        VFolderOperationStatus.DELETE_PENDING,
-    },
-    VFolderStatusSet.PURGABLE: {
-        VFolderOperationStatus.DELETE_COMPLETE,
-    },
-}
-
-
-class VFolderPermissionSetAlias(Enum):
-    READABLE = {
-        VFolderPermission.READ_ONLY,
-        VFolderPermission.READ_WRITE,
-        VFolderPermission.RW_DELETE,
-    }
-    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
-    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 async def check_vfolder_status(
@@ -1956,7 +1917,8 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             .select_from(j)
             .where(
                 ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
-                & (vfolders.c.name == target_vfolder.name),
+                & (vfolders.c.name == target_vfolder.name)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         result = await conn.execute(query)
@@ -2121,10 +2083,10 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if len(user_info) < 1:
             raise ObjectNotFound(object_name="user")
         if len(user_info) < len(params["emails"]):
-            users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
+            users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_in_vfolder_group)}",
+                f" {','.join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
@@ -2325,7 +2287,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
     )
 
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
-    await check_vfolder_status(row, VFolderStatusSet.SOFT_DELETABLE)
+    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
         await _delete(
             root_ctx,
@@ -2370,7 +2332,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
     rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
     for row in rows:
         try:
-            await check_vfolder_status(row, VFolderStatusSet.SOFT_DELETABLE)
+            await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
             break
         except VFolderFilterStatusFailed:
             continue
@@ -2475,7 +2437,7 @@ async def delete_forever(
         folder_id,
     )
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
-    await check_vfolder_status(row, VFolderStatusSet.HARD_DELETABLE)
+    await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
