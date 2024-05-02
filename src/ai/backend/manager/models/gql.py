@@ -1073,8 +1073,14 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         image_load_filters: set[ImageLoadFilter] = set()
-        if is_installed is not None:
+        if is_installed is None:
             image_load_filters.add(ImageLoadFilter.INSTALLED)
+            image_load_filters.add(ImageLoadFilter.NOT_INSTALLED)
+        elif is_installed:
+            image_load_filters.add(ImageLoadFilter.INSTALLED)
+        else:
+            image_load_filters.add(ImageLoadFilter.NOT_INSTALLED)
+
         if is_operation is not None:
             image_load_filters.add(ImageLoadFilter.EXCLUDE_OPERATIONAL)
 

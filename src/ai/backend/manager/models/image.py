@@ -85,6 +85,7 @@ __all__ = (
 
 class ImageLoadFilter(str, enum.Enum):
     INSTALLED = "installed"
+    NOT_INSTALLED = "not_installed"
     EXCLUDE_OPERATIONAL = "operational"
     CUSTOMIZED_ONLY = "customized"
 
@@ -695,6 +696,8 @@ class Image(graphene.ObjectType):
         filters: set[ImageLoadFilter],
     ) -> bool:
         if ImageLoadFilter.INSTALLED in filters and not self.installed:
+            return False
+        if ImageLoadFilter.NOT_INSTALLED in filters and self.installed:
             return False
 
         is_customized_image = False
