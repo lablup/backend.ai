@@ -933,8 +933,6 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(tzutc())
-
     async def _update() -> None:
         async with engine.begin_session() as db_session:
             query = (
