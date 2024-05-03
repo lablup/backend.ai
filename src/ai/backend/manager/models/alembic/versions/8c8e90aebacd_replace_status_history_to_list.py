@@ -1,7 +1,7 @@
 """Replace sessions, kernels's status_history's type map with list
 
 Revision ID: 8c8e90aebacd
-Revises: 8b2ec7e3d22a
+Revises: dddf9be580f5
 Create Date: 2024-01-26 11:19:23.075014
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "8c8e90aebacd"
-down_revision = "8b2ec7e3d22a"
+down_revision = "dddf9be580f5"
 branch_labels = None
 depends_on = None
 
