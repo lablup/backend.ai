@@ -29,7 +29,7 @@ from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
-from ai.backend.common.utils import get_first_occurrence_time
+from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -812,9 +812,11 @@ def status_history(ctx: CLIContext, session_id):
                 [FieldSpec("status"), FieldSpec("timestamp"), FieldSpec("time_elapsed")],
             )
 
-            if (preparing := get_first_occurrence_time(status_history, "PREPARING")) is None:
+            if (preparing := get_first_timestamp_for_status(status_history, "PREPARING")) is None:
                 elapsed = timedelta()
-            elif (terminated := get_first_occurrence_time(status_history, "TERMINATED")) is None:
+            elif (
+                terminated := get_first_timestamp_for_status(status_history, "TERMINATED")
+            ) is None:
                 elapsed = datetime.now(tzutc()) - isoparse(preparing)
             else:
                 elapsed = isoparse(terminated) - isoparse(preparing)

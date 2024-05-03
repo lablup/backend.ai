@@ -406,7 +406,7 @@ async def umount(
     return True
 
 
-def get_first_occurrence_time(
+def get_first_timestamp_for_status(
     status_history_records: list[dict[str, str]], status: str
 ) -> str | None:
     """
