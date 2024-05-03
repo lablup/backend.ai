@@ -8,9 +8,11 @@ from ..models.session import SessionRow
 
 class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def create_network(self, session: SessionRow, *, options: dict[str, Any] = {}) -> str:
+    async def create_network(
+        self, session: SessionRow, *, options: dict[str, Any] = {}
+    ) -> dict[str, Any]:
         """
-        Creates a cross-container network and returns its name.
+        Creates a cross-container network and returns network config which later will be passed to agent.
         """
         raise NotImplementedError
 

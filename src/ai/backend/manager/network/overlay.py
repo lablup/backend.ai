@@ -36,7 +36,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         await self.docker.close()
         await super().cleanup()
 
-    async def create_network(self, session: SessionRow, *, options: dict[str, Any] = {}) -> str:
+    async def create_network(self, session: SessionRow, *, options: dict[str, Any] = {}) -> dict[str, Any]:
         network_name = f"bai-multinode-{session.id}"
         mtu: int | None = self.plugin_config["mtu"]
 
