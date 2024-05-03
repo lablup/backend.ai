@@ -25,7 +25,6 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         plugin_config_iv.check(plugin_config)
 
     async def init(self, context: Any = None) -> None:
-        await super().init(context)
         self.docker = aiodocker.Docker()
 
         info = await self.docker.system.info()
@@ -34,7 +33,6 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
 
     async def cleanup(self) -> None:
         await self.docker.close()
-        await super().cleanup()
 
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] = {}
