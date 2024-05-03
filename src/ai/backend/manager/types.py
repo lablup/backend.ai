@@ -56,3 +56,18 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+
+
+class RaftNodeInitialRole(str, enum.Enum):
+    LEADER = "leader"
+    VOTER = "voter"
+    LEARNER = "learner"
+
+
+class RaftLogLovel(str, enum.Enum):
+    TRACE = "trace"
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+    FATAL = "fatal"

@@ -16,7 +16,7 @@ pool-pre-ping = false
 
 
 [manager]
-num-proc = 4
+num-proc = 3
 service-addr = { host = "0.0.0.0", port = 8081 }
 #user = "nobody"
 #group = "nobody"
@@ -35,6 +35,11 @@ hide-agents = true
 # The order of agent selection.
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
+[raft]
+heartbeat-tick = 3
+election-tick = 10
+log-dir = "./logs"
+
 [docker-registry]
 ssl-verify = false
 
@@ -48,6 +53,7 @@ drivers = ["console"]
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+"ai.backend.manager.server.raft" = "INFO"
 "alembic" = "INFO"
 "sqlalchemy" = "WARNING"
 

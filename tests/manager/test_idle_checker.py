@@ -7,7 +7,7 @@ import pytest
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import RaftClusterContext, RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerHost,
@@ -97,6 +97,7 @@ async def new_user_grace_period_checker(
         [".etcd"],
     )
     root_ctx: RootContext = test_app["_root.context"]
+    root_ctx.raft_ctx = RaftClusterContext()
 
     # test config
     grace_period = 30
@@ -116,6 +117,7 @@ async def new_user_grace_period_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -146,6 +148,7 @@ async def network_timeout_idle_checker(
         [".etcd"],
     )
     root_ctx: RootContext = test_app["_root.context"]
+    root_ctx.raft_ctx = RaftClusterContext()
 
     # test 1
     # remaining time is positive and no grace period
@@ -177,6 +180,7 @@ async def network_timeout_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -230,6 +234,7 @@ async def network_timeout_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -287,6 +292,7 @@ async def network_timeout_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -349,6 +355,7 @@ async def network_timeout_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -397,6 +404,7 @@ async def session_lifetime_checker(
         [".etcd"],
     )
     root_ctx: RootContext = test_app["_root.context"]
+    root_ctx.raft_ctx = RaftClusterContext()
 
     # test 1
     # remaining time is positive and no grace period
@@ -424,6 +432,7 @@ async def session_lifetime_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -471,6 +480,7 @@ async def session_lifetime_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -523,6 +533,7 @@ async def session_lifetime_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -577,6 +588,7 @@ async def session_lifetime_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     try:
@@ -620,6 +632,7 @@ async def utilization_idle_checker__utilization(
         [".etcd"],
     )
     root_ctx: RootContext = test_app["_root.context"]
+    root_ctx.raft_ctx = RaftClusterContext()
 
     kernel_id = KernelId(uuid4())
     expected = {
@@ -665,6 +678,7 @@ async def utilization_idle_checker__utilization(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
@@ -704,6 +718,7 @@ async def utilization_idle_checker(
         [".etcd"],
     )
     root_ctx: RootContext = test_app["_root.context"]
+    root_ctx.raft_ctx = RaftClusterContext()
 
     # test 1
     # remaining time is positive and no utilization.
@@ -764,6 +779,7 @@ async def utilization_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
@@ -848,6 +864,7 @@ async def utilization_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(
@@ -932,6 +949,7 @@ async def utilization_idle_checker(
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
+        root_ctx.raft_ctx,
         root_ctx.distributed_lock_factory,
     )
     await redis_helper.execute(

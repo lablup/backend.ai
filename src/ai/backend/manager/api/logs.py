@@ -14,7 +14,11 @@ from aiohttp import web
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed import (
+    AbstractGlobalTimer,
+    DistributedLockGlobalTimer,
+    RaftGlobalTimer,
+)
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
@@ -234,7 +238,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    log_cleanup_timer: GlobalTimer
+    log_cleanup_timer: AbstractGlobalTimer
     log_cleanup_timer_evh: EventHandler[web.Application, DoLogCleanupEvent]
 
 
@@ -246,14 +250,24 @@ async def init(app: web.Application) -> None:
         app,
         log_cleanup_task,
     )
-    app_ctx.log_cleanup_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
-        root_ctx.event_producer,
-        lambda: DoLogCleanupEvent(),
-        20.0,
-        initial_delay=17.0,
-        task_name="log_cleanup_task",
-    )
+
+    if root_ctx.raft_ctx.use_raft():
+        app_ctx.log_cleanup_timer = RaftGlobalTimer(
+            root_ctx.raft_ctx.raft_node,
+            root_ctx.event_producer,
+            lambda: DoLogCleanupEvent(),
+            20.0,
+            initial_delay=17.0,
+        )
+    else:
+        app_ctx.log_cleanup_timer = DistributedLockGlobalTimer(
+            root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
+            root_ctx.event_producer,
+            lambda: DoLogCleanupEvent(),
+            20.0,
+            initial_delay=17.0,
+            task_name="log_cleanup_task",
+        )
     await app_ctx.log_cleanup_timer.join()
 
 

@@ -76,6 +76,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=25.1.2",
+//     "raftify==0.1.65",
 //     "redis[hiredis]==4.5.5",
 //     "rich~=13.6",
 //     "setproctitle~=1.3.2",
@@ -990,6 +991,7 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+<<<<<<< HEAD
               "hash": "b8433d481d50b68a0162c0379c0dd4aabfc3d1ad901800beb5b87815997511c1",
               "url": "https://files.pythonhosted.org/packages/9a/b0/a4301290ea6cdbb0cda7048ae11b0e560eacca7d2c2e64e6b3d5a9fb3fde/boto3-1.34.144-py3-none-any.whl"
             },
@@ -997,22 +999,40 @@
               "algorithm": "sha256",
               "hash": "2f3e88b10b8fcc5f6100a9d74cd28230edc9d4fa226d99dd40a3ab38ac213673",
               "url": "https://files.pythonhosted.org/packages/42/e5/738f7bf96f4f5597c8393e11be2c28bef5f876b5635c1ea9d86888e59657/boto3-1.34.144.tar.gz"
+=======
+              "hash": "6c8125310005255ea998bccc3e8353b4df81a96ab105c89c118461f6c54c07c8",
+              "url": "https://files.pythonhosted.org/packages/09/18/6b9e0bbdc28a11c1f953160934cd10c938811345d80c3d9c5719c18fe522/boto3-1.34.97-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "60e5dda0b29805fb410bfda1d98e898edaebedac0e6983e9c57cb88e44dfa64e",
+              "url": "https://files.pythonhosted.org/packages/e5/27/9073116821d6cf73d6463424e3f2d3ab0edaf2ee182c9eb1b263defa3eaf/boto3-1.34.97.tar.gz"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
+<<<<<<< HEAD
             "botocore<1.35.0,>=1.34.144",
+=======
+            "botocore<1.35.0,>=1.34.97",
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.11.0,>=0.10.0"
           ],
           "requires_python": ">=3.8",
+<<<<<<< HEAD
           "version": "1.34.144"
+=======
+          "version": "1.34.97"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
+<<<<<<< HEAD
               "hash": "a2cf26e1bf10d5917a2285e50257bc44e94a1d16574f282f3274f7a5d8d1f08b",
               "url": "https://files.pythonhosted.org/packages/24/4b/956a80d406dfffba1f8f7fbaba7dd73d418ed8a7b95faa1ade7cf17663a5/botocore-1.34.144-py3-none-any.whl"
             },
@@ -1020,6 +1040,15 @@
               "algorithm": "sha256",
               "hash": "4215db28d25309d59c99507f1f77df9089e5bebbad35f6e19c7c44ec5383a3e8",
               "url": "https://files.pythonhosted.org/packages/8c/66/01d63edf404b2ef2c5594701565ac0c031ce7253231298d423e2514566b8/botocore-1.34.144.tar.gz"
+=======
+              "hash": "c98b1272e377c69e167cc68c0f2c9c79bc7a6098775eecdad41ee5a28de69324",
+              "url": "https://files.pythonhosted.org/packages/79/2a/cf6ad65939b48a4a3a984174928abab0955e4627a79bf552c876dd17172b/botocore-1.34.97-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e421b592add68547ed141643c8a8b4aa819a07059b85efd72e89b6758c956420",
+              "url": "https://files.pythonhosted.org/packages/8e/4d/724915591564af6c31bf6a0a41981542634e3b8000a0a1aa61541719c5b1/botocore-1.34.97.tar.gz"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             }
           ],
           "project_name": "botocore",
@@ -1031,7 +1060,11 @@
             "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
           ],
           "requires_python": ">=3.8",
+<<<<<<< HEAD
           "version": "1.34.144"
+=======
+          "version": "1.34.97"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
         },
         {
           "artifacts": [
@@ -2539,6 +2572,7 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+<<<<<<< HEAD
               "hash": "86ce7fb914aa865001a4b2092c4c2872d13bc347f3d42673272cabfdbad386f1",
               "url": "https://files.pythonhosted.org/packages/96/d7/f318261e6ccbba86bdf626e07cd850981508fdaec52cfcdc4ac1030327ab/marshmallow-3.21.3-py3-none-any.whl"
             },
@@ -2546,6 +2580,15 @@
               "algorithm": "sha256",
               "hash": "4f57c5e050a54d66361e826f94fba213eb10b67b2fdb02c3e0343ce207ba1662",
               "url": "https://files.pythonhosted.org/packages/d6/31/0881962e77efa2d524ca80566ba1fb7cab000edaa9f4152b97a39b8d9a2d/marshmallow-3.21.3.tar.gz"
+=======
+              "hash": "70b54a6282f4704d12c0a41599682c5c5450e843b9ec406308653b47c59648a1",
+              "url": "https://files.pythonhosted.org/packages/be/24/cbb242420021a79c87768dcd22ce028f48ef40913239ad6106c8a557f52c/marshmallow-3.21.2-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "82408deadd8b33d56338d2182d455db632c6313aa2af61916672146bb32edc56",
+              "url": "https://files.pythonhosted.org/packages/a2/16/06ad266adc423f9d7ee49dce26787b973907aa70213760c9fe1711745405/marshmallow-3.21.2.tar.gz"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             }
           ],
           "project_name": "marshmallow",
@@ -2564,7 +2607,11 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.8",
+<<<<<<< HEAD
           "version": "3.21.3"
+=======
+          "version": "3.21.2"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
         },
         {
           "artifacts": [
@@ -3397,6 +3444,7 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+<<<<<<< HEAD
               "hash": "c434598117762e2bd304e526244f67bf66bbd7b5d6cf22138be51ff661980343",
               "url": "https://files.pythonhosted.org/packages/4e/e7/81ebdd666d3bff6670d27349b5053605d83d55548e6bd5711f3b0ae7dd23/pytest-8.2.2-py3-none-any.whl"
             },
@@ -3404,6 +3452,15 @@
               "algorithm": "sha256",
               "hash": "de4bb8104e201939ccdc688b27a89a7be2079b22e2bd2b07f806b6ba71117977",
               "url": "https://files.pythonhosted.org/packages/a6/58/e993ca5357553c966b9e73cb3475d9c935fe9488746e13ebdf9b80fae508/pytest-8.2.2.tar.gz"
+=======
+              "hash": "1733f0620f6cda4095bbf0d9ff8022486e91892245bb9e7d5542c018f612f233",
+              "url": "https://files.pythonhosted.org/packages/c4/43/6b1debd95ecdf001bc46789a933f658da3f9738c65f32db3f4e8f2a4ca97/pytest-8.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d507d4482197eac0ba2bae2e9babf0672eb333017bcedaa5fb1a3d42c1174b3f",
+              "url": "https://files.pythonhosted.org/packages/09/9d/78b3785134306efe9329f40815af45b9215068d6ae4747ec0bc91ff1f4aa/pytest-8.2.0.tar.gz"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             }
           ],
           "project_name": "pytest",
@@ -3424,7 +3481,11 @@
             "xmlschema; extra == \"dev\""
           ],
           "requires_python": ">=3.8",
+<<<<<<< HEAD
           "version": "8.2.2"
+=======
+          "version": "8.2.0"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
         },
         {
           "artifacts": [
@@ -3602,8 +3663,31 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+<<<<<<< HEAD
               "hash": "d163680656b34f263fb5074023db44b999c68ff31ab394445ebfd1a2a41fe9a2",
               "url": "https://files.pythonhosted.org/packages/6b/cd/feba6c20ae4b00d424e6fd802edd4e1557e500501b376c8111a60ba1b83f/readchar-4.1.0-py3-none-any.whl"
+=======
+              "hash": "04c5983aed2c700eb0f3100ac09e51ce5c65ba39d8a627ec138d385261a6a850",
+              "url": "https://files.pythonhosted.org/packages/78/76/118c5e454a68014e4580cdc2aa0cb87a12c51f40bc57b420ae3daec102ee/raftify-0.1.65-cp312-cp312-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "71abf9d3e3e829850cba5b013a42c6e9ef2d556585bf224de5aff75a182a93c2",
+              "url": "https://files.pythonhosted.org/packages/df/e0/49cb08a23f49a232d94fd3a32f534654750930e98cf85d074a9b4be3582b/raftify-0.1.65.tar.gz"
+            }
+          ],
+          "project_name": "raftify",
+          "requires_dists": [],
+          "requires_python": ">=3.10",
+          "version": "0.1.65"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "b4b31dd35de4897be738f27e8f9f62426b5fedb54b648364987e30ae534b71bc",
+              "url": "https://files.pythonhosted.org/packages/86/db/aca9e5e6a53a499d61cbd78b3594d700f1e48a50ab6970a92a4d1251f8db/readchar-4.0.6-py3-none-any.whl"
+>>>>>>> b9b8a242 (feat: Introduce Raftify and RaftGlobalTimer to replace DistributedGlobalTimer)
             },
             {
               "algorithm": "sha256",
@@ -4896,6 +4980,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=25.1.2",
+    "raftify==0.1.65",
     "redis[hiredis]==4.5.5",
     "rich~=13.6",
     "setproctitle~=1.3.2",
