@@ -6,9 +6,14 @@ from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 
 class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def create_network(self, session: SessionRow, *, options: dict[str, Any] = {}) -> str:
+    async def create_network(
+        self,
+        *,
+        identifier: str | None = None,
+        options: dict[str, Any] = {},
+    ) -> dict[str, Any]:
         """
-        Creates a cross-container network and returns its name.
+        Creates a cross-container network and returns network config which later will be passed to agent.
         :param identifier: Optional network identifier. If not provided, a random identifier will be generated.
         :param options: Network options.
         :return: NetworkInfo object which contains network_id and options.
