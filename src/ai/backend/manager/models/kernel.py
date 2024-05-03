@@ -870,7 +870,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": scheduled_at[1] if scheduled_at else None,
+            "scheduled_at": scheduled_at or None,
             "occupied_slots": row.occupied_slots.to_json(),
             # resources
             "agent": row.agent if not hide_agents else None,
