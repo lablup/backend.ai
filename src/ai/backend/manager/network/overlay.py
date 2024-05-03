@@ -1,4 +1,3 @@
-
 import asyncio
 import uuid
 from typing import Any, Mapping
@@ -19,12 +18,13 @@ class OverlayNetworkError(RuntimeError):
 
 class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
     docker: aiodocker.Docker
+
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
 
         plugin_config_iv.check(plugin_config)
 
-    async def init(self, context: Any = None) -> asyncio.Coroutine[Any, Any, None]:
+    async def init(self, context: Any = None) -> None:
         await super().init(context)
         self.docker = aiodocker.Docker()
 
@@ -36,7 +36,9 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         await self.docker.close()
         await super().cleanup()
 
-    async def create_network(self, session: SessionRow, *, options: dict[str, Any] = {}) -> dict[str, Any]:
+    async def create_network(
+        self, *, identifier: str | None = None, options: dict[str, Any] = {}
+    ) -> dict[str, Any]:
         ident = identifier or f"{uuid.uuid4()}-nw"
         network_name = f"bai-multinode-{ident}"
         mtu: int | None = self.plugin_config["mtu"]
