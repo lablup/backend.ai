@@ -928,7 +928,7 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row["status_history"]
+        status_history = row.status_history
         scheduled_at = get_first_occurrence_time(status_history, KernelStatus.SCHEDULED.name)
 
         return {

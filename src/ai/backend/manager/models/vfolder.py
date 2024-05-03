@@ -1470,7 +1470,7 @@ async def update_vfolder_status(
                         vfolders.c.status_history,
                         (),
                         {
-                            update_status.name: datetime.now(tzutc()).isoformat(),
+                            update_status.name: now.isoformat(),
                         },
                     ),
                 )
