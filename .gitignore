@@ -142,3 +142,6 @@ docs/manager/rest-reference/openapi.json
 
 /DIST-INFO
 /INSTALL-INFO
+
+# Raft cluster config
+raft-cluster-config.toml

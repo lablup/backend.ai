@@ -35,7 +35,11 @@ from sqlalchemy.engine import Row
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed import (
+    AbstractGlobalTimer,
+    DistributedLockGlobalTimer,
+    RaftGlobalTimer,
+)
 from ai.backend.common.events import (
     AbstractEvent,
     DoIdleCheckEvent,
@@ -58,13 +62,14 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
+from ai.backend.manager.api.context import RaftClusterContext
+from ai.backend.manager.types import DistributedLockFactory
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
 from .models.user import users
-from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -169,6 +174,7 @@ class RemainingTimeType(enum.StrEnum):
 
 
 class IdleCheckerHost:
+    timer: AbstractGlobalTimer
     check_interval: ClassVar[float] = DEFAULT_CHECK_INTERVAL
 
     def __init__(
@@ -177,6 +183,7 @@ class IdleCheckerHost:
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        raft_ctx: RaftClusterContext,
         lock_factory: DistributedLockFactory,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
@@ -199,6 +206,7 @@ class IdleCheckerHost:
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
             event_dispatcher, self._redis_live, self._redis_stat
         )
+        self.raft_ctx = raft_ctx
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -218,13 +226,22 @@ class IdleCheckerHost:
         )
         for checker in self._checkers:
             await checker.populate_config(raw_config.get(checker.name) or {})
-        self.timer = GlobalTimer(
-            self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
-            self._event_producer,
-            lambda: DoIdleCheckEvent(),
-            self.check_interval,
-            task_name="idle_checker",
-        )
+
+        if self.raft_ctx.use_raft():
+            self.timer = RaftGlobalTimer(
+                self.raft_ctx.raft_node,
+                self._event_producer,
+                lambda: DoIdleCheckEvent(),
+                self.check_interval,
+            )
+        else:
+            self.timer = DistributedLockGlobalTimer(
+                self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
+                self._event_producer,
+                lambda: DoIdleCheckEvent(),
+                self.check_interval,
+            )
+
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,
             None,
@@ -855,7 +872,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
             return True
 
-        # Wait until the time "interval" is passed after the last udpated time.
+        # Wait until the time "interval" is passed after the last updated time.
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         util_now: float = t[0] + (t[1] / (10**6))
         raw_util_last_collected = await redis_helper.execute(
@@ -1057,6 +1074,7 @@ async def init_idle_checkers(
     shared_config: SharedConfig,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
+    raft_ctx: RaftClusterContext,
     lock_factory: DistributedLockFactory,
 ) -> IdleCheckerHost:
     """
@@ -1068,6 +1086,7 @@ async def init_idle_checkers(
         shared_config,
         event_dispatcher,
         event_producer,
+        raft_ctx,
         lock_factory,
     )
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
