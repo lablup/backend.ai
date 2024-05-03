@@ -19,7 +19,6 @@ class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def destroy_network(
         self,
-        network_name: str,
         session: SessionRow,
     ) -> None:
         """
