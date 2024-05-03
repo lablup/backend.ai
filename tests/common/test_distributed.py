@@ -17,7 +17,7 @@ import pytest
 from redis.asyncio import Redis
 
 from ai.backend.common import config
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed import DistributedLockGlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
@@ -104,7 +104,7 @@ async def run_timer(
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
-    timer = GlobalTimer(
+    timer = DistributedLockGlobalTimer(
         lock_factory(),
         event_producer,
         lambda: NoopEvent(test_case_ns),
@@ -173,7 +173,7 @@ def etcd_timer_node_process(
                 )
                 etcd_lock = EtcetraLock(etcd_ctx.lock_name, etcetra_etcd, timeout=None, debug=True)
 
-        timer = GlobalTimer(
+        timer = DistributedLockGlobalTimer(
             etcd_lock,
             event_producer,
             lambda: NoopEvent(timer_ctx.test_case_ns),
@@ -230,7 +230,7 @@ class TimerNode(threading.Thread):
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
-        timer = GlobalTimer(
+        timer = DistributedLockGlobalTimer(
             self.lock_factory(),
             event_producer,
             lambda: NoopEvent(self.test_case_ns),
@@ -424,7 +424,7 @@ async def test_global_timer_join_leave(request, test_case_ns, redis_container) -
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     for _ in range(10):
-        timer = GlobalTimer(
+        timer = DistributedLockGlobalTimer(
             FileLock(lock_path, timeout=0, debug=True),
             event_producer,
             lambda: NoopEvent(test_case_ns),

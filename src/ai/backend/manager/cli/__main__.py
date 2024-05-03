@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import pathlib
 import subprocess
 import sys
 from datetime import datetime
 from functools import partial
+from typing import Any
 
 import click
 from more_itertools import chunked
+from raftify import (
+    InitialRole,
+    Peer,
+    Peers,
+    RaftServiceClient,
+    cli_main,
+)
 from setproctitle import setproctitle
+from tabulate import tabulate
 
 from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
@@ -21,6 +31,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 from ai.backend.manager.models import error_logs
 from ai.backend.manager.models.utils import vacuum_db
+from ai.backend.manager.raft.utils import register_custom_deserializer
 
 from .context import CLIContext, redis_ctx
 
@@ -339,6 +350,93 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     asyncio.run(_clear_terminated_sessions())
     asyncio.run(_clear_old_error_logs())
     asyncio.run(vacuum_db(cli_ctx.local_config, vacuum_full))
+
+
+async def inspect_node_status(cli_ctx: CLIContext) -> None:
+    raft_configs = cli_ctx.local_config["raft"]
+    table = []
+    headers = ["ENDPOINT", "NODE ID", "IS LEADER", "RAFT TERM", "RAFT APPLIED INDEX"]
+
+    if raft_configs is not None:
+        raft_cluster_configs = cli_ctx.raft_cluster_config
+        assert raft_cluster_configs is not None
+
+        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
+        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
+        initial_peers = Peers({
+            int(peer_config["node-id"]): Peer(
+                addr=f"{peer_config['host']}:{peer_config['port']}",
+                role=InitialRole.from_str(peer_config["role"]),
+            )
+            for peer_config in all_peers
+        })
+
+        peers: dict[str, Any] | None = None
+        for intial_peer in initial_peers.to_dict().values():
+            raft_client = await RaftServiceClient.build(intial_peer.get_addr())
+            try:
+                resp = await raft_client.get_peers()
+                peers = json.loads(resp)
+            except Exception as e:
+                print(f"Failed to getting peers from {intial_peer.get_addr()}: {e}")
+                continue
+
+        if peers is None:
+            print("No peers are available!")
+            return
+
+        for node_id in sorted(peers.keys()):
+            peer = peers[node_id]
+            raft_client = await RaftServiceClient.build(peer["addr"])
+
+            try:
+                node_debugging_info = json.loads(await raft_client.debug_node())
+            except Exception as e:
+                print(f"Failed to getting debugging info from {peer['addr']}: {e}")
+                table.append([peer["addr"], "(Invalid response)"])
+
+            is_leader = node_debugging_info["node_id"] == node_debugging_info["leader_id"]
+            table.append([
+                peer["addr"],
+                node_debugging_info["node_id"],
+                is_leader,
+                node_debugging_info["term"],
+                node_debugging_info["raft_log"]["applied"],
+            ])
+
+    table = [headers, *sorted(table, key=lambda x: str(x[0]))]
+    print(
+        tabulate(table, headers="firstrow", tablefmt="grid", stralign="center", numalign="center")
+    )
+
+
+@main.command()
+@click.pass_obj
+def status(cli_ctx: CLIContext) -> None:
+    """
+    Collect and print each manager process's status.
+    """
+    asyncio.run(inspect_node_status(cli_ctx))
+
+
+async def handle_raft_cli_main(argv: list[str]):
+    await cli_main(argv)
+
+
+@main.command()
+@click.pass_obj
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def raft(cli_ctx: CLIContext, args) -> None:
+    register_custom_deserializer()
+
+    argv = sys.argv
+    # Remove "backend.ai", "mgr", "raft" from the argv
+    argv[:3] = []
+    argv.insert(0, "raftify-cli")
+
+    asyncio.run(handle_raft_cli_main(argv))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
