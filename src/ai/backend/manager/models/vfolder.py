@@ -1466,6 +1466,7 @@ async def update_vfolder_status(
                 sa.update(vfolders)
                 .values(
                     status=update_status,
+                    status_changed=now,
                     status_history=sql_json_merge(
                         vfolders.c.status_history,
                         (),
