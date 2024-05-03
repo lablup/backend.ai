@@ -314,7 +314,7 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
-
+        _driver = driver or graph_ctx.shared_config["network"]["inter-container"]["default-driver"]
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
                 project = await GroupRow.get(db_session, project_id)
@@ -327,13 +327,23 @@ class CreateNetwork(graphene.Mutation):
             ):
                 raise GenericForbidden
 
+        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
+        try:
+            network_info = await network_plugin.create_network()
+            network_name = network_info.network_id
+        except Exception:
+            log.exception(
+                f"Failed to create the inter-container network (plugin: {_driver})"
+            )
+            raise
+
         async def _do_mutate() -> CreateNetwork:
             async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
                 row = NetworkRow(
                     name,
-                    "",
-                    "",
-                    project.domain,
+                    network_name,
+                    _driver,
+                    project.domain_name,
                     project.id,
                 )
                 db_session.add(row)

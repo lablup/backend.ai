@@ -11,6 +11,8 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.manager.plugin.network import NetworkPluginContext
+
 set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
@@ -111,6 +113,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac.permission_defs import ComputeSessionPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
@@ -188,6 +191,7 @@ class GraphQueryContext:
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
     db: ExtendedAsyncSAEngine
+    network_plugin_ctx: NetworkPluginContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
@@ -315,6 +319,10 @@ class Mutations(graphene.ObjectType):
     delete_container_registry = DeleteContainerRegistry.Field()
 
     modify_endpoint = ModifyEndpoint.Field()
+
+    create_network = CreateNetwork.Field()
+    modify_network = ModifyNetwork.Field()
+    delete_network = DeleteNetwork.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -815,6 +823,12 @@ class Queries(graphene.ObjectType):
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
     model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
+
+    network = graphene.Field(
+        NetworkNode,
+        id=graphene.String(required=True),
+    )
+    networks = PaginatedConnectionField(NetworkConnection)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2411,6 +2425,38 @@ class Queries(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult[ModelCard]:
         return await ModelCard.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    async def resolve_network(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await NetworkNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_networks(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await NetworkNode.get_connection(
             info,
             filter,
             order,

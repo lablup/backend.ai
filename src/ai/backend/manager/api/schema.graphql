@@ -183,6 +183,8 @@ type Queries {
 
   """Added in 24.03.0."""
   model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+  network(id: UUID!): NetworkNode
+  networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 }
 
 """
@@ -1388,6 +1390,37 @@ type ModelCardEdge {
   cursor: String!
 }
 
+type NetworkNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID
+  name: String
+  ref_name: String
+  project: UUID
+  domain_name: String
+  options: JSONString
+}
+
+type NetworkConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [NetworkEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `Network` and its cursor."""
+type NetworkEdge {
+  """The item at the end of the edge"""
+  node: NetworkNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1577,6 +1610,9 @@ type Mutations {
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
+  create_network(name: String!, project: UUID!): CreateNetwork
+  modify_network(network_id: UUID!, props: ModifyNetworkInput!): ModifyNetwork
+  delete_network(network_id: UUID!): DeleteNetwork
 }
 
 type ModifyAgent {
@@ -2335,4 +2371,25 @@ input ExtraMountInput {
   Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
   """
   permission: String
+}
+
+type CreateNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+type ModifyNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+input ModifyNetworkInput {
+  name: String!
+}
+
+type DeleteNetwork {
+  ok: Boolean
+  msg: String
 }
