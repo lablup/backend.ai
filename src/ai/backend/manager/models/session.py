@@ -734,8 +734,8 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        if first := get_first_occurrence_time(self.status_history, self.status.name):
-            return datetime.fromisoformat(first)
+        if scheduled_at := get_first_occurrence_time(self.status_history, self.status.name):
+            return datetime.fromisoformat(scheduled_at)
         return None
 
     @property
