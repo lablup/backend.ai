@@ -41,7 +41,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_occurrence_time
+from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ..api.exceptions import (
     AgentError,
@@ -706,7 +706,7 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        if scheduled_at := get_first_occurrence_time(self.status_history, self.status.name):
+        if scheduled_at := get_first_timestamp_for_status(self.status_history, self.status.name):
             return datetime.fromisoformat(scheduled_at)
         return None
 
@@ -1218,7 +1218,9 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        scheduled_at = get_first_occurrence_time(row.status_history, SessionStatus.SCHEDULED.name)
+        scheduled_at = get_first_timestamp_for_status(
+            row.status_history, SessionStatus.SCHEDULED.name
+        )
 
         return {
             # identity

@@ -45,7 +45,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_occurrence_time
+from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ..api.exceptions import (
     BackendError,
@@ -843,7 +843,7 @@ class ComputeContainer(graphene.ObjectType):
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
         status_history = row.status_history
-        scheduled_at = get_first_occurrence_time(status_history, KernelStatus.SCHEDULED.name)
+        scheduled_at = get_first_timestamp_for_status(status_history, KernelStatus.SCHEDULED.name)
 
         return {
             # identity
