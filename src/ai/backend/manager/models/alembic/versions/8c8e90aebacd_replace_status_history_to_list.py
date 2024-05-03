@@ -1,4 +1,4 @@
-"""Replace status_history's type map with list
+"""Replace sessions, kernels's status_history's type map with list
 
 Revision ID: 8c8e90aebacd
 Revises: 8b2ec7e3d22a
