@@ -83,6 +83,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
+from ..plugin.network import NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
@@ -194,6 +195,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
     gwbridge_subnet: Optional[str]
 
+    network_plugin_ctx: NetworkPluginContext
+
     def __init__(
         self,
         kernel_id: KernelId,
@@ -208,6 +211,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
+        network_plugin_ctx: NetworkPluginContext,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
@@ -242,6 +246,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self.gwbridge_subnet = gwbridge_subnet
+
+        self.network_plugin_ctx = network_plugin_ctx
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -506,30 +512,38 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_config"].get("network_name") == "host":
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            })
-        elif cluster_info["network_config"].get("network_name") is not None:
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": cluster_info["network_config"].get("network_name"),
-                },
-                "NetworkingConfig": {
-                    "EndpointsConfig": {
-                        cluster_info["network_config"].get("network_name"): {
-                            "Aliases": [self.kernel_config["cluster_hostname"]],
+        # FIXME: find out way to inect network ID to kernel resource spec
+        match cluster_info["network_config"].get("mode"):
+            case "host":
+                self.container_configs.append({
+                    "HostConfig": {
+                        "NetworkMode": "host",
+                    },
+                })
+            case "bridge":
+                self.container_configs.append({
+                    "HostConfig": {
+                        "NetworkMode": cluster_info["network_config"]["network_name"],
+                    },
+                    "NetworkingConfig": {
+                        "EndpointsConfig": {
+                            cluster_info["network_config"]["network_name"]: {
+                                "Aliases": [self.kernel_config["cluster_hostname"]],
+                            },
                         },
                     },
-                },
-            })
-            if self.gwbridge_subnet is not None:
-                self.container_configs.append({
-                    "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
                 })
-        elif self.local_config["container"].get("alternative-bridge") is not None:
+            case mode if mode:
+                plugin = self.network_plugin_ctx.plugins[mode]
+                container_config = await plugin.join_network(
+                    self.kernel_config, cluster_info, **cluster_info["network_config"]
+                )
+                self.container_configs.append(container_config)
+                if self.gwbridge_subnet is not None:
+                    self.container_configs.append({
+                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                    })
+        if self.local_config["container"].get("alternative-bridge") is not None:
             self.container_configs.append({
                 "HostConfig": {
                     "NetworkMode": self.local_config["container"]["alternative-bridge"],
@@ -1102,6 +1116,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
 
+    network_plugin_ctx: NetworkPluginContext
+
     def __init__(
         self,
         etcd: AsyncEtcd,
@@ -1203,6 +1219,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
+
+        self.network_plugin_ctx = NetworkPluginContext(self.etcd, self.local_config)
+        await self.network_plugin_ctx.init(
+            context=self,
+            allowlist=self.local_config["agent"]["allow-network-plugins"],
+            blocklist=self.local_config["agent"]["block-network-plugins"],
+        )
 
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
@@ -1569,6 +1592,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.port_pool,
             self.agent_sockpath,
             self.resource_lock,
+            self.network_plugin_ctx,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,
