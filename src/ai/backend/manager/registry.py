@@ -123,6 +123,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageIdentifier
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -158,6 +159,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    NetworkRow,
     NetworkType,
     RouteStatus,
     RoutingRow,
@@ -250,6 +252,7 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        network_plugin_ctx: NetworkPluginContext,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -268,6 +271,7 @@ class AgentRegistry:
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
         self.rpc_keepalive_timeout = int(
@@ -587,7 +591,15 @@ class AgentRegistry:
         start_event = asyncio.Event()
         self.session_creation_tracker[session_creation_id] = start_event
 
-        async with self.db.begin_readonly() as conn:
+        async with self.db.begin_readonly_session() as db_sess:
+            conn = await db_sess.connection()
+            assert conn
+            # check if network exists
+            if _network_id := config.get("attach_network"):
+                network = await NetworkRow.get(db_sess, _network_id)
+            else:
+                network = None
+
             # Use keypair bootstrap_script if it is not delivered as a parameter
             if not bootstrap_script:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
@@ -634,6 +646,7 @@ class AgentRegistry:
                         public_sgroup_only=public_sgroup_only,
                         route_id=route_id,
                         sudo_session_enabled=sudo_session_enabled,
+                        network=network,
                     )
                 ),
             )
@@ -701,6 +714,7 @@ class AgentRegistry:
         enqueue_only=False,
         max_wait_seconds=0,
         sudo_session_enabled=False,
+        attach_network: uuid.UUID | None = None,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
 
@@ -830,6 +844,11 @@ class AgentRegistry:
         current_task = asyncio.current_task()
         assert current_task is not None
 
+        if attach_network:
+            async with self.db.begin_readonly_session() as db_sess:
+                network = await NetworkRow.get(db_sess, attach_network)
+        else:
+            network = None
         try:
             session_id = await asyncio.shield(
                 self.database_ptask_group.create_task(
@@ -850,6 +869,7 @@ class AgentRegistry:
                         user_scope=user_scope,
                         session_tag=tag,
                         sudo_session_enabled=sudo_session_enabled,
+                        network=network,
                     ),
                 )
             )
@@ -932,6 +952,7 @@ class AgentRegistry:
         callback_url: Optional[URL] = None,
         route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
+        network: NetworkRow | None = None,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -1077,7 +1098,6 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
-            "use_host_network": use_host_network,
         }
 
         kernel_shared_data = {
@@ -1110,6 +1130,12 @@ class AgentRegistry:
             "preopen_ports": sa.bindparam("preopen_ports"),
             "use_host_network": use_host_network,
         }
+
+        if network:
+            session_data["network_type"] = NetworkType.PERSISTENT
+            session_data["network_id"] = str(network.id)
+        elif use_host_network:
+            session_data["network_type"] = NetworkType.HOST
 
         kernel_data = []
         session_images: list[str] = []
@@ -1542,10 +1568,19 @@ class AgentRegistry:
         img_configs = {item["canonical"]: item for item in configs}
 
         network_name: Optional[str] = None
+        network_config: Mapping[str, Any] = {}
         cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
-        if not scheduled_session.use_host_network:
-            if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
-                if scheduled_session.cluster_size > 1:
+        match scheduled_session.network_type:
+            case NetworkType.PERSISTENT:
+                async with self.db.begin_readonly_session() as db_sess:
+                    network = await NetworkRow.get(db_sess, scheduled_session.network_id)
+                    network_name = network.ref_name
+                    network_config = {"mode": network.driver, **network.options}
+            case NetworkType.VOLATILE:
+                if (
+                    scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE
+                    and scheduled_session.cluster_size > 1
+                ):
                     network_name = f"bai-singlenode-{scheduled_session.id}"
                     agent_alloc_ctx = kernel_agent_bindings[0].agent_alloc_ctx
                     assert agent_alloc_ctx.agent_id is not None
@@ -1559,53 +1594,50 @@ class AgentRegistry:
                     except Exception:
                         log.exception(f"Failed to create an agent-local network {network_name}")
                         raise
-                else:
-                    network_name = None
-            elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
-                # Create overlay network for multi-node sessions
-                network_name = f"bai-multinode-{scheduled_session.id}"
-                mtu = self.shared_config["network"]["overlay"]["mtu"]
-                try:
-                    # Overlay networks can only be created at the Swarm manager.
-                    create_options = {
-                        "Name": network_name,
-                        "Driver": "overlay",
-                        "Attachable": True,
-                        "Labels": {
-                            "ai.backend.cluster-network": "1",
-                        },
-                        "Options": {},
+                    network_config = {
+                        "mode": "bridge",
+                        "network_name": network_name,
                     }
-                    if mtu:
-                        create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
-                    await self.docker.networks.create(create_options)
-                except Exception:
-                    log.exception(f"Failed to create an overlay network {network_name}")
-                    raise
-        else:
-            network_name = "host"
-            if scheduled_session.cluster_size > 1:
-                keyfunc = lambda binding: binding.kernel.cluster_role
-                cluster_ssh_port_mapping = {}
-                for cluster_role, group_iterator in itertools.groupby(
-                    sorted(kernel_agent_bindings, key=keyfunc),
-                    key=keyfunc,
-                ):
-                    for index, item in enumerate(group_iterator):
-                        assert item.agent_alloc_ctx.agent_id is not None
-                        async with self.agent_cache.rpc_context(
-                            item.agent_alloc_ctx.agent_id,
-                            order_key=str(scheduled_session.id),
-                        ) as rpc:
-                            port = await rpc.call.assign_port()
-                            agent_addr = item.agent_alloc_ctx.agent_addr.replace(
-                                "tcp://", ""
-                            ).split(":", maxsplit=1)[0]
-                            cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
-                                agent_addr,
-                                port,
-                            )
-                            item.allocated_host_ports.add(port)
+                elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
+                    # Create overlay network for multi-node sessions
+                    driver = self.shared_config["network"]["inter-container"]["default-driver"]
+                    network_plugin = self.network_plugin_ctx.plugins[driver]
+                    try:
+                        network_info = await network_plugin.create_network(
+                            identifier=scheduled_session.id
+                        )
+                        network_config = network_info.options
+                        network_name = network_info.network_id
+                    except Exception:
+                        log.exception(
+                            f"Failed to create the inter-container network (plugin: {driver})"
+                        )
+                        raise
+            case NetworkType.HOST:
+                network_config = {"mode": "host"}
+                network_name = "host"
+                if scheduled_session.cluster_size > 1:
+                    keyfunc = lambda binding: binding.kernel.cluster_role
+                    cluster_ssh_port_mapping = {}
+                    for cluster_role, group_iterator in itertools.groupby(
+                        sorted(kernel_agent_bindings, key=keyfunc),
+                        key=keyfunc,
+                    ):
+                        for index, item in enumerate(group_iterator):
+                            assert item.agent_alloc_ctx.agent_id is not None
+                            async with self.agent_cache.rpc_context(
+                                item.agent_alloc_ctx.agent_id,
+                                order_key=str(scheduled_session.id),
+                            ) as rpc:
+                                port = await rpc.call.assign_port()
+                                agent_addr = item.agent_alloc_ctx.agent_addr.replace(
+                                    "tcp://", ""
+                                ).split(":", maxsplit=1)[0]
+                                cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
+                                    agent_addr,
+                                    port,
+                                )
+                                item.allocated_host_ports.add(port)
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
         if scheduled_session.network_type == NetworkType.VOLATILE:
@@ -1632,7 +1664,7 @@ class AgentRegistry:
             mode=scheduled_session.cluster_mode,
             size=scheduled_session.cluster_size,
             replicas=replicas,
-            network_name=network_name,
+            network_config=network_config,
             ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
@@ -1799,6 +1831,7 @@ class AgentRegistry:
                                 "is_local": get_image_conf(binding.kernel)["is_local"],
                                 "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
                             },
+                            "network_id": str(scheduled_session.id),
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
@@ -2646,46 +2679,48 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
-        async def _fetch_session() -> SessionRow:
-            async with self.db.begin_readonly_session() as sess:
-                return await SessionRow.get_session(
-                    sess,
+        async def _fetch_session() -> tuple[SessionRow, str | None]:
+            async with self.db.begin_readonly_session() as db_sess:
+                sess = await SessionRow.get_session_by_id(
+                    db_sess,
                     session_id,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                    eager_loading_op=(
+                        noload("*"),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ),
                 )
+                network_ref_name = await sess.get_network_ref(db_sess)
+                return sess, network_ref_name
 
         try:
-            session = await execute_with_retry(_fetch_session)
+            session, network_ref_name = await execute_with_retry(_fetch_session)
         except SessionNotFound:
             return
 
         # Get the main container's agent info
+
         if session.network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE:
-                network_name = f"bai-singlenode-{session.id}"
                 try:
                     async with self.agent_cache.rpc_context(
                         session.main_kernel.agent,
-                        order_key=session.main_kernel.session_id,
+                        order_key=str(session.main_kernel.session_id),
                     ) as rpc:
-                        await rpc.call.destroy_local_network(network_name)
+                        await rpc.call.destroy_local_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the agent-local network {network_name}")
+                    log.exception(f"Failed to destroy the agent-local network {network_ref_name}")
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
-                network_name = f'bai-multinode-{session["session_id"]}'
+                assert network_ref_name, "network_id should not be None!"
+                network_plugin = self.network_plugin_ctx.plugins[
+                    self.shared_config["network"]["inter-container"]["default-driver"]
+                ]
                 try:
-                    try:
-                        await asyncio.sleep(2.0)
-                        network = await self.docker.networks.get(network_name)
-                        await network.delete()
-                    except aiodocker.DockerError as e:
-                        if e.status == 404:
-                            # It may have been auto-destructed when the last container was detached.
-                            pass
-                        else:
-                            raise
+                    await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the overlay network {network_name}")
+                    log.exception(f"Failed to destroy the overlay network {network_ref_name}")
             else:
                 pass
 

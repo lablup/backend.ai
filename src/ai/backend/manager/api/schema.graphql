@@ -214,6 +214,8 @@ type Queries {
 
   """Added in 24.03.0."""
   model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+  network(id: UUID!): NetworkNode
+  networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 }
 
 """
@@ -1598,6 +1600,37 @@ type ModelCardEdge {
   cursor: String!
 }
 
+type NetworkNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID
+  name: String
+  ref_name: String
+  project: UUID
+  domain_name: String
+  options: JSONString
+}
+
+type NetworkConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [NetworkEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `Network` and its cursor."""
+type NetworkEdge {
+  """The item at the end of the edge"""
+  node: NetworkNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1802,6 +1835,9 @@ type Mutations {
 
   """Added in 24.09.0."""
   check_and_transit_session_status(input: CheckAndTransitStatusInput!): CheckAndTransitStatus
+  create_network(name: String!, project: UUID!): CreateNetwork
+  modify_network(network_id: UUID!, props: ModifyNetworkInput!): ModifyNetwork
+  delete_network(network_id: UUID!): DeleteNetwork
 }
 
 type ModifyAgent {
@@ -2616,4 +2652,23 @@ type CheckAndTransitStatus {
 input CheckAndTransitStatusInput {
   ids: [GlobalIDField]!
   client_mutation_id: String
+type CreateNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+type ModifyNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+input ModifyNetworkInput {
+  name: String!
+}
+
+type DeleteNetwork {
+  ok: Boolean
+  msg: String
 }

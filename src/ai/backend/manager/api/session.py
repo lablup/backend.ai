@@ -260,6 +260,44 @@ creation_config_v5_template = t.Dict({
         UndefChecker | t.Null | t.Mapping(t.String, t.Any)
     ),
 })
+creation_config_v6 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
+        }).ignore_extra("*"),
+    ),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
+    | t.List(t.Int[1024:65535]),
+    tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
+})
+creation_config_v6_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.String)
+    ),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
+})
 
 
 overwritten_param_check = t.Dict({
@@ -468,6 +506,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
+        if 9 <= api_version[0]:
+            params["config"] = creation_config_v6_template.check(params["config"])
         if 6 <= api_version[0]:
             params["config"] = creation_config_v5_template.check(params["config"])
         elif 5 <= api_version[0]:
@@ -640,7 +680,9 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             f'Requested session ID {params["session_name"]} is reserved word'
         )
     api_version = request["api_version"]
-    if 6 <= api_version[0]:
+    if 9 <= api_version[0]:
+        creation_config = creation_config_v6.check(params["config"])
+    elif 6 <= api_version[0]:
         creation_config = creation_config_v5.check(params["config"])
     elif 5 <= api_version[0]:
         creation_config = creation_config_v4.check(params["config"])
