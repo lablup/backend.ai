@@ -1177,7 +1177,7 @@ class ComputeSession(graphene.ObjectType):
     status_info = graphene.String()
     status_data = graphene.JSONString()
     status_history = graphene.JSONString()  # legacy
-    status_history_log = graphene.JSONString()
+    status_history_log = graphene.JSONString(description="Added in 24.09.0")
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
