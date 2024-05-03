@@ -6,6 +6,9 @@ Backend.AI Migration Guide
 * The migration should be done while the managers and agents are shut down.
 * This guide only describes additional steps to follow other than the code/package upgrades.
 
+# 24.03 to 24.09
+* Etcd config `config/network/overlay` must be moved to `config/plugins/network/overlay`.
+
 # 23.09 to 24.03
 * Python version upgraded from 3.11 to 3.12. Actual patch version may differ by every Backend.AI release, so please make sure to check `pants.toml` of each release.
 * DB revision must be downgraded to `85615e005fa3` **before** initiating Backend.AI manager Python package upgrade
