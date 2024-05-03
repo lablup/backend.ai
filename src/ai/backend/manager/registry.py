@@ -110,6 +110,7 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -175,7 +176,6 @@ from .models.utils import (
 from .types import UserScope
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine.row import Row
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
@@ -224,6 +224,7 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        network_plugin_ctx: NetworkPluginContext,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -242,6 +243,7 @@ class AgentRegistry:
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
         self.rpc_keepalive_timeout = int(
@@ -256,6 +258,15 @@ class AgentRegistry:
         self.pending_waits = set()
         self.database_ptask_group = aiotools.PersistentTaskGroup()
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
+
+        if self.shared_config["network"]["inter-container"]["enabled"]:
+            plugin_name = self.shared_config["network"]["inter-container"]["plugin"]
+            if not plugin_name:
+                raise RuntimeError(
+                    "Inter-container networking enabled but plugin is not specified!"
+                )
+            if plugin_name not in self.network_plugin_ctx.plugins:
+                raise RuntimeError(f"Networking plugin {plugin_name} not found!")
 
         # passive events
         evd = self.event_dispatcher
@@ -1363,7 +1374,7 @@ class AgentRegistry:
             "is_local": is_local_image,
         }
 
-        network_name: Optional[str] = None
+        network_config = {}
         cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
         if not scheduled_session.use_host_network:
             if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
@@ -1381,31 +1392,22 @@ class AgentRegistry:
                     except Exception:
                         log.exception(f"Failed to create an agent-local network {network_name}")
                         raise
-                else:
-                    network_name = None
+                    network_config = {
+                        "mode": "bridge",
+                        "network_name": network_name,
+                    }
             elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
                 # Create overlay network for multi-node sessions
-                network_name = f"bai-multinode-{scheduled_session.id}"
-                mtu = self.shared_config["network"]["overlay"]["mtu"]
+                network_plugin = self.network_plugin_ctx.plugins[
+                    self.shared_config["network"]["inter-container"]["plugin"]
+                ]
                 try:
-                    # Overlay networks can only be created at the Swarm manager.
-                    create_options = {
-                        "Name": network_name,
-                        "Driver": "overlay",
-                        "Attachable": True,
-                        "Labels": {
-                            "ai.backend.cluster-network": "1",
-                        },
-                        "Options": {},
-                    }
-                    if mtu:
-                        create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
-                    await self.docker.networks.create(create_options)
+                    network_config = await network_plugin.create_network(scheduled_session)
                 except Exception:
-                    log.exception(f"Failed to create an overlay network {network_name}")
+                    log.exception(f"Failed to create the inter-container network {network_name}")
                     raise
         else:
-            network_name = "host"
+            network_config = {"mode": "host"}
             if scheduled_session.cluster_size > 1:
                 keyfunc = lambda item: item.kernel.cluster_role
                 cluster_ssh_port_mapping = {}
@@ -1443,7 +1445,7 @@ class AgentRegistry:
             mode=scheduled_session.cluster_mode,
             size=scheduled_session.cluster_size,
             replicas=replicas,
-            network_name=network_name,
+            network_config=network_config,
             ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
@@ -2438,54 +2440,44 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
-        async def _fetch_session() -> Row:
-            async with self.db.begin_readonly() as conn:
-                query = (
-                    sa.select([
-                        kernels.c.session_id,
-                        kernels.c.cluster_mode,
-                        kernels.c.cluster_size,
-                        kernels.c.agent,
-                        kernels.c.agent_addr,
-                        kernels.c.use_host_network,
-                    ])
-                    .select_from(kernels)
-                    .where(
-                        (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE)
-                    )
+        async def _fetch_session() -> SessionRow:
+            async with self.db.begin_readonly_session() as sess:
+                return await SessionRow.get_session_by_id(
+                    sess,
+                    session_id,
+                    eager_loading_op=(
+                        noload("*"),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ),
                 )
-                result = await conn.execute(query)
-                return result.first()
 
-        session = await execute_with_retry(_fetch_session)
-        if session is None:
+        try:
+            session = await execute_with_retry(_fetch_session)
+        except SessionNotFound:
             return
+
         # Get the main container's agent info
-        if not session["use_host_network"]:
-            if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
-                network_name = f'bai-singlenode-{session["session_id"]}'
+        if not session.use_host_network:
+            if session.cluster_mode == ClusterMode.SINGLE_NODE and session.cluster_size > 1:
+                network_name = f"bai-singlenode-{session_id}"
+                main_kernel = session.main_kernel
                 try:
                     async with self.agent_cache.rpc_context(
-                        session["agent"],
-                        order_key=session["session_id"],
+                        main_kernel.agent_row.id,
+                        order_key=session_id,
                     ) as rpc:
                         await rpc.call.destroy_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_name}")
-            elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
-                network_name = f'bai-multinode-{session["session_id"]}'
+            elif session.cluster_mode == ClusterMode.MULTI_NODE:
+                network_plugin = self.network_plugin_ctx.plugins[
+                    self.shared_config["network"]["inter-container"]["plugin"]
+                ]
                 try:
-                    try:
-                        await asyncio.sleep(2.0)
-                        network = await self.docker.networks.get(network_name)
-                        await network.delete()
-                    except aiodocker.DockerError as e:
-                        if e.status == 404:
-                            # It may have been auto-destructed when the last container was detached.
-                            pass
-                        else:
-                            raise
+                    await network_plugin.destroy_network(session)
                 except Exception:
                     log.exception(f"Failed to destroy the overlay network {network_name}")
             else:
