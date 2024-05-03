@@ -8,6 +8,7 @@ Backend.AI Migration Guide
 
 # 24.03 to 24.09
 * Etcd config `config/network/overlay` must be moved to `config/plugins/network/overlay`.
+* Etcd config `config/network/inter-container/enabled` must be set to `True` in order to create multi node session.
 
 # 23.09 to 24.03
 * Python version upgraded from 3.11 to 3.12. Actual patch version may differ by every Backend.AI release, so please make sure to check `pants.toml` of each release.
