@@ -2467,7 +2467,7 @@ class AgentRegistry:
                 try:
                     async with self.agent_cache.rpc_context(
                         main_kernel.agent_row.id,
-                        order_key=session_id,
+                        order_key=str(session_id),
                     ) as rpc:
                         await rpc.call.destroy_local_network(network_name)
                 except Exception:
