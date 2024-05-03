@@ -584,6 +584,8 @@ type ComputeSession implements Item {
   status_info: String
   status_data: JSONString
   status_history: JSONString
+
+  """Added in 24.09.0"""
   status_history_log: JSONString
   created_at: DateTime
   terminated_at: DateTime
