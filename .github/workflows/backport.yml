@@ -97,17 +97,25 @@ jobs:
           gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Backport to ${{ matrix.milestone }} is failed. Please backport manually."
         env:
           GH_TOKEN: ${{ github.token }}
-      - id: pr_title
+      - id: commit_message
         run: |
-          commit_message_without_description=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | head -n 1)
-          echo "commit_message_without_description=$commit_message_without_description" >> $GITHUB_OUTPUT
+          commit_header=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | head -n 1)
+          echo "commit_header=$commit_header" >> $GITHUB_OUTPUT
+          commit_body=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==1')
+          echo "commit_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          commit_footer=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==2')
+          echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_footer" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Create Bakport PR
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.BACKPORT_PAT }}
           author: "${{ needs.backport-target-branch.outputs.author }} <${{ needs.backport-target-branch.outputs.author_email }}>"
-          title: "${{ steps.pr_title.outputs.commit_message_without_description }}"
+          title: "${{ steps.commit_message.outputs.commit_header }}"
           body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
@@ -116,23 +124,43 @@ jobs:
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='
-            query ($pr_number: Int!) {
-              repository(owner: "lablup", name: "backend.ai") {
+            query ($pr_number: Int!, $owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
                 pullRequest(number: $pr_number) {
                   id
                 }
               }
             }
-          ' -f pr_number=${{ steps.pr.outputs.pull-request-number }} | jq -r '.data.repository.pullRequest.id')
+          ' -F pr_number=${{ steps.pr.outputs.pull-request-number }} -f owner=${{ github.repository_owner }} -f name=${{ github.event.repository.name }} | jq -r '.data.repository.pullRequest.id')
           echo "pr_id=$pr_id" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.BACKPORT_PAT }}
+      - id: commit_footer
+        run: |
+          commit_footer="Co-authored-by: ${{ needs.backport-target-branch.outputs.author }} <${{ needs.backport-target-branch.outputs.author_email }}>
+          ${{ steps.commit_message.outputs.commit_footer }}
+          Backported-from: main (${{ needs.backport-target-branch.outputs.latest_release }})
+          Backported-to: ${{ matrix.milestone }}
+          Backport-of: ${{ needs.backport-target-branch.outputs.pr_number }}"
+          commit_footer=$(echo "$commit_footer" | grep '.')  # remove empty lines
+          echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_footer" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Enable auto-merge
         if: ${{ steps.pr.outputs.pull-request-number }}
         run: |
           gh api graphql -f query='
             mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
-              enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, mergeMethod: $mergeMethod}) {
+              enablePullRequestAutoMerge(input: {
+                pullRequestId: $pullRequestId,
+                mergeMethod: $mergeMethod,
+                commitBody: """
+          ${{ steps.commit_message.outputs.commit_body }}
+
+          ${{ steps.commit_footer.outputs.commit_footer }}
+                """,
+                commitHeadline: "${{ steps.commit_message.outputs.commit_header }} (#${{ steps.pr.outputs.pull-request-number }})"
+              }) {
                 pullRequest {
                   autoMergeRequest {
                     enabledAt
