@@ -6,7 +6,7 @@ import os.path
 import uuid
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence
 
 import aiohttp
 import aiotools
@@ -29,6 +29,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MountPermission,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
@@ -38,7 +39,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..api.exceptions import (
+    InvalidAPIParameters,
+    VFolderNotFound,
+    VFolderOperationFailed,
+    VFolderPermissionError,
+)
 from ..defs import (
     DEFAULT_CHUNK_SIZE,
     RESERVED_VFOLDER_PATTERNS,
@@ -62,11 +68,7 @@ from .base import (
     generate_sql_info_for_gql_connection,
     metadata,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -88,7 +90,7 @@ __all__: Sequence[str] = (
     "VFolderPermission",
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
-    "VFolderAccessStatus",
+    "VFolderStatusSet",
     "DEAD_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
@@ -106,6 +108,11 @@ __all__: Sequence[str] = (
     "update_vfolder_status",
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
+    "vfolder_status_map",
+    "DEAD_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "VFolderPermissionSetAlias",
 )
 
 
@@ -164,22 +171,85 @@ class VFolderOperationStatus(enum.StrEnum):
 
     DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanentyl, only DB row remains
+    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
 
-class VFolderAccessStatus(enum.StrEnum):
+class VFolderStatusSet(enum.StrEnum):
     """
-    Introduce virtual folder desired status for storage-proxy operations.
-    Not added to db scheme  and determined only by current vfolder status.
+    Acts as an alias to represent set of VFolder statuses. Use this value as a key of
+    `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
     """
 
     READABLE = "readable"
+    """Represents VFolder in a normal (readable, mountable and clonable) state"""
+
+    MOUNTABLE = "mountable"
+    """Represents VFolder in a mountable state"""
+
     UPDATABLE = "updatable"
+    """Represents VFolder in idle (not performing active clone or removal) state"""
+
+    DELETABLE = "deletable"
+    """Simillar with UPDATABLE but does not allow VFolder in MOUNTED state"""
+
+    PURGABLE = "purgable"
+    """Represents VFolder located in trash bin. The meaning of `purge` here is
+    completely different between our VFolder `/purge` API so be sure not to confuse.
+    That API will be renamed any soon in a more self-representitive way."""
+
     RECOVERABLE = "recoverable"
-    SOFT_DELETABLE = "soft-deletable"  # Able to move to `trash bin`
-    HARD_DELETABLE = "hard-deletable"  # Able to delete vfolder in storage proxy
-    PURGABLE = "purgable"  # Able to delete vfolder row in DB. The real data of vfolder should be deleted already.
+    """alias of VFolderStatusSet.PURGABLE"""
+
+    INACCESSIBLE = "inaccessible"
+    """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+
+vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.MOUNTABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.INACCESSIBLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+}
+
+
+class VFolderPermissionSetAlias(enum.Enum):
+    READABLE = {
+        VFolderPermission.READ_ONLY,
+        VFolderPermission.READ_WRITE,
+        VFolderPermission.RW_DELETE,
+    }
+    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
+    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 SOFT_DELETED_VFOLDER_STATUSES = (
@@ -446,18 +516,20 @@ async def query_accessible_vfolders(
     entries: List[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
+        # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+            .select_from(j)
+            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
+        )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
-        # Scan vfolders shared with me.
+        # Scan vfolders shared with requester.
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
@@ -475,7 +547,8 @@ async def query_accessible_vfolders(
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         if extra_invited_vf_conds is not None:
@@ -522,7 +595,9 @@ async def query_accessible_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+                (vfolders.c.group.in_(group_ids))
+                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         if extra_vf_conds is not None:
@@ -646,6 +721,7 @@ async def prepare_vfolder_mounts(
     resource_policy: Mapping[str, Any],
     requested_mount_references: Sequence[str | uuid.UUID],
     requested_mount_reference_map: Mapping[str | uuid.UUID, str],
+    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
@@ -656,6 +732,11 @@ async def prepare_vfolder_mounts(
     ]
     requested_mount_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+    requested_mount_options: dict[str, dict[str, Any]] = {
+        name: options
+        for name, options in requested_mount_reference_options.items()
+        if isinstance(name, str)
     }
 
     vfolder_ids_to_resolve = [
@@ -672,6 +753,8 @@ async def prepare_vfolder_mounts(
         requested_mounts.append(name)
         if path := requested_mount_reference_map.get(vfid):
             requested_mount_map[name] = path
+        if options := requested_mount_reference_options.get(vfid):
+            requested_mount_options[name] = options
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -703,12 +786,14 @@ async def prepare_vfolder_mounts(
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
+    extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
+        DEAD_VFOLDER_STATUSES
+    )
     if requested_vfolder_names:
-        extra_vf_conds = vfolders.c.name.in_(
-            requested_vfolder_names.values()
-        ) | vfolders.c.name.startswith(".")
-    else:
-        extra_vf_conds = vfolders.c.name.startswith(".")
+        extra_vf_conds = extra_vf_conds | (
+            vfolders.c.name.in_(requested_vfolder_names.values())
+            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
+        )
     accessible_vfolders = await query_accessible_vfolders(
         conn,
         user_scope.user_uuid,
@@ -798,6 +883,18 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
+            match requested_perm := requested_mount_options.get(key, {}).get("permission"):
+                case MountPermission.READ_ONLY:
+                    mount_perm = MountPermission.READ_ONLY
+                case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
+                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                        raise VFolderPermissionError(
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"but attempted with '{requested_perm.value}' mode."
+                        )
+                    mount_perm = requested_perm
+                case _:  # None if unset
+                    mount_perm = vfolder["permission"]
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
@@ -805,7 +902,7 @@ async def prepare_vfolder_mounts(
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
-                    mount_perm=vfolder["permission"],
+                    mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
                 )
             )
@@ -1006,6 +1103,7 @@ async def initiate_vfolder_deletion(
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
 ) -> int:
+    """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)

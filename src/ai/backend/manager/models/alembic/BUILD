@@ -15,5 +15,6 @@ resources(
     name="resources",
     sources=[
         "script.py.mako",
+        "revision_history/*.json",
     ],
 )

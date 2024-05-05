@@ -215,6 +215,7 @@ async def connect_database(
         connect_args=pgsql_connect_opts,
         pool_size=local_config["db"]["pool-size"],
         pool_recycle=local_config["db"]["pool-recycle"],
+        pool_pre_ping=local_config["db"]["pool-pre-ping"],
         max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
@@ -389,3 +390,13 @@ def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
 
 def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
+
+
+async def vacuum_db(
+    local_config: LocalConfig | Mapping[str, Any], vacuum_full: bool = False
+) -> None:
+    async with connect_database(local_config, isolation_level="AUTOCOMMIT") as db:
+        async with db.begin() as conn:
+            vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
+            log.info(f"Perfoming {vacuum_sql} operation...")
+            await conn.exec_driver_sql(vacuum_sql)
