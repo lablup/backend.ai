@@ -583,7 +583,7 @@ type ComputeSession implements Item {
   status_changed: DateTime
   status_info: String
   status_data: JSONString
-  status_history: JSONString
+  status_history: JSONString @deprecated(reason: "Deprecated since 24.09.0; use `status_history_log`")
 
   """Added in 24.09.0"""
   status_history_log: JSONString
