@@ -1282,7 +1282,9 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
-    status_history = graphene.JSONString()  # legacy
+    status_history = graphene.JSONString(
+        deprecation_reason="Deprecated since 24.09.0; use `status_history_log`"
+    )
     status_history_log = graphene.JSONString(description="Added in 24.09.0")
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
