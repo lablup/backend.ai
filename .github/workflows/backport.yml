@@ -38,7 +38,7 @@ jobs:
       - name: Check if this is a merged pr commit
         run: |
           if [[ -z "${{ steps.commit.outputs.pr_number }}" ]]; then
-            echo "This is not a merged pr commit."
+            echo "This is not a merge commit of a PR."
             exit 0
           fi
           # Modified in a way to terminate without failure indication
@@ -116,7 +116,7 @@ jobs:
           token: ${{ secrets.BACKPORT_PAT }}
           author: "${{ needs.backport-target-branch.outputs.author }} <${{ needs.backport-target-branch.outputs.author_email }}>"
           title: "${{ steps.commit_message.outputs.commit_header }}"
-          body: "This is a pr that backports #${{ needs.backport-target-branch.outputs.pr_number }} to version ${{ matrix.milestone }}."
+          body: "This is an auto-generated backport PR of #${{ needs.backport-target-branch.outputs.pr_number }} to the ${{ matrix.milestone }} release."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
           labels: backport
