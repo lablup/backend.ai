@@ -21,13 +21,13 @@ jobs:
       - name: Extract pr_number from commit message
         id: commit
         run: |
-          latest_commit=$(git rev-parse HEAD)  # 현재 repository의 가장 최근 commit 해시 가져오기
+          latest_commit=$(git rev-parse HEAD)  # Get the recent commit hash of the current repository
           echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
-          commit_message=$(git show -s --format=%B $latest_commit)  # 최근 commit의 메시지 가져오기
+          commit_message=$(git show -s --format=%B $latest_commit)  # Get messages from recent commit
           echo "commit_message<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_message" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)" | grep -oP "\d+")  # commit 메시지에서 pr 번호 가져오기
+          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)" | grep -oP "\d+")  # Get pr number from commit message
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
           latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
           echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
@@ -41,7 +41,7 @@ jobs:
             echo "This is not a merged pr commit."
             exit 0
           fi
-          # 실패표시없이 종료시키는 방법으로 수정
+          # Modified in a way to terminate without failure indication
       - name: Get target milestones
         id: milestones
         run: |
