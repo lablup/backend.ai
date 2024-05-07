@@ -84,9 +84,6 @@ class KernelResourceSpec:
     container_id: str
     """The container ID to refer inside containers."""
 
-    network_id: str
-    """The network ID"""
-
     slots: Mapping[SlotName, str]
     """Stores the original user-requested resource slots."""
 
@@ -121,7 +118,6 @@ class KernelResourceSpec:
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
         resource_str += f"MOUNTS={mounts_str}\n"
         resource_str += f"SLOTS={slots_str}\n"
-        resource_str += f"NETWORK={self.network_id}\n"
 
         for device_name, slots in self.allocations.items():
             for slot_name, per_device_alloc in slots.items():
@@ -189,7 +185,6 @@ class KernelResourceSpec:
             allocations=dict(allocations),
             slots=ResourceSlot(json.loads(kvpairs["SLOTS"])),
             mounts=mounts,
-            network_id=kvpairs.get("NETWORK", "unknown"),
         )
 
     @classmethod
