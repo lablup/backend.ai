@@ -534,7 +534,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 })
             case mode if mode:
-                plugin = self.network_plugin_ctx.plugins[mode]
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+
                 container_config = await plugin.join_network(
                     self.kernel_config, cluster_info, **cluster_info["network_config"]
                 )
