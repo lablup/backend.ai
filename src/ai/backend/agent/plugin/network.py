@@ -35,4 +35,4 @@ class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABC
 
 
 class NetworkPluginContext(BasePluginContext[AbstractNetworkAgentPlugin]):
-    plugin_group = "backendai_network_client_v1"
+    plugin_group = "backendai_network_agent_v1"
