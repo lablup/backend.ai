@@ -944,7 +944,7 @@ class MemoryPlugin(AbstractComputePlugin):
         }
 
 
-class OverlayNetworkPlugin(AbstractNetworkAgentPlugin):
+class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
     async def join_network(
         self,
         kernel_config: KernelCreationConfig,
