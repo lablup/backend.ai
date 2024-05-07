@@ -409,18 +409,14 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Install towncrier requirements
-      run: |
-        pip install -U -r tools/towncrier-requirements.txt
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
+        pip install -U 'twine~=4.0'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -567,7 +563,6 @@ jobs:
       run: |
         export LANG=C.UTF-8
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v5
