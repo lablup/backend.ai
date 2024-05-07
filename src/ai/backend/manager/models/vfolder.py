@@ -104,7 +104,12 @@ from .rbac import (
 from .rbac.exceptions import InvalidScope, NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
 from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    execute_with_retry,
+    sql_append_dict_to_list,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -374,14 +379,14 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    # status_history records the most recent status changes for each status
+    # status_history records the status changes of the vfolder.
     # e.g)
-    # {
-    #   "ready": "2022-10-22T10:22:30",
-    #   "delete-pending": "2022-10-22T11:40:30",
-    #   "delete-ongoing": "2022-10-25T10:22:30"
-    # }
-    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
+    # [
+    #   {"status": "ready", "timestamp": "2022-10-22T10:22:30"},
+    #   {"status": "delete-pending", "timestamp": "2022-10-22T11:40:30"},
+    #   {"status": "delete-ongoing", "timestamp": "2022-10-25T10:22:30"}
+    # ]
+    sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[]),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
 )
 
@@ -1467,12 +1472,9 @@ async def update_vfolder_status(
                 .values(
                     status=update_status,
                     status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
+                    status_history=sql_append_dict_to_list(
+                        VFolderRow.status_history,
+                        {"status": update_status.name, "timestamp": now.isoformat()},
                     ),
                 )
                 .where(cond)
