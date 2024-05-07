@@ -947,10 +947,9 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         self,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
-        *,
-        network_name: str,
-        **options,
+        **kwargs: Any,
     ) -> dict[str, Any]:
+        network_name: str = kwargs["network_name"]
         return {
             "HostConfig": {
                 "NetworkMode": network_name,
