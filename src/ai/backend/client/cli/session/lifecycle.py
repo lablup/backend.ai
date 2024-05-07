@@ -16,7 +16,6 @@ import click
 import inquirer
 import treelib
 from async_timeout import timeout
-from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from faker import Faker
 from humanize import naturalsize
@@ -802,9 +801,9 @@ def status_history(ctx: CLIContext, session_id):
             elif (
                 terminated := get_first_timestamp_for_status(status_history, "TERMINATED")
             ) is None:
-                elapsed = datetime.now(tzutc()) - isoparse(preparing)
+                elapsed = datetime.now(tzutc()) - preparing
             else:
-                elapsed = isoparse(terminated) - isoparse(preparing)
+                elapsed = terminated - preparing
 
             print_done(f"Actual Resource Allocation Time: {elapsed.total_seconds()}")
         except Exception as e:

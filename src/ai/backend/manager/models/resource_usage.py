@@ -15,7 +15,7 @@ from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo
-from ai.backend.common.utils import nmget
+from ai.backend.common.utils import get_first_timestamp_for_status, nmget
 
 from .group import GroupRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
@@ -519,7 +519,9 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
-            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
+            scheduled_at=str(
+                get_first_timestamp_for_status(kern.status_history, KernelStatus.SCHEDULED.name)
+            ),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
