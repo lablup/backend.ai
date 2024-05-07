@@ -76,7 +76,6 @@ from .base import (
 )
 from .group import groups
 from .image import ImageNode, ImageRow
-from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
@@ -956,7 +955,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": scheduled_at or None,
+            "scheduled_at": scheduled_at,
             "occupied_slots": row.occupied_slots.to_json(),
             # resources
             "agent": row.agent if not hide_agents else None,
@@ -1010,7 +1009,7 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
-        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), dtparse),
+        "scheduled_at": ("scheduled_at", None),
     }
 
     _queryorder_colmap: ColumnMapType = {
@@ -1027,7 +1026,7 @@ class ComputeContainer(graphene.ObjectType):
         "status_changed": ("status_info", None),
         "created_at": ("created_at", None),
         "terminated_at": ("terminated_at", None),
-        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
+        "scheduled_at": ("scheduled_at", None),
     }
 
     @classmethod
