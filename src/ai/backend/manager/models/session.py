@@ -71,7 +71,7 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang import ArrayFieldItem, JSONFieldItem
+from .minilang import ArrayFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
@@ -733,10 +733,8 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> Optional[datetime]:
-        if scheduled_at := get_first_timestamp_for_status(self.status_history, self.status.name):
-            return datetime.fromisoformat(scheduled_at)
-        return None
+    def status_changed(self) -> datetime | None:
+        return get_first_timestamp_for_status(self.status_history, self.status.name)
 
     @property
     def resource_opts(self) -> dict[str, Any]:
@@ -1472,10 +1470,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
-        "scheduled_at": (
-            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
-            dtparse,
-        ),
+        "scheduled_at": ("scheduled_at", None),
         "startup_command": ("sessions_startup_command", None),
     }
 
@@ -1503,10 +1498,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", None),
         "terminated_at": ("sessions_terminated_at", None),
         "starts_at": ("sessions_starts_at", None),
-        "scheduled_at": (
-            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
-            None,
-        ),
+        "scheduled_at": ("scheduled_at", None),
     }
 
     @classmethod

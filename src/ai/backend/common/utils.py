@@ -8,7 +8,7 @@ import re
 import sys
 import uuid
 from collections import OrderedDict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from itertools import chain
 from pathlib import Path
 from typing import (
@@ -25,6 +25,7 @@ from typing import (
 
 import aiofiles
 from async_timeout import timeout
+from dateutil.parser import parse as dtparse
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -408,12 +409,12 @@ async def umount(
 
 def get_first_timestamp_for_status(
     status_history_records: list[dict[str, str]], status: str
-) -> str | None:
+) -> datetime | None:
     """
     Get the first occurrence time of the given status from the status history records.
     """
 
     for status_history in status_history_records:
         if status_history["status"] == status:
-            return status_history["timestamp"]
+            return dtparse(status_history["timestamp"])
     return None
