@@ -689,6 +689,7 @@ async def get_allowed_vfolder_hosts_by_user(
             association_groups_users,
             (
                 (groups.c.id == association_groups_users.c.group_id)
+                & (groups.c.type != ProjectType.MODEL_STORE)
                 & (groups.c.id == group_id)
                 & (association_groups_users.c.user_id == user_uuid)
             ),
@@ -698,6 +699,7 @@ async def get_allowed_vfolder_hosts_by_user(
             association_groups_users,
             (
                 (groups.c.id == association_groups_users.c.group_id)
+                & (groups.c.type != ProjectType.MODEL_STORE)
                 & (association_groups_users.c.user_id == user_uuid)
             ),
         )
