@@ -8,7 +8,7 @@ from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 TKernel = TypeVar("TKernel", bound=AbstractKernel)
 
 
-class AbstractNetworkAgentPlugin(AbstractPlugin, Generic[TKernel], metaclass=ABCMeta):
+class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def join_network(
         self,
