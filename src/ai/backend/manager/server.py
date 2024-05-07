@@ -824,6 +824,7 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
