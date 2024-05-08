@@ -62,6 +62,7 @@ __all__: Sequence[str] = (
     "verify_dotfile_name",
 )
 
+
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
