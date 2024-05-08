@@ -278,9 +278,11 @@ type AgentSummaryList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.09.0."""
 type AgentNode implements Node {
   """The ID of the object"""
   id: ID!
+  row_id: String
   status: String
   status_changed: DateTime
   region: String
