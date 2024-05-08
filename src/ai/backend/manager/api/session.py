@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import enum
 import functools
 import json
 import logging
@@ -84,6 +83,8 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    CustomizedImageLabelKey,
+    CustomizedImageVisibilityScope,
     ImageRow,
     KernelLoadingStrategy,
     KernelRole,
@@ -91,6 +92,8 @@ from ..models import (
     SessionRow,
     SessionStatus,
     UserRole,
+    build_customized_img_email_label,
+    build_customized_img_owner_label,
     groups,
     kernels,
     keypairs,
@@ -1010,11 +1013,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     return web.json_response(resp, status=201)
 
 
-class CustomizedImageVisibilityScope(str, enum.Enum):
-    USER = "user"
-    PROJECT = "project"
-
-
 class ConvertSessionToImageRequesteModel(BaseModel):
     image_name: str = Field(
         pattern=r"[a-zA-Z0-9\.\-_]+",
@@ -1157,15 +1155,13 @@ async def convert_session_to_image(
             )
 
             image_labels = {
-                "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
-                "ai.backend.customized-image.name": params.image_name,
-                "ai.backend.customized-image.id": customized_image_id,
+                **build_customized_img_owner_label(params.image_visibility, image_owner_id),
+                CustomizedImageLabelKey.NAME.value: params.image_name,
+                CustomizedImageLabelKey.ID.value: customized_image_id,
             }
             match params.image_visibility:
                 case CustomizedImageVisibilityScope.USER:
-                    image_labels["ai.backend.customized-image.user.email"] = request["user"][
-                        "email"
-                    ]
+                    image_labels.update(build_customized_img_email_label(request["user"]["email"]))
 
             # commit image with new tag set
             resp = await root_ctx.registry.commit_session(
