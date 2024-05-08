@@ -1682,6 +1682,7 @@ class AgentRegistry:
                                 "labels": image_infos[binding.kernel.image].labels,
                                 "is_local": is_local,
                             },
+                            "network_id": str(scheduled_session.id),
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
