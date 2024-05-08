@@ -2084,7 +2084,7 @@ class AbstractAgent(
                     "attached_devices": attached_devices,
                 }
 
-                if model_definition:
+                if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                     for model in model_definition["models"]:
                         asyncio.create_task(
                             self.start_and_monitor_model_service_health(kernel_obj, model)
