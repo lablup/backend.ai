@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import base64
 import secrets
-import time
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import graphene
@@ -28,7 +26,6 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .vfolder import VirtualFolder
 
-from ..api.ratelimit import _rlim_window, _time_prec
 from ..defs import RESERVED_DOTFILES
 from .base import (
     Base,
@@ -66,11 +63,6 @@ __all__: Sequence[str] = (
 
 _rolling_count_script = """
 local access_key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-if redis.call('EXISTS', access_key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', access_key, 0, now - window)
-end
 return redis.call('ZCARD', access_key)
 """
 
@@ -244,7 +236,6 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        now = Decimal(time.time()).quantize(_time_prec)
         redis_rlim = redis_helper.get_redis_object(
             ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
         )
@@ -253,7 +244,7 @@ class KeyPair(graphene.ObjectType):
             "rollingcount",
             _rolling_count_script,
             [self.access_key],
-            [str(now), str(_rlim_window)],
+            [],
         )
         return int(ret) if ret is not None else 0
 
