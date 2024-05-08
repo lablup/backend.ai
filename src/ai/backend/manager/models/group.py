@@ -52,11 +52,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
@@ -91,7 +87,6 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-# _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 association_groups_users = sa.Table(
     "association_groups_users",

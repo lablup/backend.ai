@@ -70,11 +70,7 @@ from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
-from .gql_relay import (
-    AsyncListConnectionField,
-    AsyncNode,
-    ConnectionPaginationOrder,
-)
+from .gql_relay import AsyncListConnectionField, AsyncNode, ConnectionPaginationOrder
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
@@ -776,7 +772,7 @@ class SlugType(TypeDecorator):
     def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
         self._allow_unicode = allow_unicode
         self._length = length
-        self._rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+        self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$")
 
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(sa.String(64))
@@ -785,7 +781,7 @@ class SlugType(TypeDecorator):
         if self._length is not None and len(value) > self._length:
             raise ValueError(f"value is too long (max length {self._length}")
         if not self._allow_unicode:
-            if self._rx_slug.search(value) is None:
+            if self._rx_slug.search(value, flags=re.ASCII) is None:
                 return ValueError("invalid name format. slug format required.", value)
         return value
 
