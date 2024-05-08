@@ -136,3 +136,7 @@ Be advised that starting from 24.03, every new and updated REST APIs should adap
 
 Use `ai.backend.manager.api.utils.pydantic_response_api_handler` as a function decorator for API handlers without request body or queryparam to consume. Otherwise adapt `ai.backend.manager.utils.pydantic_params_api_handler`.
 Every response data model should inherit `ai.backend.manager.api.utils.BaseResponseModel` as its parent class. To use arbitrary HTTP response status code other than 200, fill in `status` value of `BaseResponseModel`.
+
+Here are some examples:
+# `<list_serve()> https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L147-L152`
+# `<get_info()> https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L221-L224`
