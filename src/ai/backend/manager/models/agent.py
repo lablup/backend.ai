@@ -602,6 +602,7 @@ class AgentNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.String()
     status = graphene.String()
     status_changed = GQLDateTime()
     region = graphene.String()
@@ -627,6 +628,7 @@ class AgentNode(graphene.ObjectType):
             return None
         return cls(
             id=row.id,
+            row_id=row.id,
             status=row.status.name,
             status_changed=row.status_changed,
             region=row.region,
@@ -655,6 +657,7 @@ class AgentNode(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
+        "row_id": ("id", None),
         "status": ("status", enum_field_getter(AgentStatus)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
