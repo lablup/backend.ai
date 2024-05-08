@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Iterable, TypeVar
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -20,6 +20,19 @@ class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABC
     ) -> dict[str, Any]:
         """
         Returns required container config to attach container to network.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def expose_ports(
+        self,
+        kernel: TKernel,
+        bind_host: str,
+        ports: Iterable[tuple[int, int]],
+        **kwargs,
+    ) -> None:
+        """
+        Expose given set of ports to the public network.
         """
         raise NotImplementedError
 

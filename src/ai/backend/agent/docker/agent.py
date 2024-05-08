@@ -646,6 +646,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports: List[ServicePort],
+        cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
 
@@ -793,6 +794,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         loop = current_loop()
         resource_spec = kernel_obj.resource_spec
@@ -837,6 +839,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 host_ips.append(str(container_bind_host))
         assert len(host_ips) == len(host_ports) == len(exposed_ports)
+
+        if (mode := cluster_info["network_config"].get("mode")) and mode not in ("host", "bridge"):
+            try:
+                plugin = self.network_plugin_ctx.plugins[mode]
+            except KeyError:
+                raise RuntimeError(f"Network plugin {mode} not loaded!")
+
+            await plugin.expose_ports(
+                kernel_obj,
+                str(container_bind_host),
+                [
+                    (host_port, container_port)
+                    for host_port, container_port in zip(host_ports, exposed_ports)
+                ],
+            )
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
