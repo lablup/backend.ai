@@ -208,7 +208,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline":
-                aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
+                session_id = request.headers.get("X-BackendAI-SessionID", "")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
                     jwt_secret = config["pipeline"]["jwt"]["secret"]
                     now = datetime.now().astimezone()
@@ -218,13 +218,12 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
-                        "aiohttp_session": aiohttp_session,
+                        "aiohttp_session": session_id,
                         "access_key": api_session.config.access_key,  # since 23.03.10
                     }
                     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
-                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
+                api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
