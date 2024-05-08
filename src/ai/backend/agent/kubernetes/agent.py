@@ -509,6 +509,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
         loop = current_loop()
         if self.restarting:
@@ -647,6 +648,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         image_labels = self.kernel_config["image"]["labels"]
         service_ports = kernel_obj.service_ports
