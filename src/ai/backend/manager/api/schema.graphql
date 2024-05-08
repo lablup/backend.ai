@@ -22,13 +22,19 @@ type Queries {
 
   """Added in 24.03.0."""
   group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
-  group(id: UUID!, domain_name: String): Group
+  group(
+    id: UUID!
+    domain_name: String
+
+    """Added in 24.03.0."""
+    type: [String] = ["GENERAL"]
+  ): Group
   groups_by_name(name: String!, domain_name: String): [Group]
   groups(
     domain_name: String
     is_active: Boolean
 
-    """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0."""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(
@@ -39,7 +45,7 @@ type Queries {
   ): Image
   images(is_installed: Boolean, is_operation: Boolean): [Image]
 
-  """Added since 24.03.1"""
+  """Added in 24.03.1"""
   customized_images: [ImageNode]
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
@@ -1003,7 +1009,7 @@ type Mutations {
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
 
@@ -1108,7 +1114,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added since 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0."""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -1118,7 +1124,7 @@ input GroupInput {
   integration_id: String = ""
   resource_policy: String = "default"
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   container_registry: JSONString = "{}"
 }
 
@@ -1140,7 +1146,7 @@ input ModifyGroupInput {
   integration_id: String
   resource_policy: String
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0"""
   container_registry: JSONString = "{}"
 }
 

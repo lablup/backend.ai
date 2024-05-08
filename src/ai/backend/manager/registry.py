@@ -3166,17 +3166,19 @@ class AgentRegistry:
 
     async def get_commit_status(
         self,
-        session: SessionRow,
-    ) -> Mapping[str, str]:
-        kern_id = str(session.main_kernel.id)
-        key = f"kernel.{kern_id}.commit"
-        result: Optional[bytes] = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(key),
-        )
+        kernel_ids: Sequence[KernelId],
+    ) -> Mapping[KernelId, str]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for kernel_id in kernel_ids:
+                await pipe.get(f"kernel.{kernel_id}.commit")
+            return pipe
+
+        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+
         return {
-            "kernel": kern_id,
-            "status": str(result, "utf-8") if result is not None else CommitStatus.READY.value,
+            kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
+            for kernel_id, result in zip(kernel_ids, commit_statuses)
         }
 
     async def commit_session(
