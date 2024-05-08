@@ -179,6 +179,7 @@ OP_EXC = {
     "get_logs_from_agent": KernelExecutionFailed,
     "refresh_session": KernelExecutionFailed,
     "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
 }
 
 
