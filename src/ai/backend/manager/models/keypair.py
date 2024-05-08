@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
@@ -60,11 +61,6 @@ __all__: Sequence[str] = (
     "query_bootstrap_script",
     "verify_dotfile_name",
 )
-
-_rolling_count_script = """
-local access_key = KEYS[1]
-return redis.call('ZCARD', access_key)
-"""
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
@@ -239,13 +235,11 @@ class KeyPair(graphene.ObjectType):
         redis_rlim = redis_helper.get_redis_object(
             ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
         )
-        ret = await redis_helper.execute_script(
-            redis_rlim,
-            "rollingcount",
-            _rolling_count_script,
-            [self.access_key],
-            [],
-        )
+
+        async def _zcard(r: Redis):
+            return await r.zcard(self.access_key)
+
+        ret = await redis_helper.execute(redis_rlim, _zcard)
         return int(ret) if ret is not None else 0
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
