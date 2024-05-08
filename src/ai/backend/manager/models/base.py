@@ -79,6 +79,8 @@ from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql.selectable import ScalarSelect
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -1364,18 +1366,30 @@ def _build_sql_stmt_from_connection_args(
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
         match pagination_order:
             case ConnectionPaginationOrder.FORWARD | None:
-                conditions.append(id_column > _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
-                )
+
+                def subq_to_condition(
+                    col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
+                ) -> WhereClauseType:
+                    condition_when_same_with_subq = (col == subquery) & (id_column > _id)
+                    if direction == OrderDirection.ASC:
+                        return (col > subquery) | condition_when_same_with_subq
+                    else:
+                        return (col < subquery) | condition_when_same_with_subq
             case ConnectionPaginationOrder.BACKWARD:
-                conditions.append(id_column < _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
-                )
+
+                def subq_to_condition(
+                    col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
+                ) -> WhereClauseType:
+                    condition_when_same_with_subq = (col == subquery) & (id_column < _id)
+                    if direction == OrderDirection.ASC:
+                        return (col < subquery) | condition_when_same_with_subq
+                    else:
+                        return (col > subquery) | condition_when_same_with_subq
+
         for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            stmt = stmt.where(set_subquery(col, subq, direction))
+            cond = subq_to_condition(col, subq, direction)
+            conditions.append(cond)
 
     if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
