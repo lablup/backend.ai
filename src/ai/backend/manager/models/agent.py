@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -22,15 +23,19 @@ from .base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
+    FilterExprArg,
     Item,
+    OrderExprArg,
     PaginatedList,
     ResourceSlotColumn,
     batch_result,
+    generate_sql_info_for_gql_connection,
     mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
 )
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
@@ -591,6 +596,145 @@ class AgentSummaryList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(AgentSummary, required=True)
+
+
+class AgentNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    status = graphene.String()
+    status_changed = GQLDateTime()
+    region = graphene.String()
+    scaling_group = graphene.String()
+    schedulable = graphene.Boolean()
+    available_slots = graphene.JSONString()
+    occupied_slots = graphene.JSONString()
+    addr = graphene.String()  # bind/advertised host:port
+    architecture = graphene.String()
+    first_contact = GQLDateTime()
+    lost_at = GQLDateTime()
+    live_stat = graphene.JSONString()
+    version = graphene.String()
+    compute_plugins = graphene.JSONString()
+    hardware_metadata = graphene.JSONString()
+    auto_terminate_abusing_kernel = graphene.Boolean()
+    local_config = graphene.JSONString()
+    container_count = graphene.Int()
+
+    @classmethod
+    def from_row(cls, row: AgentRow | None) -> AgentNode | None:
+        if row is None:
+            return None
+        return cls(
+            id=row.id,
+            status=row.status.name,
+            status_changed=row.status_changed,
+            region=row.region,
+            scaling_group=row.scaling_group,
+            schedulable=row.schedulable,
+            available_slots=row.available_slots.to_json(),
+            occupied_slots=row.occupied_slots.to_json(),
+            addr=row.addr,
+            architecture=row.architecture,
+            first_contact=row.first_contact,
+            lost_at=row.lost_at,
+            version=row.version,
+            compute_plugins=row.compute_plugins,
+            auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> AgentNode | None:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, agent_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(AgentRow).where(AgentRow.id == agent_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            agent_row = await db_session.scalar(query)
+            return cls.from_row(agent_row)
+
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", enum_field_getter(AgentStatus)),
+        "status_changed": ("status_changed", dtparse),
+        "region": ("region", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulabe", None),
+        "addr": ("addr", None),
+        "first_contact": ("first_contat", dtparse),
+        "lost_at": ("lost_at", dtparse),
+        "version": ("version", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", None),
+        "status_changed": ("status_changed", None),
+        "region": ("region", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulable", None),
+        "first_contact": ("first_contact", None),
+        "lost_at": ("lost_at", None),
+        "version": ("version", None),
+        "available_slots": ("available_slots", None),
+        "occupied_slots": ("occupied_slots", None),
+    }
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            AgentRow,
+            AgentRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(AgentRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(row) for row in user_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class AgentConnection(Connection):
+    class Meta:
+        node = AgentNode
 
 
 async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:

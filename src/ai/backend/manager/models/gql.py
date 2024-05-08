@@ -49,7 +49,15 @@ from ..api.exceptions import (
     TooManyKernelsFound,
 )
 from .acl import PredefinedAtomicPermission
-from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
+from .agent import (
+    Agent,
+    AgentConnection,
+    AgentList,
+    AgentNode,
+    AgentSummary,
+    AgentSummaryList,
+    ModifyAgent,
+)
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
@@ -302,6 +310,12 @@ class Queries(graphene.ObjectType):
         scaling_group=graphene.String(),
         status=graphene.String(),
     )
+
+    agent_node = graphene.Field(
+        AgentNode, id=graphene.String(required=True), description="Added in 24.09.0."
+    )
+
+    agent_nodes = PaginatedConnectionField(AgentConnection, description="Added in 24.09.0.")
 
     domain = graphene.Field(
         Domain,
@@ -817,6 +831,38 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentSummaryList(agent_list, total_count)
+
+    @staticmethod
+    async def resolve_agent_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> AgentNode | None:
+        return await AgentNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_agent_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await AgentNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     async def resolve_domain(
