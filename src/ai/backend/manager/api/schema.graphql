@@ -14,6 +14,12 @@ type Queries {
   agents(scaling_group: String, status: String): [Agent]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
+
+  """Added in 24.09.0."""
+  agent_node(id: String!): AgentNode
+
+  """Added in 24.09.0."""
+  agent_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AgentConnection
   domain(name: String): Domain
   domains(is_active: Boolean): [Domain]
 
@@ -272,6 +278,66 @@ type AgentSummaryList implements PaginatedList {
   total_count: Int!
 }
 
+type AgentNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  status: String
+  status_changed: DateTime
+  region: String
+  scaling_group: String
+  schedulable: Boolean
+  available_slots: JSONString
+  occupied_slots: JSONString
+  addr: String
+  architecture: String
+  first_contact: DateTime
+  lost_at: DateTime
+  live_stat: JSONString
+  version: String
+  compute_plugins: JSONString
+  hardware_metadata: JSONString
+  auto_terminate_abusing_kernel: Boolean
+  local_config: JSONString
+  container_count: Int
+}
+
+type AgentConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AgentEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""A Relay edge containing a `Agent` and its cursor."""
+type AgentEdge {
+  """The item at the end of the edge"""
+  node: AgentNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type Domain {
   name: String
   description: String
@@ -311,23 +377,6 @@ type UserConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """A Relay edge containing a `User` and its cursor."""
