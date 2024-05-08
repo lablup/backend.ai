@@ -1370,21 +1370,23 @@ def _build_sql_stmt_from_connection_args(
                 def subq_to_condition(
                     col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
                 ) -> WhereClauseType:
-                    condition_when_same_with_subq = (col == subquery) & (id_column > _id)
                     if direction == OrderDirection.ASC:
-                        return (col > subquery) | condition_when_same_with_subq
+                        cond = col > subquery
                     else:
-                        return (col < subquery) | condition_when_same_with_subq
+                        cond = col < subquery
+                    condition_when_same_with_subq = (col == subquery) & (id_column > _id)
+                    return cond | condition_when_same_with_subq
             case ConnectionPaginationOrder.BACKWARD:
 
                 def subq_to_condition(
                     col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
                 ) -> WhereClauseType:
-                    condition_when_same_with_subq = (col == subquery) & (id_column < _id)
                     if direction == OrderDirection.ASC:
-                        return (col < subquery) | condition_when_same_with_subq
+                        cond = col < subquery
                     else:
-                        return (col > subquery) | condition_when_same_with_subq
+                        cond = col > subquery
+                    condition_when_same_with_subq = (col == subquery) & (id_column < _id)
+                    return cond | condition_when_same_with_subq
 
         for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == _id).scalar_subquery()
