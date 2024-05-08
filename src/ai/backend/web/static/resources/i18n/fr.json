@@ -64,7 +64,8 @@
       "Data&Model": "Données",
       "InvalidBlankPassword": "Tapez votre mot de passe",
       "InvalidBlankEmail": "Entrer votre Email",
-      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas"
+      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas",
+      "MyEnvironments": "Mes environnements"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Vous pouvez exécuter votre code avec plusieurs nœuds et clusters pour faire évoluer votre idée.",
       "AddEnvironmentVariable": "Ajouter des variables d'environnement",
       "EnvironmentVariableValueRequired": "Veuillez saisir une valeur.",
-      "PleaseCompleteForm": "Le formulaire est incomplet ou contient des erreurs. Veuillez vérifier vos données."
+      "PleaseCompleteForm": "Le formulaire est incomplet ou contient des erreurs. Veuillez vérifier vos données.",
+      "FailedToStartNewSession": "La création de la session a échoué. \nVeuillez vérifier l'onglet « TERMINÉ » sur la page de la session."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -305,7 +307,8 @@
       "Prepared": "Préparé",
       "App": "Application",
       "NoExistingConnectionExample": "Aucun exemple de connexion à copier.",
-      "SSHConnectionExampleClipboardCopy": "L'exemple de connexion SSH a été copié dans le presse-papiers."
+      "SSHConnectionExampleClipboardCopy": "L'exemple de connexion SSH a été copié dans le presse-papiers.",
+      "ConnectUrlIsNotValid": "L'URL de connexion n'est pas valide."
     },
     "TensorboardPath": "Répertoire des journaux pour TensorBoard",
     "InputTensorboardPath": "Veuillez saisir le répertoire de journal auquel TensorBoard fera référence. Notez que le répertoire des journaux ne sera pas automatiquement créé.",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "Le mot de passe et la confirmation ne correspondent pas.",
     "NoChangeMade": "Aucune modification n'a été apportée",
     "Architecture": "Architecture",
-    "NoImageToDisplay": "Pas d'images à afficher"
+    "NoImageToDisplay": "Pas d'images à afficher",
+    "CustomizedImageSuccessfullyDeleted": "Image personnalisée supprimée avec succès."
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Il existe des paires de clés qui font référence à cette politique de ressources.",
     "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
-    "WrongAPIServerAddress": "Mauvaise adresse du serveur API."
+    "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
+    "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",

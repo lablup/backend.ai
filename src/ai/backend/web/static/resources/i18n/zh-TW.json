@@ -64,7 +64,8 @@
       "Data&Model": "數據",
       "InvalidBlankPassword": "輸入您的密碼",
       "InvalidBlankEmail": "輸入你的電子郵件信箱",
-      "DisMatchUserEmail": "使用者電子郵件不符"
+      "DisMatchUserEmail": "使用者電子郵件不符",
+      "MyEnvironments": "我的環境"
     },
     "YouAreOffline": "您現在離線",
     "YouAreOnline": "您現在在線",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "您可以使用多个节点和集群运行代码，以扩展您的想法",
       "AddEnvironmentVariable": "添加环境变量",
       "EnvironmentVariableValueRequired": "请输入数值。",
-      "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。"
+      "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。",
+      "FailedToStartNewSession": "會話創建失敗。\n請檢查會話頁面上的「已完成」標籤。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -305,7 +307,8 @@
       "Prepared": "準備好了",
       "NoExistingConnectionExample": "无连接示例可复制。",
       "SSHConnectionExampleClipboardCopy": "SSH 连接示例已复制到剪贴板。",
-      "App": "应用程序"
+      "App": "应用程序",
+      "ConnectUrlIsNotValid": "連線 URL 無效。"
     },
     "TensorboardPath": "TensorBoard 的日誌目錄",
     "InputTensorboardPath": "請輸入 TensorBoard 將引用的日誌目錄。請注意，日誌目錄不會自動創建..",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "密碼和確認不匹配。",
     "NoChangeMade": "未作改动",
     "Architecture": "建筑学",
-    "NoImageToDisplay": "无图像显示"
+    "NoImageToDisplay": "无图像显示",
+    "CustomizedImageSuccessfullyDeleted": "自訂圖片已成功刪除。"
   },
   "resourcePreset": {
     "ResourcePresets": "資源預設",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "存在引用该资源策略的密钥对。",
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
-    "WrongAPIServerAddress": "错误的 API 服务器地址。"
+    "WrongAPIServerAddress": "错误的 API 服务器地址。",
+    "ReachedResourceLimitPleaseContact": "已達到您的資源限制。\n請聯絡管理員。"
   },
   "maxLength": {
     "64chars": "（最多 64 個字符）",

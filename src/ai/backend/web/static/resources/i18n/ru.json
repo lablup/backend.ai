@@ -64,7 +64,8 @@
       "Data&Model": "Данные",
       "InvalidBlankPassword": "Введите ваш пароль",
       "InvalidBlankEmail": "Введите адрес электронной почты",
-      "DisMatchUserEmail": "Электронная почта пользователя не совпадает"
+      "DisMatchUserEmail": "Электронная почта пользователя не совпадает",
+      "MyEnvironments": "Моя среда"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -273,7 +274,8 @@
       "BatchModeDesc": "Вы можете запускать свой код на нескольких узлах и кластерах, чтобы масштабировать свою идею.",
       "AddEnvironmentVariable": "Добавьте переменные окружения",
       "EnvironmentVariableValueRequired": "Пожалуйста, введите значение.",
-      "PleaseCompleteForm": "Форма не заполнена или содержит ошибки. Пожалуйста, проверьте введенные данные."
+      "PleaseCompleteForm": "Форма не заполнена или содержит ошибки. Пожалуйста, проверьте введенные данные.",
+      "FailedToStartNewSession": "Создание сеанса не удалось. \nПожалуйста, проверьте вкладку «Законченный» на странице сеанса."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -307,7 +309,8 @@
       "Prepared": "Готовый",
       "App": "Приложение",
       "NoExistingConnectionExample": "Нет примера подключения для копирования.",
-      "SSHConnectionExampleClipboardCopy": "Пример подключения SSH скопирован в буфер обмена."
+      "SSHConnectionExampleClipboardCopy": "Пример подключения SSH скопирован в буфер обмена.",
+      "ConnectUrlIsNotValid": "URL-адрес подключения недействителен."
     },
     "TensorboardPath": "Каталог журналов для TensorBoard",
     "InputTensorboardPath": "Введите каталог журнала, на который будет ссылаться TensorBoard. Обратите внимание, что каталог журналов не будет создан автоматически.",
@@ -816,7 +819,8 @@
     "PasswordsDoNotMatch": "Пароль и подтверждение не совпадают.",
     "NoChangeMade": "Изменения не вносились",
     "Architecture": "Архитектура",
-    "NoImageToDisplay": "Нет изображений для отображения"
+    "NoImageToDisplay": "Нет изображений для отображения",
+    "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено."
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -1401,7 +1405,8 @@
     "ResourcePolicyStillReferenced": "Существуют пары ключей, которые ссылаются на данную ресурсную политику.",
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
-    "WrongAPIServerAddress": "Неверный адрес сервера API."
+    "WrongAPIServerAddress": "Неверный адрес сервера API.",
+    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",

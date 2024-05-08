@@ -74,6 +74,8 @@ __all__ = (
     "PreloadImage",
     "RescanImages",
     "ForgetImage",
+    "ForgetImageById",
+    "UntagImageFromRegistry",
     "ModifyImage",
     "AliasImage",
     "DealiasImage",
@@ -617,6 +619,19 @@ class Image(graphene.ObjectType):
         return await cls.batch_load_by_canonical(graph_ctx, image_names)
 
     @classmethod
+    async def load_item_by_id(
+        cls,
+        ctx: GraphQueryContext,
+        id: UUID,
+    ) -> Image:
+        async with ctx.db.begin_readonly_session() as session:
+            row = await ImageRow.get(session, id, load_aliases=True)
+            if not row:
+                raise ImageNotFound
+
+            return await cls.from_row(ctx, row)
+
+    @classmethod
     async def load_item(
         cls,
         ctx: GraphQueryContext,
@@ -749,6 +764,23 @@ class ImageNode(graphene.ObjectType):
         )
 
     @classmethod
+    def from_legacy_image(cls, row: Image) -> ImageNode:
+        return cls(
+            id=row.id,
+            name=row.name,
+            humanized_name=row.humanized_name,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.digest,
+            labels=row.labels,
+            size_bytes=row.size_bytes,
+            resource_limits=row.resource_limits,
+            supported_accelerators=row.supported_accelerators,
+        )
+
+    @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
         graph_ctx: GraphQueryContext = info.context
 
@@ -846,6 +878,7 @@ class ForgetImageById(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
@@ -853,16 +886,20 @@ class ForgetImageById(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> ForgetImageById:
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
         log.info("forget image {0} by API request", image_id)
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            try:
-                _image_id = UUID(image_id)
-            except ValueError:
-                raise ObjectNotFound("image")
-
             image_row = await ImageRow.get(session, _image_id)
             if not image_row:
                 raise ObjectNotFound("image")
@@ -876,7 +913,7 @@ class ForgetImageById(graphene.Mutation):
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImageById(ok=True, msg="")
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class ForgetImage(graphene.Mutation):
@@ -892,6 +929,7 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
@@ -922,7 +960,70 @@ class ForgetImage(graphene.Mutation):
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImage(ok=True, msg="")
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
+class UntagImageFromRegistry(graphene.Mutation):
+    """Added in 24.03.1"""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> UntagImageFromRegistry:
+        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("remove image from registry {0} by API request", str(_image_id))
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_readonly_session() as session:
+            image_row = await ImageRow.get(session, _image_id)
+            if not image_row:
+                raise ImageNotFound
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
+
+            registry_info = await ctx.shared_config.get_container_registry(
+                image_row.image_ref.registry
+            )
+            if registry_info.get("type", "") != "harbor2":
+                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
+        await scanner.untag(image_row.image_ref)
+
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class AliasImage(graphene.Mutation):
@@ -1077,7 +1178,7 @@ class ModifyImage(graphene.Mutation):
         )
         set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not None:
+        if props.resource_limits is not Undefined:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}

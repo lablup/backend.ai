@@ -64,7 +64,8 @@
       "Data&Model": "Өгөгдөл",
       "InvalidBlankPassword": "Нууц үгээ оруулна уу",
       "InvalidBlankEmail": "Имэйлээ оруулна уу",
-      "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна"
+      "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна",
+      "MyEnvironments": "Миний орчин"
     },
     "YouAreOffline": "Та одоо офлайн байна",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -260,7 +261,8 @@
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Кластерын хэмжээ 2-оос багагүй тохиолдолд зөвхөн бүхэл тоог зөвшөөрнө.",
       "StartAfter": "Дараа нь эхлэх:",
-      "StartTimeDoesNotApply": "Хэрэв эхлэх цагийг тохируулаагүй бол энэ нь хамаарахгүй."
+      "StartTimeDoesNotApply": "Хэрэв эхлэх цагийг тохируулаагүй бол энэ нь хамаарахгүй.",
+      "FailedToStartNewSession": "Сеанс үүсгэж чадсангүй. \nСеанс хуудасны 'Дууссан' табыг шалгана уу."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -294,7 +296,8 @@
       "Prepared": "Бэлтгэсэн",
       "App": "Апп",
       "NoExistingConnectionExample": "Хуулбарлах холболтын жишээ байхгүй.",
-      "SSHConnectionExampleClipboardCopy": "SSH холболтын жишээг санах ой руу хуулсан."
+      "SSHConnectionExampleClipboardCopy": "SSH холболтын жишээг санах ой руу хуулсан.",
+      "ConnectUrlIsNotValid": "Холбох URL буруу байна."
     },
     "TensorboardPath": "TensorBoard-ийн бүртгэлийн лавлах",
     "InputTensorboardPath": "TensorBoard-ийн лавлах лавлах санг оруулна уу. Бүртгэлийн лавлах автоматаар үүсгэхгүй гэдгийг анхаарна уу.",
@@ -798,7 +801,8 @@
     "PasswordsDoNotMatch": "Нууц үг ба баталгаажуулалт таарахгүй байна.",
     "NoChangeMade": "Өөрчлөлт ороогүй",
     "Architecture": "Архитектур",
-    "NoImageToDisplay": "Үзүүлэх зураг байхгүй"
+    "NoImageToDisplay": "Үзүүлэх зураг байхгүй",
+    "CustomizedImageSuccessfullyDeleted": "Тохируулсан зургийг амжилттай устгалаа."
   },
   "resourcePreset": {
     "ResourcePresets": "Нөөцийн урьдчилсан тохируулга",
@@ -1380,7 +1384,8 @@
     "UserNameAlreadyExist": "Хэрэглэгчийн нэр аль хэдийн байна. \nҮүнийг хуулбарлах боломжгүй.",
     "VirtualFolderAlreadyExist": "Ижил нэртэй виртуал хавтас аль хэдийн байна. \nӨөрийн фолдерыг устгах эсвэл урилгаас татгалзаарай.",
     "WrongAPIServerAddress": "API серверийн хаяг буруу байна.",
-    "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу."
+    "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу.",
+    "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу."
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",

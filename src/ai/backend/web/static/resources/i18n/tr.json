@@ -64,7 +64,8 @@
       "Data&Model": "Veri",
       "InvalidBlankPassword": "Şifrenizi girin",
       "InvalidBlankEmail": "E-postanızı giriniz",
-      "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor"
+      "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
+      "MyEnvironments": "Ortamlarım"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Fikrinizi ölçeklendirmek için kodunuzu birden fazla düğüm ve küme ile çalıştırabilirsiniz",
       "AddEnvironmentVariable": "Ortam değişkenleri ekleme",
       "EnvironmentVariableValueRequired": "Lütfen bir değer girin.",
-      "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin."
+      "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin.",
+      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -305,7 +307,8 @@
       "Prepared": "Hazırlanmış",
       "NoExistingConnectionExample": "Kopyalanacak Bağlantı Örneği Yok.",
       "SSHConnectionExampleClipboardCopy": "SSH Bağlantı Örneği panoya kopyalandı.",
-      "App": "Uygulama"
+      "App": "Uygulama",
+      "ConnectUrlIsNotValid": "Bağlantı URL'si geçerli değil."
     },
     "TensorboardPath": "TensorBoard için günlük dizini",
     "InputTensorboardPath": "Lütfen TensorBoard'un başvuracağı günlük dizinini girin. Günlük dizininin otomatik olarak oluşturulmayacağını unutmayın..",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "Şifre ve Onaylama eşleşmiyor.",
     "NoChangeMade": "Herhangi bir değişiklik yapılmadı",
     "Architecture": "Mimarlık",
-    "NoImageToDisplay": "Görüntülenecek Görüntü Yok"
+    "NoImageToDisplay": "Görüntülenecek Görüntü Yok",
+    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi."
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Bu kaynak ilkesine referans veren anahtar çiftleri vardır.",
     "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
     "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
-    "WrongAPIServerAddress": "Yanlış API sunucu adresi."
+    "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
+    "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",

@@ -64,7 +64,8 @@
       "Data&Model": "Δεδομένα",
       "InvalidBlankPassword": "Εισάγετε τον κωδικό σας",
       "InvalidBlankEmail": "Συμπληρώστε το email σας",
-      "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει"
+      "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
+      "MyEnvironments": "Τα περιβάλλοντα μου"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Μπορείτε να εκτελέσετε τον κώδικά σας με πολλαπλούς κόμβους & συστάδες για να κλιμακώσετε την ιδέα σας",
       "AddEnvironmentVariable": "Προσθήκη μεταβλητών περιβάλλοντος",
       "EnvironmentVariableValueRequired": "Παρακαλώ εισάγετε μια τιμή.",
-      "PleaseCompleteForm": "Το έντυπο είναι ελλιπές ή περιέχει σφάλματα. Παρακαλούμε ελέγξτε τα στοιχεία σας."
+      "PleaseCompleteForm": "Το έντυπο είναι ελλιπές ή περιέχει σφάλματα. Παρακαλούμε ελέγξτε τα στοιχεία σας.",
+      "FailedToStartNewSession": "Η δημιουργία συνεδρίας απέτυχε. \nΕλέγξτε την καρτέλα \"Πεπερασμένος\" στη σελίδα της συνεδρίας."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -305,7 +307,8 @@
       "Prepared": "Ετοιμος",
       "NoExistingConnectionExample": "Δεν υπάρχει σύνδεση Παράδειγμα προς αντιγραφή.",
       "SSHConnectionExampleClipboardCopy": "Το παράδειγμα σύνδεσης SSH έχει αντιγραφεί στο πρόχειρο.",
-      "App": "Εφαρμογή"
+      "App": "Εφαρμογή",
+      "ConnectUrlIsNotValid": "Η διεύθυνση URL σύνδεσης δεν είναι έγκυρη."
     },
     "TensorboardPath": "Κατάλογος καταγραφής για TensorBoard",
     "InputTensorboardPath": "Εισαγάγετε τον κατάλογο καταγραφής στον οποίο αναφέρεται το TensorBoard. Σημειώστε ότι ο κατάλογος καταγραφής δεν θα δημιουργηθεί αυτόματα ..",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "Ο κωδικός πρόσβασης και η επιβεβαίωση δεν ταιριάζουν.",
     "NoChangeMade": "Δεν έγιναν αλλαγές",
     "Architecture": "Αρχιτεκτονική",
-    "NoImageToDisplay": "Δεν εμφανίζονται εικόνες"
+    "NoImageToDisplay": "Δεν εμφανίζονται εικόνες",
+    "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς."
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Υπάρχουν ζεύγη κλειδιών που παραπέμπουν σε αυτή την πολιτική πόρων.",
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
-    "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API."
+    "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
+    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",

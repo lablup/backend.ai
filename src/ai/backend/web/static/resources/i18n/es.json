@@ -64,7 +64,8 @@
     "UpdateError": "Error de actualización",
     "UserHasNoGroup": "El usuario no tiene grupo. Póngase en contacto con el administrador para solucionarlo.",
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
-    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación."
+    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
+    "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador."
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -457,7 +458,8 @@
     "Status": "Estado",
     "SuccessfullyModified": "Modificado con éxito",
     "TakesTime": ". Lleva tiempo, así que tómate un café.",
-    "Version": "Versión"
+    "Version": "Versión",
+    "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -1009,7 +1011,8 @@
       "ConfirmAndRun": "Lo he comprobado y voy a empezar",
       "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
       "Prepared": "Preparado",
-      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles."
+      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles.",
+      "ConnectUrlIsNotValid": "La URL de conexión no es válida."
     },
     "core": "núcleo",
     "exportCSV": "exportar CSV",
@@ -1167,7 +1170,8 @@
       "BatchModeDesc": "Puedes ejecutar tu código con múltiples nodos y clusters para escalar tu idea",
       "AddEnvironmentVariable": "Añadir variables de entorno",
       "EnvironmentVariableValueRequired": "Por favor, introduzca un valor.",
-      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos."
+      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos.",
+      "FailedToStartNewSession": "Error al crear la sesión. \nPor favor marque la pestaña 'TERMINADO' en la página de la sesión."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1506,7 +1510,8 @@
       "Data&Model": "Datos",
       "InvalidBlankPassword": "Ingresa tu contraseña",
       "InvalidBlankEmail": "Introduce tu correo electrónico",
-      "DisMatchUserEmail": "El correo electrónico del usuario no coincide"
+      "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
+      "MyEnvironments": "Mis ambientes"
     }
   },
   "modelStore": {

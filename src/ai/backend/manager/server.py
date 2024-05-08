@@ -746,6 +746,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
                 root_ctx.shared_config.etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
+        case "etcetra":
+            from ai.backend.common.lock import EtcetraLock
+
+            return lambda lock_id, lifetime_hint: EtcetraLock(
+                str(lock_id),
+                root_ctx.shared_config.etcetra_etcd,
+                lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+            )
         case other:
             raise ValueError(f"Invalid lock backend: {other}")
 

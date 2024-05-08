@@ -64,7 +64,8 @@
       "Data&Model": "データ",
       "InvalidBlankPassword": "パスワードを入力してください",
       "InvalidBlankEmail": "メールアドレスを入力",
-      "DisMatchUserEmail": "ユーザーの電子メールが一致しません"
+      "DisMatchUserEmail": "ユーザーの電子メールが一致しません",
+      "MyEnvironments": "私の環境"
     },
     "YouAreOffline": "あなたは今オフラインです",
     "YouAreOnline": "あなたは今オンラインです",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
       "AddEnvironmentVariable": "環境変数の追加",
       "EnvironmentVariableValueRequired": "値を入力してください。",
-      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。"
+      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。",
+      "FailedToStartNewSession": "セッションの作成に失敗しました。\nセッションページの「終了しました」タブをご確認ください。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -305,7 +307,8 @@
       "Prepared": "準備",
       "NoExistingConnectionExample": "コピーする接続例がありません。",
       "SSHConnectionExampleClipboardCopy": "SSH接続例がクリップボードにコピーされました。",
-      "App": "アプリ"
+      "App": "アプリ",
+      "ConnectUrlIsNotValid": "接続 URL が無効です。"
     },
     "TensorboardPath": "TensorBoardのログディレクトリ",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "パスワードと確認が一致しません。",
     "NoChangeMade": "変更された部分はありません。",
     "Architecture": "アーキテクチャ",
-    "NoImageToDisplay": "画像情報がありません。"
+    "NoImageToDisplay": "画像情報がありません。",
+    "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "このリソース・ポリシーを参照するキー・ペアが存在する。",
     "SmallerResourceThenImageRequires": "リソース要求が画像に必要な最小値より小さい。より多くのリソースを試してください。",
     "APINotSupported": "APIはサポートされていません。最新バージョンのBackend.AIマネージャが必要です。",
-    "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。"
+    "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
+    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
