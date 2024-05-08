@@ -601,6 +601,7 @@ class AgentSummaryList(graphene.ObjectType):
 class AgentNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
+        description = "Added in 24.09.0."
 
     row_id = graphene.String()
     status = graphene.String()
