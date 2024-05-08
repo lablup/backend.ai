@@ -172,7 +172,7 @@ class KeyPair(graphene.ObjectType):
     last_used = GQLDateTime()
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
-    rolling_count = graphene.Int()
+    rolling_count = graphene.Int(description="Added in 24.09.0.")
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
