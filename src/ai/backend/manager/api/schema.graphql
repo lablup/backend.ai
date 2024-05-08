@@ -227,6 +227,12 @@ type ImageNode implements Node {
   size_bytes: BigInt
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
+
+  """Added in 24.09.0."""
+  owner_id: UUID
+
+  """Added in 24.09.0."""
+  user_email: String
 }
 
 type KVPair {
