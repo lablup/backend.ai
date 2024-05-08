@@ -5,7 +5,7 @@ import platform
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Collection, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, cast
 
 import aiohttp
 import async_timeout
@@ -962,6 +962,11 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                 },
             },
         }
+
+    async def expose_ports(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int]], **kwargs
+    ) -> None:
+        pass
 
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass
