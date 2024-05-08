@@ -1,0 +1,163 @@
+name: webserver release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release'
+        required: true
+
+jobs:
+  build-scies:
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest: intel
+        # linux-aarch64: aarch64 (self-hosted)
+        # macos-12: intel
+        # macos-13: apple silicon
+        os: [ubuntu-latest, linux-aarch64, macos-13-xlarge, macos-12-large]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - id: version
+      run: |
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.version.outputs.PATCH_VERSION }}
+    - name: Download webui release
+      run: |
+        scripts/download-webui-release.sh ${{ inputs.version }}
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Install coreutils for macOS
+      if: ${{ startsWith(matrix.os, 'macos') }}
+      run: brew install coreutils
+    - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
+      # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v8
+      with:
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'false'
+    - name: Write version file
+      run: |
+        "${{ inputs.version }}" > VERSION
+    - name: Build fat packages
+      run: |
+        pants --tag="scie" package src/ai/backend/web
+        # 'pants run' does not support parallelization
+        pants list --filter-tag-regex='checksum' src/ai/backend/web | xargs -n 1 pants run
+    - name: Clean up intermediate pex files
+      run: |
+        rm -rf dist/src.*/
+    - name: Upload scies
+      uses: actions/upload-artifact@v4
+      with:
+        name: scies-${{ matrix.os }}
+        path: dist/*
+    - name: Upload pants log
+      uses: actions/upload-artifact@v4
+      with:
+        name: pants-${{ matrix.os }}.build-scies.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  build-wheels:
+    runs-on: ubuntu-latest
+    steps:
+    - id: version
+      run: |
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.version.outputs.PATCH_VERSION }}
+    - name: Download webui release
+      run: |
+        scripts/download-webui-release.sh ${{ inputs.version }}
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v8
+      with:
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'false'
+    - name: Write version file
+      run: |
+        "${{ inputs.version }}" > VERSION
+    - name: Build wheel packages
+      run: |
+        # Build non-platform-specific wheels
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package src/ai/backend/web
+        # Build x86_64 wheels
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package src/ai/backend/web
+        # Build arm64 wheels
+        pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package src/ai/backend/web
+        ls -lh dist
+    - name: Upload wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheels
+        path: dist/*
+    - name: Upload pants log
+      uses: actions/upload-artifact@v4
+      with:
+        name: pants.build-wheels.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  make-final-release:
+    needs: [build-scies, build-wheels]
+    runs-on: ubuntu-latest
+    environment: deploy-to-pypi
+    steps:
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        name: wheels
+        path: dist
+    - name: Download scies
+      uses: actions/download-artifact@v4
+      with:
+        pattern: scies-*
+        path: dist
+        merge-multiple: true
+    - name: Upload GitHub release
+      run: |
+        gh release upload $(echo "${{ inputs.version }}" | cut -d'.' -f1-3) --clobber dist/*
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
