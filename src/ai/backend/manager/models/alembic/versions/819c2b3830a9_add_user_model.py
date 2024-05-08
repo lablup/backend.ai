@@ -5,6 +5,7 @@ Revises: 8e660aa31fe3
 Create Date: 2019-05-02 00:21:43.704843
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -29,7 +30,7 @@ branch_labels = None
 depends_on = None
 
 
-userrole_choices = list(map(lambda v: v.value, UserRole))
+userrole_choices = list(map(str, UserRole))
 userrole = postgresql.ENUM(*userrole_choices, name="userrole")
 
 
@@ -89,9 +90,12 @@ def upgrade():
     # ### Create users based on keypair.user_id & associate keypairs.user to user record ###
     # Get all keypairs
     connection = op.get_bind()
-    query = sa.select(
-        [keypairs.c.user_id, keypairs.c.access_key, keypairs.c.secret_key, keypairs.c.is_admin]
-    ).select_from(keypairs)
+    query = sa.select([
+        keypairs.c.user_id,
+        keypairs.c.access_key,
+        keypairs.c.secret_key,
+        keypairs.c.is_admin,
+    ]).select_from(keypairs)
     results = connection.execute(query).fetchall()
     for keypair in results:
         email = keypair["user_id"]

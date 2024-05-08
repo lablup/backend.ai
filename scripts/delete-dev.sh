@@ -34,6 +34,8 @@ usage() {
   echo "  ${LWHITE}--skip-containers${NC}  Skip removal of docker resources (default: false)"
   echo ""
   echo "  ${LWHITE}--skip-venvs${NC}       Skip removal of temporary virtualenvs (default: false)"
+  echo ""
+  echo "  ${LWHITE}--skip-db${NC}          Skip removal of volume resources (default: false)"
 }
 
 show_error() {
@@ -88,7 +90,7 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_VERSION="3.12.2"
 STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 if [ $(has_python "$bpython") -ne 0 ]; then
@@ -100,12 +102,14 @@ fi
 INSTALL_PATH="./backend.ai-dev"
 REMOVE_VENVS=1
 REMOVE_CONTAINERS=1
+REMOVE_DB=1
 
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
     --skip-venvs)          REMOVE_VENVS=0 ;;
     --skip-containers)     REMOVE_CONTAINERS=0 ;;
+    --skip-db)             REMOVE_DB=0 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -132,6 +136,11 @@ if [ $REMOVE_CONTAINERS -eq 1 ]; then
   fi
 else
   show_info "Skipped removal of Docker containers."
+fi
+
+if [ $REMOVE_DB -eq 1 ]; then
+  show_info "Removing data volumes..."
+  rm -rf volumes
 fi
 
 echo ""

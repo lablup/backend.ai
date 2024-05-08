@@ -9,28 +9,28 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 07:21+0000\n"
+"POT-Creation-Date: 2024-03-29 16:51+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.14.0\n"
 
 # dc7e45bc0f1e421188c938440a2f0caf
-#: ../../client/index.rst:2 410332e255014fe486cf9264e1effbb2
+#: ../../client/index.rst:2 833f59dfb3dc4f54a225cbc9daac7226
 msgid "Backend.AI Client SDK for Python"
 msgstr "Python용 Backend.AI 클라이언트 SDK"
 
 # b7cf23769a684d6192ecc9a581d20cc3
-#: ../../client/index.rst:4 aa8a385fc9c642d388b352029fa98d9d
+#: ../../client/index.rst:4 d907bfe3955447eca29488a95a7e80fe
 #, fuzzy
 msgid "Python 3.8 or higher is required."
 msgstr "Python 3.5.3 또는 그보다 최신 버전이 필요합니다."
 
 # 8ca1127c323949e48e7e663a602f97d4
-#: ../../client/index.rst:6 c6d00725f23042d6874b56d255be9bf9
+#: ../../client/index.rst:6 a24475ce4be74550b3b56449dae9025a
 msgid ""
 "You can download `its official installer from python.org "
 "<https://www.python.org/downloads/>`_, or use a 3rd-party package/version"
@@ -47,7 +47,7 @@ msgstr ""
 "macOS, Windows 환경에서 테스트되었습니다."
 
 # 3f48b69b5aaa4c9d99cb26f93cf8b67a
-#: ../../client/index.rst:12 41313da1028a4c0a86a1cd55a477cf74
+#: ../../client/index.rst:12 5f3045a610cc49c2927a4345b675b5f8
 msgid ""
 "We recommend to create a virtual environment for isolated, unobtrusive "
 "installation of the client SDK library and tools."
@@ -56,20 +56,33 @@ msgstr ""
 "environment)을 만드실 것을 권장합니다."
 
 # 4247c91bca0e46b490dd8828c9540ed9
-#: ../../client/index.rst:21 b84d3948399547c1ba8e4a7c78a402eb
+#: ../../client/index.rst:21 75d99ea74b6f41ef96ab3f60a6ec29fc
 msgid "Then install the client library from PyPI."
 msgstr "PyPI로부터 클라이언트 라이브러리를 설치합니다."
 
+#: ../../client/index.rst:30 433a5107145d40feb2f480fbfdefaff4
+msgid ""
+"We recommend to install the client library with the same version as the "
+"server. You can check the server version by visiting the server's webui, "
+"click the profile icon on the top-right corner, and then click the "
+"\"About Backend.AI\" menu. Then install the client library with the same "
+"version as the server."
+msgstr ""
+"서버와 동일한 버전의 클라이언트 라이브러리를 설치하는 것이 좋습니다. 서버 버전은 "
+"webui에 접속하신 후 우측 상단의 프로필 아이콘을 클릭하신 후 \"Backend.AI에 관하여\" 메뉴를 "
+"클릭하시면 확인하실 수 있습니다. 그런 다음 서버와 동일한 버전으로 클라이언트 라이브러리를 설치합니다."
+
 # 1914cd4407134b87896f0ddfbec6d922
-#: ../../client/index.rst:28 14c05f04711f449393522a0150a0cc7e
+#: ../../client/index.rst:38 3ccd74de431f44c7bad9a9b6491feee2
 msgid "Set your API keypair as environment variables:"
 msgstr "자신의 API keypair를 다음과 같이 환경변수에 설정합니다:"
 
 # e95d33615c444bfab3ba5208bcc99981
-#: ../../client/index.rst:35 d78a90204f3f400aa3268ffe4d19e6c2
+#: ../../client/index.rst:45 fcd58d182f9347baa1b0a3dc9c14f6fb
 msgid "And then try the first commands:"
 msgstr "그 다음엔 첫 명령어를 실행해봅니다:"
 
-#: ../../client/index.rst:44 6fd611230e3640fa849693dc296e6bc3
+#: ../../client/index.rst:54 9ec46d5e83fa4a7184d81f03b1090a52
 msgid "Check out more details with the below table of contents."
 msgstr ""
+

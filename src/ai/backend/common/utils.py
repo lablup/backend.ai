@@ -164,7 +164,7 @@ def nmget(
 
 
 def readable_size_to_bytes(expr: Any) -> BinarySize | Decimal:
-    if isinstance(expr, numbers.Real):
+    if isinstance(expr, numbers.Integral):
         return BinarySize(expr)
     return BinarySize.from_str(expr)
 

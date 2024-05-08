@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 
 from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound
@@ -31,18 +32,22 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     URLColumn,
+    set_if_set,
+    simple_db_mutate_returning_item,
 )
-from .image import ImageRow
+from .image import ImageNode, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
+from .user import UserRole
 
 if TYPE_CHECKING:
-    pass  # from .gql import GraphQueryContext
+    from .gql import GraphQueryContext
 
 __all__ = (
     "EndpointRow",
     "Endpoint",
     "EndpointLifecycle",
     "EndpointList",
+    "ModifyEndpoint",
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
@@ -77,7 +82,10 @@ class EndpointRow(Base):
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
     model = sa.Column(
-        "model", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
+        "model",
+        GUID,
+        sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
+        nullable=True,
     )
     model_mount_destiation = sa.Column(
         "model_mount_destiation",
@@ -118,7 +126,7 @@ class EndpointRow(Base):
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    url = sa.Column("url", sa.String(length=1024), unique=True)
+    url = sa.Column("url", sa.String(length=1024))
     resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     cluster_mode = sa.Column(
         "cluster_mode",
@@ -147,6 +155,12 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    created_user_row = relationship(
+        "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
+    )
+    session_owner_row = relationship(
+        "UserRow", back_populates="owned_endpoints", foreign_keys="EndpointRow.session_owner"
+    )
 
     def __init__(
         self,
@@ -204,6 +218,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_tokens=False,
         load_image=False,
+        load_created_user=False,
+        load_session_owner=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -215,6 +231,10 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -237,6 +257,8 @@ class EndpointRow(Base):
         load_routes=False,
         load_image=False,
         load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
     ) -> List["EndpointRow"]:
         query = (
@@ -250,6 +272,51 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if project:
+            query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
+    async def list_by_model(
+        cls,
+        session: AsyncSession,
+        model_id: uuid.UUID,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_routes=False,
+        load_image=False,
+        load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
+        status_filter=[EndpointLifecycle.CREATED],
+    ) -> List["EndpointRow"]:
+        query = (
+            sa.select(EndpointRow)
+            .order_by(sa.desc(EndpointRow.created_at))
+            .filter(
+                EndpointRow.lifecycle_stage.in_(status_filter) & (EndpointRow.model == model_id)
+            )
+        )
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -265,7 +332,9 @@ class EndpointTokenRow(Base):
 
     id = IDColumn()
     token = sa.Column("token", sa.String(), nullable=False)
-    endpoint = ForeignKeyIDColumn("endpoint", "endpoints.id")
+    endpoint = sa.Column(
+        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
+    )
     session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
     domain = sa.Column(
         "domain",
@@ -360,7 +429,8 @@ class Endpoint(graphene.ObjectType):
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String()
+    image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
+    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
@@ -368,8 +438,16 @@ class Endpoint(graphene.ObjectType):
     url = graphene.String()
     model = graphene.UUID()
     model_mount_destiation = graphene.String()
-    created_user = graphene.UUID()
-    session_owner = graphene.UUID()
+    created_user = graphene.UUID(
+        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+    )
+    created_user_email = graphene.String(description="Added at 23.09.8")
+    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner = graphene.UUID(
+        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+    )
+    session_owner_email = graphene.String(description="Added at 23.09.8")
+    session_owner_id = graphene.UUID(description="Added at 23.09.8")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -401,7 +479,8 @@ class Endpoint(graphene.ObjectType):
     ) -> "Endpoint":
         return cls(
             endpoint_id=row.id,
-            image=row.image_row.name,
+            # image="", # deprecated, row.image_object.name,
+            image_object=ImageNode.from_row(row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -410,7 +489,11 @@ class Endpoint(graphene.ObjectType):
             model=row.model,
             model_mount_destiation=row.model_mount_destiation,
             created_user=row.created_user,
+            created_user_id=row.created_user,
+            created_user_email=row.created_user_row.email,
             session_owner=row.session_owner,
+            session_owner_id=row.session_owner,
+            session_owner_email=row.session_owner_row.email,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,
@@ -425,7 +508,7 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
+            routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
         )
 
@@ -442,9 +525,10 @@ class Endpoint(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(EndpointRow)
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -476,11 +560,14 @@ class Endpoint(graphene.ObjectType):
             .offset(offset)
             .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
+            .options(selectinload(EndpointRow.created_user_row))
+            .options(selectinload(EndpointRow.session_owner_row))
             .order_by(sa.desc(EndpointRow.created_at))
             .filter(
-                EndpointRow.lifecycle_stage.in_(
-                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
-                )
+                EndpointRow.lifecycle_stage.in_([
+                    EndpointLifecycle.CREATED,
+                    EndpointLifecycle.DESTROYING,
+                ])
             )
         )
         if project is not None:
@@ -512,9 +599,15 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
-                session, project=project, domain=domain_name, user_uuid=user_uuid, load_image=True
+                session,
+                project=project,
+                domain=domain_name,
+                user_uuid=user_uuid,
+                load_image=True,
+                load_created_user=True,
+                load_session_owner=True,
             )
-        return [await Endpoint.from_row(ctx, row) for row in rows]
+            return [await Endpoint.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -539,23 +632,31 @@ class Endpoint(graphene.ObjectType):
                     project=project,
                     load_image=True,
                     load_routes=True,
+                    load_created_user=True,
+                    load_session_owner=True,
                 )
+                return await Endpoint.from_row(ctx, row)
         except NoResultFound:
             raise EndpointNotFound
-        return await Endpoint.from_row(ctx, row)
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
             return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
-        if (
-            len([r for r in self.routings if r.status == RouteStatus.HEALTHY.name])
-            == self.desired_session_count
-        ):
-            return "HEALTHY"
+        if (spawned_service_count := len([r for r in self.routings])) > 0:
+            healthy_service_count = len([
+                r for r in self.routings if r.status == RouteStatus.HEALTHY.name
+            ])
+            if healthy_service_count == spawned_service_count:
+                return "HEALTHY"
+            unhealthy_service_count = len([
+                r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
+            ])
+            if unhealthy_service_count > 0:
+                return "DEGRADED"
         return "PROVISIONING"
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
@@ -587,6 +688,119 @@ class EndpointList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(Endpoint, required=True)
+
+
+class ModifyEndpointInput(graphene.InputObjectType):
+    resource_slots = graphene.JSONString()
+    resource_opts = graphene.JSONString()
+    cluster_mode = graphene.String()
+    cluster_size = graphene.Int()
+    desired_session_count = graphene.Int()
+    image = ImageRefType()
+    name = graphene.String()
+    resource_group = graphene.String()
+    open_to_public = graphene.Boolean()
+
+
+class ModifyEndpoint(graphene.Mutation):
+    class Arguments:
+        endpoint_id = graphene.UUID(required=True)
+        props = ModifyEndpointInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added at 23.09.8")
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        endpoint_id: uuid.UUID,
+        props: ModifyEndpointInput,
+    ) -> "ModifyEndpoint":
+        graph_ctx: GraphQueryContext = info.context
+        data: dict[str, Any] = {}
+        set_if_set(
+            props,
+            data,
+            "resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "resource_opts")
+        set_if_set(props, data, "cluster_mode")
+        set_if_set(props, data, "cluster_size")
+        set_if_set(props, data, "desired_session_count")
+        set_if_set(props, data, "image")
+        set_if_set(props, data, "resource_group")
+        image = data.pop("image", None)
+
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            match graph_ctx.user["role"]:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    domain_name = graph_ctx.user["domain_name"]
+                    stmt = (
+                        sa.select(EndpointRow)
+                        .where(EndpointRow.id == endpoint_id)
+                        .where(EndpointRow.domain == domain_name)
+                    )
+                    endpoint_row = (await db_session.scalars(stmt)).first()
+                    if endpoint_row is None:
+                        raise EndpointNotFound
+                case _:
+                    user_id = graph_ctx.user["uuid"]
+                    stmt = (
+                        sa.select(EndpointRow)
+                        .where(EndpointRow.id == endpoint_id)
+                        .where(
+                            (EndpointRow.session_owner == user_id)
+                            | (EndpointRow.created_user == user_id)
+                        )
+                    )
+                    endpoint_row = (await db_session.scalars(stmt)).first()
+                    if endpoint_row is None:
+                        raise EndpointNotFound
+
+            if image is not None:
+                image_name = image["name"]
+                registry = image.get("registry") or ["*"]
+                arch = image.get("architecture")
+                if arch is not None:
+                    image_ref = ImageRef(image_name, registry, arch)
+                else:
+                    image_ref = ImageRef(
+                        image_name,
+                        registry,
+                    )
+                image_object = await ImageRow.resolve(db_session, [image_ref])
+                data["image"] = image_object.id
+
+        update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
+
+        async def _post(conn, result) -> EndpointRow:
+            endpoint = result.first()
+            try:
+                async with AsyncSession(conn) as session:
+                    row = await EndpointRow.get(
+                        session,
+                        endpoint_id=endpoint.id,
+                        domain=endpoint.domain,
+                        user_uuid=endpoint.created_user,
+                        project=endpoint.project,
+                        load_image=True,
+                        load_routes=True,
+                        load_created_user=True,
+                        load_session_owner=True,
+                    )
+                return row
+            except NoResultFound:
+                raise EndpointNotFound
+
+        return await simple_db_mutate_returning_item(
+            cls, graph_ctx, update_query, item_cls=Endpoint, post_func=_post
+        )
 
 
 class EndpointToken(graphene.ObjectType):
@@ -654,13 +868,6 @@ class EndpointToken(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> Sequence["EndpointToken"]:
-        log.debug(
-            "Endpoint: {}, project: {}, domain: {}, user: {}",
-            endpoint_id,
-            project,
-            domain_name,
-            user_uuid,
-        )
         query = (
             sa.select(EndpointTokenRow)
             .limit(limit)

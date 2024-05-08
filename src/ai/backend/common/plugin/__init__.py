@@ -12,7 +12,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
-from ..logging_utils import BraceStyleAdapter
+from ..logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -142,13 +142,9 @@ class BasePluginContext(Generic[P]):
     ) -> None:
         if allowlist is not None and blocklist is not None:
             if union := allowlist & blocklist:
-                raise ConfigurationError(
-                    {
-                        "plugin.BasePluginContext": (
-                            f"allowlist and blocklist has union value '{union}'"
-                        )
-                    }
-                )
+                raise ConfigurationError({
+                    "plugin.BasePluginContext": f"allowlist and blocklist has union value '{union}'"
+                })
         scanned_plugins = self.discover_plugins(
             self.plugin_group,
             allowlist=allowlist,

@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -31,7 +31,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -52,8 +52,6 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
-    - name: Check forbidden cross imports
-      run: pants dependencies '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -73,16 +71,16 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.lint.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: arc-runner-set
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -100,7 +98,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -136,15 +134,15 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.check.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -160,7 +158,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: maxnowack/local-cache@v1
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -173,7 +171,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -209,10 +207,10 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.test.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -235,7 +233,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -252,7 +250,7 @@ jobs:
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: brew install coreutils
     - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -292,9 +290,9 @@ jobs:
         cd dist-local-proxy
         ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: local-proxy
+        name: local-proxy-${{ matrix.os }}
         path: dist-local-proxy/*
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
@@ -311,15 +309,15 @@ jobs:
       run: |
         rm -rf dist/src.*/
     - name: Upload scies
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: scies
+        name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
+        name: pants-${{ matrix.os }}.build-scies.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
@@ -334,7 +332,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -347,7 +345,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -385,20 +383,15 @@ jobs:
         done
         ls -lh dist
     - name: Upload wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wheels
-        path: dist/*.whl
-    - name: Upload source tarballs
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*.tar.gz
+        path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
+        name: pants.build-wheels.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
   build-sbom:
@@ -419,7 +412,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Install towncrier requirements
@@ -433,22 +426,24 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: scies
+        pattern: scies-*
         path: dist
+        merge-multiple: true
     - name: Download local-proxy
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: local-proxy
+        pattern: local-proxy-*
         path: dist
+        merge-multiple: true
     - name: Download SBOM report
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: SBOM report
         path: dist
@@ -459,10 +454,98 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
+    - name: Extract stable release version
+      id: extract_stable_release_version
+      run: |
+        release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
+        echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
+    - name: Update stable installer shorten URL
+      if: ${{ !env.IS_PRERELEASE }} && ${{ vars.STABLE_RELEASE }} == ${{ steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      run: |
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
+        }'
+    - name: Extract edge release version
+      id: extract_edge_release_version
+      run: |
+        release_version=$(git branch -r | grep -E 'origin/[0-9]{2}\.[0-9]{2}$' | awk -F'/' '{print $2}' | sort -V | tail -n 1)
+        echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
+    - name: Update edge installer shorten URL
+      if: ${{ github.ref_name }} == ${{ steps.extract_edge_release_version.outputs.RELEASE_VERSION }}
+      run: |
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
+        }'
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels, make-final-release]
+    needs: [make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
@@ -472,7 +555,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: lfs-cache
       with:
           path: .git/lfs
@@ -487,7 +570,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
@@ -504,7 +587,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wheels
         path: dist

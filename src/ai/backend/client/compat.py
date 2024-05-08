@@ -35,13 +35,11 @@ def _cancel_all_tasks(loop):
         if task.cancelled():
             continue
         if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during asyncio.run() shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+            loop.call_exception_handler({
+                "message": "unhandled exception during asyncio.run() shutdown",
+                "exception": task.exception(),
+                "task": task,
+            })
 
 
 def _asyncio_run(coro, *, debug=False):
@@ -64,7 +62,7 @@ def _asyncio_run(coro, *, debug=False):
 if hasattr(asyncio, "run"):  # Python 3.7+
     asyncio_run = asyncio.run
 else:
-    asyncio_run = _asyncio_run
+    asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
 def asyncio_run_forever(server_context, *, debug=False):

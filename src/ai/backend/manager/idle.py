@@ -163,7 +163,7 @@ class ThresholdOperator(enum.Enum):
     OR = "or"
 
 
-class RemainingTimeType(str, enum.Enum):
+class RemainingTimeType(enum.StrEnum):
     GRACE_PERIOD = "grace_period"
     EXPIRE_AFTER = "expire_after"
 
@@ -259,18 +259,16 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.access_key,
-                        kernels.c.session_id,
-                        kernels.c.session_type,
-                        kernels.c.created_at,
-                        kernels.c.occupied_slots,
-                        kernels.c.cluster_size,
-                        users.c.created_at.label("user_created_at"),
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.access_key,
+                    kernels.c.session_id,
+                    kernels.c.session_type,
+                    kernels.c.created_at,
+                    kernels.c.occupied_slots,
+                    kernels.c.cluster_size,
+                    users.c.created_at.label("user_created_at"),
+                ])
                 .select_from(j)
                 .where(
                     (kernels.c.status.in_(LIVE_STATUS))
@@ -285,12 +283,10 @@ class IdleCheckerHost:
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
-                        sa.select(
-                            [
-                                keypair_resource_policies.c.max_session_lifetime,
-                                keypair_resource_policies.c.idle_timeout,
-                            ]
-                        )
+                        sa.select([
+                            keypair_resource_policies.c.max_session_lifetime,
+                            keypair_resource_policies.c.idle_timeout,
+                        ])
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -539,7 +535,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
-        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
+        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
         self._evhandlers = [
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
@@ -759,7 +755,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds", default=None): t.Null | t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -776,7 +773,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
-    slot_resource_map: Mapping[str, Set[str]] = {
+    slot_prefix_to_utilization_metric_map: Mapping[str, Set[str]] = {
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
@@ -792,16 +789,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
             }
         else:
             resources: list[str] = []
-            for r in self.slot_resource_map.values():
+            for r in self.slot_prefix_to_utilization_metric_map.values():
                 resources = [*resources, *r]
             self.resource_thresholds = {r: None for r in resources}
         self.thresholds_check_operator: ThresholdOperator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join(
-            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
-        )
+        thresholds_log = " ".join([
+            f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()
+        ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '
@@ -892,16 +889,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
         # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
-        unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
-        for k, v in occupied_slots.items():
-            unique_key = k.split(".")[0]
-            unique_res_map[unique_key] += v
+        unique_res_map: DefaultDict[str, Decimal] = defaultdict(Decimal)
+        for slot_name, alloc in occupied_slots.items():
+            unique_key = slot_name.split(".")[0]
+            unique_res_map[unique_key] += alloc
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for slot in unique_res_map:
-            if unique_res_map[slot] == 0:
-                unavailable_resources.update(self.slot_resource_map[slot])
+        for slot_prefix, util_metric in self.slot_prefix_to_utilization_metric_map.items():
+            if unique_res_map.get(slot_prefix, 0) == 0:
+                unavailable_resources.update(util_metric)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:

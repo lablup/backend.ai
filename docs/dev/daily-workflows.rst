@@ -178,7 +178,7 @@ To (re-)generate the virtualenv(s), run:
 
     $ pants export --resolve=RESOLVE_NAME  # you may add multiple --resolve options
 
-You may display the available resolve names by (the command works with Python 3.11 or later):
+You may display the available resolve names by (the command works with Python 3.12 or later):
 
 .. code-block:: console
 
@@ -188,7 +188,7 @@ Similarly, you can export all virtualenvs at once:
 
 .. code-block:: console
 
-    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs ./pants export
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
@@ -209,22 +209,19 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
 * ``ruff``: Provides a fast linting (combining pylint, flake8, and isort)
-  and formatting (auto-fix for some linting rules and isort)
+  fixing (auto-fix for some linting rules and isort) and formatting (black)
 
 * ``mypy``: Validates the type annotations and performs a static analysis
-
-* ``black``: Validates and reformats all Python codes by reconstructing it from AST,
-  just like ``gofmt``.
 
   .. tip::
 
      For a long list of arguments or list/tuple items, you could explicitly add a
-     trailing comma to force Black to insert line-breaks after every item even when
+     trailing comma to force Ruff/Black to insert line-breaks after every item even when
      the line length does not exceed the limit (100 characters).
 
   .. tip::
@@ -246,9 +243,11 @@ Install the following extensions:
 
    * Python (``ms-python.python``)
    * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
-   * Black (``ms-python.black-formatter``)
    * Mypy (``ms-python.mypy-type-checker``)
    * Ruff (``charliermarsh.ruff``)
+   * For other standard Python extensions like Flake8, isort, and Black,
+     *disable* them for the Backend.AI workspace only to prevent interference
+     with Ruff's own linting, fixing and formatting.
 
 Set the workspace settings for the Python extension for code navigation and auto-completion:
 
@@ -260,11 +259,13 @@ Set the workspace settings for the Python extension for code navigation and auto
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+     - ``["dist/export/python/virtualenvs/python-default/3.12.2/lib/python3.12/site-packages"]``
    * - ``python.analysis.importFormat``
      - ``"relative"``
    * - ``editor.formatOnSave``
      - ``true``
+   * - ``editor.codeActionsOnSave``
+     - ``{"source.fixAll": true}``
 
 Set the following keys in the workspace settings to configure Python tools:
 
@@ -273,14 +274,14 @@ Set the following keys in the workspace settings to configure Python tools:
 
    * - Setting ID
      - Example value
-   * - ``{mypy-type-checker,black-formatter}.interpreter``
-     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.4/bin/python"]``
-   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+   * - ``mypy-type-checker.interpreter``
+     - ``["dist/export/python/virtualenvs/mypy/3.12.2/bin/python"]``
+   * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/python"]``
-   * - ``ruff.path``
-     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.12.2/bin/python"]``
+   * - ``ruff.importStrategy``
+     - ``"fromEnvironment"``
 
 .. note:: **Changed in July 2023**
 
@@ -308,11 +309,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
-   let g:ale_linters = { "python": ['ruff', 'black', 'mypy'] }
-   let g:ale_fixers = {'python': ['ruff', 'black']}
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff'
+   let g:ale_linters = { "python": ['ruff', 'mypy'] }
+   let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
 
 When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
@@ -323,42 +323,20 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 .. code-block:: json
 
    {
-     "coc.preferences.formatOnType": true,
-     "coc.preferences.formatOnSaveFiletypes": [],  // Use the autocmd config
+     "coc.preferences.formatOnType": false,
      "coc.preferences.willSaveHandlerTimeout": 5000,
      "ruff.enabled": true,
-     "ruff.autoFixOnSave": false,  // Use the autocmd config
+     "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
-     "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.12.2/bin/python",
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
 after opening any Python source file to install the ``ruff-lsp`` server.
-
-Unfortunately, CoC does not support applying multiple formatters on save, we should call
-them serially using ``autocmd``.
-To configure it, put the following vimscript as ``.exrc`` in the working copy root:
-
-.. code-block:: vim
-
-   function! OrganizeAndFormat()
-       CocCommand ruff.executeOrganizeImports
-       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
-       sleep 50m  " to avoid races
-       call CocAction('format')
-       sleep 50m
-   endfunction
-
-   augroup autofix
-       autocmd!
-       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | endif
-   augroup END
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -562,6 +540,49 @@ Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'
    may be owned by root and running ``pants`` as the user privilege would not work.
    In such cases, remove the directories with ``sudo`` and retry.
 
+Resolve the error message 'Pants is not abailable for your platform', When installing Backend.AI with pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When installing Backend.AI, you may find the following error message saying 'Pants is not available for your platform' if you have installed Pants 2.17 or older with prior versions of Backend.AI.
+
+.. code-block:: text
+
+   [INFO] Bootstrapping the Pants build system...
+   Pants system command is already installed.
+   Failed to fetch https://binaries.pantsbuild.org/tags/pantsbuild.pants/release_2.19.0: [22] HTTP response code said error (The requested URL returned error: 404)
+   Bootstrapping Pants 2.19.0 using cpython 3.9.15
+   Installing pantsbuild.pants==2.19.0 into a virtual environment at /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.4/65.4 KB 3.3 MB/s eta 0:00:00
+   ERROR: Could not find a version that satisfies the requirement pantsbuild.pants==2.19.0 (from versions: 0.0.17, 0.0.18, 0.0.20, 0.0.21, 0.0.22, ... (a long list of versions) ..., 2.17.0,
+   2.17.1rc0, 2.17.1rc1, 2.17.1rc2, 2.17.1rc3, 2.17.1, 2.18.0.dev0, 2.18.0.dev1, 2.18.0.dev3, 2.18.0.dev4, 2.18.0.dev5, 2.18.0.dev6, 2.18.0.dev7, 2.18.0a0)
+   ERROR: No matching distribution found for pantsbuild.pants==2.19.0
+   Install failed: Command '['/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/bin/python', '-sE', '-m', 'pip', '--disable-pip-versi
+   on-check', '--no-python-version-warning', '--log', PosixPath('/home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/venvs/2.19.0/pants-install.log'
+   ), 'install', '--quiet', '--find-links', 'file:///home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/find_links/2.19.0/e430175b/index.html', '--p
+   rogress-bar', 'off', 'pantsbuild.pants==2.19.0']' returned non-zero exit status 1.
+   More information can be found in the log at: /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/bindings/logs/install.log
+
+   Error: Isolates your Pants from the elements.
+
+   Please select from the following boot commands:
+
+   <default>: Detects the current Pants installation and launches it.
+   bootstrap-tools: Introspection tools for the Pants bootstrap process.
+   pants: Runs a hermetic Pants installation.
+   pants-debug: Runs a hermetic Pants installation with a debug server for debugging Pants code.
+   update: Update scie-pants.
+
+   You can select a boot command by passing it as the 1st argument or else by setting the SCIE_BOOT environment variable.
+
+   ERROR: Failed to establish atomic directory /home/aaa/.cache/nce/bad1ad5b44f41a6ca9c99a135f9af8849a3b93ec5a018c7b2d13acaf0a969e3a/locks/install-a4f15e2d2c97473883ec33b4ee0f9d11f99dcf5bee63
+   8b1cc7a0270d55d0ec8d. Population of work directory failed: Boot binding command failed: exit status: 1
+
+   [ERROR] Cannot proceed the installation because Pants is not available for your platform!
+
+To resolve this error, `reinstall or upgrade Pants <https://www.pantsbuild.org/2.19/docs/getting-started/installing-pants>`_.
+As of the Pants 2.18.0 release, they no longer use the Python Package Index but GitHub releases to distribute the binary builds.
+
+
 Resolving missing directories error when running Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -696,6 +717,21 @@ Making a new release
 
 * Push the commit and tag.  The GitHub Actions workflow will build the packages
   and publish them to PyPI.
+
+* When making a new major release, snapshot of prior release's final DB migration history
+  should be dumped. This will later help to fill out missing gaps of DB revisions when
+  upgrading outdated cluster. The output then should be committed to **next** major release.
+
+  .. code-block:: console
+
+      $ ./backend.ai mgr schema dump-history > src/ai/backend/manager/models/alembic/revision_history/<version>.json
+
+  Suppose you are trying to create both fresh baked 24.09.0 and good old 24.03.10 releases.
+  In such cases you should first make a release of version 24.03.10, move back to latest branch, and then
+  execute code snippet above with `<version>` set as `24.03.10`, and release 24.09.0 including the dump.
+
+  To make workflow above effective, be aware that backporting DB revisions to older major releases will no longer
+  be permitted after major release version is switched.
 
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

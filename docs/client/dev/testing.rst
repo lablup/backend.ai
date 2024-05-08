@@ -68,7 +68,7 @@ random identifiers.
 
 .. tip::
 
-   The *halfstack* configuration and the ``example-keypairs.json`` fixture is compatible with this
+   The *halfstack* configuration and the ``example-users.json``, ``example-keypairs.json``, ``example-set-user-main-access-keys.json`` fixture is compatible with this
    integration test suite.
 
 

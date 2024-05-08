@@ -14,11 +14,9 @@ def test_auth():
     random_msg = uuid.uuid4().hex
     with Session():
         request = Request("GET", "/auth")
-        request.set_json(
-            {
-                "echo": random_msg,
-            }
-        )
+        request.set_json({
+            "echo": random_msg,
+        })
         with request.fetch() as resp:
             assert resp.status == 200
             data = resp.json()
@@ -69,11 +67,9 @@ async def test_async_auth():
     random_msg = uuid.uuid4().hex
     async with AsyncSession():
         request = Request("GET", "/auth")
-        request.set_json(
-            {
-                "echo": random_msg,
-            }
-        )
+        request.set_json({
+            "echo": random_msg,
+        })
         async with request.fetch() as resp:
             assert resp.status == 200
             data = await resp.json()

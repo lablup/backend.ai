@@ -4,7 +4,9 @@ import threading
 import time
 from pathlib import Path
 
-from ai.backend.common.logging import BraceStyleAdapter, Logger
+import trafaret as t
+
+from ai.backend.common.logging import BraceStyleAdapter, LocalLogger, Logger
 
 test_log_config = {
     "level": "DEBUG",
@@ -18,25 +20,6 @@ test_log_config = {
 test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
-
-
-def get_logger_thread():
-    for t in threading.enumerate():
-        if t.name == "Logger":
-            return t
-    return None
-
-
-def test_logger(unused_tcp_port):
-    test_log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_endpoint = f"ipc://{test_log_path}"
-    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
-    with logger:
-        assert test_log_path.exists()
-        log.warning("blizzard warning {}", 123)
-        assert get_logger_thread() is not None
-    assert not test_log_path.exists()
-    assert get_logger_thread() is None
 
 
 class NotPicklableClass:
@@ -57,18 +40,69 @@ class NotUnpicklableClass:
         return type(self), (1,)
 
 
-def test_logger_not_picklable():
+def get_logger_thread() -> threading.Thread | None:
+    for thread in threading.enumerate():
+        if thread.name == "Logger":
+            return thread
+    return None
+
+
+def test_logger(unused_tcp_port, capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
     with logger:
-        # The following line should not throw an error.
+        assert test_log_path.exists()
+        log.warning("blizzard warning {}", 123)
+        assert get_logger_thread() is not None
+    assert not test_log_path.exists()
+    assert get_logger_thread() is None
+    captured = capsys.readouterr()
+    assert "blizzard warning 123" in captured.err
+
+
+def test_local_logger(capsys):
+    logger = LocalLogger(test_log_config)
+    with logger:
+        log.warning("blizzard warning {}", 456)
+        assert get_logger_thread() is None
+    assert get_logger_thread() is None
+    captured = capsys.readouterr()
+    assert "blizzard warning 456" in captured.err
+
+
+def test_logger_not_picklable(capsys):
+    test_log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_endpoint = f"ipc://{test_log_path}"
+    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    with logger:
         log.warning("blizzard warning {}", NotPicklableClass())
     assert not test_log_path.exists()
     assert get_logger_thread() is None
+    captured = capsys.readouterr()
+    assert "blizzard warning" in captured.err
+    assert "NotPicklableClass" in captured.err
 
 
-def test_logger_not_unpicklable():
+def test_logger_trafaret_dataerror(capsys):
+    test_log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_endpoint = f"ipc://{test_log_path}"
+    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    with logger:
+        try:
+            iv = t.Int()
+            iv.check("x")
+        except t.DataError:
+            log.exception("simulated dataerror")
+    assert not test_log_path.exists()
+    assert get_logger_thread() is None
+    captured = capsys.readouterr()
+    assert "simulated dataerror" in captured.err
+    assert "Traceback (most recent call last)" in captured.err
+    assert "value can't be converted to int" in captured.err
+
+
+def test_logger_not_unpicklable(capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
@@ -78,3 +112,6 @@ def test_logger_not_unpicklable():
         assert get_logger_thread() is not None, "logger thread must be alive"
     assert not test_log_path.exists()
     assert get_logger_thread() is None
+    captured = capsys.readouterr()
+    assert "blizzard warning" in captured.err
+    assert "NotUnpicklableClass" in captured.err
