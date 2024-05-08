@@ -1094,6 +1094,7 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
