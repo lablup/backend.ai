@@ -28,6 +28,7 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
+etcd-client-py==0.3.0
 etcetra~=0.1.19
 faker~=24.7.1
 graphene~=3.3.0
@@ -59,6 +60,7 @@ PyYAML~=6.0
 pydantic~=2.6.4
 packaging>=21.3
 hiredis>=2.2.3
+raftify==0.1.65
 redis[hiredis]==4.5.5
 rich~=13.6
 SQLAlchemy[postgresql_asyncpg]~=1.4.40
@@ -97,5 +99,3 @@ types-tabulate
 backend.ai-krunner-alpine==5.2.0
 backend.ai-krunner-static-gnu==4.2.0
 
-etcd-client-py==0.3.0
-raftify==0.1.65

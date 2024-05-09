@@ -1136,7 +1136,6 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
-
                 if cfg["manager"]["event-loop"] == "uvloop":
                     import uvloop
 

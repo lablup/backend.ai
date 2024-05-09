@@ -47,12 +47,15 @@ class RaftGlobalTimer(AbstractGlobalTimer):
         event_factory: Callable[[], AbstractEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
+        *,
+        task_name: str | None = None,
     ) -> None:
         self._event_producer = event_producer
         self._event_factory = event_factory
         self._stopped = False
         self.interval = interval
         self.initial_delay = initial_delay
+        self.task_name = task_name
         self.raft_node = raft_node
 
     async def generate_tick(self) -> None:
@@ -76,6 +79,8 @@ class RaftGlobalTimer(AbstractGlobalTimer):
 
     async def join(self) -> None:
         self._tick_task = asyncio.create_task(self.generate_tick())
+        if self.task_name is not None:
+            self._tick_task.set_name(self.task_name)
 
     async def leave(self) -> None:
         self._stopped = True

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Configuration Schema on etcd
 ----------------------------
@@ -173,6 +171,8 @@ Alias keys are also URL-quoted in the same way.
      + nodes
        - {instance-id}: 1  # just a membership set
 """
+
+from __future__ import annotations
 
 import json
 import logging

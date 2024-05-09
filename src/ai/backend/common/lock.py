@@ -4,10 +4,9 @@ import abc
 import asyncio
 import fcntl
 import logging
-from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Mapping, Optional
 
 import trafaret as t
 from etcd_client import Client as EtcdClient

@@ -226,6 +226,7 @@ class SchedulerDispatcher(aobject):
                 self.event_producer,
                 lambda: DoScheduleEvent(),
                 interval=10.0,
+                task_name="schedule_timer",
             )
             self.prepare_timer = RaftGlobalTimer(
                 self.raft_ctx.raft_node,
@@ -233,6 +234,7 @@ class SchedulerDispatcher(aobject):
                 lambda: DoPrepareEvent(),
                 interval=10.0,
                 initial_delay=5.0,
+                task_name="prepare_timer",
             )
             self.scale_timer = RaftGlobalTimer(
                 self.raft_ctx.raft_node,
@@ -240,6 +242,7 @@ class SchedulerDispatcher(aobject):
                 lambda: DoScaleEvent(),
                 interval=10.0,
                 initial_delay=7.0,
+                task_name="scale_timer",
             )
         else:
             self.schedule_timer = DistributedLockGlobalTimer(
@@ -247,6 +250,7 @@ class SchedulerDispatcher(aobject):
                 self.event_producer,
                 lambda: DoScheduleEvent(),
                 interval=10.0,
+                task_name="schedule_timer",
             )
             self.prepare_timer = DistributedLockGlobalTimer(
                 self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
@@ -254,6 +258,7 @@ class SchedulerDispatcher(aobject):
                 lambda: DoPrepareEvent(),
                 interval=10.0,
                 initial_delay=5.0,
+                task_name="prepare_timer",
             )
             self.scale_timer = DistributedLockGlobalTimer(
                 self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
@@ -261,12 +266,12 @@ class SchedulerDispatcher(aobject):
                 lambda: DoScaleEvent(),
                 interval=10.0,
                 initial_delay=7.0,
+                task_name="scale_timer",
             )
 
         await self.schedule_timer.join()
         await self.prepare_timer.join()
         await self.scale_timer.join()
-
         log.info("Session scheduler started")
 
     async def close(self) -> None:
@@ -274,6 +279,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.scale_timer.leave())
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
+        await self.redis_live.close()
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -358,23 +364,6 @@ class SchedulerDispatcher(aobject):
                         datetime.now(tzutc()).isoformat(),
                     ),
                 )
-                result = await db_sess.execute(query)
-                schedulable_scaling_groups = [row.scaling_group for row in result.fetchall()]
-            for sgroup_name in schedulable_scaling_groups:
-                try:
-                    await self._schedule_in_sgroup(
-                        sched_ctx,
-                        sgroup_name,
-                    )
-                except InstanceNotAvailable as e:
-                    # Proceed to the next scaling group and come back later.
-                    log.debug(
-                        "schedule({}): instance not available ({})",
-                        sgroup_name,
-                        e.extra_msg,
-                    )
-                except Exception as e:
-                    log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -1324,90 +1313,91 @@ class SchedulerDispatcher(aobject):
             known_slot_types,
         )
         try:
-            now = datetime.now(tzutc())
+            async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
+                now = datetime.now(tzutc())
 
-            async def _mark_session_preparing() -> Sequence[SessionRow]:
-                async with self.db.begin_session() as db_sess:
-                    update_query = (
-                        sa.update(KernelRow)
-                        .values(
-                            status=KernelStatus.PREPARING,
-                            status_changed=now,
-                            status_info="",
-                            status_data={},
-                            status_history=sql_json_merge(
-                                KernelRow.status_history,
-                                (),
-                                {
-                                    KernelStatus.PREPARING.name: now.isoformat(),
-                                },
+                async def _mark_session_preparing() -> Sequence[SessionRow]:
+                    async with self.db.begin_session() as db_sess:
+                        update_query = (
+                            sa.update(KernelRow)
+                            .values(
+                                status=KernelStatus.PREPARING,
+                                status_changed=now,
+                                status_info="",
+                                status_data={},
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
+                            )
+                            .where(
+                                (KernelRow.status == KernelStatus.SCHEDULED),
+                            )
+                        )
+                        await db_sess.execute(update_query)
+                        update_sess_query = (
+                            sa.update(SessionRow)
+                            .values(
+                                status=SessionStatus.PREPARING,
+                                # status_changed=now,
+                                status_info="",
+                                status_data={},
+                                status_history=sql_json_merge(
+                                    SessionRow.status_history,
+                                    (),
+                                    {
+                                        SessionStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
+                            )
+                            .where(SessionRow.status == SessionStatus.SCHEDULED)
+                            .returning(SessionRow.id)
+                        )
+                        rows = (await db_sess.execute(update_sess_query)).fetchall()
+                        if len(rows) == 0:
+                            return []
+                        target_session_ids = [r["id"] for r in rows]
+                        select_query = (
+                            sa.select(SessionRow)
+                            .where(SessionRow.id.in_(target_session_ids))
+                            .options(
+                                noload("*"),
+                                selectinload(SessionRow.kernels).noload("*"),
+                            )
+                        )
+                        result = await db_sess.execute(select_query)
+                        return result.scalars().all()
+
+                scheduled_sessions: Sequence[SessionRow]
+                scheduled_sessions = await execute_with_retry(_mark_session_preparing)
+                log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
+                async with (
+                    async_timeout.timeout(delay=50.0),
+                    aiotools.PersistentTaskGroup() as tg,
+                ):
+                    for scheduled_session in scheduled_sessions:
+                        await self.registry.event_producer.produce_event(
+                            SessionPreparingEvent(
+                                scheduled_session.id,
+                                scheduled_session.creation_id,
                             ),
                         )
-                        .where(
-                            (KernelRow.status == KernelStatus.SCHEDULED),
+                        tg.create_task(
+                            self.start_session(
+                                sched_ctx,
+                                scheduled_session,
+                            )
                         )
-                    )
-                    await db_sess.execute(update_query)
-                    update_sess_query = (
-                        sa.update(SessionRow)
-                        .values(
-                            status=SessionStatus.PREPARING,
-                            # status_changed=now,
-                            status_info="",
-                            status_data={},
-                            status_history=sql_json_merge(
-                                SessionRow.status_history,
-                                (),
-                                {
-                                    SessionStatus.PREPARING.name: now.isoformat(),
-                                },
+
+                        await redis_helper.execute(
+                            self.redis_live,
+                            lambda r: r.hset(
+                                redis_key, "resource_group", scheduled_session.scaling_group_name
                             ),
                         )
-                        .where(SessionRow.status == SessionStatus.SCHEDULED)
-                        .returning(SessionRow.id)
-                    )
-                    rows = (await db_sess.execute(update_sess_query)).fetchall()
-                    if len(rows) == 0:
-                        return []
-                    target_session_ids = [r["id"] for r in rows]
-                    select_query = (
-                        sa.select(SessionRow)
-                        .where(SessionRow.id.in_(target_session_ids))
-                        .options(
-                            noload("*"),
-                            selectinload(SessionRow.kernels).noload("*"),
-                        )
-                    )
-                    result = await db_sess.execute(select_query)
-                    return result.scalars().all()
-
-            scheduled_sessions: Sequence[SessionRow]
-            scheduled_sessions = await execute_with_retry(_mark_session_preparing)
-            log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
-            async with (
-                async_timeout.timeout(delay=50.0),
-                aiotools.PersistentTaskGroup() as tg,
-            ):
-                for scheduled_session in scheduled_sessions:
-                    await self.registry.event_producer.produce_event(
-                        SessionPreparingEvent(
-                            scheduled_session.id,
-                            scheduled_session.creation_id,
-                        ),
-                    )
-                    tg.create_task(
-                        self.start_session(
-                            sched_ctx,
-                            scheduled_session,
-                        )
-                    )
-
-                    await redis_helper.execute(
-                        self.redis_live,
-                        lambda r: r.hset(
-                            redis_key, "resource_group", scheduled_session.scaling_group_name
-                        ),
-                    )
             await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset(
