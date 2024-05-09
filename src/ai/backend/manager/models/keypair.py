@@ -84,7 +84,7 @@ keypairs = sa.Table(
         sa.Integer,
         nullable=False,
         default=DEFAULT_KEYPAIR_RATE_LIMIT,
-        server_default=str(DEFAULT_KEYPAIR_RATE_LIMIT),
+        server_default=sa.text(str(DEFAULT_KEYPAIR_RATE_LIMIT)),
     ),
     sa.Column("num_queries", sa.Integer, server_default="0"),
     # SSH Keypairs.
