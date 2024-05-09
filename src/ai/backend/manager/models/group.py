@@ -483,8 +483,6 @@ class CreateGroup(graphene.Mutation):
         name: str,
         props: GroupInput,
     ) -> CreateGroup:
-        # if _rx_slug.search(name) is None:
-        #     raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -548,8 +546,6 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "container_registry")
 
-        # if "name" in data and _rx_slug.search(data["name"]) is None:
-        #     raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:

@@ -209,8 +209,6 @@ class CreateDomain(graphene.Mutation):
         name: str,
         props: DomainInput,
     ) -> CreateDomain:
-        # if _rx_slug.search(name) is None:
-        #     return cls(False, "invalid name format. slug format required.", None)
         ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -258,8 +256,6 @@ class ModifyDomain(graphene.Mutation):
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "allowed_docker_registries")
         set_if_set(props, data, "integration_id")
-        # if "name" in data and _rx_slug.search(data["name"]) is None:
-        #     raise ValueError("invalid name format. slug format required.")
         update_query = sa.update(domains).values(data).where(domains.c.name == name)
         return await simple_db_mutate_returning_item(cls, ctx, update_query, item_cls=Domain)
 
