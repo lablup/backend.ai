@@ -5,7 +5,6 @@ import collections
 import enum
 import functools
 import logging
-import re
 import sys
 import uuid
 from typing import (
@@ -66,6 +65,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.common.utils import compile_slug_re_pattern
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
@@ -609,13 +609,15 @@ class SlugType(TypeDecorator):
     impl = sa.types.Unicode
     cache_ok = True
 
-    def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
-        self._allow_unicode = allow_unicode
+    def __init__(
+        self,
+        *,
+        length: int | None = None,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
+    ) -> None:
         super().__init__(length=length)
-        if not self._allow_unicode:
-            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$", flags=re.ASCII)
-        else:
-            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$")
+        self._rx_slug = compile_slug_re_pattern(allow_space, allow_unicode)
 
     def process_bind_param(self, value: str, dialect) -> str:
         if self._rx_slug.search(string=value) is None:

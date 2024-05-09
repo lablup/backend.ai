@@ -9,7 +9,6 @@ import json
 import os
 import pwd
 import random
-import re
 import uuid
 from collections.abc import Iterable
 from decimal import Decimal
@@ -49,6 +48,7 @@ from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
 from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
+from .utils import compile_slug_re_pattern
 
 __all__ = (
     "AliasedKey",
@@ -580,8 +580,6 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
-    _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
-
     def __init__(
         self,
         *,
@@ -592,7 +590,7 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
     ) -> None:
         super().__init__()
         self._allow_dot = allow_dot
-        self._allow_unicode = allow_unicode
+        self._rx_slug = compile_slug_re_pattern(allow_space=True, allow_unicode=allow_unicode)
         if min_length is not None and min_length < 0:
             raise TypeError("min_length must be larger than or equal to zero.")
         if max_length is not None and max_length < 0:
@@ -612,10 +610,9 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
                 checked_value = value[1:]
             else:
                 checked_value = value
-            if not self._allow_unicode:
-                m = type(self)._rx_slug.search(checked_value)
-                if not m:
-                    self._failure("value must be a valid slug.", value=value)
+            match = self._rx_slug.search(checked_value)
+            if match is None:
+                self._failure("value must be a valid slug.", value=value)
         else:
             self._failure("value must be a string", value=value)
         return value
