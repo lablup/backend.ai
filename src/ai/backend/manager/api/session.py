@@ -1485,8 +1485,8 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
     resp = {}
-    sess_type: SessionTypes = sess.session_type
-    if sess_type == SessionTypes.SYSTEM:
+    sess_type = cast(SessionTypes, sess.session_type)
+    if sess.session_type == SessionTypes.SYSTEM:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
