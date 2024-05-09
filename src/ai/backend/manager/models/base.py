@@ -248,7 +248,7 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
-    def python_type(self) -> T_StrEnum:
+    def python_type(self) -> type[T_StrEnum]:
         return self._enum_cls
 
 
