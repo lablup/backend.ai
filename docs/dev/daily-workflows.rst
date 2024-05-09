@@ -760,5 +760,5 @@ Every response data model should inherit ``ai.backend.manager.api.utils.BaseResp
 
 Here are some examples:
 
-* `<https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L147-L152> list_serve()`_
-* `<https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L221-L224> get_info()`_
+* `list_serve() <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L147-L152>`_
+* `get_info() <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L221-L224>`_
