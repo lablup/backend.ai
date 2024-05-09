@@ -34,6 +34,8 @@ def upgrade():
         );
     """
     )
+    op.execute("UPDATE kernels SET status_history = '[]'::jsonb WHERE status_history IS NULL;")
+    op.alter_column("kernels", "status_history", nullable=False, default=[])
 
     op.execute(
         """
@@ -53,6 +55,8 @@ def upgrade():
         );
     """
     )
+    op.execute("UPDATE sessions SET status_history = '[]'::jsonb WHERE status_history IS NULL;")
+    op.alter_column("sessions", "status_history", nullable=False, default=[])
 
 
 def downgrade():
@@ -73,6 +77,8 @@ def downgrade():
         WHERE data.id = kernels.id;
     """
     )
+    op.alter_column("kernels", "status_history", nullable=True, default=None)
+    op.execute("UPDATE kernels SET status_history = NULL WHERE status_history = '[]'::jsonb;")
 
     op.execute(
         """
@@ -91,3 +97,5 @@ def downgrade():
         WHERE data.id = sessions.id;
     """
     )
+    op.alter_column("sessions", "status_history", nullable=True, default=None)
+    op.execute("UPDATE sessions SET status_history = NULL WHERE status_history = '[]'::jsonb;")
