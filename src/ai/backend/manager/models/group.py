@@ -578,8 +578,8 @@ class ModifyGroup(graphene.Mutation):
 
         async def _do_mutate() -> ModifyGroup:
             async with graph_ctx.db.begin_session() as db_session:
-                users_to_add = user_data.get("users_to_add") or set()
-                users_to_remove = user_data.get("users_to_remove") or set()
+                users_to_add = user_data.get("users_to_add", set())
+                users_to_remove = user_data.get("users_to_remove", set())
                 if union := (users_to_add & users_to_remove):
                     raise ValueError(
                         "Should be no user IDs included in both `users_to_add` and `users_to_remove`."
