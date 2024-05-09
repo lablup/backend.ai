@@ -19,6 +19,7 @@ from ..defs import RESERVED_DOTFILES
 from .base import (
     Base,
     ResourceSlotColumn,
+    SlugType,
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
@@ -55,7 +56,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 domains = sa.Table(
     "domains",
     mapper_registry.metadata,
-    sa.Column("name", sa.String(length=64), primary_key=True),
+    sa.Column("name", SlugType(length=64, allow_unicode=True), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
