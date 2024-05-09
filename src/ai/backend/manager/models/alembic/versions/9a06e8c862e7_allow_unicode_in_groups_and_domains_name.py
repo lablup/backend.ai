@@ -20,12 +20,12 @@ def upgrade():
     op.alter_column(
         "domains",
         column_name="name",
-        type_=sa.types.Unicode,
+        type_=sa.types.Unicode(length=64),
     )
     op.alter_column(
         "groups",
         column_name="name",
-        type_=sa.types.Unicode,
+        type_=sa.types.Unicode(length=64),
     )
 
 

@@ -611,23 +611,13 @@ class SlugType(TypeDecorator):
 
     def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
         self._allow_unicode = allow_unicode
-        self._length = length
+        super().__init__(length=length)
         if not self._allow_unicode:
             self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$", flags=re.ASCII)
         else:
             self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$")
 
-    def load_dialect_impl(self, dialect):
-        return dialect.type_descriptor(sa.String(64))
-
-    def process_bind_param(self, value: str, dialect):
-        if self._length is not None and len(value) > self._length:
-            raise ValueError(f"value is too long (max length {self._length}")
-        if self._rx_slug.search(string=value) is None:
-            return ValueError("invalid name format. slug format required.", value)
-        return value
-
-    def process_result_value(self, value: str, dialect):
+    def process_bind_param(self, value: str, dialect) -> str:
         if self._rx_slug.search(string=value) is None:
             return ValueError("invalid name format. slug format required.", value)
         return value
