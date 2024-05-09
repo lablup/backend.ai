@@ -122,6 +122,14 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
+def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
+    iv, real_payload = payload.split(b":")
+    key = (base64.b64encode(endpoint.encode("ascii")) + iv + iv)[:32]
+    crypt = AES.new(key, AES.MODE_CBC, iv)
+    b64p = base64.b64decode(real_payload)
+    return unpad(crypt.decrypt(bytes(b64p)), 16)
+
+
 @web.middleware
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
@@ -135,14 +143,8 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         if scheme is None:
             scheme = request.scheme
         api_endpoint = f"{scheme}://{request.host}"
-        payload = await request.text()
-        initial_vector, real_payload = payload.split(":")
-        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
-        crypt = AES.new(
-            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
-        )
-        b64p = base64.b64decode(real_payload)
-        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+        payload = await request.read()
+        request["payload"] = _decrypt_payload(api_endpoint, payload)
     else:
         # For all other requests without explicit encryption,
         # let the handler decide how to read the body.
@@ -206,7 +208,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline":
-                aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
+                session_id = request.headers.get("X-BackendAI-SessionID", "")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
                     jwt_secret = config["pipeline"]["jwt"]["secret"]
                     now = datetime.now().astimezone()
@@ -216,13 +218,12 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
-                        "aiohttp_session": aiohttp_session,
+                        "aiohttp_session": session_id,
                         "access_key": api_session.config.access_key,  # since 23.03.10
                     }
                     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
-                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
+                api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:

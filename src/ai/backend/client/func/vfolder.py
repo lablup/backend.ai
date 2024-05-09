@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import asyncio
+import uuid
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Mapping, Optional, Sequence, TypeAlias, TypeVar, Union
 
 import aiohttp
 import janus
@@ -19,6 +22,7 @@ from yarl import URL
 
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.common.types import ResultSet
 
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
@@ -41,14 +45,18 @@ _default_list_fields = (
     vfolder_fields["status"],
 )
 
+T = TypeVar("T")
+list_: TypeAlias = list[T]
+
 
 class ResponseFailed(Exception):
     pass
 
 
 class VFolder(BaseFunction):
-    def __init__(self, name: str):
+    def __init__(self, name: str, id: Optional[uuid.UUID] = None):
         self.name = name
+        self.id = id
 
     @api_function
     @classmethod
@@ -60,7 +68,6 @@ class VFolder(BaseFunction):
         group: str = None,
         usage_mode: str = "general",
         permission: str = "rw",
-        quota: str = "0",
         cloneable: bool = False,
     ):
         rqst = Request("POST", "/folders")
@@ -71,7 +78,6 @@ class VFolder(BaseFunction):
             "group": group,
             "usage_mode": usage_mode,
             "permission": permission,
-            "quota": quota,
             "cloneable": cloneable,
         })
         async with rqst.fetch() as resp:
@@ -204,6 +210,15 @@ class VFolder(BaseFunction):
             page_size=page_size,
         )
 
+    async def _get_id_by_name(self) -> uuid.UUID:
+        rqst = Request("GET", "/folders/_/id")
+        rqst.set_json({
+            "name": self.name,
+        })
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return uuid.UUID(data["id"])
+
     @api_function
     @classmethod
     async def list_hosts(cls):
@@ -238,14 +253,45 @@ class VFolder(BaseFunction):
             return {}
 
     @api_function
-    async def purge(self):
-        rqst = Request("POST", "/folders/{0}/purge".format(self.name))
+    async def purge(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/purge")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
+        async with rqst.fetch():
+            return {}
+
+    async def _restore(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/restore-from-trash-bin")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
         async with rqst.fetch():
             return {}
 
     @api_function
     async def recover(self):
-        rqst = Request("POST", "/folders/{0}/recover".format(self.name))
+        return await self._restore()
+
+    @api_function
+    async def restore(self):
+        return await self._restore()
+
+    @api_function
+    async def delete_trash(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("POST", "/folders/delete-from-trash-bin")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
         async with rqst.fetch():
             return {}
 
@@ -283,7 +329,7 @@ class VFolder(BaseFunction):
         if_range: str | None = None
         file_unit = "bytes"
         file_mode = "wb"
-        file_req_hdrs: Dict[str, str] = {}
+        file_req_hdrs: dict[str, str] = {}
         try:
             async for session_attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
@@ -475,7 +521,7 @@ class VFolder(BaseFunction):
             if path.is_file():
                 file_list.append(path)
             else:
-                await self._mkdir(path.relative_to(base_path))
+                await self._mkdir([path.relative_to(base_path)])
                 dir_list.append(path)
         await self._upload_files(file_list, basedir, dst_dir, chunk_size, address_map)
         for dir in dir_list:
@@ -506,10 +552,10 @@ class VFolder(BaseFunction):
 
     async def _mkdir(
         self,
-        path: Union[str, Path],
+        path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ) -> str:
+    ) -> ResultSet:
         rqst = Request("POST", "/folders/{}/mkdir".format(self.name))
         rqst.set_json({
             "path": path,
@@ -517,15 +563,16 @@ class VFolder(BaseFunction):
             "exist_ok": exist_ok,
         })
         async with rqst.fetch() as resp:
-            return await resp.text()
+            reply = await resp.json()
+            return reply["results"]
 
     @api_function
     async def mkdir(
         self,
-        path: Union[str, Path],
+        path: str | Path | list_[str | Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ) -> str:
+    ) -> ResultSet:
         return await self._mkdir(path, parents, exist_ok)
 
     @api_function

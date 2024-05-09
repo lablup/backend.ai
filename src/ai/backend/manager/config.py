@@ -207,10 +207,13 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
+from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
+    LogSeverity,
     RoundRobinState,
     SlotName,
     SlotTypes,
@@ -221,6 +224,7 @@ from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
+from .pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -243,7 +247,10 @@ manager_local_config_iv = (
             t.Key("user"): t.String,
             t.Key("password"): t.String,
             t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+            t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
+            t.Key("pool-pre-ping", default=False): t.ToBool,
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
+            t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
         t.Key("manager"): t.Dict({
             t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
@@ -265,8 +272,18 @@ manager_local_config_iv = (
             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("distributed-lock", default="pg_advisory"): t.Enum(
-                "filelock", "pg_advisory", "redlock", "etcd"
+                "filelock",
+                "pg_advisory",
+                "redlock",
+                "etcd",
+                "etcetra",
             ),
+            t.Key(
+                "pg-advisory-config", default=PgAdvisoryLock.default_config
+            ): PgAdvisoryLock.config_iv,
+            t.Key("filelock-config", default=FileLock.default_config): FileLock.config_iv,
+            t.Key("redlock-config", default=RedisLock.default_config): RedisLock.config_iv,
+            t.Key("etcdlock-config", default=EtcdLock.default_config): EtcdLock.config_iv,
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
                 allow_nonexisting=True,
@@ -502,7 +519,10 @@ class LocalConfig(AbstractConfig):
         raise NotImplementedError
 
 
-def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalConfig:
+def load(
+    config_path: Optional[Path] = None,
+    log_level: LogSeverity = LogSeverity.INFO,
+) -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
@@ -533,10 +553,10 @@ def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalCo
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -569,7 +589,6 @@ class SharedConfig(AbstractConfig):
         etcd_password: Optional[str],
         namespace: str,
     ) -> None:
-        # WARNING: importing etcd3/grpc must be done after forks.
         super().__init__()
         credentials = None
         if etcd_user:
@@ -584,6 +603,9 @@ class SharedConfig(AbstractConfig):
             # TODO: provide a way to specify other scope prefixes
         }
         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+        self.etcetra_etcd = EtcetraAsyncEtcd(
+            etcd_addr, namespace, scope_prefix_map, credentials=credentials
+        )
 
     async def close(self) -> None:
         await self.etcd.close()

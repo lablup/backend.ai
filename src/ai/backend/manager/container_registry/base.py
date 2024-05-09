@@ -20,6 +20,7 @@ from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ...common.types import SSLContextType
 from ..models.image import ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -43,9 +44,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
     MEDIA_TYPE_OCI_MANIFEST: Final[str] = "application/vnd.oci.image.manifest.v1+json"
-    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[
-        str
-    ] = "application/vnd.docker.distribution.manifest.list.v2+json"
+    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[str] = (
+        "application/vnd.docker.distribution.manifest.list.v2+json"
+    )
     MEDIA_TYPE_DOCKER_MANIFEST: Final[str] = "application/vnd.docker.distribution.manifest.v2+json"
 
     def __init__(
@@ -70,7 +71,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
-        ssl_ctx = None  # default
+        ssl_ctx: SSLContextType = True  # default
         if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
@@ -81,6 +82,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> None:
+        log.info("rescan_single_registry()")
         all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
@@ -150,6 +152,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
+            username = self.registry_info["username"]
+            if username is not None:
+                self.credentials["username"] = username
+            password = self.registry_info["password"]
+            if password is not None:
+                self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
                 image, tag = ImageRef._parse_image_tag(image_ref)
                 rqst_args = await registry_login(
@@ -170,6 +178,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         sess: aiohttp.ClientSession,
         image: str,
     ) -> None:
+        log.info("_scan_image()")
         rqst_args = await registry_login(
             sess,
             self.registry_url,
@@ -233,6 +242,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         ]
                         request_type = self.MEDIA_TYPE_OCI_MANIFEST
                     case _:
+                        log.warn("Unknown content type: {}", content_type)
                         raise RuntimeError(
                             "The registry does not support the standard way of "
                             "listing multiarch images."
@@ -258,28 +268,18 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     resp.raise_for_status()
                     data = json.loads(await resp.read())
                 labels = {}
-                if "container_config" in data:
-                    raw_labels = data["container_config"].get("Labels")
-                    if raw_labels:
-                        labels.update(raw_labels)
-                    else:
-                        log.warn(
-                            "label not found on image {}:{}/{}",
-                            image,
-                            tag,
-                            architecture,
-                        )
-                else:
-                    raw_labels = data["config"].get("Labels")
-                    if raw_labels:
-                        labels.update(raw_labels)
-                    else:
-                        log.warn(
-                            "label not found on image {}:{}/{}",
-                            image,
-                            tag,
-                            architecture,
-                        )
+                # we should favor `config` instead of `container_config` since `config` can contain additional datas
+                # set when commiting image via `--change` flag
+                if _config_labels := data.get("config", {}).get("Labels"):
+                    labels = _config_labels
+                elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+                    labels = _container_config_labels
+
+                if not labels:
+                    log.warning(
+                        "Labels section not found on image {}:{}/{}", image, tag, architecture
+                    )
+
                 manifests[architecture] = {
                     "size": size_bytes,
                     "labels": labels,

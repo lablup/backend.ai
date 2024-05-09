@@ -34,6 +34,11 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+)
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -52,8 +57,10 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     ACTIVE_USER_STATUSES,
-    DEAD_VFOLDER_STATUSES,
+    HARD_DELETED_VFOLDER_STATUSES,
     AgentStatus,
+    EndpointLifecycle,
+    EndpointRow,
     GroupRow,
     KernelStatus,
     ProjectResourcePolicyRow,
@@ -62,21 +69,22 @@ from ..models import (
     UserRole,
     UserRow,
     UserStatus,
-    VFolderAccessStatus,
     VFolderCloneInfo,
     VFolderDeletionInfo,
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionSetAlias,
     VFolderPermissionValidator,
+    VFolderStatusSet,
     agents,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     initiate_vfolder_clone,
-    initiate_vfolder_purge,
+    initiate_vfolder_deletion,
     kernels,
     keypair_resource_policies,
     keypairs,
@@ -87,6 +95,7 @@ from ..models import (
     verify_vfolder_name,
     vfolder_invitations,
     vfolder_permissions,
+    vfolder_status_map,
     vfolders,
 )
 from ..models.utils import execute_with_retry
@@ -98,6 +107,7 @@ from .exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
+    ModelServiceDependencyNotCleared,
     ObjectNotFound,
     TooManyVFoldersFound,
     VFolderAlreadyExists,
@@ -109,7 +119,12 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import check_api_params, get_user_scopes
+from .utils import (
+    BaseResponseModel,
+    check_api_params,
+    get_user_scopes,
+    pydantic_params_api_handler,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -120,60 +135,112 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-async def ensure_vfolder_status(
+class SuccessResponseModel(BaseResponseModel):
+    success: bool = Field(default=True)
+
+
+async def check_vfolder_status(
+    folder_row: VFolderRow,
+    status: VFolderStatusSet,
+) -> None:
+    """
+    Checks if the target vfolder status matches one of the status sets aliased by `status` VFolderStatusSet,
+    and when check fails, raises VFolderFilterStatusFailed.
+    This function should prevent user from accessing VFolders which are performing critical operations
+    (e.g. VFolder cloning, removal, ...).
+    This helper can be combined with `resolve_vfolders
+    """
+
+    available_vf_statuses = vfolder_status_map.get(status)
+    if not available_vf_statuses:
+        raise VFolderFilterStatusNotAvailable
+    if folder_row["status"] not in available_vf_statuses:
+        raise VFolderFilterStatusFailed
+
+
+def with_vfolder_status_checked(
+    status: VFolderStatusSet,
+) -> Callable[
+    [Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]],
+    Callable[Concatenate[web.Request, Sequence[VFolderRow], P], Awaitable[web.Response]],
+]:
+    """
+    Checks if the target vfolder status matches one of the status sets aliased by `status` VFolderStatusSet.
+    This function should prevent user from accessing VFolders which are performing critical operations
+    (e.g. VFolder being cloned, being removed, ...).
+    This helper can be combined with `resolve_vfolders
+    """
+
+    def _wrapper(
+        handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]],
+    ) -> Callable[Concatenate[web.Request, Sequence[VFolderRow], P], Awaitable[web.Response]]:
+        @functools.wraps(handler)
+        async def _wrapped(
+            request: web.Request,
+            folder_rows: Sequence[VFolderRow],
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> web.Response:
+            for row in folder_rows:
+                try:
+                    await check_vfolder_status(row, status)
+                    return await handler(request, row, *args, **kwargs)
+                except VFolderFilterStatusFailed:
+                    pass
+            # none of our candidates matched the status filter, so we should instead raise error here
+            raise VFolderFilterStatusFailed
+
+        return _wrapped
+
+    return _wrapper
+
+
+async def resolve_vfolder_rows(
     request: web.Request,
-    perm: VFolderAccessStatus,
-    folder_id_or_name: uuid.UUID | str,
+    perm: VFolderPermissionSetAlias | VFolderPermission | str,
+    folder_id_or_name: str | uuid.UUID,
 ) -> Sequence[VFolderRow]:
     """
-    Checks if the target vfolder status is READY.
-    This function should prevent user access
-    while storage-proxy operations such as vfolder clone, deletion is handling.
+    Checks if the target VFolder exists and is either:
+    - owned by requester, or
+    - original owner (of target VFolder) has granted certain level of access to the requester
+
+    When requester passes VFolder name to `folder_id_or_name` parameter then there is a possibility for
+    this helper to return multiple entries of VFolder rows which are considered deleted,
+    since Backend.AI also is aware of both deleted and purged VFolders. Resolving VFolder row by ID
+    will not fall in such cases as it is guaranted by DB side that every VFolder ID is unique across whole table.
+    To avoid such behavior, either do not consider VFolder name as an index to resolve VFolder row or
+    pass every returned elements of this helper to a separate check_vfolder_status() call, so that
+    the handler can figure out which row is the actual row that is aware of.
     """
 
     root_ctx: RootContext = request.app["_root.context"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    match folder_id_or_name:
-        case uuid.UUID():
-            vf_name_conds = vfolders.c.id == folder_id_or_name
-        case str():
-            vf_name_conds = vfolders.c.name == folder_id_or_name
+    vf_user_cond = None
+    vf_group_cond = None
 
     match perm:
-        case VFolderAccessStatus.READABLE:
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.PERFORMING,
-                VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETE_COMPLETE,
-                VFolderOperationStatus.MOUNTED,
-            }
-        case VFolderAccessStatus.UPDATABLE:
-            # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.MOUNTED,
-            }
-        case VFolderAccessStatus.DELETABLE:
-            # if DELETABLE access status is requested, only READY operation status is accepted.
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-            }
-        case VFolderAccessStatus.RECOVERABLE:
-            available_vf_statuses = {
-                VFolderOperationStatus.DELETE_COMPLETE,
-            }
-        case VFolderAccessStatus.PURGABLE:
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.DELETE_COMPLETE,
-            }
+        case VFolderPermissionSetAlias():
+            invited_perm_cond = vfolder_permissions.c.permission.in_(list(perm.value))
+            if not request["is_admin"]:
+                vf_group_cond = vfolders.c.permission.in_(list(perm.value))
         case _:
-            raise VFolderFilterStatusNotAvailable()
+            # Otherwise, just compare it as-is (for future compatibility).
+            invited_perm_cond = vfolder_permissions.c.permission == perm
+            if not request["is_admin"]:
+                vf_group_cond = vfolders.c.permission == perm
+
+    match folder_id_or_name:
+        case str():
+            extra_vf_conds = vfolders.c.name == folder_id_or_name
+        case uuid.UUID():
+            extra_vf_conds = vfolders.c.id == folder_id_or_name
+        case _:
+            raise RuntimeError(f"Unsupported VFolder index type {type(folder_id_or_name)}")
+
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -181,93 +248,41 @@ async def ensure_vfolder_status(
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=vf_name_conds,
-            allow_privileged_access=True,
+            extra_vf_conds=extra_vf_conds,
+            extra_invited_vf_conds=invited_perm_cond,
+            extra_vf_user_conds=vf_user_cond,
+            extra_vf_group_conds=vf_group_cond,
         )
         if len(entries) == 0:
-            raise VFolderNotFound(extra_data=str(folder_id_or_name))
-        for entry in entries:
-            if entry["status"] not in available_vf_statuses:
-                raise VFolderFilterStatusFailed()
+            raise VFolderNotFound(extra_data=folder_id_or_name)
         return entries
 
 
-def vfolder_permission_required(
-    perm: VFolderPermission,
+def with_vfolder_rows_resolved(
+    perm: VFolderPermissionSetAlias | VFolderPermission,
 ) -> Callable[
-    [Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]],
+    [Callable[Concatenate[web.Request, Sequence[VFolderRow], P], Awaitable[web.Response]]],
     Callable[Concatenate[web.Request, P], Awaitable[web.Response]],
 ]:
     """
-    Checks if the target vfolder exists and is either:
-    - owned by the current access key, or
-    - allowed accesses by the access key under the specified permission.
-
-    The decorated handler should accept an extra argument
-    which contains a dict object describing the matched VirtualFolder table row.
+    Decorator to pass result of `resolve_vfolder_rows()` to request handler. Index of VFolder is
+    extracted from `name` path parameter. When multiple VFolder entries share same name, this decorator
+    will pass every rows matching with the name and it is up to `with_vfolder_status_checked` decorator
+    to filter out only row with its status matching the intention of the handler.
+    Check documentation of `resolve_vfolder_rows()` for more information.
     """
 
     def _wrapper(
-        handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]],
+        handler: Callable[
+            Concatenate[web.Request, Sequence[VFolderRow], P], Awaitable[web.Response]
+        ],
     ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
         @functools.wraps(handler)
         async def _wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> web.Response:
-            root_ctx: RootContext = request.app["_root.context"]
-            domain_name = request["user"]["domain_name"]
-            user_role = request["user"]["role"]
-            user_uuid = request["user"]["uuid"]
             folder_name = request.match_info["name"]
-            allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-            vf_user_cond = None
-            vf_group_cond = None
-            if perm == VFolderPermission.READ_ONLY:
-                # if READ_ONLY is requested, any permission accepts.
-                invited_perm_cond = vfolder_permissions.c.permission.in_([
-                    VFolderPermission.READ_ONLY,
-                    VFolderPermission.READ_WRITE,
-                    VFolderPermission.RW_DELETE,
-                ])
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_([
-                        VFolderPermission.READ_ONLY,
-                        VFolderPermission.READ_WRITE,
-                        VFolderPermission.RW_DELETE,
-                    ])
-            elif perm == VFolderPermission.READ_WRITE:
-                invited_perm_cond = vfolder_permissions.c.permission.in_([
-                    VFolderPermission.READ_WRITE,
-                    VFolderPermission.RW_DELETE,
-                ])
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_([
-                        VFolderPermission.READ_WRITE,
-                        VFolderPermission.RW_DELETE,
-                    ])
-            elif perm == VFolderPermission.RW_DELETE:
-                # If RW_DELETE is requested, only RW_DELETE accepts.
-                invited_perm_cond = vfolder_permissions.c.permission == VFolderPermission.RW_DELETE
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == VFolderPermission.RW_DELETE
-            else:
-                # Otherwise, just compare it as-is (for future compatibility).
-                invited_perm_cond = vfolder_permissions.c.permission == perm
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == perm
-            async with root_ctx.db.begin_readonly() as conn:
-                entries = await query_accessible_vfolders(
-                    conn,
-                    user_uuid,
-                    user_role=user_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=(vfolders.c.name == folder_name),
-                    extra_invited_vf_conds=invited_perm_cond,
-                    extra_vf_user_conds=vf_user_cond,
-                    extra_vf_group_conds=vf_group_cond,
-                )
-                if len(entries) == 0:
-                    raise VFolderNotFound(extra_data=folder_name)
-            return await handler(request, entries[0], *args, **kwargs)
+            return await handler(
+                request, await resolve_vfolder_rows(request, perm, folder_name), *args, **kwargs
+            )
 
         return _wrapped
 
@@ -326,7 +341,6 @@ def vfolder_check_exists(
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
         tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
         tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("quota", default=None): tx.BinarySize | t.Null,
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
@@ -481,7 +495,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 sa.select([sa.func.count()])
                 .select_from(vfolders)
                 .where(
-                    (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+                    (vfolders.c.user == user_uuid)
+                    & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
                 )
             )
             result = await conn.scalar(query)
@@ -496,7 +511,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
         #     params["quota"] = max_vfolder_size
 
         # Prevent creation of vfolder with duplicated name on all hosts.
-        extra_vf_conds = [vfolders.c.name == params["name"]]
+        extra_vf_conds = [
+            (vfolders.c.name == params["name"]),
+            (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
+        ]
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -557,7 +575,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
@@ -574,7 +591,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
-            "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
+            "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
@@ -863,9 +880,9 @@ async def list_allowed_types(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
 async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     resp: Dict[str, Any] = {}
     folder_name = request.match_info["name"]
@@ -927,7 +944,10 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     })
 )
 async def get_quota(request: web.Request, params: Any) -> web.Response:
-    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = (
+        await resolve_vfolder_rows(request, VFolderPermissionSetAlias.READABLE, params["id"])
+    )[0]
+    await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -981,7 +1001,10 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     }),
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
-    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
+    vfolder_row = (
+        await resolve_vfolder_rows(request, VFolderPermissionSetAlias.READABLE, params["id"])
+    )[0]
+    await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -1065,7 +1088,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def get_usage(request: web.Request, params: Any) -> web.Response:
-    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = (
+        await resolve_vfolder_rows(request, VFolderPermissionSetAlias.READABLE, params["id"])
+    )[0]
+    await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -1080,7 +1106,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         "folder/usage",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID(vfolder_row["quota_scope_id"], params["id"])),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -1096,7 +1122,10 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
-    entries = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = (
+        await resolve_vfolder_rows(request, VFolderPermissionSetAlias.READABLE, params["id"])
+    )[0]
+    await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
@@ -1106,7 +1135,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         "folder/used-bytes",
         json={
             "volume": volume_name,
-            "vfid": str(VFolderID(entries[0]["quota_scope_id"], params["id"])),
+            "vfid": str(VFolderID(vfolder_row["quota_scope_id"], params["id"])),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -1115,14 +1144,15 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_permission_required(VFolderPermission.OWNER_PERM)
+@with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict({
         t.Key("new_name"): tx.Slug(allow_dot=True),
     })
 )
-async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
+async def rename_vfolder(
+    request: web.Request, params: Any, row: Sequence[VFolderRow]
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1177,7 +1207,8 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_permission_required(VFolderPermission.OWNER_PERM)
+@with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("cloneable", default=None): t.Bool | t.Null,
@@ -1187,7 +1218,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
@@ -1225,21 +1255,23 @@ async def update_vfolder_options(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_WRITE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
-        t.Key("path"): t.String,
+        t.Key("path"): t.String | t.List(t.String),
         t.Key("parents", default=True): t.ToBool,
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
+    if isinstance(params["path"], list) and len(params["path"]) > 50:
+        raise InvalidAPIParameters("Too many directories specified.")
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
-        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, path:{})",
+        "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, paths:{})",
         request["user"]["email"],
         access_key,
         folder_name,
@@ -1257,14 +1289,20 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "parents": params["parents"],
             "exist_ok": params["exist_ok"],
         },
-    ):
-        pass
-    return web.Response(status=201)
+    ) as (_, storage_resp):
+        storage_reply = await storage_resp.json()
+        match storage_resp.status:
+            case 200 | 207:
+                return web.json_response(storage_reply, status=storage_resp.status)
+            # 422 will be wrapped as VFolderOperationFailed by storage_manager
+            case _:
+                raise RuntimeError("should not reach here")
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
 @check_api_params(
     t.Dict({
         tx.AliasedKey(["path", "file"]): t.String,
@@ -1274,7 +1312,6 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{}, path:{})"
     log_args = (
@@ -1323,7 +1360,8 @@ async def create_download_session(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_WRITE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("path"): t.String,
@@ -1331,7 +1369,6 @@ async def create_download_session(
     })
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1375,7 +1412,8 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_WRITE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("target_path"): t.String,
@@ -1384,7 +1422,6 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     })
 )
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1429,7 +1466,8 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_WRITE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("src"): t.String,
@@ -1437,7 +1475,6 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     })
 )
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1467,7 +1504,8 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_WRITE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("files"): t.List(t.String),
@@ -1475,7 +1513,6 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
     })
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1506,14 +1543,16 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
 @check_api_params(
     t.Dict({
         t.Key("path", default=""): t.String(allow_blank=True),
     })
 )
 async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, request.match_info["name"])
+    # we can skip check_vfolder_status() guard here since the status is already verified by
+    # vfolder_permission_required() decorator
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1640,14 +1679,15 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         tx.AliasedKey(["perm", "permission"], default="rw"): VFolderPermissionValidator,
         tx.AliasedKey(["emails", "user_ids", "userIDs"]): t.List(t.String),
     }),
 )
-async def invite(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
+async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1665,25 +1705,23 @@ async def invite(request: web.Request, params: Any) -> web.Response:
     resource_policy = request["keypair"]["resource_policy"]
     if folder_name.startswith("."):
         raise GenericForbidden("Cannot share private dot-prefixed vfolders.")
-    async with root_ctx.db.begin_readonly() as conn:
-        # Get virtual folder.
-        query = (
-            sa.select("*")
-            .select_from(vfolders)
-            .where((vfolders.c.user == user_uuid) & (vfolders.c.name == folder_name))
-        )
+
+    rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
+    for row in rows:
         try:
-            result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
-        vf = result.first()
-        if vf is None:
-            raise VFolderNotFound()
-        folder_host = vf.host
+            await check_vfolder_status(row, VFolderStatusSet.READABLE)
+            break
+        except VFolderFilterStatusFailed:
+            continue
+    else:
+        raise VFolderFilterStatusFailed
+    source_vfolder = row
+
+    async with root_ctx.db.begin_readonly() as conn:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
             conn,
-            folder_host,
+            source_vfolder["host"],
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
@@ -1718,12 +1756,14 @@ async def invite(request: web.Request, params: Any) -> web.Response:
             .select_from(j)
             .where(
                 (vfolders.c.user.in_(invitee_uuids) | vfolder_permissions.c.user.in_(invitee_uuids))
-                & (vfolders.c.name == folder_name),
+                & (vfolders.c.id == source_vfolder["id"]),
             )
         )
         result = await conn.execute(query)
         if result.scalar() > 0:
-            raise VFolderAlreadyExists
+            raise VFolderAlreadyExists(
+                extra_msg="Invitation to this VFolder already sent out to target user"
+            )
 
         # Create invitation.
         invitees = [kp.user_id for kp in kps]
@@ -1737,7 +1777,7 @@ async def invite(request: web.Request, params: Any) -> web.Response:
                 .where(
                     (vfolder_invitations.c.inviter == inviter)
                     & (vfolder_invitations.c.invitee == invitee)
-                    & (vfolder_invitations.c.vfolder == vf.id)
+                    & (vfolder_invitations.c.vfolder == source_vfolder["id"])
                     & (vfolder_invitations.c.state == VFolderInvitationState.PENDING),
                 )
             )
@@ -1755,7 +1795,7 @@ async def invite(request: web.Request, params: Any) -> web.Response:
                 {
                     "id": uuid.uuid4().hex,
                     "permission": perm,
-                    "vfolder": vf.id,
+                    "vfolder": source_vfolder["id"],
                     "inviter": inviter,
                     "invitee": invitee,
                     "state": VFolderInvitationState.PENDING,
@@ -1872,7 +1912,8 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
             .select_from(j)
             .where(
                 ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
-                & (vfolders.c.name == target_vfolder.name),
+                & (vfolders.c.name == target_vfolder.name)
+                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
         result = await conn.execute(query)
@@ -1958,14 +1999,15 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
 
 @admin_required
 @server_status_required(ALL_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("permission", default="rw"): VFolderPermissionValidator,
         t.Key("emails"): t.List(t.String),
     }),
 )
-async def share(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
+async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
     Share a group folder to users with overriding permission.
 
@@ -2026,7 +2068,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
                 & (agus.c.group_id == vf_info["group"])
-                & (users.c.status == ACTIVE_USER_STATUSES),
+                & (users.c.status.in_(ACTIVE_USER_STATUSES)),
             )
         )
         result = await conn.execute(query)
@@ -2036,16 +2078,16 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < 1:
             raise ObjectNotFound(object_name="user")
         if len(user_info) < len(params["emails"]):
-            users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
+            users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_in_vfolder_group)}",
+                f" {','.join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
         # Do not share to users who have already been shared the folder.
         query = (
-            sa.select([vfolder_permissions.c.user])
+            sa.select([vfolder_permissions])
             .select_from(vfolder_permissions)
             .where(
                 (vfolder_permissions.c.user.in_(users_to_share))
@@ -2082,16 +2124,17 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
 @admin_required
 @server_status_required(ALL_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("emails"): t.List(t.String),
     }),
 )
-async def unshare(request: web.Request, params: Any) -> web.Response:
+async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
     Unshare a group folder from users.
     """
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     folder_name = request.match_info["name"]
@@ -2164,6 +2207,7 @@ async def _delete(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2181,6 +2225,17 @@ async def _delete(
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        # perform extra check to make sure records of alive model service not removed by foreign key rule
+        if entry["usage_mode"] == VFolderUsageMode.MODEL:
+            async with root_ctx.db._begin_session(conn) as sess:
+                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
+                if (
+                    len([
+                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
+                    ])
+                    > 0
+                ):
+                    raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
             conn,
@@ -2195,19 +2250,21 @@ async def _delete(
     await update_vfolder_status(
         root_ctx.db,
         (entry["id"],),
-        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_PENDING,
+    )
+
+
+class DeleteRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to soft-delete, to go to trash bin",
     )
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("id"): tx.UUID,
-    }),
-)
-async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
+@pydantic_params_api_handler(DeleteRequestModel)
+async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
     access_key = request["keypair"]["access_key"]
@@ -2216,13 +2273,16 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    folder_id = params["id"]
+    folder_id = params.vfolder_id
     log.info(
         "VFOLDER.DELETE_BY_ID (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
         folder_id,
     )
+
+    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
         await _delete(
             root_ctx,
@@ -2247,7 +2307,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, request.match_info["name"])
     root_ctx: RootContext = request.app["_root.context"]
 
     folder_name = request.match_info["name"]
@@ -2264,36 +2323,172 @@ async def delete_by_name(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
-    try:
-        await _delete(
-            root_ctx,
-            (vfolders.c.name == folder_name),
-            user_uuid,
-            user_role,
-            domain_name,
-            allowed_vfolder_types,
-            resource_policy,
-        )
-    except TooManyVFoldersFound as e:
-        log.error(
-            "VFOLDER.DELETE(email:{}, folder name:{}, hosts:{}",
-            request["user"]["email"],
-            folder_name,
-            e.extra_data,
-        )
-        raise
+
+    rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
+    for row in rows:
+        try:
+            await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
+            break
+        except VFolderFilterStatusFailed:
+            continue
+    else:
+        raise VFolderFilterStatusFailed
+
+    await _delete(
+        root_ctx,
+        (vfolders.c.id == row["id"]),
+        user_uuid,
+        user_role,
+        domain_name,
+        allowed_vfolder_types,
+        resource_policy,
+    )
     return web.Response(status=204)
+
+
+class IDRequestModel(BaseModel):
+    name: str = Field(
+        validation_alias=AliasChoices("vfolder_name", "vfolderName", "name"),
+        description="Target vfolder name",
+    )
+
+
+class CompactVFolderInfoModel(BaseResponseModel):
+    id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
+    name: str = Field(description="Name of the vfolder.")
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def purge(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.PURGABLE, folder_id_or_name=request.match_info["name"]
+@pydantic_params_api_handler(IDRequestModel)
+async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
+    root_ctx: RootContext = request.app["_root.context"]
+
+    folder_name = params.name
+    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
+    user_role = request["user"]["role"]
+    user_uuid = request["user"]["uuid"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+
+    log.info(
+        "VFOLDER.GET_ID (email:{}, ak:{}, vf:{})",
+        request["user"]["email"],
+        access_key,
+        folder_name,
     )
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        entries = await query_accessible_vfolders(
+            db_session.bind,
+            user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name),
+        )
+        if len(entries) > 1:
+            log.error(
+                "VFOLDER.GET_ID(folder name:{}, hosts:{}",
+                folder_name,
+                [entry["host"] for entry in entries],
+            )
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters(f"No such vfolder (name: {folder_name})")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+    return CompactVFolderInfoModel(id=entry["id"], name=folder_name)
+
+
+class DeleteFromTrashRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to hard-delete, permanently remove from storage",
+    )
+
+
+@auth_required
+@pydantic_params_api_handler(DeleteFromTrashRequestModel)
+async def delete_from_trash_bin(
+    request: web.Request, params: DeleteFromTrashRequestModel
+) -> web.Response:
+    """
+    Delete `delete-pending` vfolders in storage proxy
+    """
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
-    folder_name = request.match_info["name"]
+    folder_id = params.vfolder_id
+    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
+    user_role = request["user"]["role"]
+    user_uuid = request["user"]["uuid"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    log.info(
+        "VFOLDER.DELETE_FROM_TRASH_BIN (email:{}, ak:{}, vf:{})",
+        request["user"]["email"],
+        access_key,
+        folder_id,
+    )
+    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
+
+    async with root_ctx.db.begin_readonly() as conn:
+        entries = await query_accessible_vfolders(
+            conn,
+            user_uuid,
+            allow_privileged_access=True,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.id == folder_id),
+        )
+        # FIXME: For now, deleting multiple VFolders at once will raise an error.
+        # This behavior should be fixed in 24.03
+        if len(entries) > 1:
+            log.error(
+                "VFOLDER.DELETE_FROM_TRASH_BIN(folder id:{}, hosts:{}",
+                folder_id,
+                [entry["host"] for entry in entries],
+            )
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same id.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters("No such vfolder.")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+
+    folder_host = entry["host"]
+    # fs-level deletion may fail or take longer time
+    await initiate_vfolder_deletion(
+        root_ctx.db,
+        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
+        root_ctx.storage_manager,
+        app_ctx.storage_ptask_group,
+    )
+    return web.Response(status=204)
+
+
+class PurgeRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to purge, permanently remove from DB",
+    )
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(PurgeRequestModel)
+async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
+    """
+    Delete `delete-complete`d vfolder rows in DB
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2303,110 +2498,108 @@ async def purge(request: web.Request) -> web.Response:
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
     )
+    if request["user"]["role"] not in (
+        UserRole.ADMIN,
+        UserRole.SUPERADMIN,
+    ):
+        raise InsufficientPrivilege("You are not allowed to purge vfolders")
+
+    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
+
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            extra_vf_conds=(vfolders.c.id == folder_id),
         )
-        # FIXME: For now, purging multiple VFolders at once will raise an error.
-        # This behavior should be fixed in 24.03
         if len(entries) > 1:
             log.error(
-                "VFOLDER.PURGE(folder name:{}, hosts:{}",
-                folder_name,
+                "VFOLDER.PURGE(folder id:{}, hosts:{}",
+                folder_id,
                 [entry["host"] for entry in entries],
             )
             raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
+                extra_msg="Multiple folders with the same id.",
                 extra_data=None,
             )
         elif len(entries) == 0:
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
-        # Folder owner OR user who have DELETE permission can delete folder.
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
+        delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
+        await conn.execute(delete_stmt)
 
-    folder_host = entry["host"]
-    # fs-level deletion may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    await initiate_vfolder_purge(
-        root_ctx.db,
-        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
-        root_ctx.storage_manager,
-        app_ctx.storage_ptask_group,
-    )
     return web.Response(status=204)
+
+
+class RestoreRequestModel(BaseModel):
+    vfolder_id: uuid.UUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        description="Target vfolder id to restore",
+    )
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def recover(request: web.Request) -> web.Response:
+@pydantic_params_api_handler(RestoreRequestModel)
+async def restore(request: web.Request, params: RestoreRequestModel) -> web.Response:
     """
     Recover vfolder from trash bin, by changing status.
     """
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.RECOVERABLE, folder_id_or_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
-    resource_policy = request["keypair"]["resource_policy"]
+    folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
-        "VFOLDER.RECOVER (email: {}, ak:{}, vf:{})",
+        "VFOLDER.RESTORE (email: {}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
-        folder_name,
+        folder_id,
     )
+
+    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    await check_vfolder_status(row, VFolderStatusSet.RECOVERABLE)
+
     async with root_ctx.db.begin() as conn:
-        recover_targets = await query_accessible_vfolders(
+        restore_targets = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            extra_vf_conds=(vfolders.c.id == folder_id),
         )
-        # FIXME: For now, multiple entries on recover vfolder will raise an error.
-        if len(recover_targets) > 1:
+        # FIXME: For now, multiple entries on restore vfolder will raise an error.
+        if len(restore_targets) > 1:
             log.error(
-                "VFOLDER.RECOVER(email:{}, folder name:{}, hosts:{})",
+                "VFOLDER.RESTORE(email:{}, folder id:{}, hosts:{})",
                 request["user"]["email"],
-                folder_name,
-                [entry["host"] for entry in recover_targets],
+                folder_id,
+                [entry["host"] for entry in restore_targets],
             )
             raise TooManyVFoldersFound(
                 extra_msg="Multiple folders with the same name.",
                 extra_data=None,
             )
-        elif len(recover_targets) == 0:
+        elif len(restore_targets) == 0:
             raise InvalidAPIParameters("No such vfolder.")
 
-        # Check resource policy's max_vfolder_count
-        if resource_policy["max_vfolder_count"] > 0:
-            query = sa.select([sa.func.count()]).where(
-                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
-            )
-            result = await conn.scalar(query)
-            if result + len(recover_targets) > resource_policy["max_vfolder_count"]:
-                raise InvalidAPIParameters("You cannot create (or recover) more vfolders.")
-
         # query_accesible_vfolders returns list
-        entry = recover_targets[0]
-        # Folder owner OR user who have DELETE permission can recover folder.
+        entry = restore_targets[0]
+        # Folder owner OR user who have DELETE permission can restore folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot recover the vfolder that is not owned by myself.")
+            raise InvalidAPIParameters("Cannot restore the vfolder that is not owned by myself.")
 
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
@@ -2416,7 +2609,8 @@ async def recover(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         tx.AliasedKey(["shared_user_uuid", "sharedUserUuid"], default=None): t.String | t.Null,
@@ -2424,11 +2618,10 @@ async def recover(request: web.Request) -> web.Response:
 )
 async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
-    Leave a shared vfolder.
+    Leave from shared VFolder.
 
-    Cannot leave a group vfolder or a vfolder that the requesting user owns.
+    Cannot leave a group VFolder or a VFolder that the requesting user owns.
     """
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
 
@@ -2471,7 +2664,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
         t.Key("cloneable", default=False): t.Bool,
@@ -2482,7 +2676,6 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     }),
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, request.match_info["name"])
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2579,7 +2772,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
             query = sa.select([sa.func.count()]).where(
-                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+                (vfolders.c.user == user_uuid)
+                & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
             )
             result = await conn.scalar(query)
             if result >= max_vfolder_count:
@@ -3212,7 +3406,12 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+            sa.select([vfolders.c.host])
+            .select_from(vfolders)
+            .where(
+                (vfolders.c.id == vfolder_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+            )
         )
         folder_host = await conn.scalar(query)
     if folder_host not in allowed_hosts_by_user:
@@ -3291,13 +3490,13 @@ def create_app(default_cors_options):
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
     cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
+    cors.add(add_route("GET", r"/_/id", get_vfolder_id))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
     cors.add(add_route("GET", r"/_/all_hosts", list_all_hosts))  # legacy underbar
     cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
     cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
-    cors.add(add_route("POST", r"/{name}/purge", purge))
     cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
     cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
@@ -3314,6 +3513,9 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/share", share))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
+    cors.add(add_route("POST", r"/purge", purge))
+    cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
+    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))

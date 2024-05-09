@@ -270,7 +270,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
             ),
@@ -336,7 +336,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ProcessMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_process=per_process_cpu_used,
             ),
@@ -512,7 +512,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             NodeMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_node=Measurement(total_mem_used_bytes, total_mem_capacity_bytes),
@@ -522,7 +522,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey("disk"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 per_node=Measurement(total_disk_usage, total_disk_capacity),
                 per_device=per_disk_stat,
@@ -714,21 +714,21 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_mem_used_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_read_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
@@ -749,7 +749,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_io_scratch_size,
@@ -817,21 +817,21 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             ProcessMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_process=per_process_mem_used_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_read_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_write_bytes,

@@ -1,3 +1,6 @@
+[project]
+requires-python = "~=3.12.2"
+
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
 filename = "CHANGELOG.md"
@@ -82,6 +85,7 @@ ignore = ["E203","E731","E501"]
 [tool.ruff.isort]
 known-first-party = ["ai.backend"]
 known-local-folder = ["src"]
+known-third-party = ["alembic", "redis"]
 split-on-trailing-comma = true
 
 [tool.ruff.per-file-ignores]
@@ -102,5 +106,5 @@ implicit_optional = true  # FIXME: remove after adding https://github.com/haunts
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.11.6/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.12.2/bin/python"
 disable_error_code = ["typeddict-unknown-key"]

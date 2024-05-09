@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-HTML = """
+OPENAPI_HTML = """
 <!DOCTYPE html>
 <html>
   <head>
@@ -33,28 +33,71 @@ HTML = """
     </style>
   </head>
   <body>
-    <redoc spec-url="spec/spec.json"></redoc>
-    <script src="static/vendor/spec-viewer.js"> </script>
+    <redoc spec-url="openapi/spec.json"></redoc>
+    <script src="../static/vendor/spec-viewer.js"></script>
+  </body>
+</html>
+"""
+
+
+GRAPHIQL_HTML = """
+<html>
+  <head>
+    <title>Backend.AI GraphQL API Reference</title>
+	<meta charset="UTF-8">
+    <link href="../static/vendor/graphiql.min.css" rel="stylesheet" />
+  </head>
+  <body style="margin: 0;">
+    <div id="graphiql" style="height: 100vh;"></div>
+
+    <script src="../static/vendor/react.production.min.js"
+    ></script>
+    <script src="../static/vendor/react-dom.production.min.js"
+    ></script>
+    <script src="../static/vendor/graphiql.min.js"
+    ></script>
+
+    <script>
+      const fetcher = GraphiQL.createFetcher({ url: '../admin/gql' });
+
+      ReactDOM.render(
+        React.createElement(GraphiQL, { fetcher: fetcher }),
+        document.getElementById('graphiql'),
+      );
+    </script>
   </body>
 </html>
 """
 
 
 @auth_required
-async def render_html(request: web.Request) -> web.Response:
+async def render_graphiql_html(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
+    if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
         raise GenericForbidden
 
     return web.Response(
-        body=HTML,
+        body=GRAPHIQL_HTML,
         status=200,
         content_type="text/html",
     )
 
 
 @auth_required
-async def generate_spec(request: web.Request) -> web.Response:
+async def render_openapi_html(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
+        raise GenericForbidden
+
+    return web.Response(
+        body=OPENAPI_HTML,
+        status=200,
+        content_type="text/html",
+    )
+
+
+@auth_required
+async def generate_openapi_spec(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
         raise GenericForbidden
@@ -79,7 +122,8 @@ def create_app(
     app["prefix"] = "spec"
     app.on_startup.append(init)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    cors.add(app.router.add_route("GET", "", render_html))
-    cors.add(app.router.add_route("GET", "/spec.json", generate_spec))
+    cors.add(app.router.add_route("GET", "/graphiql", render_graphiql_html))
+    cors.add(app.router.add_route("GET", "/openapi", render_openapi_html))
+    cors.add(app.router.add_route("GET", "/openapi/spec.json", generate_openapi_spec))
 
     return app, []

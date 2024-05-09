@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Bienvenue,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bienvenue, {{ userName }}.",
       "Summary": "Résumé",
       "Sessions": "Sessions",
       "Import&Run": "Importer et exécuter",
@@ -61,7 +60,12 @@
       "YouMushChangeYourPassword": "Il est recommandé de modifier périodiquement votre mot de passe pour des raisons de sécurité. Étant donné qu'un certain temps s'est écoulé depuis la dernière modification de votre mot de passe, vous devez le modifier pour pouvoir continuer à utiliser le service.",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
       "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Données",
+      "InvalidBlankPassword": "Tapez votre mot de passe",
+      "InvalidBlankEmail": "Entrer votre Email",
+      "DisMatchUserEmail": "L'e-mail de l'utilisateur ne correspond pas",
+      "MyEnvironments": "Mes environnements"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -110,7 +114,8 @@
     "IPUEnabled": "IPU NPU Activé",
     "ATOMEnabled": "ATOM NPU Activé",
     "WarboyEnabled": "Warboy NPU activé",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU activé"
   },
   "session": {
     "launcher": {
@@ -240,17 +245,35 @@
       "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
       "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
       "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
-      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
-      "SessionName": "__NOT_TRANSLATED__",
-      "ResetFormConfirm": "__NOT_TRANSLATED__",
-      "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "Si vous la définissez sur une taille supérieure aux ressources actuellement disponibles, la création de la session sera retardée dans la file d'attente jusqu'à ce qu'elle devienne disponible.",
+      "SessionName": "Nom de la séance",
+      "ResetFormConfirm": "Voulez-vous réinitialiser toutes vos entrées ?",
+      "TemplateAndHistory": "Modèles",
+      "ScheduleTimeSimple": "Définir l'heure de début",
       "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
       "NumberOfContainer": "Nombre de conteneurs",
+      "ErrorCanNotExceedRemaining": "Ne peut être supérieur aux ressources restantes ({{montant}}).",
       "EnterEnvironmentVariable": "Saisir le nom de la variable",
       "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
-      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà."
+      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà.",
+      "Template": "Modèle de session",
+      "EnableAutomaticMiniumShmem": "Définir la mémoire partagée minimale",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Seul un nombre entier est autorisé lorsque la taille du cluster n'est pas inférieure à 2.",
+      "StartAfter": "Commencez après :",
+      "StartTimeDoesNotApply": "Si l'heure de début n'est pas définie, elle ne s'applique pas.",
+      "MiniumAllocation": "Exigences minimales",
+      "MiniumAllocationTooltip": "Choisir comme exigence minimale pour l'environnement d'exécution sélectionné",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Vous utilisez le lanceur de session \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Sauter à l'examen",
+      "InteractiveModeDesc": "vous permet de créer, de tester et d'exécuter du code de manière interactive via jupyter notebook, visual studio code, etc.",
+      "BatchModeDesc": "Vous pouvez exécuter votre code avec plusieurs nœuds et clusters pour faire évoluer votre idée.",
+      "AddEnvironmentVariable": "Ajouter des variables d'environnement",
+      "EnvironmentVariableValueRequired": "Veuillez saisir une valeur.",
+      "PleaseCompleteForm": "Le formulaire est incomplet ou contient des erreurs. Veuillez vérifier vos données.",
+      "FailedToStartNewSession": "La création de la session a échoué. \nVeuillez vérifier l'onglet « TERMINÉ » sur la page de la session."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -284,7 +307,8 @@
       "Prepared": "Préparé",
       "App": "Application",
       "NoExistingConnectionExample": "Aucun exemple de connexion à copier.",
-      "SSHConnectionExampleClipboardCopy": "L'exemple de connexion SSH a été copié dans le presse-papiers."
+      "SSHConnectionExampleClipboardCopy": "L'exemple de connexion SSH a été copié dans le presse-papiers.",
+      "ConnectUrlIsNotValid": "L'URL de connexion n'est pas valide."
     },
     "TensorboardPath": "Répertoire des journaux pour TensorBoard",
     "InputTensorboardPath": "Veuillez saisir le répertoire de journal auquel TensorBoard fera référence. Notez que le répertoire des journaux ne sera pas automatiquement créé.",
@@ -314,11 +338,15 @@
     "Architecture": "Architecture",
     "Validation": {
       "SessionNameRequired": "Le nom de la session est obligatoire",
-      "EnterValidSessionName": "Saisir un nom de session valide",
+      "EnterValidSessionName": "Veuillez saisir une combinaison d'au moins 4 lettres de l'alphabet, ou chiffres, ou trait d'union, ou trait de soulignement.",
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
       "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
       "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
-      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'."
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 4 lettres, chiffres, '.', '_' et '-'.",
+      "SessionNameTooShort": "Veuillez saisir au moins 4 caractères.",
+      "SessionNameShouldStartWith": "Il doit commencer par une lettre de l'alphabet, un chiffre ou \"_\".",
+      "SessionNameShouldEndWith": "Il doit se terminer par une lettre de l'alphabet, un chiffre ou \"_\".",
+      "SessionNameInvalidCharacter": "Le milieu d'un nom ne peut contenir que des lettres de l'alphabet, des chiffres et des \"_\"."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -368,7 +396,15 @@
     "CPU": "UNITÉ CENTRALE",
     "MEM": "Mémoire",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (mémoire)"
+    "GPU(MEM)": "GPU (mémoire)",
+    "Agents": "Agents",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (mémoire)",
+    "ConvertSessionToImage": "Convertir une session en image",
+    "SessionName": "Nom de la session",
+    "SessionId": "ID de session",
+    "EnvironmentAndVersion": "Environnement et version",
+    "Tags": "Mots clés"
   },
   "button": {
     "Cancel": "Annuler",
@@ -399,7 +435,13 @@
     "Reset": "Réinitialisation",
     "EnterManually": "Saisie manuelle",
     "Unset": "Non défini",
-    "OK": "OK"
+    "OK": "OK",
+    "Download": "Télécharger",
+    "Clone": "Clone",
+    "Config": "Config",
+    "Next": "Suivant",
+    "Previous": "Précédent",
+    "PushToImage": "Pousser la session vers une image personnalisée"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -443,7 +485,10 @@
     "Enabled": "Activée",
     "StorageProxies": "Stockages",
     "None": "Aucun",
-    "Image": "__NOT_TRANSLATED__"
+    "Image": "Image",
+    "All": "Tous",
+    "InProgress": "En cours",
+    "Session": "Session"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -521,7 +566,9 @@
     "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
     "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
     "ModifyUserDetail": "Modifier les détails de l'utilisateur",
-    "EnableSudoSession": "__NOT_TRANSLATED__"
+    "EnableSudoSession": "Activer la session sudo",
+    "MainAccessKey": "Clé d'accès principale",
+    "InactivateTheFollowingUsers": "Désactivez les utilisateurs suivants."
   },
   "data": {
     "Folders": "Dossiers",
@@ -574,7 +621,7 @@
       "FolderRenamed": "Dossier renommé",
       "FolderNameMismatched": "Le nom du dossier ne correspond pas. Veuillez vérifier s'il y a un espace dans le champ de saisie ou non.",
       "SameFileName": "La valeur d'entrée est la même que le nom de fichier à mettre à jour. Veuillez le changer pour un nom différent.",
-      "FolderDeleted": "Dossier supprimé",
+      "FolderDeleted": "Le dossier {{ folderName }} a été supprimé.",
       "FolderUpdated": "Option(s) de dossier mise à jour",
       "FolderDisconnected": "Le dossier a été déconnecté.",
       "FileRenamed": "Fichier renommé",
@@ -601,7 +648,13 @@
       "CloneFolder": "Cloner un dossier",
       "LeaveFolder": "Dossier de sortie",
       "ShareFolder": "Dossier de partage",
-      "ModifyPermissions": "Modifier les autorisations"
+      "ModifyPermissions": "Modifier les autorisations",
+      "Restore": "Restaurer",
+      "DeleteForever": "Supprimer pour toujours",
+      "FolderRestored": "Le dossier {{ folderName }} a été restauré.",
+      "FolderDeletedForever": "Le dossier {{ folderName }} a été supprimé définitivement.",
+      "MoveToTrashBin": "Déplacer vers la poubelle",
+      "MovedToTrashBin": "Le dossier {{ folderName }} a été déplacé vers la corbeille."
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -652,7 +705,8 @@
       "EmptyFilesAndFoldersAreNotUploaded": "Les fichiers et dossiers vides ne sont pas téléchargés.",
       "FolderAlreadyExists": "Le dossier sur le point d'être téléchargé existe déjà.",
       "NumberOfSFTPSessionsExceededTitle": "Limite atteinte pour le nombre de sessions de téléchargement en cours",
-      "NumberOfSFTPSessionsExceededBody": "Vous exécutez toutes les sessions de téléchargement que vous êtes autorisé à créer. Veuillez mettre fin aux sessions de téléchargement inutilisées avant de commencer une nouvelle session."
+      "NumberOfSFTPSessionsExceededBody": "Vous exécutez toutes les sessions de téléchargement que vous êtes autorisé à créer. Veuillez mettre fin aux sessions de téléchargement inutilisées avant de commencer une nouvelle session.",
+      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier."
     },
     "invitation": {
       "NoValidEmails": "Aucun e-mail valide n'a été saisi",
@@ -687,21 +741,28 @@
     "Used": "Utilisé",
     "Pipeline": "Dossiers du pipeline",
     "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack.",
-    "SearchByName": "Rechercher par nom"
+    "SearchByName": "Rechercher par nom",
+    "ModelStore": "Magasin de modèles",
+    "New": "Nouveau",
+    "Add": "Ajouter",
+    "CloningIsOnlyPossibleSameHost": "Actuellement, le clonage n'est possible que sur le même hôte.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ATTENTION : cela ne peut pas être annulé !",
       "LogDeletion": "Voulez-vous vraiment supprimer tous les messages du journal ?",
       "WillBeAppliedToNewSessions": "Cette mise à jour sera appliquée aux nouvelles sessions.",
-      "Required": "Exigée"
+      "Required": "Exigée",
+      "DeleteForeverDesc": "ATTENTION : les éléments sélectionnés seront supprimés définitivement et vous ne pourrez pas les restaurer."
     },
     "ask": {
       "DoYouWantToProceed": "Voulez-vous poursuivre?"
     },
     "title": {
       "LetsDouble-Check": "Vérifions deux fois",
-      "Notice": "Avis"
+      "Notice": "Avis",
+      "DeleteForever": "Supprimer pour toujours?"
     },
     "ErrorOccurred": "Erreur est survenue",
     "error": {
@@ -756,7 +817,8 @@
     "PasswordsDoNotMatch": "Le mot de passe et la confirmation ne correspondent pas.",
     "NoChangeMade": "Aucune modification n'a été apportée",
     "Architecture": "Architecture",
-    "NoImageToDisplay": "Pas d'images à afficher"
+    "NoImageToDisplay": "Pas d'images à afficher",
+    "CustomizedImageSuccessfullyDeleted": "Image personnalisée supprimée avec succès."
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -832,7 +894,14 @@
     "DescAutoLogout": "Déconnectez-vous automatiquement si toutes les pages connectées sont fermées, à l'exception des pages d'origine de session pour les applications (par exemple, bloc-notes jupyter, terminal Web, etc.)",
     "BootstrapScriptDescription": "Le script Bootstrap ne sera exécuté qu'une seule fois après la création de la session.",
     "SSHKeypairEnterManually": "Couple de clés SSH",
-    "SSHKeypairEnterManuallyFinished": "La paire de clés SSH a été enregistrée avec succès."
+    "SSHKeypairEnterManuallyFinished": "La paire de clés SSH a été enregistrée avec succès.",
+    "MyKeypairInfo": "Informations sur ma paire de clés",
+    "DescMyKeypairInfo": "Voir les informations de ma paire de clés",
+    "DarkMode": "Mode sombre",
+    "LightMode": "Mode lumière",
+    "UseSystemSetting": "Utiliser les paramètres du système",
+    "DescThemeMode": "Personnalisez l'apparence de Backend.AI WebUI sur votre appareil.",
+    "ThemeMode": "Mode Thème"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilisation avancée du terminal Web : copier le contenu du terminal",
@@ -854,7 +923,9 @@
     "Parameters": "Paramètres",
     "ErrorType": "Type d'erreur",
     "LogMessageRemoved": "Les messages de journal ont été supprimés.",
-    "NoLogToDisplay": "Aucun journal à afficher"
+    "NoLogToDisplay": "Aucun journal à afficher",
+    "ShowOnlyError": "Afficher uniquement l'erreur",
+    "SearchLogs": "Journaux de recherche"
   },
   "resourcePolicy": {
     "Resources": "Ressources",
@@ -916,7 +987,8 @@
     "RegistrySuccessfullyModified": "Registre modifié avec succès.",
     "ModifyRegistry": "Modifier le registre",
     "NoRegistryToDisplay": "Aucun registre à afficher",
-    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?"
+    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?",
+    "DescURLFormat": "Type d'URL invalide"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -1056,8 +1128,6 @@
     "Scaling": "Mise à l'échelle",
     "AllowAgentSideRegistration": "Autoriser l'enregistrement côté agent",
     "DescAllowAgentSideRegistration": "Autoriser l'agent à s'inscrire auprès du gestionnaire. <br/> À utiliser uniquement si le cluster Backend.AI est géré sur un emplacement sécurisé.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "Prise en charge du processeur graphique CUDA",
     "DescCUDAGPUsupport": "Prise en charge du GPU NVIDIA CUDA. <br/> Nécessite le plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Désactivé car le système utilise le plug-in Fractional GPU",
     "ROCMGPUsupport": "Prise en charge du GPU ROCm",
@@ -1107,13 +1177,23 @@
     "RequireATOMPlugin": "Nécessite le plugin ATOM Backend.AI.",
     "Warboysupport": "Warboy",
     "DescWarboysupport": "Utiliser le support Furiosa Warboy",
-    "RequireWarboyPlugin": "Requiert le plugin Backend.AI Warboy."
+    "RequireWarboyPlugin": "Requiert le plugin Backend.AI Warboy.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Prise en charge des GPU CUDA Open Source",
+    "ShowOnlyChanged": "Afficher uniquement les modifications",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Utilisez l'accélérateur Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Nécessite le plugin LPU Backend.AI Hyperaccel."
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
     "Visit": "Visite",
     "SeeDetail": "Voir le détail",
-    "Initializing": "Initialisation..."
+    "Initializing": "Initialisation...",
+    "NoNotification": "Aucune notification.",
+    "Notifications": "Notifications",
+    "ClearNotifications": "Effacer les notifications",
+    "AreYouSureToClearAllNotifications": "Êtes-vous sûr d'avoir effacé toutes les notifications ?"
   },
   "information": {
     "Core": "Cœur",
@@ -1156,14 +1236,12 @@
     "LeaveService": "Quitter le service",
     "DescConfirmLeave": "Pour confirmer, veuillez saisir à nouveau votre e-mail et votre mot de passe.",
     "Password": "Mot de passe",
-    "E-mail": "E-mail",
     "APIKey": "clé API",
     "SecretKey": "Clef secrète",
     "Endpoint": "Point de terminaison",
     "NotAUser": "Vous n'êtes pas utilisateur ?",
     "LoginAnotherway": "Vous voulez vous connecter autrement ?",
     "SignUp": "S'inscrire",
-    "LoginWithE-mail": "Connectez-vous avec e-mail",
     "LoginWithIAM": "Connectez-vous avec IAM",
     "ClickToUseIAM": "Cliquez pour utiliser IAM",
     "ClickToUseID": "Cliquez pour utiliser l'identifiant",
@@ -1191,7 +1269,9 @@
     },
     "EndpointInfo": "À propos d'Endpoint",
     "DescEndpoint": "Dans API ENDPOINT, l'URL du serveur web Backend.AI, qui transmet la demande au gestionnaire, doit être saisie. </p><p>par exemple, http://127.0.0.1:8090/</p> <p>L'URL du serveur web Backend.AI, qui transmet la demande au gestionnaire, doit être saisie.",
-    "EndpointStartWith": "Le point d'arrivée doit commencer par http:// ou https://."
+    "EndpointStartWith": "Le point d'arrivée doit commencer par http:// ou https://.",
+    "LoginWithE-mailorUsername": "Connectez-vous avec e-mail ou nom d'utilisateur",
+    "E-mailorUsername": "E-mail ou nom d'utilisateur"
   },
   "signup": {
     "SignupBETA": "Inscription (invitation bêta uniquement)",
@@ -1249,7 +1329,7 @@
     "CouldNotCopyText": "Impossible de copier le texte :",
     "NotebookBadgeURL": "URL du bloc-notes",
     "GetAndRunNotebook": "Importer et exécuter",
-    "ImportGithubRepo": "Importer le dépôt Github",
+    "ImportGithubRepo": "Importer le dépôt GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Accéder au dossier",
     "RepoWillBeFolder": "Les dépôts GitHub importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
@@ -1263,13 +1343,13 @@
     "FolderName": "Nom du dossier importé :",
     "NotebookBadgeCodeHTML": "Code de badge de bloc-notes (HTML)",
     "NotebookBadgeCodeMarkdown": "Code de badge de bloc-notes (Markdown)",
-    "GithubInternalError": "Erreur interne de Github.",
-    "GithubAPILimitError": "Erreur de limitation de l'API Github.",
-    "GithubAPIEtcError": "Problème de serveur Github.",
-    "ImportGitlabRepo": "Importer le dépôt Gitlab",
-    "GitlabRepoWillBeFolder": "Les dépôts Gitlab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nom de la branche Gitlab"
+    "GithubInternalError": "Erreur interne de GitHub.",
+    "GithubAPILimitError": "Erreur de limitation de l'API GitHub.",
+    "GithubAPIEtcError": "Problème de serveur GitHub.",
+    "ImportGitlabRepo": "Importer le dépôt GitLab",
+    "GitlabRepoWillBeFolder": "Les dépôts GitLab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nom de la branche GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiques pour ce mois",
@@ -1323,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Il existe des paires de clés qui font référence à cette politique de ressources.",
     "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
-    "WrongAPIServerAddress": "Mauvaise adresse du serveur API."
+    "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
+    "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
@@ -1347,10 +1428,13 @@
     "ConfirmTotpRemovalBody": "Êtes-vous sûr de ne pas utiliser l'authentification à deux facteurs ?",
     "TotpSetupNotAvailable": "L'authentification à deux facteurs ne peut pas être configurée.",
     "TurnOffTotp": "Désactiver l'authentification à deux facteurs",
-    "RemoveTotpSetupCompleted": "2FA désactivé"
+    "RemoveTotpSetupCompleted": "2FA désactivé",
+    "EnterConfirmationCode": "Entrez maintenant l'OTP généré par l'authentificateur pour vérifier.",
+    "RequireOTP": "Écrivez OTP."
   },
   "inputLimit": {
-    "4to64chars": "(4~64 caractères)"
+    "4to64chars": "(4~64 caractères)",
+    "4to32chars": "(4 ~ 32 caractères)"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1384,7 +1468,8 @@
     "ForUser": "Pour l'utilisateur",
     "ForProject": "Pour le projet",
     "QuotaDoesNotSupported": "Ce backend de stockage ne prend pas en charge les quotas.",
-    "BeCarefulToSetUserResourcePolicy": "La modification d'une politique de ressources peut affecter tous les utilisateurs qui utilisent cette politique de ressources, il convient donc de l'utiliser avec précaution."
+    "BeCarefulToSetUserResourcePolicy": "La modification d'une politique de ressources peut affecter tous les utilisateurs qui utilisent cette politique de ressources, il convient donc de l'utiliser avec précaution.",
+    "StorageSetting": "Paramètres de stockage"
   },
   "modelService": {
     "EditModelService": "Modifier le modèle de service",
@@ -1431,12 +1516,55 @@
     "FormValidationFailed": "La validation du formulaire a échoué",
     "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
-    "Image": "Image"
+    "Image": "Image",
+    "Owner": "Propriétaire",
+    "ServiceDelegatedFrom": "Le service modèle est créé par {{ createdUser }} mais la propriété de la session sera déléguée à {{ sessionOwner }}.",
+    "FailedToTerminateService": "La demande d'arrêt du service a échoué.",
+    "FailedToUpdateService": "Échec de la mise à jour du service.",
+    "ServiceCreated": "Le service modèle {{ name }} a été créé avec succès.",
+    "ServiceUpdated": "Le service modèle {{ name }} a été mis à jour avec succès.",
+    "ServiceTerminated": "Le service modèle {{ name }} a été terminé avec succès."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
     "reloadPage": "Recharger la page",
     "resetErrorBoundary": "Réinitialisation de la limite d'erreur",
     "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI."
+  },
+  "modelStore": {
+    "Description": "Description",
+    "Model": "Modèle",
+    "FilterByName": "Filtrer par nom",
+    "ServiceDetails": "Détails des services",
+    "Metadata": "Métadonnées",
+    "ModelPath": "Chemin du modèle",
+    "SearchModels": "Rechercher des modèles",
+    "MinResource": "Ressource minimale",
+    "LastModified": "Dernière modification",
+    "Created": "Créé",
+    "Version": "Version",
+    "Author": "Auteur",
+    "MaxRetries": "Nombre maximal de tentatives",
+    "Path": "Chemin",
+    "HealthCheck": "Bilan de santé",
+    "Port": "Port",
+    "StartCommand": "Démarrer la commande",
+    "PreStartActions": "Actions préalables au démarrage",
+    "Framework": "Le cadre",
+    "Category": "Catégories",
+    "Label": "Étiquette",
+    "Task": "Tâche",
+    "CloneAsFolder": "Cloner en tant que dossier",
+    "CloneSuccess": "La demande de clone a été envoyée avec succès.",
+    "CloneInfo": "Il sera cloné en tant que dossier de votre type d'utilisateur.",
+    "category": "Catégorie"
+  },
+  "table": {
+    "SettingTable": "Paramètre de table",
+    "SelectColumnToDisplay": "Sélectionnez les colonnes à afficher",
+    "SearchTableColumn": "Rechercher des colonnes dans un tableau"
+  },
+  "setting": {
+    "SearchPlaceholder": "Entrez le terme de recherche"
   }
 }

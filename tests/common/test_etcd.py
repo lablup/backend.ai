@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from etcetra.types import WatchEventType
+from etcd_client import CondVar, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -192,8 +192,8 @@ async def test_multi(etcd: AsyncEtcd) -> None:
 async def test_watch(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
-    r_ready = asyncio.Event()
-    rp_ready = asyncio.Event()
+    r_ready = CondVar()
+    rp_ready = CondVar()
 
     async def _record():
         recv_count = 0
@@ -251,8 +251,8 @@ async def test_watch(etcd: AsyncEtcd) -> None:
 async def test_watch_once(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
-    r_ready = asyncio.Event()
-    rp_ready = asyncio.Event()
+    r_ready = CondVar()
+    rp_ready = CondVar()
 
     async def _record():
         recv_count = 0

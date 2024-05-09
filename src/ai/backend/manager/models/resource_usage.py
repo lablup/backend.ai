@@ -102,6 +102,9 @@ class ResourceUsage:
             "gpu_allocated": self.gpu_allocated,
         }
 
+    def copy(self) -> ResourceUsage:
+        return attrs.evolve(self, nfs={*self.nfs}, device_type={*self.device_type})
+
 
 def to_str(val: Any) -> Optional[str]:
     return str(val) if val is not None else None
@@ -178,21 +181,21 @@ class BaseResourceUsageGroup:
             "project_id": self.project_id,
             "project_name": self.project_name,
             "kernel_id": self.kernel_id,
-            "container_ids": self.container_ids,
+            "container_ids": self.container_ids.copy() if self.container_ids is not None else None,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
-            "last_stat": self.last_stat,
-            "extra_info": self.extra_info,
+            "last_stat": {**self.last_stat} if self.last_stat is not None else None,
+            "extra_info": {**self.extra_info} if self.extra_info is not None else None,
             "full_name": self.full_name,
-            "images": self.images,
-            "agents": self.agents,
+            "images": self.images.copy() if self.images is not None else None,
+            "agents": self.agents.copy() if self.agents is not None else None,
             "status": self.status,
             "status_info": self.status_info,
             "status_history": self.status_history,
             "cluster_mode": self.cluster_mode,
             "scheduled_at": self.scheduled_at,
-            "total_usage": self.total_usage,
+            "total_usage": self.total_usage.copy(),
         }
 
     def to_json_base(self) -> dict[str, Any]:
@@ -229,6 +232,7 @@ class BaseResourceUsageGroup:
 class KernelResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
     # child_usage_group: dict = attrs.field(factory=dict)
+    agent: str
     kernel_id: UUID
     project_row: GroupRow
     session_row: SessionRow
@@ -237,7 +241,8 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
+            "agent": self.agent,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -261,6 +266,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
             kernel_row=usage_group.kernel_row,
+            agent=usage_group.kernel_row.agent,
             **usage_group.to_map(),
         )
 
@@ -282,7 +288,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -309,7 +315,10 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         return cls(
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
-            **usage_group.to_map(),
+            **{
+                **usage_group.to_map(),
+                "total_usage": ResourceUsage(),
+            },
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
@@ -375,6 +384,7 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
             "cluster_mode": None,
             "scheduled_at": None,
             "terminated_at": None,
+            "total_usage": ResourceUsage(),
         }
         return cls(
             project_row=usage_group.project_row,
@@ -462,7 +472,7 @@ def parse_resource_usage(
 
     return ResourceUsage(
         agent_ids={kernel.agent},
-        nfs=nfs,
+        nfs={*nfs},
         cpu_allocated=float(kernel.occupied_slots.get("cpu", 0)),
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
         mem_allocated=int(kernel.occupied_slots.get("mem", 0)),
@@ -472,7 +482,7 @@ def parse_resource_usage(
         disk_used=int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
         io_read=int(nmget(last_stat, "io_read.current", 0)),
         io_write=int(nmget(last_stat, "io_write.current", 0)),
-        device_type=device_type,
+        device_type={*device_type},
         smp=float(smp),
         gpu_mem_allocated=float(gpu_mem_allocated),
         gpu_allocated=float(gpu_allocated),

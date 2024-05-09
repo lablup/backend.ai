@@ -103,7 +103,11 @@ class VASTQuotaModel(BaseQuotaModel):
                 raise ExternalError(str(e))
             await self._set_vast_quota_id(quota_scope_id, quota.id)
 
-    async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        config: QuotaConfig,
+    ) -> None:
         vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
         if vast_quota_id is None:
             raise QuotaScopeNotFoundError

@@ -122,6 +122,7 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
     variables = {
         "hostname": "cr.example.com",
         "props": {
+            "url": "http://cr2.example.com",
             "type": "harbor2",
             "project": ["default", "example"],
         },
@@ -130,7 +131,7 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
-    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"
@@ -162,7 +163,7 @@ async def test_modify_container_registry_allows_empty_string(
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
-    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"
@@ -198,7 +199,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
-    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["url"] == "http://cr2.example.com"
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"

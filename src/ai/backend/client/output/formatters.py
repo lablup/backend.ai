@@ -4,9 +4,11 @@ import decimal
 import json
 import textwrap
 from collections import defaultdict
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 import humanize
+
+from ai.backend.common.types import MetricValue
 
 from .types import AbstractOutputFormatter, FieldSpec
 
@@ -115,21 +117,25 @@ class NestedDictOutputFormatter(OutputFormatter):
 
 class MiBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = round(value / 2**20, 1)
+        if value is not None:
+            value = round(value / 2**20, 1)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = round(value / 2**20, 1)
+        if value is not None:
+            value = round(value / 2**20, 1)
         return super().format_json(value, field)
 
 
 class SizeBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = humanize.naturalsize(value, binary=True, gnu=True)
+        if value is not None:
+            value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = humanize.naturalsize(value, binary=True, gnu=True)
+        if value is not None:
+            value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_json(value, field)
 
 
@@ -142,6 +148,27 @@ class SubFieldOutputFormatter(OutputFormatter):
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return super().format_json(value[self._subfield_name], field)
+
+
+class CustomizedImageOutputFormatter(OutputFormatter):
+    def _get_name(self, labels: Any) -> str:
+        customized_name = [
+            label["value"] for label in labels if label["key"] == "ai.backend.customized-image.name"
+        ]
+        assert len(customized_name) == 1
+        owner_email = [
+            label["value"]
+            for label in labels
+            if label["key"] == "ai.backend.customized-image.user.email"
+        ]
+        assert len(owner_email) == 1
+        return f"{customized_name[0]} (Owner: {owner_email[0]})"
+
+    def format_console(self, value: Any, field: FieldSpec) -> str:
+        return super().format_console(self._get_name(value), field)
+
+    def format_json(self, value: Any, field: FieldSpec) -> Any:
+        return super().format_json(self._get_name(value), field)
 
 
 class ResourceSlotFormatter(OutputFormatter):
@@ -170,10 +197,15 @@ class AgentStatFormatter(OutputFormatter):
         except TypeError:
             return ""
 
-        value_formatters = {
+        percent_formatter = lambda metric, _: "{} %".format(metric["pct"])
+        value_formatters: Mapping[str, Callable[[MetricValue, bool], str]] = {
             "bytes": lambda metric, binary: "{} / {}".format(
-                humanize.naturalsize(int(metric["current"]), binary, gnu=binary),
-                humanize.naturalsize(int(metric["capacity"]), binary, gnu=binary),
+                humanize.naturalsize(int(metric["current"]), binary=binary, gnu=binary),
+                (
+                    humanize.naturalsize(int(metric["capacity"]), binary=binary, gnu=binary)
+                    if metric["capacity"] is not None
+                    else "(unknown)"
+                ),
             ),
             "Celsius": lambda metric, _: "{:,} C".format(
                 float(metric["current"]),
@@ -181,18 +213,20 @@ class AgentStatFormatter(OutputFormatter):
             "bps": lambda metric, _: "{}/s".format(
                 humanize.naturalsize(float(metric["current"])),
             ),
-            "pct": lambda metric, _: "{} %".format(
-                metric["pct"],
-            ),
+            "pct": percent_formatter,
+            "percent": percent_formatter,
+            "%": percent_formatter,
         }
 
-        def format_value(metric, binary):
+        def format_value(metric: MetricValue, binary: bool) -> str:
+            unit_hint = metric["unit_hint"]
             formatter = value_formatters.get(
-                metric["unit_hint"],
-                lambda m: "{} / {} {}".format(
+                unit_hint,
+                # a fallback implementation
+                lambda m, _: "{} / {} {}".format(
                     m["current"],
-                    m["capacity"],
-                    m["unit_hint"],
+                    "(unknown)" if m["capacity"] is None else m["capacity"],
+                    "" if unit_hint == "count" else unit_hint,
                 ),
             )
             return formatter(metric, binary)
