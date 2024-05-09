@@ -38,26 +38,37 @@ kernelrole_choices = list(map(lambda v: v.name, KernelRole))
 kernelrole = postgresql.ENUM(*kernelrole_choices, name="kernelrole")
 
 
-class SessionTypes(str, enum.Enum):
+class OldSessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
-    SYSTEM = "system"
-
-
-def _delete_enum(enum_name: str):
-    op.execute(
-        text(f"""DELETE FROM pg_enum
-        WHERE enumlabel = '{enum_name}'
-        AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{ENUM_CLS}'
-        )""")
-    )
 
 
 def upgrade():
+    connection = op.get_bind()
     op.drop_column("kernels", "role")
-    op.execute(f"ALTER TYPE {ENUM_CLS} ADD VALUE '{SessionTypes.SYSTEM.name}'")
+
+    # Relax the sessions.session_type from enum to varchar(64).
+    connection.execute(
+        text(
+            "ALTER TABLE sessions ALTER COLUMN session_type TYPE varchar(64) USING session_type::text;"
+        )
+    )
+    connection.execute(
+        text("ALTER TABLE sessions ALTER COLUMN session_type SET DEFAULT 'INTERACTIVE';")
+    )
+
+    # Relax the kernels.session_type from enum to varchar(64).
+    connection.execute(
+        text(
+            "ALTER TABLE kernels ALTER COLUMN session_type TYPE varchar(64) USING session_type::text;"
+        )
+    )
+    connection.execute(
+        text("ALTER TABLE kernels ALTER COLUMN session_type SET DEFAULT 'INTERACTIVE';")
+    )
+
+    connection.execute(text("DROP TYPE sessiontypes;"))
 
 
 def downgrade():
@@ -84,11 +95,11 @@ def downgrade():
         ),
         sa.Column(
             "session_type",
-            EnumType(SessionTypes),
+            sa.VARCHAR,
             index=True,
             nullable=False,
-            default=SessionTypes.INTERACTIVE,
-            server_default=SessionTypes.INTERACTIVE.name,
+            default="interactive",
+            server_default="interactive",
         ),
         extend_existing=True,
     )
@@ -99,26 +110,20 @@ def downgrade():
         sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")),
         sa.Column(
             "session_type",
-            EnumType(SessionTypes),
+            sa.VARCHAR,
             index=True,
             nullable=False,
-            default=SessionTypes.INTERACTIVE,
-            server_default=SessionTypes.INTERACTIVE.name,
+            default="interactive",
+            server_default="interactive",
         ),
         extend_existing=True,
     )
 
     # replace session_type.system role
     while True:
-        _subq = (
-            sa.select([kernels.c.id])
-            .where(kernels.c.session_type == SessionTypes.SYSTEM)
-            .limit(PAGE_SIZE)
-        )
+        _subq = sa.select([kernels.c.id]).where(kernels.c.session_type == "system").limit(PAGE_SIZE)
         _fetch_query = (
-            sa.update(kernels)
-            .values({"session_type": SessionTypes.BATCH})
-            .where(kernels.c.id.in_(_subq))
+            sa.update(kernels).values({"session_type": "batch"}).where(kernels.c.id.in_(_subq))
         )
         result = connection.execute(_fetch_query)
         if result.rowcount < PAGE_SIZE:
@@ -126,20 +131,14 @@ def downgrade():
 
     while True:
         _subq = (
-            sa.select([sessions.c.id])
-            .where(sessions.c.session_type == SessionTypes.SYSTEM)
-            .limit(PAGE_SIZE)
+            sa.select([sessions.c.id]).where(sessions.c.session_type == "system").limit(PAGE_SIZE)
         )
         _fetch_query = (
-            sa.update(sessions)
-            .values({"session_type": SessionTypes.BATCH})
-            .where(sessions.c.id.in_(_subq))
+            sa.update(sessions).values({"session_type": "batch"}).where(sessions.c.id.in_(_subq))
         )
         result = connection.execute(_fetch_query)
         if result.rowcount < PAGE_SIZE:
             break
-
-    _delete_enum(SessionTypes.SYSTEM.name)
 
     images = sa.Table(
         "images",
@@ -197,3 +196,33 @@ def downgrade():
             break
 
     op.alter_column("kernels", column_name="role", nullable=False)
+
+    connection.execute(
+        text(
+            "CREATE TYPE sessiontypes AS ENUM (%s)"
+            % (",".join(f"'{choice.name}'" for choice in OldSessionTypes))
+        )
+    )
+    # Revert sessions.session_type to enum
+    connection.execute(text("ALTER TABLE sessions ALTER COLUMN session_type DROP DEFAULT;"))
+    connection.execute(
+        text(
+            "ALTER TABLE sessions ALTER COLUMN session_type TYPE sessiontypes "
+            "USING session_type::sessiontypes;"
+        )
+    )
+    connection.execute(
+        text("ALTER TABLE sessions ALTER COLUMN session_type SET DEFAULT 'INTERACTIVE';")
+    )
+
+    # Revert kernels.session_type to enum
+    connection.execute(text("ALTER TABLE kernels ALTER COLUMN session_type DROP DEFAULT;"))
+    connection.execute(
+        text(
+            "ALTER TABLE kernels ALTER COLUMN session_type TYPE sessiontypes "
+            "USING session_type::sessiontypes;"
+        )
+    )
+    connection.execute(
+        text("ALTER TABLE kernels ALTER COLUMN session_type SET DEFAULT 'INTERACTIVE';")
+    )

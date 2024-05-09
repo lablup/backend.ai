@@ -65,6 +65,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -539,7 +540,7 @@ class SessionRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=False, index=True)
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,

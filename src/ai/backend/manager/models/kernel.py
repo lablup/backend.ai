@@ -66,6 +66,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
@@ -392,7 +393,7 @@ kernels = sa.Table(
     sa.Column("session_name", sa.String(length=64), unique=False, index=True),  # previously sess_id
     sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,

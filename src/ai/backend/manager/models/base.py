@@ -214,31 +214,42 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
+        self._use_name = use_name
         self._enum_cls = enum_cls
 
     def process_bind_param(
         self,
-        value: Optional[T_StrEnum],
+        value: T_StrEnum | None,
         dialect: Dialect,
-    ) -> Optional[str]:
-        return value.value if value is not None else None
+    ) -> str | None:
+        if value is None:
+            return None
+        if self._use_name:
+            return value.name
+        else:
+            return value.value
 
     def process_result_value(
         self,
-        value: str,
+        value: str | None,
         dialect: Dialect,
-    ) -> Optional[T_StrEnum]:
-        return self._enum_cls(value) if value is not None else None
+    ) -> T_StrEnum | None:
+        if value is None:
+            return None
+        if self._use_name:
+            return self._enum_cls[value]
+        else:
+            return self._enum_cls(value)
 
     def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, **self._opts)
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
     def python_type(self) -> T_StrEnum:
-        return self._enum_class
+        return self._enum_cls
 
 
 class CurvePublicKeyColumn(TypeDecorator):
