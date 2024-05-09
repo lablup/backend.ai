@@ -1340,8 +1340,6 @@ def _build_sql_stmt_from_connection_args(
 
     cursor_id, pagination_order, requested_page_size = connection_args
 
-    # Default ordering by id column
-    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
         parser = order_expr.parser
@@ -1350,10 +1348,14 @@ def _build_sql_stmt_from_connection_args(
     # Apply SQL order_by
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
             set_ordering = lambda col, direction: (
                 col.asc() if direction == OrderDirection.ASC else col.desc()
             )
         case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
             set_ordering = lambda col, direction: (
                 col.desc() if direction == OrderDirection.ASC else col.asc()
             )
@@ -1363,33 +1365,41 @@ def _build_sql_stmt_from_connection_args(
 
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
-        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
+        _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
         match pagination_order:
             case ConnectionPaginationOrder.FORWARD | None:
 
                 def subq_to_condition(
-                    col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
+                    column_to_be_compared: InstrumentedAttribute,
+                    subquery: ScalarSelect,
+                    direction: OrderDirection,
                 ) -> WhereClauseType:
                     if direction == OrderDirection.ASC:
-                        cond = col > subquery
+                        cond = column_to_be_compared > subquery
                     else:
-                        cond = col < subquery
-                    condition_when_same_with_subq = (col == subquery) & (id_column > _id)
+                        cond = column_to_be_compared < subquery
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column > cursor_row_id
+                    )
                     return cond | condition_when_same_with_subq
             case ConnectionPaginationOrder.BACKWARD:
 
                 def subq_to_condition(
-                    col: InstrumentedAttribute, subquery: ScalarSelect, direction: OrderDirection
+                    column_to_be_compared: InstrumentedAttribute,
+                    subquery: ScalarSelect,
+                    direction: OrderDirection,
                 ) -> WhereClauseType:
                     if direction == OrderDirection.ASC:
-                        cond = col < subquery
+                        cond = column_to_be_compared < subquery
                     else:
-                        cond = col > subquery
-                    condition_when_same_with_subq = (col == subquery) & (id_column < _id)
+                        cond = column_to_be_compared > subquery
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column < cursor_row_id
+                    )
                     return cond | condition_when_same_with_subq
 
         for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == _id).scalar_subquery()
+            subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
             cond = subq_to_condition(col, subq, direction)
             conditions.append(cond)
 
