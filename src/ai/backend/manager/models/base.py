@@ -621,7 +621,7 @@ class SlugType(TypeDecorator):
 
     def process_bind_param(self, value: str, dialect) -> str:
         if self._rx_slug.search(string=value) is None:
-            return ValueError("invalid name format. slug format required.", value)
+            raise ValueError("invalid name format. slug format required.", value)
         return value
 
 
