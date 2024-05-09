@@ -490,7 +490,7 @@ class CreateGroup(graphene.Mutation):
         _type = ProjectType[props.type]
         data = {
             "name": name,
-            "type": ProjectType[props.type],
+            "type": _type,
             "description": props.description,
             "is_active": props.is_active,
             "domain_name": props.domain_name,
