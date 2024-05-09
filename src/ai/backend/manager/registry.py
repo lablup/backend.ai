@@ -96,6 +96,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
@@ -457,6 +458,10 @@ class AgentRegistry:
                     ],
                 )
             requested_image_ref = image_row.image_ref
+            if (
+                _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
+            ) and _owner_id != f"user:{user_scope.user_uuid}":
+                raise ImageNotFound
             if not requested_image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
                     query = (
@@ -911,9 +916,12 @@ class AgentRegistry:
             )
             use_host_network_result = await conn.execute(use_host_network_query)
             use_host_network = use_host_network_result.scalar()
-            # Translate mounts/mount_map into vfolder mounts
+            # Translate mounts/mount_map/mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
+            requested_mount_options = (
+                session_enqueue_configs["creation_config"].get("mount_options") or {}
+            )
             allowed_vfolder_types = await self.shared_config.get_vfolder_types()
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -923,6 +931,7 @@ class AgentRegistry:
                 resource_policy,
                 requested_mounts,
                 requested_mount_map,
+                requested_mount_options,
             )
 
             # Prepare internal data for common dotfiles.
@@ -1435,16 +1444,25 @@ class AgentRegistry:
             size=scheduled_session.cluster_size,
             replicas=replicas,
             network_name=network_name,
-            ssh_keypair=(
-                await self.create_cluster_ssh_keypair()
-                if scheduled_session.cluster_size > 1
-                else None
-            ),
+            ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),
         )
+
+        async with self.db.begin_readonly_session() as db_sess:
+            uuid, email, username = (
+                await db_sess.execute(
+                    sa.select([UserRow.uuid, UserRow.email, UserRow.username]).where(
+                        UserRow.uuid == scheduled_session.user_uuid
+                    )
+                )
+            ).fetchone()
+
         scheduled_session.environ.update({
+            "BACKENDAI_USER_UUID": str(uuid),
+            "BACKENDAI_USER_EMAIL": email,
+            "BACKENDAI_USER_NAME": username,
             "BACKENDAI_SESSION_ID": str(scheduled_session.id),
             "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
             "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),
@@ -3148,23 +3166,72 @@ class AgentRegistry:
 
     async def get_commit_status(
         self,
-        session: SessionRow,
-    ) -> Mapping[str, str]:
-        kern_id = str(session.main_kernel.id)
-        key = f"kernel.{kern_id}.commit"
-        result: Optional[bytes] = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(key),
-        )
+        kernel_ids: Sequence[KernelId],
+    ) -> Mapping[KernelId, str]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for kernel_id in kernel_ids:
+                await pipe.get(f"kernel.{kernel_id}.commit")
+            return pipe
+
+        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+
         return {
-            "kernel": kern_id,
-            "status": str(result, "utf-8") if result is not None else CommitStatus.READY.value,
+            kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
+            for kernel_id, result in zip(kernel_ids, commit_statuses)
         }
 
     async def commit_session(
         self,
         session: SessionRow,
+        new_image_ref: ImageRef,
+        *,
+        extra_labels: dict[str, str] = {},
+    ) -> Mapping[str, Any]:
+        """
+        Commit a main kernel's container of the given session.
+        """
+
+        kernel: KernelRow = session.main_kernel
+        if kernel.status != KernelStatus.RUNNING:
+            raise InvalidAPIParameters(
+                f"Unable to commit since the kernel k:{kernel.id} (of s:{session.id}) is"
+                " currently not in RUNNING state."
+            )
+        email = await self._get_user_email(kernel)
+        async with handle_session_exception(self.db, "commit_session", session.id):
+            async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
+                resp: Mapping[str, Any] = await rpc.call.commit(
+                    str(kernel.id),
+                    email,
+                    canonical=new_image_ref.canonical,
+                    extra_labels=extra_labels,
+                )
+        return resp
+
+    async def push_image(
+        self,
+        agent: AgentId,
+        image_ref: ImageRef,
+        registry: ImageRegistry,
+    ) -> Mapping[str, Any]:
+        """
+        Commit a main kernel's container of the given session.
+        """
+        async with self.agent_cache.rpc_context(agent) as rpc:
+            resp: Mapping[str, Any] = await rpc.call.push_image(
+                image_ref.canonical,
+                image_ref.architecture,
+                {**registry, "url": str(registry["url"])},
+                is_local=image_ref.is_local,
+            )
+        return resp
+
+    async def commit_session_to_file(
+        self,
+        session: SessionRow,
         filename: str | None,
+        extra_labels: dict[str, str] = {},
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
@@ -3183,9 +3250,11 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
-        async with handle_session_exception(self.db, "commit_session", session.id):
+        async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel.id), email, filename)
+                resp: Mapping[str, Any] = await rpc.call.commit(
+                    str(kernel.id), email, filename=filename, extra_labels=extra_labels
+                )
         return resp
 
     async def get_agent_local_config(

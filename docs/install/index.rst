@@ -9,4 +9,5 @@ Installation Guides
    install-on-clouds
    install-on-premise
    install-monitoring-and-logging-tools
+   upgrade-existing-cluster
    env-wsl2

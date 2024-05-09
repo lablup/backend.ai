@@ -64,7 +64,8 @@
       "Data&Model": "Veri",
       "InvalidBlankPassword": "Şifrenizi girin",
       "InvalidBlankEmail": "E-postanızı giriniz",
-      "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor"
+      "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
+      "MyEnvironments": "Ortamlarım"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -113,7 +114,8 @@
     "ATOMEnabled": "ATOM NPU Etkin",
     "WarboyEnabled": "Warboy NPU Etkinleştirildi",
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin"
   },
   "session": {
     "launcher": {
@@ -255,11 +257,23 @@
       "EnvironmentVariableNamePatternError": "Değişken adı bir harf veya alt çizgi ile başlamalıdır ve yalnızca harfler, sayılar ve alt çizgiler içerebilir.",
       "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı.",
       "Template": "Oturum Şablonu",
-      "EnableAutomaticShmem": "Otomatik paylaşılan bellek",
+      "EnableAutomaticMiniumShmem": "Minimum paylaşılan belleği ayarlama",
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Küme boyutu 2'den az olmadığında yalnızca tam sayılara izin verilir.",
       "StartAfter": "Şundan sonra başla:",
-      "StartTimeDoesNotApply": "Başlangıç ​​zamanı ayarlanmamışsa geçerli değildir."
+      "StartTimeDoesNotApply": "Başlangıç ​​zamanı ayarlanmamışsa geçerli değildir.",
+      "MiniumAllocation": "Minimum gereksinimler",
+      "MiniumAllocationTooltip": "Seçilen çalışma ortamı için minimum gereksinim olarak seçin",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "\"{{launcher}}\" oturum başlatıcısını kullanıyorsunuz.",
+      "SkipToConfirmAndLaunch": "İncelemeye geç",
+      "InteractiveModeDesc": "jupyter notebook, visual studio code vb. aracılığıyla etkileşimli olarak kod oluşturmanıza, test etmenize ve çalıştırmanıza olanak tanır.",
+      "BatchModeDesc": "Fikrinizi ölçeklendirmek için kodunuzu birden fazla düğüm ve küme ile çalıştırabilirsiniz",
+      "AddEnvironmentVariable": "Ortam değişkenleri ekleme",
+      "EnvironmentVariableValueRequired": "Lütfen bir değer girin.",
+      "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin.",
+      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -293,7 +307,8 @@
       "Prepared": "Hazırlanmış",
       "NoExistingConnectionExample": "Kopyalanacak Bağlantı Örneği Yok.",
       "SSHConnectionExampleClipboardCopy": "SSH Bağlantı Örneği panoya kopyalandı.",
-      "App": "Uygulama"
+      "App": "Uygulama",
+      "ConnectUrlIsNotValid": "Bağlantı URL'si geçerli değil."
     },
     "TensorboardPath": "TensorBoard için günlük dizini",
     "InputTensorboardPath": "Lütfen TensorBoard'un başvuracağı günlük dizinini girin. Günlük dizininin otomatik olarak oluşturulmayacağını unutmayın..",
@@ -312,12 +327,16 @@
     "Architecture": "Mimarlık",
     "SessionType": "OturumTürü",
     "Validation": {
-      "EnterValidSessionName": "Geçerli oturum adını girin",
+      "EnterValidSessionName": "Lütfen en az 4 alfabe harfi veya rakamı, kısa çizgi veya alt çizgiden oluşan bir kombinasyon girin.",
       "SessionNameRequired": "Oturum adı gereklidir",
       "SluggedStrings": "Kesikli dizeler (>3 karakter)",
       "SessionNameAlreadyExist": "Oturum adı zaten mevcut",
       "SessionNameTooLong64": "Lütfen 64 veya daha az karakter girin.",
-      "PleaseFollowSessionNameRule": "Lütfen en az 4 harf, rakam, '.', '_' ve '-' kombinasyonunu girin."
+      "PleaseFollowSessionNameRule": "Lütfen en az 4 harf, rakam, '.', '_' ve '-' kombinasyonunu girin.",
+      "SessionNameTooShort": "Lütfen en az 4 karakter giriniz.",
+      "SessionNameShouldStartWith": "Bir alfabe harfi, bir sayı veya '_' ile başlamalıdır.",
+      "SessionNameShouldEndWith": "Bir alfabe harfi, bir sayı veya '_' ile bitmelidir.",
+      "SessionNameInvalidCharacter": "Bir adın ortasında yalnızca alfabe harfleri, sayılar ve '_' bulunabilir."
     },
     "Interactive": "İnteraktif",
     "Batch": "Toplu İş",
@@ -377,7 +396,15 @@
     "CPU": "CPU",
     "MEM": "Hafıza",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (bellek)"
+    "GPU(MEM)": "GPU (bellek)",
+    "Agents": "Temsilciler",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (bellek)",
+    "ConvertSessionToImage": "Oturumu Resme Dönüştür",
+    "SessionName": "Oturum Adı",
+    "SessionId": "Oturum kimliği",
+    "EnvironmentAndVersion": "Ortam ve Sürüm",
+    "Tags": "Etiketler"
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -411,7 +438,10 @@
     "EnterManually": "Manuel Olarak Girin",
     "Download": "İndir",
     "Clone": "Klon",
-    "Config": "Konfigürasyon"
+    "Config": "Konfigürasyon",
+    "Next": "Sonraki",
+    "Previous": "Önceki",
+    "PushToImage": "Oturumu özelleştirilmiş resme aktarın"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -537,7 +567,8 @@
     "Status": "Durum",
     "NoUserToDisplay": "Görüntülenecek Kullanıcı Yok",
     "EnableSudoSession": "Sudo oturumunu etkinleştir",
-    "MainAccessKey": "Ana Erişim Anahtarı"
+    "MainAccessKey": "Ana Erişim Anahtarı",
+    "InactivateTheFollowingUsers": "Aşağıdaki kullanıcıları devre dışı bırakın."
   },
   "data": {
     "Folders": "klasörler",
@@ -590,7 +621,7 @@
       "FolderRenamed": "Klasör yeniden adlandırıldı",
       "FolderNameMismatched": "Klasör adı eşleşmiyor. Lütfen giriş alanında boşluk karakteri olup olmadığını kontrol edin.",
       "SameFileName": "Giriş değeri, güncellenecek dosya adıyla aynıdır. Lütfen farklı bir adla değiştirin.",
-      "FolderDeleted": "klasör silindi",
+      "FolderDeleted": "{{ folderName }} klasörü silindi.",
       "FolderUpdated": "Klasör seçenekleri güncellendi",
       "FolderDisconnected": "Klasörün bağlantısı kesildi.",
       "FileRenamed": "Dosya Yeniden Adlandırıldı",
@@ -617,7 +648,13 @@
       "CloneFolder": "Klasör klonlama",
       "ShareFolder": "Paylaşım klasörü",
       "ModifyPermissions": "İzinleri değiştirme",
-      "LeaveFolder": "Klasörden ayrıl"
+      "LeaveFolder": "Klasörden ayrıl",
+      "Restore": "Eski haline getirmek",
+      "DeleteForever": "Tamamen sil",
+      "FolderRestored": "{{ klasörAdı }} klasörü geri yüklendi.",
+      "FolderDeletedForever": "{{ folderName }} klasörü kalıcı olarak silindi.",
+      "MoveToTrashBin": "Çöp kutusuna taşı",
+      "MovedToTrashBin": "{{ folderName }} klasörü çöp kutusuna taşındı."
     },
     "explorer": {
       "Delete": "Sil...",
@@ -668,7 +705,8 @@
       "SFTPSessionNotAvailable": "SFTP Oturumu şu anda mevcut değil",
       "StartingSSH/SFTPSession": "SFTP oturumu başlatılıyor...",
       "NumberOfSFTPSessionsExceededTitle": "Çalışan yükleme oturumu sayısı sınırına ulaşıldı",
-      "NumberOfSFTPSessionsExceededBody": "Oluşturmanıza izin verilen tüm mevcut yükleme oturumlarını çalıştırıyorsunuz. Lütfen yeni bir oturum başlatmadan önce kullanılmayan yükleme oturumlarını sonlandırın."
+      "NumberOfSFTPSessionsExceededBody": "Oluşturmanıza izin verilen tüm mevcut yükleme oturumlarını çalıştırıyorsunuz. Lütfen yeni bir oturum başlatmadan önce kullanılmayan yükleme oturumlarını sonlandırın.",
+      "DownloadNotAllowed": "Bu klasörde dosya/klasör indirmeye izin verilmiyor."
     },
     "invitation": {
       "NoValidEmails": "Geçerli e-posta girilmedi",
@@ -707,21 +745,24 @@
     "ModelStore": "Model Mağazası",
     "New": "Yeni",
     "Add": "Ekle",
-    "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür."
+    "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "UYARI: bu geri alınamaz!",
       "LogDeletion": "Tüm günlük mesajlarını silmek istediğinizden emin misiniz?",
       "WillBeAppliedToNewSessions": "Bu güncelleme yeni oturumlara uygulanacaktır.",
-      "Required": "Gerekli"
+      "Required": "Gerekli",
+      "DeleteForeverDesc": "UYARI: seçilen öğeler kalıcı olarak silinecek ve bunları geri yükleyemeyeceksiniz."
     },
     "ask": {
       "DoYouWantToProceed": "Devam etmek istiyor musunuz?"
     },
     "title": {
       "LetsDouble-Check": "İki kez kontrol edelim",
-      "Notice": "Uyarı"
+      "Notice": "Uyarı",
+      "DeleteForever": "Sonsuza Kadar Silinsin mi?"
     },
     "ErrorOccurred": "Hata oluştu",
     "error": {
@@ -776,7 +817,8 @@
     "PasswordsDoNotMatch": "Şifre ve Onaylama eşleşmiyor.",
     "NoChangeMade": "Herhangi bir değişiklik yapılmadı",
     "Architecture": "Mimarlık",
-    "NoImageToDisplay": "Görüntülenecek Görüntü Yok"
+    "NoImageToDisplay": "Görüntülenecek Görüntü Yok",
+    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi."
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1138,7 +1180,10 @@
     "OutOfRange": "Menzil dışında.",
     "Plugins": "Eklentiler",
     "OpenSourceCUDAGPUsupport": "Açık Kaynak CUDA GPU desteği",
-    "ShowOnlyChanged": "Yalnızca Değişiklikleri Görüntüle"
+    "ShowOnlyChanged": "Yalnızca Değişiklikleri Görüntüle",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Hyperaccel LPU hızlandırıcısını kullanın.",
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir."
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1191,14 +1236,12 @@
     "LeaveService": "Hizmetten Ayrıl",
     "DescConfirmLeave": "Onaylamak için lütfen E-posta adresinizi ve şifrenizi tekrar giriniz.",
     "Password": "Parola",
-    "E-mail": "e-posta",
     "APIKey": "API Anahtarı",
     "SecretKey": "Gizli anahtar",
     "Endpoint": "uç nokta",
     "NotAUser": "Kullanıcı değil misiniz?",
     "LoginAnotherway": "Başka bir şekilde giriş yapmak ister misiniz?",
     "SignUp": "kaydol",
-    "LoginWithE-mail": "E-posta ile Giriş",
     "LoginWithIAM": "IAM ile Giriş Yap",
     "ClickToUseIAM": "IAM'yi Kullanmak İçin Tıklayın",
     "ClickToUseID": "Kimliği Kullanmak İçin Tıklayın",
@@ -1226,7 +1269,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "SAML ile Oturum Açma",
       "LoginWithRealm": "{{realmName }} ile giriş yapın"
-    }
+    },
+    "LoginWithE-mailorUsername": "E-posta veya Kullanıcı Adıyla Giriş Yapın",
+    "E-mailorUsername": "E-posta ya da kullanıcı adı"
   },
   "signup": {
     "SignupBETA": "Kaydolma (yalnızca Beta davetiyesi)",
@@ -1358,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Bu kaynak ilkesine referans veren anahtar çiftleri vardır.",
     "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
     "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
-    "WrongAPIServerAddress": "Yanlış API sunucu adresi."
+    "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
+    "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1464,7 +1510,8 @@
     "ForUser": "Kullanıcı için",
     "ForProject": "Proje için",
     "QuotaDoesNotSupported": "Bu depolama arka ucu kotayı desteklemez.",
-    "BeCarefulToSetUserResourcePolicy": "Bir kaynak ilkesinin değiştirilmesi, o kullanıcı kaynak ilkesini kullanan tüm kullanıcıları etkileyebilir, bu nedenle dikkatli kullanın."
+    "BeCarefulToSetUserResourcePolicy": "Bir kaynak ilkesinin değiştirilmesi, o kullanıcı kaynak ilkesini kullanan tüm kullanıcıları etkileyebilir, bu nedenle dikkatli kullanın.",
+    "StorageSetting": "Depolama Ayarı"
   },
   "totp": {
     "TotpSetupCompleted": "Etkinleştirilmiş 2FA",
@@ -1481,7 +1528,8 @@
   },
   "OpenVSCodeRemote": "Yerel Visual Studio Kodunu açın",
   "inputLimit": {
-    "4to64chars": "(4~64 karakter)"
+    "4to64chars": "(4~64 karakter)",
+    "4to32chars": "(4~32 karakter)"
   },
   "modelStore": {
     "Description": "Tanım",

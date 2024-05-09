@@ -20,7 +20,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, MountExpression
 
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
@@ -245,26 +245,35 @@ def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_mount_arg(
-    mount_args: Optional[Sequence[str]],
-) -> Tuple[Sequence[str], Mapping[str, str]]:
+    mount_args: Optional[Sequence[str]] = None,
+    *,
+    escape: bool = True,
+) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
-    vfolder name and in-container mount path pairs.
+    vfolder name and in-container mount path pairs,
+    followed by extra options.
+
+    :param mount_args: A list of mount arguments such as
+        [
+            "type=bind,source=/colon:path/test,target=/data",
+            "type=bind,source=/colon:path/abcd,target=/zxcv,readonly",
+            # simple formats are still supported
+            "vf-abcd:/home/work/zxcv",
+        ]
     """
     mounts = set()
     mount_map = {}
+    mount_options = {}
     if mount_args is not None:
-        for value in mount_args:
-            if "=" in value:
-                sp = value.split("=", maxsplit=1)
-            elif ":" in value:  # docker-like volume mount mapping
-                sp = value.split(":", maxsplit=1)
-            else:
-                sp = [value]
-            mounts.add(sp[0])
-            if len(sp) == 2:
-                mount_map[sp[0]] = sp[1]
-    return list(mounts), mount_map
+        for mount_arg in mount_args:
+            mountpoint = {**MountExpression(mount_arg).parse(escape=escape)}
+            mount = str(mountpoint.pop("source"))
+            mounts.add(mount)
+            if target := mountpoint.pop("target", None):
+                mount_map[mount] = str(target)
+            mount_options[mount] = mountpoint
+    return list(mounts), mount_map, mount_options
 
 
 @main.command()
@@ -448,7 +457,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map = prepare_mount_arg(mount)
+    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
     if env_range is None:
         env_range = []  # noqa
@@ -628,6 +637,7 @@ def run(
                 cluster_mode=cluster_mode,
                 mounts=mount,
                 mount_map=mount_map,
+                mount_options=mount_options,
                 envs=envs,
                 resources=resources,
                 resource_opts=resource_opts,
