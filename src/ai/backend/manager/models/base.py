@@ -70,7 +70,11 @@ from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
-from .gql_relay import AsyncListConnectionField, AsyncNode, ConnectionPaginationOrder
+from .gql_relay import (
+    AsyncListConnectionField,
+    AsyncNode,
+    ConnectionPaginationOrder,
+)
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 

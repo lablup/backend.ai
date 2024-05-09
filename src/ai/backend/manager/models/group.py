@@ -53,7 +53,11 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
+)
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
