@@ -8,6 +8,7 @@ import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -43,6 +44,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
+    RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -58,12 +60,10 @@ from ai.backend.common.types import (
     ResourceSlot,
     RoundRobinState,
     SessionId,
-    SessionTypes,
     aobject,
 )
 from ai.backend.manager.models.session import _build_session_fetch_query
-from ai.backend.manager.types import DistributedLockFactory, UserScope
-from ai.backend.manager.utils import query_userinfo
+from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
@@ -82,12 +82,9 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    keypair_resource_policies,
-    keypairs,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    users,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
@@ -97,7 +94,10 @@ from .predicates import (
     check_domain_resource_limit,
     check_group_resource_limit,
     check_keypair_resource_limit,
+    check_pending_session_count_limit,
+    check_pending_session_resource_limit,
     check_reserved_batch_session,
+    check_user_resource_limit,
 )
 from .types import (
     AbstractScheduler,
@@ -183,6 +183,7 @@ class SchedulerDispatcher(aobject):
         self.db = registry.db
         self.redis_live = redis_helper.get_redis_object(
             self.shared_config.data["redis"],
+            name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
 
@@ -480,8 +481,20 @@ class SchedulerDispatcher(aobject):
                     if not sess_ctx.is_private:
                         predicates += [
                             (
+                                "pending_session_resource_limit",
+                                check_pending_session_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "pending_session_count_limit",
+                                check_pending_session_count_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
                                 "keypair_resource_limit",
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_resource_limit",
+                                check_user_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
                                 "user_group_resource_limit",
@@ -507,26 +520,20 @@ class SchedulerDispatcher(aobject):
             passed_predicates = []
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": repr(result),
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": repr(result),
+                    })
                     continue
                 if result.passed:
-                    passed_predicates.append(
-                        {
-                            "name": predicate_name,
-                        }
-                    )
+                    passed_predicates.append({
+                        "name": predicate_name,
+                    })
                 else:
-                    failed_predicates.append(
-                        {
-                            "name": predicate_name,
-                            "msg": result.message or "",
-                        }
-                    )
+                    failed_predicates.append({
+                        "name": predicate_name,
+                        "msg": result.message or "",
+                    })
 
             async def _check_predicates_hook() -> HookResult:
                 async with self.db.begin_readonly_session() as db_sess:
@@ -553,12 +560,10 @@ class SchedulerDispatcher(aobject):
                     # Append result only when plugin exists.
                     passed_predicates.append({"name": hook_name})
             else:
-                failed_predicates.append(
-                    {
-                        "name": hook_name,
-                        "msg": hook_result.reason or "",
-                    }
-                )
+                failed_predicates.append({
+                    "name": hook_name,
+                    "msg": hook_result.reason or "",
+                })
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
@@ -720,12 +725,16 @@ class SchedulerDispatcher(aobject):
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architectures' single node session",
             )
+        if not sess_ctx.kernels:
+            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
 
         try:
+            if not candidate_agents:
+                raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
@@ -751,14 +760,45 @@ class SchedulerDispatcher(aobject):
             agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
+
+                async with self.db.begin_session() as db_sess:
+                    result = (
+                        await db_sess.execute(
+                            sa.select([AgentRow.available_slots, AgentRow.occupied_slots]).where(
+                                AgentRow.id == agent_id
+                            )
+                        )
+                    ).fetchall()[0]
+
+                if result is None:
+                    raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+
+                available_slots, occupied_slots = result
+
+                for key in available_slots.keys():
+                    if (
+                        available_slots[key] - occupied_slots.get(key, Decimal("0"))
+                        >= sess_ctx.requested_slots[key]
+                    ):
+                        continue
+                    else:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                f"The designated agent ({agent_id}) does not have "
+                                f"the enough remaining capacity ({key}, "
+                                f"requested: {sess_ctx.requested_slots[key]}, "
+                                f"remaining: {available_slots[key] - occupied_slots[key]})."
+                            ),
+                        )
+
             else:
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    rr_state: RoundRobinState | None = (
-                        await sched_ctx.registry.shared_config.get_roundrobin_state(
-                            sgroup_name, requested_architecture
-                        )
+                    rr_state: (
+                        RoundRobinState | None
+                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
+                        sgroup_name, requested_architecture
                     )
 
                     if rr_state is not None:
@@ -821,23 +861,6 @@ class SchedulerDispatcher(aobject):
                         )
 
             async with self.db.begin_session() as agent_db_sess:
-                query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
-                available_agent_slots = (await agent_db_sess.execute(query)).scalar()
-                if available_agent_slots is None:
-                    raise GenericBadRequest(f"No such agent: {agent_id}")
-                assert isinstance(available_agent_slots, ResourceSlot)
-                for key in available_agent_slots:
-                    if available_agent_slots[key] >= sess_ctx.requested_slots[key]:
-                        continue
-                    else:
-                        raise InstanceNotAvailable(
-                            extra_msg=(
-                                f"The designated agent ({agent_id}) does not have "
-                                f"the enough remaining capacity ({key}, "
-                                f"requested: {sess_ctx.requested_slots[key]}, "
-                                f"available: {available_agent_slots[key]})."
-                            ),
-                        )
                 agent_alloc_ctx = await _reserve_agent(
                     sched_ctx,
                     agent_db_sess,
@@ -985,12 +1008,24 @@ class SchedulerDispatcher(aobject):
                     agent: Optional[AgentRow] = kernel.agent_row
                     if agent is not None:
                         # Check the resource availability of the manually designated agent
-                        query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
-                        available_agent_slots = (await agent_db_sess.execute(query)).scalar()
-                        if available_agent_slots is None:
-                            raise GenericBadRequest(f"No such agent: {agent.id}")
-                        for key in available_agent_slots:
-                            if available_agent_slots[key] >= kernel.requested_slots[key]:
+                        result = (
+                            await agent_db_sess.execute(
+                                sa.select([
+                                    AgentRow.available_slots,
+                                    AgentRow.occupied_slots,
+                                ]).where(AgentRow.id == agent.id)
+                            )
+                        ).fetchall()[0]
+
+                        if result is None:
+                            raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+                        available_slots, occupied_slots = result
+
+                        for key in available_slots.keys():
+                            if (
+                                available_slots[key] - occupied_slots[key]
+                                >= kernel.requested_slots[key]
+                            ):
                                 continue
                             else:
                                 raise InstanceNotAvailable(
@@ -998,7 +1033,7 @@ class SchedulerDispatcher(aobject):
                                         f"The designated agent ({agent.id}) does not have "
                                         f"the enough remaining capacity ({key}, "
                                         f"requested: {sess_ctx.requested_slots[key]}, "
-                                        f"available: {available_agent_slots[key]})."
+                                        f"remaining: {available_slots[key] - occupied_slots[key]})."
                                     ),
                                 )
                         agent_id = agent.id
@@ -1007,6 +1042,10 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
+                        if not candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg="No agents are available for scheduling"
+                            )
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
@@ -1316,7 +1355,7 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warn("prepare(): timeout while executing start_session()")
+            log.warning("prepare(): timeout while executing start_session()")
 
     async def scale_services(
         self,
@@ -1325,7 +1364,7 @@ class SchedulerDispatcher(aobject):
         event: DoScaleEvent,
     ) -> None:
         log.debug("scale_services(): triggered")
-        # Altering inference sessions should only be done by this method
+        # Altering inference sessions should only be done by invoking this method
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.scale_services"
 
@@ -1357,25 +1396,25 @@ class SchedulerDispatcher(aobject):
                 status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
             )
         for endpoint in endpoints:
-            non_error_routings = [
+            active_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
             desired_session_count = endpoint.desired_session_count
             if (
                 endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
-                and len(endpoint.routings) == 0
+                and len(active_routings) == 0
             ):
                 endpoints_to_mark_terminated.add(endpoint)
                 continue
 
-            if len(non_error_routings) > desired_session_count:
+            if len(active_routings) > desired_session_count:
                 # We need to scale down!
-                destroy_count = len(non_error_routings) - desired_session_count
+                destroy_count = len(active_routings) - desired_session_count
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
-                            for route in non_error_routings
+                            for route in active_routings
                             if (
                                 route.status != RouteStatus.PROVISIONING
                                 and route.status != RouteStatus.TERMINATING
@@ -1387,19 +1426,19 @@ class SchedulerDispatcher(aobject):
                 log.debug(
                     "Shrinking {} from {} to {}",
                     endpoint.name,
-                    len(non_error_routings),
+                    len(active_routings),
                     endpoint.desired_session_count,
                 )
-            elif len(non_error_routings) < desired_session_count:
+            elif len(active_routings) < desired_session_count:
                 if endpoint.retries > SERVICE_MAX_RETRIES:
                     continue
                 # We need to scale up!
-                create_count = desired_session_count - len(non_error_routings)
+                create_count = desired_session_count - len(active_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
-                    len(non_error_routings),
+                    len(active_routings),
                     endpoint.desired_session_count,
                 )
 
@@ -1424,7 +1463,7 @@ class SchedulerDispatcher(aobject):
             try:
                 await self.registry.destroy_session(
                     session,
-                    forced=False,
+                    forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
             except SessionNotFound:
@@ -1439,100 +1478,25 @@ class SchedulerDispatcher(aobject):
             ),
         )
 
-        user_ids = tuple(
-            {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
-            | {endpoint.session_owner for endpoint in endpoints_to_expand.keys()}
-        )
-
-        async with self.db.begin_readonly() as conn:
-            join = sa.join(
-                users, keypairs, (users.c.uuid == keypairs.c.user) & keypairs.c.is_active.is_(True)
-            )
-            query = (
-                sa.select(
-                    [
-                        users.c.uuid,
-                        users.c.role,
-                        users.c.domain_name,
-                        users.c.sudo_session_enabled,
-                        keypairs.c.access_key,
-                        keypairs.c.resource_policy,
-                    ]
-                )
-                .select_from(join)
-                .where(users.c.uuid.in_(user_ids))
-            )
-            result = await conn.execute(query)
-            user_id_row_mapping = {row.uuid: row for row in result.fetchall()}
-            keypair_resource_policy_names = {
-                row.resource_policy for row in user_id_row_mapping.values()
-            }
-            query = (
-                sa.select([keypair_resource_policies])
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name.in_(keypair_resource_policy_names))
-            )
-            result = await conn.execute(query)
-            keypair_resource_policy_name_policy_mapping = {
-                row.name: row for row in result.fetchall()
-            }
-
-        for endpoint, expand_count in endpoints_to_expand.items():
-            log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
-            async with self.db.begin_readonly() as conn:
-                _, group_id, resource_policy = await query_userinfo(
-                    conn,
-                    user_id_row_mapping[endpoint.created_user].uuid,
-                    user_id_row_mapping[endpoint.created_user].access_key,
-                    user_id_row_mapping[endpoint.created_user].role,
-                    user_id_row_mapping[endpoint.created_user].domain_name,
-                    keypair_resource_policy_name_policy_mapping[
-                        user_id_row_mapping[endpoint.created_user].resource_policy
-                    ],
-                    endpoint.domain,
-                    endpoint.project,
-                    query_on_behalf_of=user_id_row_mapping[endpoint.session_owner]["access_key"],
-                )
-            for _ in range(expand_count):
-                try:
-                    await self.registry.create_session(
-                        f"{endpoint.name}-{uuid.uuid4()}",
-                        endpoint.image_row.name,
-                        endpoint.image_row.architecture,
-                        UserScope(
-                            domain_name=endpoint.domain,
-                            group_id=group_id,
-                            user_uuid=user_id_row_mapping[endpoint.created_user].uuid,
-                            user_role=user_id_row_mapping[endpoint.created_user].role,
-                        ),
-                        user_id_row_mapping[endpoint.session_owner]["access_key"],
-                        resource_policy,
-                        SessionTypes.INFERENCE,
-                        {
-                            "mounts": [endpoint.model],
-                            "mount_map": {endpoint.model: endpoint.model_mount_destiation},
-                            "environ": endpoint.environ,
-                            "scaling_group": endpoint.resource_group,
-                            "resources": endpoint.resource_slots,
-                            "resource_opts": endpoint.resource_opts,
-                            "preopen_ports": None,
-                            "agent_list": None,
-                        },
-                        ClusterMode[endpoint.cluster_mode],
-                        endpoint.cluster_size,
-                        bootstrap_script=endpoint.bootstrap_script,
-                        startup_command=endpoint.startup_command,
-                        tag=endpoint.tag,
-                        callback_url=endpoint.callback_url,
-                        enqueue_only=True,
-                        endpoint_id=endpoint.id,
-                        sudo_session_enabled=user_id_row_mapping[
-                            endpoint.session_owner
-                        ].sudo_session_enabled,
+        created_routes = []
+        async with self.db.begin_session() as db_sess:
+            for endpoint, expand_count in endpoints_to_expand.items():
+                log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
+                for _ in range(expand_count):
+                    route_id = uuid.uuid4()
+                    routing_row = RoutingRow(
+                        route_id,
+                        endpoint.id,
+                        None,
+                        endpoint.session_owner,
+                        endpoint.domain,
+                        endpoint.project,
                     )
-                except Exception:
-                    # TODO: Handle
-                    log.exception("error while creating session:")
+                    db_sess.add(routing_row)
+                    created_routes.append(route_id)
+            await db_sess.commit()
+        for route_id in created_routes:
+            await self.event_producer.produce_event(RouteCreatedEvent(route_id))
         await redis_helper.execute(
             self.redis_live,
             lambda r: r.hset(
@@ -1548,12 +1512,10 @@ class SchedulerDispatcher(aobject):
             async with self.db.begin_session() as db_sess:
                 query = (
                     sa.update(EndpointRow)
-                    .values(
-                        {
-                            "destroyed_at": sa.func.now(),
-                            "lifecycle_stage": EndpointLifecycle.DESTROYED,
-                        }
-                    )
+                    .values({
+                        "destroyed_at": sa.func.now(),
+                        "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                    })
                     .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
                 )
                 await db_sess.execute(query)
@@ -1572,7 +1534,7 @@ class SchedulerDispatcher(aobject):
                         endpoint,
                     )
                 except Exception as e:
-                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                    log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,

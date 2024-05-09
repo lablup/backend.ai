@@ -8,7 +8,7 @@ Icon made by Freepik from www.flaticon.com
 
 file_type_*.svg from vscode-icon project ( https://github.com/vscode-icons/vscode-icons )
 
-ROCm.png , ROCm project icon is trademark of amd.com 
+rocm.svg , ROCm project icon is trademark of amd.com (https://library.amd.com/web/217be2670389d983/technologies---software-logos/)
 
 Icons made by Kiranshastry from www.flaticon.com
  * default.png
@@ -16,7 +16,7 @@ Icons made by Kiranshastry from www.flaticon.com
 Icons from pngwave https://www.pngwave.com/png-clip-art-cdsrv
  * xfce.png
 
-Icons from iconfinder by Paomedia (https://www.iconfinder.com/paomedia) under CC Attribution 3.0 ( https://creativecommons.org/licenses/by/3.0/ ) 
+Icons from iconfinder by Paomedia (https://www.iconfinder.com/paomedia) under CC Attribution 3.0 ( https://creativecommons.org/licenses/by/3.0/ )
  * terminal.svg
 
 tpu.svg, TPU icon is trademark of google.com
@@ -32,11 +32,11 @@ Icons from www.flaticon.com made by https://www.flaticon.com/authors/dave-gandy 
 Icon from Cern GitLab ( https://gitlab.cern.ch/linuxsupport/ceph-for-el6 ) under Apache 2.0 License.
  * ceph.png
 
-Icon from Github purestorage repo ( https://github.com/purestorage/helm-charts ) under Apache 2.0 License.
+Icon from GitHub purestorage repo ( https://github.com/purestorage/helm-charts ) under Apache 2.0 License.
  * purestorage.png
 
 Icon from flaticon by Pixel perfect ( https://www.flaticon.com/authors/pixel-perfect )
  * xrdp.svg
 
 Icon from flaticon by Freepik ( https://www.flaticon.com/free-icon/check-list_1721929?related_id=1721929 )
- * check-list.svg 
+ * check-list.svg

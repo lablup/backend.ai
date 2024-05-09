@@ -1,3 +1,4 @@
+python_sources()
 python_requirements(
     name="reqs-pytest",
     source="pytest-requirements.txt",
@@ -27,4 +28,9 @@ python_requirements(
     name="reqs-towncrier",
     source="towncrier-requirements.txt",
     resolve="towncrier",
+)
+python_requirements(
+    name="reqs-setuptools",
+    source="setuptools-requirements.txt",
+    resolve="setuptools",
 )

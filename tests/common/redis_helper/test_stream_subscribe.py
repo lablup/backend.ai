@@ -53,6 +53,7 @@ async def test_stream_fanout(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -88,7 +89,7 @@ async def test_stream_fanout(
             with pytest.raises(RedisConnectionError):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         elif disruption_method == "pause":
-            with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
+            with pytest.raises((RedisConnectionError, asyncio.TimeoutError, RedisTimeoutError)):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         else:
             raise RuntimeError("should not reach here")

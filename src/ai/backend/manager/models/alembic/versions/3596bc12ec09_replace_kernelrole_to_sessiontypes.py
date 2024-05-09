@@ -5,6 +5,7 @@ Revises: b86b341fd9c9
 Create Date: 2023-10-04 16:43:46.281383
 
 """
+
 import enum
 
 import sqlalchemy as sa
@@ -45,11 +46,13 @@ class SessionTypes(str, enum.Enum):
 
 
 def _delete_enum(enum_name: str):
-    op.execute(text(f"""DELETE FROM pg_enum
+    op.execute(
+        text(f"""DELETE FROM pg_enum
         WHERE enumlabel = '{enum_name}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{ENUM_CLS}'
-        )"""))
+        )""")
+    )
 
 
 def upgrade():
@@ -169,26 +172,24 @@ def downgrade():
             break
         query = (
             sa.update(kernels)
-            .values(
-                {
-                    "role": cast(
-                        coalesce(
-                            # `limit(1)` is introduced since it is possible (not prevented) for two
-                            # records have the same image name. Without `limit(1)`, the records
-                            # raises multiple values error.
-                            sa.select([images.c.labels.op("->>")("ai.backend.role")])
-                            .select_from(images)
-                            .where(images.c.name == kernels.c.image)
-                            .limit(1)
-                            .as_scalar(),
-                            # Set the default role when there is no matching image.
-                            # This may occur when one of the previously used image is deleted.
-                            KernelRole.COMPUTE.value,
-                        ),
-                        EnumType(KernelRole),
-                    )
-                }
-            )
+            .values({
+                "role": cast(
+                    coalesce(
+                        # `limit(1)` is introduced since it is possible (not prevented) for two
+                        # records have the same image name. Without `limit(1)`, the records
+                        # raises multiple values error.
+                        sa.select([images.c.labels.op("->>")("ai.backend.role")])
+                        .select_from(images)
+                        .where(images.c.name == kernels.c.image)
+                        .limit(1)
+                        .as_scalar(),
+                        # Set the default role when there is no matching image.
+                        # This may occur when one of the previously used image is deleted.
+                        KernelRole.COMPUTE.value,
+                    ),
+                    EnumType(KernelRole),
+                )
+            })
             .where(kernels.c.id.in_(kernel_ids_to_update))
         )
         result = connection.execute(query)

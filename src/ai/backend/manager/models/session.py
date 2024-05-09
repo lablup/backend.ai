@@ -301,7 +301,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         candidate = SessionStatus.PULLING
                     case KernelStatus.PREPARING:
                         candidate = SessionStatus.PREPARING
-                    case (KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING):
+                    case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
                     case KernelStatus.TERMINATING | KernelStatus.ERROR:
                         candidate = SessionStatus.RUNNING_DEGRADED
@@ -513,7 +513,7 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
-class SessionOp(str, enum.Enum):
+class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
     RESTART = "restart_session"
@@ -526,7 +526,7 @@ class SessionOp(str, enum.Enum):
     GET_AGENT_LOGS = "get_logs_from_agent"
 
 
-class KernelLoadingStrategy(str, enum.Enum):
+class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
     NONE = "none"
@@ -926,7 +926,7 @@ class SessionRow(Base):
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] = [],
+        eager_loading_op: list[Any] | None = None,
     ) -> SessionRow:
         """
         Retrieve the session information by session's UUID,
@@ -942,29 +942,26 @@ class SessionRow(Base):
         :param kernel_loading_strategy: Determines JOIN strategy of `kernels` relation when fetching session rows.
         :param eager_loading_op: Extra loading operators to be passed directly to `match_sessions()` API.
         """
+        _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend(
-                    [
+                _eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(SessionRow.kernels).options(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend(
-                    [
+                _eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(kernel_rel).options(
                         noload("*"),
-                        selectinload(kernel_rel).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
 
         session_list = await cls.match_sessions(
             db_session,
@@ -972,7 +969,7 @@ class SessionRow(Base):
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            eager_loading_op=eager_loading_op,
+            eager_loading_op=_eager_loading_op,
         )
         if not session_list:
             raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
@@ -999,31 +996,28 @@ class SessionRow(Base):
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy=KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] = [],
+        eager_loading_op: list[Any] | None = None,
     ) -> Iterable[SessionRow]:
+        _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
             case KernelLoadingStrategy.ALL_KERNELS:
-                eager_loading_op.extend(
-                    [
+                _eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(SessionRow.kernels).options(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                eager_loading_op.extend(
-                    [
+                _eager_loading_op.extend([
+                    noload("*"),
+                    selectinload(kernel_rel).options(
                         noload("*"),
-                        selectinload(kernel_rel).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ]
-                )
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                ])
 
         session_list = await cls.match_sessions(
             db_session,
@@ -1031,7 +1025,7 @@ class SessionRow(Base):
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            eager_loading_op=eager_loading_op,
+            eager_loading_op=_eager_loading_op,
         )
         try:
             return session_list
@@ -1202,6 +1196,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
+    requested_slots = graphene.JSONString(description="Added in 24.03.0")
 
     # statistics
     num_queries = BigInt()
@@ -1241,7 +1236,7 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": group_name,
+            "group_name": group_name[0],
             "group_id": row.group_id,
             "user_email": email,
             "full_name": full_name,
@@ -1270,6 +1265,7 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
         }
@@ -1339,14 +1335,10 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_readonly_session() as db_sess:
-            session: SessionRow = await SessionRow.get_session(
-                db_sess,
-                self.id,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        commit_status = await graph_ctx.registry.get_commit_status(session)
-        return commit_status["status"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "ComputeSession.commit_statuses"
+        )
+        return await loader.load(self.main_kernel_id)
 
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         containers = self.containers
@@ -1383,6 +1375,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
@@ -1412,6 +1405,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
@@ -1588,6 +1582,15 @@ class ComputeSession(graphene.ObjectType):
                 session_ids,
                 lambda row: row.SessionRow.id,
             )
+
+    @classmethod
+    async def batch_load_commit_statuses(
+        cls,
+        ctx: GraphQueryContext,
+        kernel_ids: Sequence[KernelId],
+    ) -> Sequence[str]:
+        commit_statuses = await ctx.registry.get_commit_status(kernel_ids)
+        return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
 
 
 class ComputeSessionList(graphene.ObjectType):

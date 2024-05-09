@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "환영합니다. ",
-      "WelcomeMessage_2": "님",
+      "WelcomeMessage": "환영합니다. {{ userName }}님",
       "Summary": "요약",
       "Sessions": "세션",
       "Serving": "모델 서빙",
@@ -61,7 +60,12 @@
       "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요.",
       "Notifications": "알림",
       "Tasks": "작업",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "데이터 & 모델",
+      "InvalidBlankEmail": "E-mail을 입력하세요.",
+      "InvalidBlankPassword": "패스워드를 입력하세요.",
+      "DisMatchUserEmail": "사용자 E-mail이 일치하지 않습니다.",
+      "MyEnvironments": "나의 실행 환경"
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -110,7 +114,8 @@
     "IPUEnabled": "IPU NPU 사용중",
     "ATOMEnabled": "ATOM NPU 사용중",
     "WarboyEnabled": "Warboy NPU 사용중",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 사용중"
   },
   "session": {
     "launcher": {
@@ -123,9 +128,12 @@
       "StartNewSession": "새 세션 시작",
       "SessionType": "세션 타입",
       "BatchMode": "Batch",
+      "BatchModeDesc": "여러 노드 클러스터로 코드를 실행합니다.",
       "InteractiveMode": "Interactive",
+      "InteractiveModeDesc": "주피터 노트북, 비주얼 스튜디오 코드 등을 통해 코드를 인터랙티브하게 생성, 테스트, 실행할 수 있게 해줍니다.",
       "BatchModeConfig": "Batch 모드 설정",
       "ScheduleTime": "시작 시간 설정 (옵션)",
+      "ScheduleTimeSimple": "시작 시간 설정",
       "StartUpCommand": "세션 시작시 실행할 명령",
       "SessionStartTime": "세션 시작 시간: ",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
@@ -137,12 +145,14 @@
       "Base": "기본환경",
       "Requirements": "요구사항",
       "SessionNameOptional": "세션 이름 (옵션)",
+      "SessionName": "세션 이름",
       "Environments": "실행 환경",
       "Start": "시작",
       "FolderToMount": "마운트할 폴더",
       "FolderToMountList": "마운트할 폴더",
       "MountedFolders": "마운트된 폴더",
       "ResourceAllocation": "자원 할당",
+      "ResourceAllocationPerContainer": "컨테이너당 리소스 할당",
       "NoSuitablePreset": "해당되는 프리셋 없음",
       "CustomAllocation": "사용자 설정 자원 할당",
       "Core": "코어",
@@ -181,6 +191,7 @@
       "LaunchConfirmationDialog": "코드 및 데이터를 계속 유지하거나 다른 공동 작업자들과 공유하기 위해서는 데이터 & 폴더 메뉴에서 스토리지 폴더를 생성하신 후, 자원을 시작할 때 해당 폴더를 마운트하고 그 안에 보관하시면 됩니다.",
       "Launch": "시작",
       "ConfirmAndLaunch": "검토 및 시작",
+      "SkipToConfirmAndLaunch": "검토로 건너뛰기",
       "Accelerator": "가속기",
       "CustomResourceApplied": "사용자 설정 자원이 할당됨",
       "StartImportedNotebook": "가져온 노트북 열기",
@@ -202,6 +213,7 @@
       "DescSetEnv": "<p>사용자가 기본 환경 변수를 설정하고 Backend.AI 에서도 자체적인 동작을 위하여 이름이 같은 환경 변수를 설정한 경우, Backend.AI가 설정하는 값이 우선 적용됩니다.</p><p style='color:var(--paper-red-400);'>세션 런쳐 다이얼로그를 띄울 때마다 입력한 값은 모두 초기화됩니다.<br />이러한 설정은 환경 변수와 값 입력란이 각각 비어있지 않은 경우에만 전달됩니다.</p>",
       "EnvironmentVariableTitle": "우선 순위: 컨테이너와 Backend.AI 환경 변수",
       "EnvironmentVariable": "환경 변수",
+      "AddEnvironmentVariable": "환경 변수 추가",
       "EnvironmentVariableValue": "값",
       "EnvironmentVariableConfigurationDone": "환경 변수가 설정되었습니다.",
       "EnvironmentVariablePaneTitle": "추가될 환경 변수 (옵션)",
@@ -210,6 +222,7 @@
       "GPUSlot": "슬롯",
       "FolderAlias": "경로 & 대체이름",
       "FolderAliasOverlapping": "대체 이름이 이미 존재하는 다른 이름과 겹칩니다.",
+      "FolderAliasInvalid": "영문 대소문자, 숫자, 밑줄(_), 슬래시(/), 대시(-)만 입력 가능합니다.",
       "DescFolderAlias": "<p>이 입력을 채우면 폴더 이름이 마운트될 때 별칭으로 변경됩니다.</p><p>절대 경로는 '/'에 마운트되고, / 또는 공백으로 시작하지 않으면 /home/work의 하위 경로에 속하게 됩니다.</p><p>시스템 폴더들과 같은 별칭을 사용하지 마십시오.</p><p>아래의 '마운트된 폴더'에서 최종 경로를 확인하십시오.</p><p>이 창을 다시 보고 싶으면 '경로 & 대체이름' 옆의 아이콘을 누르세요.</p>",
       "OpenMPOptimization": "OpenMP/OpenBLAS 최적화",
       "DescOpenMPOptimization": "<p>이 값은 nthreads-var 내부 컨트롤 변수의 초기 값을 설정하여 병렬 영역에 사용할 스레드 수를 설정합니다.</p><p>Backend.AI는 이 값을 CPU 코어수와 같게 설정하며, 일반적인 고성능 컴퓨팅 워크로드를 가속하는 효과가 있습니다. 그러나 일부 멀티스레드 워크로드의 경우 OpenMP를 사용하는 여러 프로세스가 동시에 사용되어 비정상적으로 많은 스레드를 생성하여 상당한 성능 저하가 발생합니다. 이러한 경우 이 값을 1 또는 2로 조정하시기 바랍니다.</p>",
@@ -232,7 +245,36 @@
       "PreOpenPortConfigurationDone": "사전 개방 포트값이 설정되었습니다.",
       "PreOpenPortPanelTitle": "추가될 사전 개방 포트값 (옵션)",
       "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다.",
-      "MinMemory": "현재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다."
+      "PreOpenPortRangeGuide": "여러 값을 콤마(,) 또는 스페이스로 구분하여 입력할 수 있습니다.",
+      "PreOpenPortMaxCountLimit": "사전 개방 포트는 최대 {{count}}개까지 설정할 수 있습니다.",
+      "MinMemory": "현재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다.",
+      "Enable": "활성화",
+      "Network": "네트워크",
+      "preopen": "사전 개방 포트",
+      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원({{amount}})보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
+      "ErrorCanNotExceedRemaining": "남아있는 자원({{amount}})보다 크게 설정할 수 없습니다.",
+      "Template": "세션 템플릿",
+      "TemplateAndHistory": "템플릿 및 최근기록",
+      "ResetFormConfirm": "입력한 사항을 모두 초기화하시겠습니까?",
+      "StartTimeMustBeInTheFuture": "시작 시간은 현재 시간 이후여야 합니다.",
+      "NumberOfContainer": "컨테이너 개수",
+      "EnterEnvironmentVariable": "변수 이름 입력해주세요.",
+      "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
+      "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다.",
+      "EnableAutomaticMiniumShmem": "최소 공유메모리 설정",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "클러스터 크기가 2 이상인 경우 정수만 허용됩니다.",
+      "StartAfter": "다음 이후에 시작:",
+      "StartTimeDoesNotApply": "시작 시간을 설정하지 않으면 적용되지 않습니다.",
+      "MiniumAllocation": "최소 요구사항 할당",
+      "MiniumAllocationTooltip": "선택한 실행환경에서 요구되는 최소 요구사항으로 선택",
+      "NeoSwitchDescription": "현재 \"{{launcher}}\" 세션 런처를 사용중입니다.",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "EnvironmentVariableValueRequired": "값을 입력해주세요.",
+      "PleaseCompleteForm": "양식이 완성되지 않았거나 오류가 포함되어 있습니다. 입력 내용을 확인해주세요.",
+      "NeedToCorrectForm": "수정 버튼을 눌러 입력하신 내용을 확인해주세요.",
+      "FailedToStartNewSession": "세션 생성에 실패했습니다. 세션 페이지의 '종료' 탭을 확인해 주세요."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -259,7 +301,7 @@
     "AllowedClientIps": "허용된 클라이언트 IP",
     "CommaSeparated": "콤마로 구분",
     "TryPreferredPort": "선호 포트",
-    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
+    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH 키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
     "ConnectionInformation": "연결 정보",
     "VNCconnection": "VNC 연결",
     "CheckAgainDialog": "이 선택은 취소할 수 없습니다. 정말 진행하시겠습니까?",
@@ -276,7 +318,8 @@
       "Prepared": "준비되었습니다",
       "App": "앱",
       "NoExistingConnectionExample": "복사할 접속 예제가 없습니다.",
-      "SSHConnectionExampleClipboardCopy": "SSH 접속 예제가 클립보드에 복사되었습니다."
+      "SSHConnectionExampleClipboardCopy": "SSH 접속 예제가 클립보드에 복사되었습니다.",
+      "ConnectUrlIsNotValid": "연결 URL이 유효하지 않습니다."
     },
     "TensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로",
     "InputTensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로를 입력하세요. 로그 디렉토리는 자동으로 생성되지 않는다는 점에 주의하십시오.",
@@ -299,8 +342,14 @@
     "Validation": {
       "SessionNameRequired": "세션 이름을 입력해주세요",
       "SluggedStrings": "최소 4자 이상의 고유문자열로 입력해주세요",
-      "EnterValidSessionName": "올바른 세션 이름을 입력해주세요",
-      "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다"
+      "EnterValidSessionName": "영문, 숫자, 하이픈, 밑줄 4자 이상 조합하여 입력해주세요.",
+      "SessionNameAlreadyExist": "같은 이름의 세션이 이미 있습니다",
+      "SessionNameTooLong64": "64자 이하로 입력해주세요.",
+      "PleaseFollowSessionNameRule": "최소 4자 이상의 문자, 숫자, '.', '_', '-' 조합으로 입력해주세요.",
+      "SessionNameTooShort": "4자 이상 입력해주세요.",
+      "SessionNameShouldStartWith": "알파벳 대소문자, 숫자 또는 '_' 로 시작해야 합니다.",
+      "SessionNameShouldEndWith": "알파벳 대소문자, 숫자, '_'로 끝나야 합니다.",
+      "SessionNameInvalidCharacter": "이름의 중간에는 알파벳 대소문자, 숫자, '_', '.', '-'만 포함할 수 있습니다."
     },
     "AlreadyTerminatingSession": "이미 종료중인 세션입니다",
     "CommitSession": "세션을 이미지로 커밋하기",
@@ -348,7 +397,15 @@
     "CPU": "CPU",
     "MEM": "메모리",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU(메모리)"
+    "GPU(MEM)": "GPU(메모리)",
+    "Agents": "실행노드",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU(메모리)",
+    "ConvertSessionToImage": "세션을 이미지로 변환",
+    "SessionName": "세션 이름",
+    "SessionId": "세션 ID",
+    "EnvironmentAndVersion": "환경 및 버전",
+    "Tags": "태그"
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -392,10 +449,17 @@
     "ExpiredDate": "토큰 만료 시각",
     "TokenExpiredDateHelp": "토큰 만료 시각 기본 값은 24시간 뒤입니다.",
     "TokenExpiredDateError": "토큰 만료 시간은 현재 시간 이후여야 합니다.",
-    "ServiceNameRule": "4~64자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
+    "ServiceNameRule": "4~24자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
     "FormValidationFailed": "양식 유효성 검사 실패",
     "resources": "자원",
-    "Image": "이미지"
+    "Image": "이미지",
+    "Owner": "소유자",
+    "ServiceDelegatedFrom": "모델 서비스는 {{ createdUser }}에 의해 생성되지만 세션 소유권은 {{ sessionOwner }}에 위임됩니다.",
+    "FailedToTerminateService": "서비스 삭제 요청이 실패하였습니다.",
+    "FailedToUpdateService": "서비스를 업데이트하지 못했습니다.",
+    "ServiceCreated": "모델 서비스 {{ name }}이(가) 성공적으로 생성되었습니다.",
+    "ServiceUpdated": "모델 서비스 {{ name }}이(가) 성공적으로 업데이트되었습니다.",
+    "ServiceTerminated": "모델 서비스 {{ name }}이(가) 성공적으로 종료되었습니다."
   },
   "button": {
     "Cancel": "취소",
@@ -416,7 +480,6 @@
     "DeleteAll": "모두 삭제",
     "Update": "업데이트",
     "Delete": "삭제",
-    "Dismiss": "해제",
     "DismissAndProceed": "무시하고 진행",
     "Close": "닫기",
     "Confirm": "확인",
@@ -427,7 +490,13 @@
     "Commit": "커밋하기",
     "Reset": "초기화",
     "Unset": "초기화",
-    "OK": "확인"
+    "OK": "확인",
+    "Download": "다운로드",
+    "Clone": "복사",
+    "Config": "설정",
+    "Next": "다음",
+    "Previous": "이전",
+    "PushToImage": "세션을 사용자 정의된 이미지로 푸시"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -455,6 +524,7 @@
     "DiskPerc": "디스크 %"
   },
   "storageHost": {
+    "StorageSetting": "스토리지 설정",
     "Usage": "사용량",
     "Total": "전체",
     "Used": "사용",
@@ -503,7 +573,12 @@
     "Control": "제어",
     "NewPassword": "새 비밀번호",
     "Enabled": "활성화됨",
-    "StorageProxies": "스토리지"
+    "StorageProxies": "스토리지",
+    "None": "없음",
+    "Image": "이미지",
+    "All": "전체",
+    "InProgress": "진행중",
+    "Session": "세션"
   },
   "credential": {
     "Permission": "권한",
@@ -580,7 +655,10 @@
     "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
     "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
     "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
-    "ModifyUserDetail": "사용자 상세 정보 수정"
+    "ModifyUserDetail": "사용자 상세 정보 수정",
+    "EnableSudoSession": "sudo 세션 허용",
+    "MainAccessKey": "기본 액세스 키",
+    "InactivateTheFollowingUsers": "다음 사용자를 비활성화합니다."
   },
   "data": {
     "Folders": "폴더",
@@ -617,6 +695,7 @@
     "StorageStatus": "저장소 상태",
     "Created": "생성됨",
     "Invited": "초대 받음",
+    "SearchByName": "이름으로 검색",
     "folders": {
       "Location": "위치",
       "Status": "상태",
@@ -644,7 +723,7 @@
       "FolderRenamed": "폴더 이름이 변경되었습니다",
       "FolderNameMismatched": "폴더 이름을 정확하게 입력하세요. 입력 칸에 공백문자가 있는지 확인해주세요.",
       "SameFileName": "입력한 파일 명이 기존 파일 명과 같습니다. 다른 이름으로 변경해주세요.",
-      "FolderDeleted": "폴더가 삭제되었습니다",
+      "FolderDeleted": "{{ folderName }} 폴더가 삭제되었습니다.",
       "FolderUpdated": "폴더 정보가 갱신되었습니다",
       "FolderDisconnected": "초대된 폴더와의 연결이 해제되었습니다.",
       "FileRenamed": "파일명이 변경되었습니다",
@@ -668,7 +747,13 @@
       "CloneFolder": "폴더 클론",
       "LeaveFolder": "초대된 폴더 나가기",
       "ShareFolder": "폴더 공유하기",
-      "ModifyPermissions": "권한 수정"
+      "ModifyPermissions": "권한 수정",
+      "Restore": "복원",
+      "DeleteForever": "영구 삭제",
+      "FolderRestored": "{{ folderName }} 폴더가 복원되었습니다.",
+      "FolderDeletedForever": "{{ folderName }} 폴더가 완전히 삭제되었습니다.",
+      "MoveToTrashBin": "휴지통으로 이동",
+      "MovedToTrashBin": "{{ folderName }} 폴더가 휴지통으로 이동되었습니다."
     },
     "explorer": {
       "Delete": "삭제",
@@ -719,7 +804,8 @@
       "StartingSSH/SFTPSession": "SFTP 서버 시작",
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
-      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요."
+      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
+      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. "
     },
     "invitation": {
       "NoValidEmails": "정상적인 이메일을 입력해주세요",
@@ -745,21 +831,28 @@
     "HostDetails": "선택한 스토리지 호스트의 가용량 정보를 보여줍니다.",
     "ProjectFolder": "프로젝트 폴더",
     "Pipeline": "파이프라인 폴더",
-    "DialogDataFolder": "FastTrack에서 파이프라인 생성 시 자동으로 생성되는 파이프라인 전용 폴더."
+    "DialogDataFolder": "FastTrack에서 파이프라인 생성 시 자동으로 생성되는 파이프라인 전용 폴더.",
+    "ModelStore": "모델 스토어",
+    "New": "새로운",
+    "Add": "추가",
+    "CloningIsOnlyPossibleSameHost": "현재 폴더 복사는 동일한 호스트간에만 가능합니다.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "주의: 이 동작은 취소할 수 없습니다!",
       "LogDeletion": "정말로 모든 로그를 삭제하시겠습니까?",
       "WillBeAppliedToNewSessions": "이 변경사항은 새 세션부터 적용됩니다.",
-      "Required": "필수 입력입니다."
+      "Required": "필수 입력입니다.",
+      "DeleteForeverDesc": "경고: 선택한 항목은 완전히 삭제되며 복원할 수 없습니다."
     },
     "ask": {
       "DoYouWantToProceed": "계속 진행하시겠습니까?"
     },
     "title": {
       "LetsDouble-Check": "한 번 더 확인합시다",
-      "Notice": "안내"
+      "Notice": "안내",
+      "DeleteForever": "완전히 삭제하시겠습니까?"
     },
     "ErrorOccurred": "문제가 발생했습니다",
     "error": {
@@ -814,7 +907,8 @@
     "ProblemOccurred": "문제가 발생했습니다.",
     "PasswordsDoNotMatch": "변경할 비밀번호와 비밀번호 확인란의 값이 일치해야 합니다.",
     "NoChangeMade": "변경된 부분이 없습니다.",
-    "Architecture": "아키텍쳐"
+    "Architecture": "아키텍쳐",
+    "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다."
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -829,6 +923,7 @@
     "NoPresetName": "자원 프리셋의 이름을 입력하십시오",
     "NoResourcePresetToDisplay": "자원 프리셋 정보가 없습니다.",
     "MemoryShouldBeLargerThanSHMEM": "메모리는 공유메모리보다 커야 합니다",
+    "SHMEMShouldBeSmallerThanMemory": "공유메모리는 메모리보다 작아야 합니다",
     "Created": "자원 프리셋이 생성되었습니다",
     "Updated": "자원 프리셋에 수정되었습니다",
     "MinimumCPUUnit": "CPU 최소 단위: 1 코어",
@@ -889,7 +984,14 @@
     "Edit_ShellScriptTitle_2": " 셀 스크립트 수정하기",
     "AutoLogout": "자동 로그아웃",
     "DescAutoLogout": "세션 내 앱을 실행하기 위해 생성된 페이지를 제외한 모든 Backend.AI 웹 UI 페이지가 닫힐 경우 자동으로 로그아웃됩니다.",
-    "SSHKeypairEnterManuallyFinished": "SSH 키페어 등록이 성공적으로 완료되었습니다."
+    "SSHKeypairEnterManuallyFinished": "SSH 키페어 등록이 성공적으로 완료되었습니다.",
+    "MyKeypairInfo": "내 키페어 정보",
+    "DescMyKeypairInfo": "내 키페어 정보 보기",
+    "DarkMode": "다크 모드",
+    "LightMode": "라이트 모드",
+    "UseSystemSetting": "시스템 설정 사용",
+    "DescThemeMode": "Backend.AI WebUI가 장치에서 어떻게 보이는지 설정합니다.",
+    "ThemeMode": "화면 모드"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "웹 터미널 고급 사용법: 터미널 내용 복사하기",
@@ -911,7 +1013,9 @@
     "Parameters": "파라미터",
     "ErrorType": "에러 종류",
     "NoLogToDisplay": "로그 정보가 없습니다.",
-    "LogMessageRemoved": "로그 메시지가 삭제되었습니다."
+    "LogMessageRemoved": "로그 메시지가 삭제되었습니다.",
+    "ShowOnlyError": "에러만 표시",
+    "SearchLogs": "로그 검색"
   },
   "resourcePolicy": {
     "Resources": "자원",
@@ -972,7 +1076,9 @@
     "RescanFailed": "리스캔 작업이 실패하였습니다.",
     "NoRegistryToDisplay": "레지스트리 정보가 없습니다.",
     "RegistrySuccessfullyModified": "레지스트리가 성공적으로 수정되었습니다.",
-    "PleaseSelectOption": "옵션을 선택하세요"
+    "PleaseSelectOption": "옵션을 선택하세요",
+    "ConfirmNoUserName": "사용자 및 비밀번호가 지정되지 않았습니다. 저장하시겠습니까?",
+    "DescURLFormat": "올바르지 않는 URL 타입입니다."
   },
   "resourceGroup": {
     "ResourceGroups": "자원 그룹",
@@ -1113,7 +1219,6 @@
     "AllowAgentSideRegistration": "에이전트쪽으로부터의 등록 허용",
     "DescAllowAgentSideRegistration": "매니저에 에이전트 자신을 등록하도록 허용합니다.<br/>Backend.AI 클러스터가 보안환경에서 동작 및 관리되고 있을 때만 사용하세요.",
     "Plugins": "플러그인",
-    "CUDAGPUsupport": "CUDA GPU 지원",
     "DescCUDAGPUsupport": "NVIDIA CUDA GPU 지원을 추가합니다. <br/>Backend.AI CUDA 플러그인이 필요합니다.",
     "CUDAGPUdisabledByFGPUsupport": "시스템이 Fractional GPU 플러그인을 사용하고 있어 비활성화되었습니다.",
     "ROCMGPUsupport": "ROCm GPU 지원",
@@ -1162,14 +1267,23 @@
     "RequireIPUPlugin": "Backend.AI IPU 플러그인이 필요합니다.",
     "RequireATOMPlugin": "Backend.AI ATOM 플러그인이 필요합니다.",
     "Warboysupport": "Warboy 지원",
-    "DescWarboysupport": "Backend.AI Warboy 플러그인이 필요합니다.",
-    "RequireWarboyPlugin": "Backend.AI Warboy 플러그인이 필요합니다."
+    "DescWarboysupport": "Furiosa Warboy 가속기를 사용합니다.",
+    "RequireWarboyPlugin": "Backend.AI Warboy 플러그인이 필요합니다.",
+    "OpenSourceCUDAGPUsupport": "오픈소스 CUDA GPU 지원",
+    "ShowOnlyChanged": "수정 사항만 표시",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Hyperaccel LPU 가속기를 사용합니다.",
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU 플러그인이 필요합니다."
   },
   "notification": {
     "SuccessfullyUpdated": "성공적으로 수정되었습니다.",
     "Visit": "방문",
     "SeeDetail": "상세보기",
-    "Initializing": "초기화 중..."
+    "Initializing": "초기화 중...",
+    "NoNotification": "알림이 없습니다.",
+    "Notifications": "알림",
+    "ClearNotifications": "모든 알림 삭제",
+    "AreYouSureToClearAllNotifications": "모든 알림을 삭제하시겠습니까?"
   },
   "information": {
     "Core": "핵심 구성 요소",
@@ -1212,14 +1326,12 @@
     "LeaveService": "서비스 탈퇴",
     "DescConfirmLeave": "확인을 위해 E-mail 및 비밀번호를 다시 입력해주세요.",
     "Password": "비밀번호",
-    "E-mail": "E-mail",
     "APIKey": "접근키",
     "SecretKey": "비밀키",
     "Endpoint": "엔드포인트",
     "NotAUser": "아직 가입 전이면",
     "LoginAnotherway": "다른 방식으로 로그인하기",
     "SignUp": "가입하기",
-    "LoginWithE-mail": "E-mail로 로그인",
     "LoginWithIAM": "IAM으로 로그인",
     "ClickToUseIAM": "IAM 사용",
     "ClickToUseID": "ID 사용",
@@ -1247,7 +1359,9 @@
       "LoginWithSAML": "SAML 로그인",
       "LoginWithRealm": "{{ realmName }} 로그인"
     },
-    "EndpointStartWith": "http:// 혹은 https:// 로 시작해야 합니다."
+    "EndpointStartWith": "http:// 혹은 https:// 로 시작해야 합니다.",
+    "LoginWithE-mailorUsername": "이메일 또는 사용자 이름으로 로그인",
+    "E-mailorUsername": "이메일 또는 사용자 이름"
   },
   "signup": {
     "SignupBETA": "가입 (베타 초대 대상)",
@@ -1319,13 +1433,13 @@
     "FolderName": "가져올 폴더 이름: ",
     "NotebookBadgeCodeHTML": "노트북 배지 코드(HTML)",
     "NotebookBadgeCodeMarkdown": "노트북 배지 코드(Markdown)",
-    "GithubInternalError": "Github 저장소가 잠시 중단되었습니다. 잠시 후 시도하시기 바랍니다.",
-    "GithubAPILimitError": "Github API 호출횟수가 많습니다. 잠시 후에 시도하시기 바랍니다.",
-    "GithubAPIEtcError": "Github API 호출이슈가 있습니다. 잠시 후에 시도하시기 바랍니다.",
-    "ImportGitlabRepo": "Gitlab 저장소 가져오기",
-    "GitlabRepoWillBeFolder": "가져온 Gitlab 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
-    "GitlabURL": "Gitlab 주소",
-    "GitlabDefaultBranch": "Gitlab 브랜치 이름"
+    "GithubInternalError": "GitHub 저장소가 잠시 중단되었습니다. 잠시 후 시도하시기 바랍니다.",
+    "GithubAPILimitError": "GitHub API 호출횟수가 많습니다. 잠시 후에 시도하시기 바랍니다.",
+    "GithubAPIEtcError": "GitHub API 호출이슈가 있습니다. 잠시 후에 시도하시기 바랍니다.",
+    "ImportGitlabRepo": "GitLab 저장소 가져오기",
+    "GitlabRepoWillBeFolder": "가져온 GitLab 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
+    "GitlabURL": "GitLab 주소",
+    "GitlabDefaultBranch": "GitLab 브랜치 이름"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "이번달 통계",
@@ -1379,7 +1493,8 @@
     "InvalidSignupToken": "잘못된 가입 토큰입니다",
     "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
-    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다."
+    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
+    "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
@@ -1390,7 +1505,8 @@
     "2048chars": "(최대 길이 2048자)"
   },
   "inputLimit": {
-    "4to64chars": "(4~64자)"
+    "4to64chars": "(4~64자)",
+    "4to32chars": "(4~32자)"
   },
   "explorer": {
     "ValueRequired": "값이 필요합니다.",
@@ -1406,12 +1522,50 @@
     "ConfirmTotpRemovalBody": "이중 인증을 정말 비활성화 하시겠습니까?",
     "TotpSetupNotAvailable": "이중 인증 설정이 불가합니다.",
     "RemoveTotpSetupCompleted": "이중 인증이 비활성화 되었습니다.",
-    "TurnOffTotp": "이중 인증 비활성화"
+    "TurnOffTotp": "이중 인증 비활성화",
+    "EnterConfirmationCode": "이제 확인을 위해 인증기에서 생성된 OTP를 입력하세요.",
+    "RequireOTP": "OTP값을 입력하세요."
   },
   "ErrorBoundary": {
     "title": "에러가 발생했습니다.",
     "reloadPage": "페이지 새로고침",
     "resetErrorBoundary": "ErrorBoundary 초기화",
     "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다."
+  },
+  "modelStore": {
+    "Description": "설명",
+    "Model": "모델",
+    "FilterByName": "이름으로 필터링",
+    "ServiceDetails": "서비스 내용",
+    "Metadata": "메타데이터",
+    "ModelPath": "모델 경로",
+    "SearchModels": "모델 검색",
+    "MinResource": "최소 리소스",
+    "LastModified": "마지막 수정",
+    "Created": "생성",
+    "Version": "버전",
+    "Author": "작가",
+    "MaxRetries": "최대 재시도 횟수",
+    "Path": "길",
+    "HealthCheck": "건강 체크",
+    "Port": "포트",
+    "StartCommand": "시작 명령",
+    "PreStartActions": "시작 전 작업",
+    "Framework": "프레임워크",
+    "category": "카테고리",
+    "Category": "카테고리",
+    "Label": "레이블",
+    "Task": "작업",
+    "CloneAsFolder": "새 폴더로 복사",
+    "CloneSuccess": "복사 요청이 성공적으로 보내졌습니다.",
+    "CloneInfo": "새로운 사용자 폴더로 복사됩니다."
+  },
+  "table": {
+    "SettingTable": "테이블 설정",
+    "SearchTableColumn": "테이블 열 검색",
+    "SelectColumnToDisplay": "표시할 열 선택"
+  },
+  "setting": {
+    "SearchPlaceholder": "검색어를 입력해 주세요"
   }
 }

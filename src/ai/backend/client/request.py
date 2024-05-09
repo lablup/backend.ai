@@ -163,13 +163,11 @@ class Request:
             self.api_version = override_api_version
         else:
             self.api_version = f"v{self.session.api_version[0]}.{self.session.api_version[1]}"
-        self.headers = CIMultiDict(
-            [
-                ("User-Agent", self.config.user_agent),
-                ("X-BackendAI-Domain", self.config.domain),
-                ("X-BackendAI-Version", self.api_version),
-            ]
-        )
+        self.headers = CIMultiDict([
+            ("User-Agent", self.config.user_agent),
+            ("X-BackendAI-Domain", self.config.domain),
+            ("X-BackendAI-Version", self.api_version),
+        ])
         self._content = b""
         self._attached_files = None
         self.set_content(content, content_type=content_type)
@@ -298,18 +296,8 @@ class Request:
         """
         Sends the request to the server and reads the response.
 
-        You may use this method either with plain synchronous Session or
-        AsyncSession.  Both the followings patterns are valid:
-
-        .. code-block:: python3
-
-          from ai.backend.client.request import Request
-          from ai.backend.client.session import Session
-
-          with Session() as sess:
-            rqst = Request('GET', ...)
-            with rqst.fetch() as resp:
-              print(resp.text())
+        You may use this method with AsyncSession only,
+        following the pattern below:
 
         .. code-block:: python3
 
@@ -540,7 +528,7 @@ class FetchContextManager:
     """
     The context manager returned by :func:`Request.fetch`.
 
-    It provides both synchronous and asynchronous context manager interfaces.
+    It provides asynchronous context manager interfaces only.
     """
 
     __slots__ = (

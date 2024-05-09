@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Selamat datang,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Selamat datang, {{ userName }}.",
       "Summary": "Ringkasan",
       "Sessions": "Sesi",
       "Import&Run": "Import & Jalankan",
@@ -61,7 +60,12 @@
       "PasswordChangePlace": "Klik ikon orang pada bar atas dan pergi ke menu \"Akaun Saya\".",
       "Notifications": "Pemberitahuan",
       "Tasks": "Tugasan",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Data",
+      "InvalidBlankPassword": "Masukkan kata laluan anda",
+      "InvalidBlankEmail": "Masukkan emel anda",
+      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan",
+      "MyEnvironments": "Persekitaran Saya"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -110,7 +114,8 @@
     "ATOMEnabled": "ATOM NPU Didayakan",
     "WarboyEnabled": "Warboy NPU Didayakan",
     "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan"
   },
   "session": {
     "launcher": {
@@ -232,7 +237,43 @@
       "PreOpenPortPanelTitle": "Prabuka port untuk ditetapkan (pilihan)",
       "PortsTitleWithRange": "Nilai port (antara 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mana-mana port prabuka yang belum disimpan akan hilang.",
-      "StartModelServing": "Mulakan Penyajian Model"
+      "StartModelServing": "Mulakan Penyajian Model",
+      "PreOpenPortRangeGuide": "Masukkan berbilang nilai yang dipisahkan dengan sama ada koma (,) atau ruang.",
+      "preopen": "prabuka",
+      "Network": "Rangkaian",
+      "Enable": "Dayakan",
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
+      "EnqueueComputeSessionWarning": "Jika anda menetapkannya lebih besar daripada sumber yang tersedia pada masa ini, penciptaan sesi akan ditangguhkan dalam baris gilir sehingga ia tersedia.",
+      "SessionName": "Nama sesi",
+      "ResetFormConfirm": "Adakah anda mahu menetapkan semula semua entri anda?",
+      "TemplateAndHistory": "templat",
+      "ScheduleTimeSimple": "Tetapkan masa mula",
+      "ResourceAllocationPerContainer": "Peruntukan Sumber Setiap Bekas",
+      "NumberOfContainer": "Bilangan bekas",
+      "ErrorCanNotExceedRemaining": "Tidak boleh ditetapkan kepada lebih besar daripada sumber yang selebihnya ({{amount}}).",
+      "EnterEnvironmentVariable": "Masukkan nama Pembolehubah",
+      "EnvironmentVariableNamePatternError": "Nama pembolehubah mesti bermula dengan huruf atau garis bawah, dan hanya boleh mengandungi huruf, nombor dan garis bawah.",
+      "EnvironmentVariableDuplicateName": "Nama pembolehubah ini sudah wujud.",
+      "Template": "Templat Sesi",
+      "EnableAutomaticMiniumShmem": "Tetapkan memori kongsi minimum",
+      "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka.",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Hanya integer dibenarkan apabila saiz kelompok tidak kurang daripada 2.",
+      "StartAfter": "Mulakan selepas:",
+      "StartTimeDoesNotApply": "Jika masa mula tidak ditetapkan, ia tidak terpakai.",
+      "MiniumAllocation": "Keperluan minimum",
+      "MiniumAllocationTooltip": "Pilih sebagai keperluan minimum untuk persekitaran berjalan yang dipilih",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Anda menggunakan pelancar sesi \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Langkau ke semakan",
+      "InteractiveModeDesc": "membolehkan anda membuat, menguji dan menjalankan kod secara interaktif melalui buku nota jupyter, kod studio visual, dsb.",
+      "BatchModeDesc": "Anda boleh menjalankan kod anda dengan berbilang nod",
+      "AddEnvironmentVariable": "Tambah pembolehubah persekitaran",
+      "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
+      "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -266,7 +307,8 @@
       "Prepared": "Bersedia",
       "NoExistingConnectionExample": "Tiada Contoh Sambungan untuk disalin.",
       "SSHConnectionExampleClipboardCopy": "Contoh Sambungan SSH telah disalin ke papan keratan.",
-      "App": "Aplikasi"
+      "App": "Aplikasi",
+      "ConnectUrlIsNotValid": "URL Sambung tidak sah."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Sila masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahawa direktori log tidak akan dibuat secara automatik ..",
@@ -285,10 +327,16 @@
     "Architecture": "Seni bina",
     "SessionType": "Jenis Sesi",
     "Validation": {
-      "EnterValidSessionName": "Masukkan nama sesi yang sah",
+      "EnterValidSessionName": "Sila masukkan gabungan sekurang-kurangnya 4 huruf abjad, atau nombor, atau sempang, atau garis bawah.",
       "SessionNameRequired": "Nama sesi diperlukan",
       "SluggedStrings": "Rentetan slugged (>3 aksara)",
-      "SessionNameAlreadyExist": "Nama sesi sudah wujud"
+      "SessionNameAlreadyExist": "Nama sesi sudah wujud",
+      "SessionNameTooLong64": "Sila masukkan 64 aksara atau kurang.",
+      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 4 huruf, nombor, '.', '_' dan '-'.",
+      "SessionNameTooShort": "Sila masukkan sekurang-kurangnya 4 aksara.",
+      "SessionNameShouldStartWith": "Ia mesti bermula dengan huruf abjad, nombor atau '_'.",
+      "SessionNameShouldEndWith": "Ia mesti berakhir dengan huruf abjad, nombor atau '_'.",
+      "SessionNameInvalidCharacter": "Bahagian tengah nama hanya boleh mengandungi huruf abjad, nombor dan '_'."
     },
     "Interactive": "Interaktif",
     "Batch": "Kumpulan",
@@ -348,7 +396,15 @@
     "CPU": "CPU",
     "MEM": "Ingatan",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memori)"
+    "GPU(MEM)": "GPU (memori)",
+    "Agents": "ejen",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memori)",
+    "ConvertSessionToImage": "Tukar Sesi kepada Imej",
+    "SessionName": "Nama Sesi",
+    "SessionId": "Id Sesi",
+    "EnvironmentAndVersion": "Persekitaran dan Versi",
+    "Tags": "Tag"
   },
   "button": {
     "Cancel": "Batal",
@@ -369,7 +425,6 @@
     "DeleteAll": "Memadam semua",
     "Update": "Kemas kini",
     "Delete": "Padam",
-    "Dismiss": "Ketepikan",
     "DismissAndProceed": "Ketepikan dan Teruskan",
     "Close": "Tutup",
     "Confirm": "Sahkan",
@@ -380,7 +435,13 @@
     "Unset": "Tidak ditetapkan",
     "OK": "okey",
     "Commit": "komited",
-    "EnterManually": "Masukkan Secara Manual"
+    "EnterManually": "Masukkan Secara Manual",
+    "Download": "Muat turun",
+    "Clone": "Klon",
+    "Config": "Konfigurasi",
+    "Next": "Seterusnya",
+    "Previous": "Sebelumnya",
+    "PushToImage": "Sesi tolak ke imej tersuai"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -422,7 +483,12 @@
     "Control": "Kawal",
     "NewPassword": "Kata laluan baharu",
     "Enabled": "Diaktifkan",
-    "StorageProxies": "Stor"
+    "StorageProxies": "Stor",
+    "None": "tiada",
+    "Image": "Gambar",
+    "All": "keseluruhan",
+    "InProgress": "Prosiding",
+    "Session": "Sesi"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -499,7 +565,10 @@
     "KeypairDetail": "Butiran pasangan kekunci",
     "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
-    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan"
+    "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
+    "EnableSudoSession": "Dayakan sesi sudo",
+    "MainAccessKey": "Kunci Akses Utama",
+    "InactivateTheFollowingUsers": "Nyahaktifkan pengguna berikut."
   },
   "data": {
     "Folders": "Folder",
@@ -552,7 +621,7 @@
       "FolderRenamed": "Folder dinamakan semula",
       "FolderNameMismatched": "Nama folder tidak sesuai. Sila Periksa sama ada watak ruang di ruang input atau tidak.",
       "SameFileName": "Nilai input adalah sama dengan nama fail yang akan dikemas kini. Tolong ubah ke nama lain.",
-      "FolderDeleted": "Folder dipadamkan",
+      "FolderDeleted": "Folder {{ folderName }} telah dipadamkan.",
       "FolderUpdated": "Pilihan folder dikemas kini",
       "FolderDisconnected": "Folder telah terputus.",
       "FileRenamed": "Fail Dinamakan Semula",
@@ -579,7 +648,13 @@
       "CloneFolder": "Klon folder",
       "ShareFolder": "Kongsi folder",
       "ModifyPermissions": "Ubah suai kebenaran",
-      "LeaveFolder": "Tinggalkan folder"
+      "LeaveFolder": "Tinggalkan folder",
+      "MoveToTrashBin": "Pindah ke tong sampah",
+      "MovedToTrashBin": "Folder {{ folderName }} telah dialihkan ke tong sampah.",
+      "DeleteForever": "Padam selama-lamanya",
+      "Restore": "Pulihkan",
+      "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
+      "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya."
     },
     "explorer": {
       "Delete": "Padamkan ...",
@@ -630,7 +705,8 @@
       "SFTPSessionNotAvailable": "Sesi SFTP tidak tersedia sekarang",
       "StartingSSH/SFTPSession": "Memulakan sesi SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Had capaian untuk menjalankan kiraan sesi muat naik",
-      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu."
+      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu.",
+      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini."
     },
     "invitation": {
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -664,28 +740,17 @@
     },
     "Pipeline": "Folder Saluran Paip",
     "DialogDataFolder": "Folder khusus saluran paip yang dibuat secara automatik apabila membuat saluran paip dalam FastTrack.",
-    "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model."
+    "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model.",
+    "SearchByName": "Cari mengikut nama",
+    "ModelStore": "Kedai Model",
+    "New": "Baru",
+    "Add": "Tambah",
+    "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
-      "CannotBeUndone": "PERINGATAN: ini tidak boleh dibuat asal!",
-      "LogDeletion": "Adakah anda pasti mahu memadamkan semua mesej log?",
-      "WillBeAppliedToNewSessions": "Kemas kini ini akan digunakan untuk sesi baru.",
-      "Required": "Diperlukan"
-    },
-    "ask": {
-      "DoYouWantToProceed": "Adakah anda mahu meneruskan?"
-    },
-    "title": {
-      "LetsDouble-Check": "Mari Periksa Semula",
-      "Notice": "Notis"
-    },
-    "ErrorOccurred": "Ralat Berlaku",
-    "error": {
-      "Error": "Ralat"
-    },
-    "hide": {
-      "DonotShowThisAgain": "Jangan tunjukkan ini lagi."
+      "DeleteForeverDesc": "AMARAN: item yang dipilih akan dipadamkan selama-lamanya dan anda tidak akan dapat memulihkannya."
     }
   },
   "environment": {
@@ -733,7 +798,8 @@
     "PasswordsDoNotMatch": "Kata Laluan dan Pengesahan tidak sepadan.",
     "NoChangeMade": "Tiada perubahan dibuat",
     "Architecture": "Seni bina",
-    "NoImageToDisplay": "Tiada Imej untuk dipaparkan"
+    "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
+    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -755,7 +821,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
-    "Deleted": "Pratetap sumber berjaya dipadamkan."
+    "Deleted": "Pratetap sumber berjaya dipadamkan.",
+    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori"
   },
   "usersettings": {
     "General": "Am",
@@ -808,7 +875,14 @@
     "DescAutoLogout": "Log keluar secara automatik jika semua halaman log masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Notebook jupyter, terminal web, dll.)",
     "SSHKeypairEnterManuallyFinished": "SSH Keypair telah berjaya didaftarkan.",
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
-    "SSHKeypairEnterManually": "SSH Keypair"
+    "SSHKeypairEnterManually": "SSH Keypair",
+    "MyKeypairInfo": "Maklumat Pasangan Kunci Saya",
+    "DescMyKeypairInfo": "Lihat maklumat pasangan kunci saya",
+    "DarkMode": "Mod Gelap",
+    "LightMode": "Mod Cahaya",
+    "UseSystemSetting": "Gunakan Tetapan Sistem",
+    "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
+    "ThemeMode": "Mod Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -830,7 +904,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Jenis Ralat",
     "LogMessageRemoved": "Mesej Log telah dikeluarkan.",
-    "NoLogToDisplay": "Tiada Log untuk dipaparkan"
+    "NoLogToDisplay": "Tiada Log untuk dipaparkan",
+    "ShowOnlyError": "Paparkan sahaja ralat",
+    "SearchLogs": "Cari log"
   },
   "resourcePolicy": {
     "Resources": "Sumber",
@@ -891,7 +967,9 @@
     "PleaseSelectOption": "Sila pilih satu pilihan.",
     "RegistrySuccessfullyModified": "Pendaftaran berjaya diubah suai.",
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
-    "ModifyRegistry": "Ubah suai Pendaftaran"
+    "ModifyRegistry": "Ubah suai Pendaftaran",
+    "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?",
+    "DescURLFormat": "Jenis URL tidak sah"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1031,8 +1109,6 @@
     "Scaling": "Penskalaan",
     "AllowAgentSideRegistration": "Benarkan pendaftaran pihak ejen",
     "DescAllowAgentSideRegistration": "Benarkan ejen mendaftarkan dirinya kepada pengurus. <br/> Gunakan hanya jika kluster Backend.AI diuruskan di lokasi yang selamat.",
-    "Plugins": "Pemalam",
-    "CUDAGPUsupport": "Sokongan GPU CUDA",
     "DescCUDAGPUsupport": "Sokongan GPU NVIDIA CUDA. <br/> Memerlukan Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Dinyahdayakan kerana sistem menggunakan pemalam GPU pecahan",
     "ROCMGPUsupport": "Sokongan GPU ROCm",
@@ -1082,13 +1158,23 @@
     "OverlayNetworkSettings": "Tetapan Rangkaian Tindanan",
     "OverlayNetworkSettingsDescription": "Rangkaian tindanan ialah rangkaian komputer yang berlapis di atas rangkaian lain. \nRangkaian tindanan mencipta rangkaian teragih di kalangan berbilang hos daemon Docker pengurus Backend.AI.",
     "MTUDescription": "Unit penghantaran maksimum, saiz paket terbesar yang boleh dihantar oleh protokol rangkaian.",
-    "OutOfRange": "Luar kawasan."
+    "OutOfRange": "Luar kawasan.",
+    "Plugins": "Pemalam",
+    "OpenSourceCUDAGPUsupport": "Sokongan GPU CUDA Sumber Terbuka",
+    "ShowOnlyChanged": "Paparkan Perubahan Sahaja",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
+    "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
     "Visit": "Lawati",
     "SeeDetail": "Lihat Perincian",
-    "Initializing": "Memulakan ..."
+    "Initializing": "Memulakan ...",
+    "NoNotification": "Tiada Pemberitahuan.",
+    "Notifications": "Pemberitahuan",
+    "ClearNotifications": "Kosongkan Pemberitahuan",
+    "AreYouSureToClearAllNotifications": "Adakah anda pasti mengosongkan semua pemberitahuan?"
   },
   "information": {
     "Core": "Teras",
@@ -1131,14 +1217,12 @@
     "LeaveService": "Tinggalkan Perkhidmatan",
     "DescConfirmLeave": "Untuk mengesahkan, sila taipkan E-mel dan kata laluan anda sekali lagi.",
     "Password": "Kata Laluan",
-    "E-mail": "E-mel",
     "APIKey": "Kunci API",
     "SecretKey": "Kunci Rahsia",
     "Endpoint": "Titik Akhir",
     "NotAUser": "Bukan pengguna?",
     "LoginAnotherway": "Mahu log masuk dengan cara lain?",
     "SignUp": "Mendaftar",
-    "LoginWithE-mail": "Log Masuk Dengan E-mel",
     "LoginWithIAM": "Log Masuk Dengan IAM",
     "ClickToUseIAM": "Klik Untuk Menggunakan IAM",
     "ClickToUseID": "Klik Untuk Menggunakan ID",
@@ -1166,7 +1250,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Log masuk dengan SAML",
       "LoginWithRealm": "Log masuk dengan {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Log masuk Dengan E-mel atau Nama Pengguna",
+    "E-mailorUsername": "E-mel atau Nama pengguna"
   },
   "signup": {
     "SignupBETA": "Pendaftaran (Jemputan beta sahaja)",
@@ -1224,7 +1310,7 @@
     "CouldNotCopyText": "Tidak dapat menyalin teks:",
     "NotebookBadgeURL": "URL buku nota",
     "GetAndRunNotebook": "Import & Jalankan",
-    "ImportGithubRepo": "Import Repositori Github",
+    "ImportGithubRepo": "Import Repositori GitHub",
     "GitHubURL": "URL GitHub",
     "GetToFolder": "Dapatkan ke Folder",
     "RepoWillBeFolder": "Repositori GitHub yang diimport ditukar menjadi folder dan boleh dipasang semasa sesi dimulakan.",
@@ -1238,13 +1324,13 @@
     "FolderName": "Nama folder yang diimport:",
     "NotebookBadgeCodeHTML": "Kod Lencana Notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Kod Lencana Notebook (Markdown)",
-    "GithubInternalError": "Ralat Dalaman Github.",
-    "GithubAPILimitError": "Ralat Had API Github.",
-    "GithubAPIEtcError": "Isu Pelayan Github.",
-    "ImportGitlabRepo": "Import Repositori Gitlab",
-    "GitlabRepoWillBeFolder": "Repositori Gitlab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
-    "GitlabURL": "URL Gitlab",
-    "GitlabDefaultBranch": "Nama Cawangan Gitlab"
+    "GithubInternalError": "Ralat Dalaman GitHub.",
+    "GithubAPILimitError": "Ralat Had API GitHub.",
+    "GithubAPIEtcError": "Isu Pelayan GitHub.",
+    "ImportGitlabRepo": "Import Repositori GitLab",
+    "GitlabRepoWillBeFolder": "Repositori GitLab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
+    "GitlabURL": "URL GitLab",
+    "GitlabDefaultBranch": "Nama Cawangan GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik untuk Bulan Ini",
@@ -1298,7 +1384,8 @@
     "UserHasNoGroup": "Pengguna tidak mempunyai kumpulan. \nSila hubungi pentadbir untuk membetulkannya.",
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
-    "WrongAPIServerAddress": "Alamat pelayan API salah."
+    "WrongAPIServerAddress": "Alamat pelayan API salah.",
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1350,7 +1437,8 @@
     "ForUser": "Untuk Pengguna",
     "ForProject": "Untuk Projek",
     "QuotaDoesNotSupported": "Bahagian belakang storan ini tidak menyokong kuota.",
-    "BeCarefulToSetUserResourcePolicy": "Menukar dasar sumber boleh menjejaskan semua pengguna yang menggunakan dasar sumber pengguna itu, jadi gunakannya dengan berhati-hati."
+    "BeCarefulToSetUserResourcePolicy": "Menukar dasar sumber boleh menjejaskan semua pengguna yang menggunakan dasar sumber pengguna itu, jadi gunakannya dengan berhati-hati.",
+    "StorageSetting": "Tetapan Storan"
   },
   "modelService": {
     "TokenGenerated": "Token dijana",
@@ -1369,7 +1457,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 64 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",
@@ -1397,7 +1485,14 @@
     "RoutingsCount": "Kiraan Laluan",
     "Active/Total": "Aktif/Jumlah",
     "Public": "Awam",
-    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan"
+    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
+    "Owner": "Pemilik",
+    "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
+    "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal.",
+    "FailedToUpdateService": "Gagal mengemas kini perkhidmatan.",
+    "ServiceCreated": "Perkhidmatan model {{ name }} telah berjaya dibuat.",
+    "ServiceUpdated": "Perkhidmatan model {{ name }} telah berjaya dikemas kini.",
+    "ServiceTerminated": "Perkhidmatan model {{ name }} telah berjaya ditamatkan."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1408,10 +1503,49 @@
     "TurnOffTotp": "Matikan pengesahan dua faktor",
     "ConfirmTotpRemovalBody": "Adakah anda pasti untuk menarik diri daripada menggunakan pengesahan dua faktor?",
     "RemoveTotpSetupCompleted": "Dilumpuhkan 2FA",
-    "OTP": "Kata laluan sekali sahaja"
+    "OTP": "Kata laluan sekali sahaja",
+    "EnterConfirmationCode": "Sekarang masukkan OTP yang dijana oleh pengesah untuk mengesahkan.",
+    "RequireOTP": "Tulis OTP."
   },
   "OpenVSCodeRemote": "Buka Kod Visual Studio tempatan",
   "inputLimit": {
-    "4to64chars": "(4~64 aksara)"
+    "4to64chars": "(4~64 aksara)",
+    "4to32chars": "(4~32 aksara)"
+  },
+  "modelStore": {
+    "Description": "Penerangan",
+    "Model": "Model",
+    "FilterByName": "Tapis Mengikut Nama",
+    "ServiceDetails": "Butiran Perkhidmatan",
+    "Metadata": "Metadata",
+    "ModelPath": "Laluan Model",
+    "SearchModels": "Cari Model",
+    "MinResource": "Sumber Min",
+    "LastModified": "Terakhir Diubah Suai",
+    "Created": "Dicipta",
+    "Version": "Versi",
+    "Author": "Pengarang",
+    "MaxRetries": "Max Cuba Semula",
+    "Path": "Laluan",
+    "HealthCheck": "Pemeriksaan kesihatan",
+    "Port": "Pelabuhan",
+    "StartCommand": "Mulakan Perintah",
+    "PreStartActions": "Tindakan Pra Mula",
+    "Framework": "Rangka kerja",
+    "Category": "kategori",
+    "Label": "Label",
+    "Task": "Tugasan",
+    "CloneAsFolder": "Klon sebagai Folder",
+    "CloneSuccess": "Permintaan klon telah berjaya dihantar.",
+    "CloneInfo": "Ia akan diklonkan sebagai folder jenis pengguna anda.",
+    "category": "kategori"
+  },
+  "table": {
+    "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
+    "SettingTable": "Tetapan Meja",
+    "SearchTableColumn": "Cari lajur jadual"
+  },
+  "setting": {
+    "SearchPlaceholder": "Masukkan Istilah Carian"
   }
 }

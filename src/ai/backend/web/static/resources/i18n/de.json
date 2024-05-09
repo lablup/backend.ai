@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Herzlich willkommen,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Willkommen, {{ userName }}.",
       "Summary": "Zusammenfassung",
       "Sessions": "Sitzungen",
       "Import&Run": "Importieren und ausführen",
@@ -61,7 +60,12 @@
       "PasswordChangePlace": "Klicken Sie auf das Personensymbol in der oberen Leiste und rufen Sie das Menü \"Mein Konto\" auf.",
       "Notifications": "Benachrichtigungen",
       "Tasks": "Aufgaben",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Daten",
+      "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
+      "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
+      "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein",
+      "MyEnvironments": "Meine Umgebungen"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -110,7 +114,8 @@
     "ATOMEnabled": "ATOM NPU Aktiviert",
     "WarboyEnabled": "Warboy NPU Aktiviert",
     "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert"
   },
   "session": {
     "launcher": {
@@ -232,7 +237,43 @@
       "PreOpenPortPanelTitle": "Vorgeöffnete Ports einstellen (optional)",
       "PortsTitleWithRange": "Port-Wert (zwischen 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Alle nicht gespeicherten, bereits geöffneten Ports werden gelöscht.",
-      "StartModelServing": "Start Model Serving"
+      "StartModelServing": "Start Model Serving",
+      "PreOpenPortRangeGuide": "Geben Sie mehrere Werte ein, getrennt durch ein Komma (,) oder ein Leerzeichen.",
+      "preopen": "Voreröffnet",
+      "Network": "Netzwerk",
+      "Enable": "Aktivieren",
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
+      "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
+      "EnqueueComputeSessionWarning": "Wenn Sie einen größeren Wert als die derzeit verfügbaren Ressourcen festlegen, wird die Sitzungserstellung in der Warteschlange verzögert, bis sie verfügbar wird.",
+      "SessionName": "Sitzungsname",
+      "ResetFormConfirm": "Möchten Sie alle Ihre Einträge zurücksetzen?",
+      "TemplateAndHistory": "Vorlagen",
+      "ScheduleTimeSimple": "Startzeit einstellen",
+      "ResourceAllocationPerContainer": "Ressourcenzuweisung pro Container",
+      "NumberOfContainer": "Nummer des Behälters",
+      "ErrorCanNotExceedRemaining": "Kann nicht auf einen Wert gesetzt werden, der größer ist als die verbleibenden Ressourcen ({{Betrag}}).",
+      "EnterEnvironmentVariable": "Variablenname eingeben",
+      "EnvironmentVariableNamePatternError": "Der Variablenname muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+      "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
+      "Template": "Sitzungsvorlage",
+      "EnableAutomaticMiniumShmem": "Minimalen gemeinsamen Speicher festlegen",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Nur Ganzzahlen sind zulässig, wenn die Clustergröße nicht weniger als 2 beträgt.",
+      "StartAfter": "Beginnen Sie nach:",
+      "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht.",
+      "MiniumAllocation": "Mindestanforderungen",
+      "MiniumAllocationTooltip": "Wählen Sie als Mindestanforderung für die ausgewählte Betriebsumgebung",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Sie verwenden den \"{{launcher}}\"-Sitzungsstarter.",
+      "SkipToConfirmAndLaunch": "Zur Bewertung springen",
+      "InteractiveModeDesc": "ermöglicht das interaktive Erstellen, Testen und Ausführen von Code über Jupyter Notebook, Visual Studio Code usw.",
+      "BatchModeDesc": "Sie können Ihren Code mit mehreren Knoten und Clustern ausführen, um Ihre Idee zu skalieren",
+      "AddEnvironmentVariable": "Umgebungsvariablen hinzufügen",
+      "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
+      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben.",
+      "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -266,7 +307,8 @@
       "Prepared": "Bereit",
       "NoExistingConnectionExample": "Keine Verbindung Zu kopierendes Beispiel.",
       "SSHConnectionExampleClipboardCopy": "SSH Connection Example wurde in die Zwischenablage kopiert.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "Die Verbindungs-URL ist ungültig."
     },
     "TensorboardPath": "Protokollverzeichnis für TensorBoard",
     "InputTensorboardPath": "Bitte geben Sie das Protokollverzeichnis ein, auf das sich TensorBoard bezieht. Beachten Sie, dass das Protokollverzeichnis nicht automatisch erstellt wird.",
@@ -285,10 +327,16 @@
     "Architecture": "Architektur",
     "SessionType": "SessionType",
     "Validation": {
-      "EnterValidSessionName": "Gültigen Sitzungsnamen eingeben",
+      "EnterValidSessionName": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, Bindestrichen oder Unterstrichen ein.",
       "SessionNameRequired": "Sitzungsname ist erforderlich",
       "SluggedStrings": "Geschliffene Zeichenfolgen (>3 Zeichen)",
-      "SessionNameAlreadyExist": "Sitzungsname existiert bereits"
+      "SessionNameAlreadyExist": "Sitzungsname existiert bereits",
+      "SessionNameTooLong64": "Bitte geben Sie maximal 64 Zeichen ein.",
+      "PleaseFollowSessionNameRule": "Bitte geben Sie eine Kombination aus mindestens 4 Buchstaben, Zahlen, „.“, „_“ und „-“ ein.",
+      "SessionNameTooShort": "Bitte geben Sie mindestens 4 Zeichen ein.",
+      "SessionNameShouldStartWith": "Er muss mit einem Buchstaben des Alphabets, einer Zahl oder '_' beginnen.",
+      "SessionNameShouldEndWith": "Er muss mit einem Buchstaben des Alphabets, einer Zahl oder '_' enden.",
+      "SessionNameInvalidCharacter": "Die Mitte eines Namens darf nur Buchstaben des Alphabets, Zahlen und '_' enthalten."
     },
     "Interactive": "Interaktiv",
     "Batch": "Stapel",
@@ -348,7 +396,15 @@
     "CPU": "CPU",
     "MEM": "Speicher",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (Speicher)"
+    "GPU(MEM)": "GPU (Speicher)",
+    "Agents": "Agenten",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (Speicher)",
+    "ConvertSessionToImage": "Konvertieren Sie die Sitzung in ein Bild",
+    "SessionName": "Sitzungsname",
+    "SessionId": "Session-ID",
+    "EnvironmentAndVersion": "Umgebung und Version",
+    "Tags": "Stichworte"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -369,7 +425,6 @@
     "DeleteAll": "Alles löschen",
     "Update": "Aktualisieren",
     "Delete": "Löschen",
-    "Dismiss": "Entlassen",
     "DismissAndProceed": "Ablehnen und fortfahren",
     "Close": "Schließen",
     "Confirm": "Bestätigen",
@@ -380,7 +435,13 @@
     "Unset": "Nicht eingestellt",
     "OK": "OK",
     "Commit": "Commit",
-    "EnterManually": "Manuell eingeben"
+    "EnterManually": "Manuell eingeben",
+    "Download": "Herunterladen",
+    "Clone": "Klonen",
+    "Config": "Konfigurieren Sie",
+    "Next": "Weiter",
+    "Previous": "Vorherige",
+    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -422,7 +483,12 @@
     "Control": "Steuerung",
     "NewPassword": "Neues Kennwort",
     "Enabled": "aktiviert",
-    "StorageProxies": "Speicher"
+    "StorageProxies": "Speicher",
+    "None": "Keine",
+    "Image": "Bild",
+    "All": "Alle",
+    "InProgress": "In Arbeit",
+    "Session": "Sitzung"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -499,7 +565,10 @@
     "KeypairDetail": "Schlüsselpaar Detail",
     "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
-    "NoUserToDisplay": "Keine Benutzer zum Anzeigen"
+    "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
+    "EnableSudoSession": "Sudo-Sitzung aktivieren",
+    "MainAccessKey": "Hauptzugangsschlüssel",
+    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer."
   },
   "data": {
     "Folders": "Ordner",
@@ -552,7 +621,7 @@
       "FolderRenamed": "Ordner umbenannt",
       "FolderNameMismatched": "Ordnername stimmt nicht überein. Bitte prüfen Sie, ob Leerzeichen im Eingabefeld vorhanden sind oder nicht.",
       "SameFileName": "Der Eingabewert ist mit dem zu aktualisierenden Dateinamen identisch. Bitte ändern Sie es in einen anderen Namen.",
-      "FolderDeleted": "Ordner gelöscht",
+      "FolderDeleted": "Der Ordner {{ FolderName }} wurde gelöscht.",
       "FolderUpdated": "Ordneroption(en) aktualisiert",
       "FolderDisconnected": "Ordner wurde getrennt.",
       "FileRenamed": "Datei umbenannt",
@@ -579,7 +648,13 @@
       "CloneFolder": "Ordner klonen",
       "ShareFolder": "Ordner teilen",
       "ModifyPermissions": "Berechtigungen ändern",
-      "LeaveFolder": "Ordner verlassen"
+      "LeaveFolder": "Ordner verlassen",
+      "Restore": "Wiederherstellen",
+      "DeleteForever": "Unwiederuflich löschen",
+      "FolderRestored": "Der Ordner {{ folderName }} wurde wiederhergestellt.",
+      "FolderDeletedForever": "Der Ordner {{ folderName }} wurde endgültig gelöscht.",
+      "MoveToTrashBin": "In den Papierkorb verschieben",
+      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben."
     },
     "explorer": {
       "Delete": "Löschen...",
@@ -630,7 +705,8 @@
       "SFTPSessionNotAvailable": "SFTP Session ist jetzt nicht verfügbar",
       "StartingSSH/SFTPSession": "SFTP-Sitzung starten...",
       "NumberOfSFTPSessionsExceededTitle": "Limit der laufenden Upload-Session erreicht",
-      "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten."
+      "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten.",
+      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet."
     },
     "invitation": {
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
@@ -664,21 +740,29 @@
     "Used": "Gebraucht",
     "Pipeline": "Pipeline-Ordner",
     "DialogDataFolder": "Pipeline-spezifische Ordner, die bei der Erstellung von Pipelines in FastTrack automatisch erstellt werden.",
-    "DialogModelFolder": "Sie können Modelle bedienen und verwalten."
+    "DialogModelFolder": "Sie können Modelle bedienen und verwalten.",
+    "SearchByName": "Suche mit Name",
+    "ModelStore": "Modellladen",
+    "New": "Neu",
+    "Add": "hinzufügen",
+    "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ACHTUNG: Dies kann nicht rückgängig gemacht werden!",
       "LogDeletion": "Möchten Sie wirklich alle Protokollnachrichten löschen?",
       "WillBeAppliedToNewSessions": "Dieses Update wird auf neue Sitzungen angewendet.",
-      "Required": "Erforderlich"
+      "Required": "Erforderlich",
+      "DeleteForeverDesc": "ACHTUNG: Ausgewählte Elemente werden für immer gelöscht und Sie können sie nicht wiederherstellen."
     },
     "ask": {
       "DoYouWantToProceed": "Willst du fortfahren?"
     },
     "title": {
       "LetsDouble-Check": "Lass uns das überprüfen",
-      "Notice": "Hinweis"
+      "Notice": "Hinweis",
+      "DeleteForever": "Unwiederuflich löschen?"
     },
     "ErrorOccurred": "Ein Fehler ist aufgetreten",
     "error": {
@@ -733,7 +817,8 @@
     "PasswordsDoNotMatch": "Passwort und Bestätigung stimmen nicht überein.",
     "NoChangeMade": "Es wurden keine Änderungen vorgenommen.",
     "Architecture": "Architektur",
-    "NoImageToDisplay": "Keine Bilder zum Anzeigen"
+    "NoImageToDisplay": "Keine Bilder zum Anzeigen",
+    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht."
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -755,7 +840,8 @@
     "RAM": "Arbeitsspeicher (GB)",
     "SharedMemory": "Gemeinsamer Speicher (GB)",
     "NoResourcePresetToDisplay": "Keine Ressourcenvoreinstellungen anzeigen",
-    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht."
+    "Deleted": "Die Ressourcenvoreinstellung wurde erfolgreich gelöscht.",
+    "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher"
   },
   "usersettings": {
     "General": "Allgemeines",
@@ -808,7 +894,14 @@
     "DescAutoLogout": "Melden Sie sich automatisch ab, wenn alle angemeldeten Seiten geschlossen sind, mit Ausnahme von sitzungsbasierten Seiten für Apps (z. B. Jupyter Notebook, Webterminal usw.)",
     "SSHKeypairEnterManuallyFinished": "SSH-Keypair wurde erfolgreich registriert.",
     "BootstrapScriptDescription": "Das Bootstrap-Skript wird nur einmal nach der Erstellung der Sitzung ausgeführt",
-    "SSHKeypairEnterManually": "SSH-Schlüsselpaar"
+    "SSHKeypairEnterManually": "SSH-Schlüsselpaar",
+    "MyKeypairInfo": "Meine Schlüsselpaarinformationen",
+    "DescMyKeypairInfo": "Siehe meine Schlüsselpaarinformationen",
+    "DarkMode": "Dunkler Modus",
+    "LightMode": "Lichtmodus",
+    "UseSystemSetting": "Verwenden Sie die Systemeinstellungen",
+    "DescThemeMode": "Passen Sie an, wie die Backend.AI-WebUI auf Ihrem Gerät aussieht.",
+    "ThemeMode": "Themenmodus"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -830,7 +923,9 @@
     "Parameters": "Parameter",
     "ErrorType": "Fehlertyp",
     "LogMessageRemoved": "Protokollnachrichten wurden entfernt.",
-    "NoLogToDisplay": "Keine Protokolle anzeigen"
+    "NoLogToDisplay": "Keine Protokolle anzeigen",
+    "ShowOnlyError": "Nur Anzeigefehler",
+    "SearchLogs": "Protokolle durchsuchen"
   },
   "resourcePolicy": {
     "Resources": "Ressourcen",
@@ -891,7 +986,9 @@
     "PleaseSelectOption": "Bitte wählen Sie eine Option.",
     "RegistrySuccessfullyModified": "Registry erfolgreich geändert.",
     "NoRegistryToDisplay": "Keine Registrierungen anzeigen",
-    "ModifyRegistry": "Registry ändern"
+    "ModifyRegistry": "Registry ändern",
+    "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?",
+    "DescURLFormat": "Ungültiger URL-Typ"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -1031,8 +1128,6 @@
     "Scaling": "Skalierung",
     "AllowAgentSideRegistration": "Agentseitige Registrierung zulassen",
     "DescAllowAgentSideRegistration": "Erlauben Sie dem Agenten, sich beim Manager zu registrieren. <br/> Nur verwenden, wenn der Backend.AI-Cluster an einem sicheren Ort verwaltet wird.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "CUDA-GPU-Unterstützung",
     "DescCUDAGPUsupport": "NVIDIA CUDA-GPU-Unterstützung. <br/> Erfordert Backend.AI CUDA-Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Deaktiviert, weil das System das Fractional GPU-Plugin verwendet",
     "ROCMGPUsupport": "ROCm-GPU-Unterstützung",
@@ -1082,13 +1177,23 @@
     "OverlayNetworkSettings": "Overlay-Netzwerkeinstellungen",
     "OverlayNetworkSettingsDescription": "Ein Overlay-Netzwerk ist ein Computernetzwerk, das auf ein anderes Netzwerk aufgesetzt wird. Das Overlay-Netzwerk schafft ein verteiltes Netzwerk zwischen mehreren Docker-Daemon-Hosts des Backend.AI-Managers.",
     "MTUDescription": "Maximale Übertragungseinheit, die Größe des größten Pakets, das ein Netzprotokoll übertragen kann.",
-    "OutOfRange": "Außerhalb der Reichweite."
+    "OutOfRange": "Außerhalb der Reichweite.",
+    "Plugins": "Plugins",
+    "OpenSourceCUDAGPUsupport": "Open Source CUDA GPU Unterstützung",
+    "ShowOnlyChanged": "Nur Änderungen anzeigen",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Verwenden Sie den Hyperaccel LPU-Beschleuniger.",
+    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
     "Visit": "Besuch",
     "SeeDetail": "Siehe Detail",
-    "Initializing": "Initialisieren..."
+    "Initializing": "Initialisieren...",
+    "NoNotification": "Keine Benachrichtigung.",
+    "Notifications": "Benachrichtigungen",
+    "ClearNotifications": "Klare Benachrichtigungen",
+    "AreYouSureToClearAllNotifications": "Sind Sie sicher, dass Sie alle Benachrichtigungen gelöscht haben?"
   },
   "information": {
     "Core": "Ader",
@@ -1131,14 +1236,12 @@
     "LeaveService": "Dienst verlassen",
     "DescConfirmLeave": "Bitte geben Sie zur Bestätigung Ihre E-Mail und Ihr Passwort erneut ein.",
     "Password": "Passwort",
-    "E-mail": "Email",
     "APIKey": "API-Schlüssel",
     "SecretKey": "Geheimer Schlüssel",
     "Endpoint": "Endpunkt",
     "NotAUser": "Kein Benutzer?",
     "LoginAnotherway": "Möchten Sie sich auf andere Weise anmelden?",
     "SignUp": "Anmelden",
-    "LoginWithE-mail": "Mit E-Mail anmelden",
     "LoginWithIAM": "Mit IAM anmelden",
     "ClickToUseIAM": "Klicken Sie hier, um IAM zu verwenden",
     "ClickToUseID": "Klicken Sie hier, um die ID zu verwenden",
@@ -1166,7 +1269,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Anmeldung mit SAML",
       "LoginWithRealm": "Anmeldung mit {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Melden Sie sich mit E-Mail oder Benutzernamen an",
+    "E-mailorUsername": "E-Mail Adresse oder Benutzername"
   },
   "signup": {
     "SignupBETA": "Anmeldung (nur Beta-Einladung)",
@@ -1224,7 +1329,7 @@
     "CouldNotCopyText": "Text konnte nicht kopiert werden:",
     "NotebookBadgeURL": "Notizbuch-URL",
     "GetAndRunNotebook": "Importieren und ausführen",
-    "ImportGithubRepo": "Github-Repository importieren",
+    "ImportGithubRepo": "GitHub-Repository importieren",
     "GitHubURL": "GitHub-URL",
     "GetToFolder": "Ordner aufrufen",
     "RepoWillBeFolder": "Importierte GitHub-Repositorys werden in Ordner konvertiert und können beim Sitzungsstart gemountet werden.",
@@ -1238,13 +1343,13 @@
     "FolderName": "Name des importierten Ordners:",
     "NotebookBadgeCodeHTML": "Notebook-Badge-Code (HTML)",
     "NotebookBadgeCodeMarkdown": "Notebook-Badge-Code (Abschlag)",
-    "GithubInternalError": "Github Interner Fehler.",
-    "GithubAPILimitError": "Github API-Beschränkungsfehler.",
-    "GithubAPIEtcError": "Github Server Problem.",
-    "ImportGitlabRepo": "Gitlab-Repository importieren",
-    "GitlabRepoWillBeFolder": "Importierte Gitlab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
-    "GitlabURL": "Gitlab-URL",
-    "GitlabDefaultBranch": "Gitlab-Zweigname"
+    "GithubInternalError": "GitHub Interner Fehler.",
+    "GithubAPILimitError": "GitHub API-Beschränkungsfehler.",
+    "GithubAPIEtcError": "GitHub Server Problem.",
+    "ImportGitlabRepo": "GitLab-Repository importieren",
+    "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
+    "GitlabURL": "GitLab-URL",
+    "GitlabDefaultBranch": "GitLab-Zweigname"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik für diesen Monat",
@@ -1298,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Es gibt Schlüsselpaare, die auf diese Ressourcenpolitik verweisen.",
     "SmallerResourceThenImageRequires": "Ihre Ressourcenanforderung ist kleiner als das für das Bild erforderliche Minimum. Versuchen Sie es mit mehr Ressourcen.",
     "APINotSupported": "API wird nicht unterstützt. Erfordert die neueste Version des Backend.AI-Managers.",
-    "WrongAPIServerAddress": "Falsche API-Serveradresse."
+    "WrongAPIServerAddress": "Falsche API-Serveradresse.",
+    "ReachedResourceLimitPleaseContact": "Ihr Ressourcenlimit wurde erreicht. \nBitte wenden Sie sich an den Administrator."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
@@ -1329,7 +1435,7 @@
     "FormValidationFailed": "Formularüberprüfung fehlgeschlagen",
     "StartNewServing": "Neue Portion starten",
     "ServiceName": "Dienst Name",
-    "ServiceNameRule": "Erlaubt sind nur 4 bis 64 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
+    "ServiceNameRule": "Erlaubt sind nur 4 bis 24 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
     "OpenToPublic": "Offen für die Öffentlichkeit",
     "DesiredRoutingCount": "Gewünschte Routinganzahl",
     "ServingRouteErrorModalTitle": "Serving Route Fehler",
@@ -1357,7 +1463,14 @@
     "RoutingsCount": "Routings zählen",
     "Active/Total": "Aktiv/Gesamt",
     "Public": "Öffentlich",
-    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung"
+    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
+    "Owner": "Eigentümer",
+    "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert.",
+    "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen.",
+    "FailedToUpdateService": "Der Dienst konnte nicht aktualisiert werden.",
+    "ServiceCreated": "Der Modelldienst {{ name }} wurde erfolgreich erstellt.",
+    "ServiceUpdated": "Der Modelldienst {{ name }} wurde erfolgreich aktualisiert.",
+    "ServiceTerminated": "Der Modelldienst {{ name }} wurde erfolgreich beendet."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1397,7 +1510,8 @@
     "ForUser": "Für Benutzer",
     "ForProject": "Für Projekt",
     "QuotaDoesNotSupported": "Dieses Speicher-Backend unterstützt keine Quoten.",
-    "BeCarefulToSetUserResourcePolicy": "Die Änderung einer Ressourcenrichtlinie kann sich auf alle Benutzer auswirken, die diese Benutzer-Ressourcenrichtlinie verwenden, daher ist sie mit Vorsicht zu genießen."
+    "BeCarefulToSetUserResourcePolicy": "Die Änderung einer Ressourcenrichtlinie kann sich auf alle Benutzer auswirken, die diese Benutzer-Ressourcenrichtlinie verwenden, daher ist sie mit Vorsicht zu genießen.",
+    "StorageSetting": "Speichereinstellung"
   },
   "totp": {
     "TotpSetupCompleted": "Aktivierte 2FA",
@@ -1408,10 +1522,49 @@
     "TurnOffTotp": "Deaktivieren Sie die Zwei-Faktor-Authentifizierung",
     "ConfirmTotpRemovalBody": "Sind Sie sicher, dass Sie die Zwei-Faktor-Authentifizierung nicht verwenden möchten?",
     "RemoveTotpSetupCompleted": "Deaktivierte 2FA",
-    "OTP": "Einmaliges Passwort"
+    "OTP": "Einmaliges Passwort",
+    "EnterConfirmationCode": "Geben Sie nun zur Überprüfung das vom Authentifikator generierte OTP ein.",
+    "RequireOTP": "Schreiben Sie OTP."
   },
   "OpenVSCodeRemote": "Lokalen Visual Studio Code öffnen",
   "inputLimit": {
-    "4to64chars": "(4~64 Zeichen)"
+    "4to64chars": "(4~64 Zeichen)",
+    "4to32chars": "(4~32 Zeichen)"
+  },
+  "modelStore": {
+    "Description": "Beschreibung",
+    "Model": "Modell",
+    "FilterByName": "Nach Namen filtern",
+    "ServiceDetails": "Servicedetails",
+    "Metadata": "Metadaten",
+    "ModelPath": "Modellpfad",
+    "SearchModels": "Modelle suchen",
+    "MinResource": "Min. Ressource",
+    "LastModified": "Zuletzt bearbeitet",
+    "Created": "Erstellt",
+    "Version": "Ausführung",
+    "Author": "Autor",
+    "MaxRetries": "Max. Wiederholungsversuche",
+    "Path": "Weg",
+    "HealthCheck": "Gesundheitskontrolle",
+    "Port": "Hafen",
+    "StartCommand": "Befehl starten",
+    "PreStartActions": "Aktionen vor dem Start",
+    "Framework": "Rahmenwerk",
+    "Category": "Kategorien",
+    "Label": "Etikett",
+    "Task": "Aufgabe",
+    "CloneAsFolder": "Als Ordner klonen",
+    "CloneSuccess": "Die Klonanfrage wurde erfolgreich gesendet.",
+    "CloneInfo": "Er wird als Ihr Benutzertyp-Ordner geklont.",
+    "category": "Kategorie"
+  },
+  "table": {
+    "SettingTable": "Sitzordnung bei Tisch",
+    "SelectColumnToDisplay": "Wählen Sie die anzuzeigenden Spalten aus",
+    "SearchTableColumn": "Tabellenspalten durchsuchen"
+  },
+  "setting": {
+    "SearchPlaceholder": "Geben Sie einen Suchbegriff ein"
   }
 }

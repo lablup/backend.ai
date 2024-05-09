@@ -15,13 +15,16 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    cast,
+    overload,
 )
+from uuid import UUID
 
 import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,10 +36,10 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
-from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from ..api.exceptions import ImageNotFound, ObjectNotFound
+from ..container_registry import get_container_registry_cls
+from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
     Base,
     BigInt,
@@ -49,13 +52,14 @@ from .base import (
     StructuredJSONColumn,
     set_if_set,
 )
+from .gql_relay import AsyncNode
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
-    from ai.backend.manager.config import SharedConfig
 
+    from ..config import SharedConfig
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -64,11 +68,14 @@ __all__ = (
     "rescan_images",
     "ImageType",
     "ImageAliasRow",
+    "ImageLoadFilter",
     "ImageRow",
     "Image",
     "PreloadImage",
     "RescanImages",
     "ForgetImage",
+    "ForgetImageById",
+    "UntagImageFromRegistry",
     "ModifyImage",
     "AliasImage",
     "DealiasImage",
@@ -76,16 +83,22 @@ __all__ = (
 )
 
 
+class ImageLoadFilter(str, enum.Enum):
+    INSTALLED = "installed"
+    EXCLUDE_OPERATIONAL = "operational"
+    CUSTOMIZED_ONLY = "customized"
+
+
 async def rescan_images(
     etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
-    registry: str = None,
-    local: bool = False,
+    registry_or_image: str | None = None,
     *,
-    reporter: ProgressReporter = None,
+    local: bool | None = False,
+    reporter: ProgressReporter | None = None,
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
-    from ai.backend.manager.config import container_registry_iv
+    from ..config import container_registry_iv
 
     if local:
         registries = {
@@ -99,18 +112,38 @@ async def rescan_images(
         }
     else:
         registry_config_iv = t.Mapping(t.String, container_registry_iv)
-        latest_registry_config = registry_config_iv.check(
-            await etcd.get_prefix("config/docker/registry"),
+        latest_registry_config = cast(
+            dict[str, Any],
+            registry_config_iv.check(
+                await etcd.get_prefix("config/docker/registry"),
+            ),
         )
         # TODO: delete images from registries removed from the previous config?
-        if registry is None:
+        if registry_or_image is None:
             # scan all configured registries
             registries = latest_registry_config
         else:
-            try:
-                registries = {registry: latest_registry_config[registry]}
-            except KeyError:
-                raise RuntimeError("It is an unknown registry.", registry)
+            # find if it's a full image ref of one of configured registries
+            for registry_name, registry_info in latest_registry_config.items():
+                if registry_or_image.startswith(registry_name + "/"):
+                    repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+                    log.debug(
+                        "running a per-image metadata scan: {}, {}",
+                        registry_name,
+                        repo_with_tag,
+                    )
+                    scanner_cls = get_container_registry_cls(registry_info)
+                    scanner = scanner_cls(db, registry_name, registry_info)
+                    await scanner.scan_single_ref(repo_with_tag)
+                    return
+            else:
+                # treat it as a normal registry name
+                registry = registry_or_image
+                try:
+                    registries = {registry: latest_registry_config[registry]}
+                    log.debug("running a per-registry metadata scan")
+                except KeyError:
+                    raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -158,19 +191,16 @@ class ImageRow(Base):
         StructuredJSONColumn(
             t.Mapping(
                 t.String,
-                t.Dict(
-                    {
-                        t.Key("min"): t.String,
-                        t.Key("max", default=None): t.Null | t.String,
-                    }
-                ),
+                t.Dict({
+                    t.Key("min"): t.String,
+                    t.Key("max", default=None): t.Null | t.String,
+                }),
             ),
         ),
         nullable=False,
     )
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
-    # kernels = relationship("KernelRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
     def __init__(
@@ -312,6 +342,16 @@ class ImageRow(Base):
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
 
     @classmethod
+    async def get(
+        cls, session: AsyncSession, image_id: UUID, load_aliases=False
+    ) -> ImageRow | None:
+        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+        result = await session.execute(query)
+        return result.scalar()
+
+    @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
         query = sa.select(ImageRow)
         if load_aliases:
@@ -375,13 +415,11 @@ class ImageRow(Base):
             max_value = slot_range.get("max")
             if max_value is None:
                 max_value = Decimal("Infinity")
-            res_limits.append(
-                {
-                    "key": slot_key,
-                    "min": min_value,
-                    "max": max_value,
-                }
-            )
+            res_limits.append({
+                "key": slot_key,
+                "min": min_value,
+                "max": max_value,
+            })
 
         accels = self.accelerators
         if accels is None:
@@ -581,6 +619,19 @@ class Image(graphene.ObjectType):
         return await cls.batch_load_by_canonical(graph_ctx, image_names)
 
     @classmethod
+    async def load_item_by_id(
+        cls,
+        ctx: GraphQueryContext,
+        id: UUID,
+    ) -> Image:
+        async with ctx.db.begin_readonly_session() as session:
+            row = await ImageRow.get(session, id, load_aliases=True)
+            if not row:
+                raise ImageNotFound
+
+            return await cls.from_row(ctx, row)
+
+    @classmethod
     async def load_item(
         cls,
         ctx: GraphQueryContext,
@@ -605,24 +656,14 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_installed: bool = None,
-        is_operation: bool = None,
+        filters: set[ImageLoadFilter] = set(),
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
-        items = [item async for item in cls.bulk_load(ctx, rows)]
-        # Convert to GQL objects
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
+        items: list[Image] = [
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+        ]
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
-
-            items = [*filter(_filter_operation, items)]
         return items
 
     @staticmethod
@@ -630,9 +671,6 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         items: Sequence[Image],
         domain_name: str,
-        *,
-        is_installed: bool = None,
-        is_operation: bool = None,
     ) -> Sequence[Image]:
         from .domain import domains
 
@@ -644,19 +682,115 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
-        items = [item for item in items if item.registry in allowed_docker_registries]
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
+        filtered_items: list[Image] = [
+            item for item in items if item.registry in allowed_docker_registries
+        ]
 
-            items = [*filter(_filter_operation, items)]
-        return items
+        return filtered_items
+
+    def matches_filter(
+        self,
+        ctx: GraphQueryContext,
+        filters: set[ImageLoadFilter],
+    ) -> bool:
+        if ImageLoadFilter.INSTALLED in filters and not self.installed:
+            return False
+
+        is_customized_image = False
+        for label in self.labels:
+            match label.key:
+                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.EXCLUDE_OPERATIONAL in filters:
+                    return False
+                case "ai.backend.customized-image.owner":
+                    if label.value != f"user:{ctx.user['uuid']}":
+                        return False
+                    is_customized_image = True
+
+        if not is_customized_image and ImageLoadFilter.CUSTOMIZED_ONLY in filters:
+            return False
+
+        return True
+
+
+class ImageNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    name = graphene.String()
+    humanized_name = graphene.String()
+    tag = graphene.String()
+    registry = graphene.String()
+    architecture = graphene.String()
+    is_local = graphene.Boolean()
+    digest = graphene.String()
+    labels = graphene.List(KVPair)
+    size_bytes = BigInt()
+    resource_limits = graphene.List(ResourceLimit)
+    supported_accelerators = graphene.List(graphene.String)
+
+    @overload
+    @classmethod
+    def from_row(cls, row: ImageRow) -> ImageNode: ...
+
+    @overload
+    @classmethod
+    def from_row(cls, row: None) -> None: ...
+
+    @classmethod
+    def from_row(cls, row: ImageRow | None) -> ImageNode | None:
+        if row is None:
+            return None
+        return cls(
+            id=row.id,
+            name=row.image,
+            humanized_name=row.image,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.config_digest,
+            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
+            size_bytes=row.size_bytes,
+            resource_limits=[
+                ResourceLimit(
+                    key=k,
+                    min=v.get("min", Decimal(0)),
+                    max=v.get("max", Decimal("Infinity")),
+                )
+                for k, v in row.resources.items()
+            ],
+            supported_accelerators=(row.accelerators or "").split(","),
+        )
+
+    @classmethod
+    def from_legacy_image(cls, row: Image) -> ImageNode:
+        return cls(
+            id=row.id,
+            name=row.name,
+            humanized_name=row.humanized_name,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.digest,
+            labels=row.labels,
+            size_bytes=row.size_bytes,
+            resource_limits=row.resource_limits,
+            supported_accelerators=row.supported_accelerators,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, image_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            image_row = await db_session.scalar(query)
+            if image_row is None:
+                raise ValueError(f"Image not found (id: {image_id})")
+            return cls.from_row(image_row)
 
 
 class PreloadImage(graphene.Mutation):
@@ -672,7 +806,7 @@ class PreloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -693,7 +827,7 @@ class UnloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -713,7 +847,7 @@ class RescanImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str = None,
     ) -> RescanImages:
@@ -730,8 +864,64 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
+class ForgetImageById(graphene.Mutation):
+    """Added since 24.03.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> ForgetImageById:
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("forget image {0} by API request", image_id)
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_session() as session:
+            image_row = await ImageRow.get(session, _image_id)
+            if not image_row:
+                raise ObjectNotFound("image")
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return ForgetImageById(ok=False, msg="Forbidden")
+            await session.delete(image_row)
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
 class ForgetImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
 
     class Arguments:
         reference = graphene.String(required=True)
@@ -739,16 +929,19 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         reference: str,
         architecture: str,
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
         async with ctx.db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session,
@@ -757,8 +950,80 @@ class ForgetImage(graphene.Mutation):
                     ImageAlias(reference),
                 ],
             )
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImage(ok=True, msg="")
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
+class UntagImageFromRegistry(graphene.Mutation):
+    """Added in 24.03.1"""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> UntagImageFromRegistry:
+        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("remove image from registry {0} by API request", str(_image_id))
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_readonly_session() as session:
+            image_row = await ImageRow.get(session, _image_id)
+            if not image_row:
+                raise ImageNotFound
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
+
+            registry_info = await ctx.shared_config.get_container_registry(
+                image_row.image_ref.registry
+            )
+            if registry_info.get("type", "") != "harbor2":
+                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
+        await scanner.untag(image_row.image_ref)
+
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class AliasImage(graphene.Mutation):
@@ -774,7 +1039,7 @@ class AliasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
         target: str,
@@ -807,7 +1072,7 @@ class DealiasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
     ) -> DealiasImage:
@@ -837,7 +1102,7 @@ class ClearImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str,
     ) -> ClearImages:
@@ -887,7 +1152,7 @@ class ModifyImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         target: str,
         architecture: str,
@@ -913,13 +1178,13 @@ class ModifyImage(graphene.Mutation):
         )
         set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not None:
+        if props.resource_limits is not Undefined:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}
-                if limit_option.min is not None and len(limit_option.min) > 0:
+                if limit_option.min is not Undefined and len(limit_option.min) > 0:
                     limit_data["min"] = limit_option.min
-                if limit_option.max is not None and len(limit_option.max) > 0:
+                if limit_option.max is not Undefined and len(limit_option.max) > 0:
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
             data["resources"] = resources_data
@@ -936,3 +1201,9 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class ImageRefType(graphene.InputObjectType):
+    name = graphene.String(required=True)
+    registry = graphene.String()
+    architecture = graphene.String()

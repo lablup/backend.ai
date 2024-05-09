@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import enum
+import functools
 import ipaddress
 import itertools
 import json
@@ -5,18 +9,16 @@ import logging
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
     Final,
     Iterable,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -72,72 +74,152 @@ default_repository = "lablup"
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
 
-common_image_label_schema = t.Dict(
-    {
-        # Required labels
-        t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
-        t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
-        # ai.backend.resource.min.*
-        t.Key("ai.backend.base-distro"): t.String(),
-        t.Key("ai.backend.runtime-type"): t.String(),
-        t.Key("ai.backend.runtime-path"): tx.PurePath(),
-        # Optional labels
-        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
-        t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
-    }
-).allow_extra("*")
+common_image_label_schema = t.Dict({
+    # Required labels
+    t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+    t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
+    # ai.backend.resource.min.*
+    t.Key("ai.backend.base-distro"): t.String(),
+    t.Key("ai.backend.runtime-type"): t.String(),
+    t.Key("ai.backend.runtime-path"): tx.PurePath(),
+    # Optional labels
+    t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
+    t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
+    t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
+    t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
+}).allow_extra("*")
 
-inference_image_label_schema = t.Dict(
-    {
-        t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
-        t.Key("ai.backend.model-path"): tx.PurePath(),
-        t.Key("ai.backend.model-format"): t.String(),
-    }
-).ignore_extra("*")
+inference_image_label_schema = t.Dict({
+    t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
+    t.Key("ai.backend.model-path"): tx.PurePath(),
+    t.Key("ai.backend.model-format"): t.String(),
+}).ignore_extra("*")
 
 
-def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
-    connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
-    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
-        docker_host = yarl.URL(raw_docker_host)
-        match docker_host.scheme:
-            case "http" | "https":
-                return docker_host, aiohttp.TCPConnector()
-            case "unix":
-                search_paths = [Path(docker_host.path)]
-                connector_cls = aiohttp.UnixConnector
-            case "npipe":
-                search_paths = [Path(docker_host.path.replace("/", "\\"))]
-                connector_cls = aiohttp.NamedPipeConnector
-            case _ as unknown_scheme:
-                raise RuntimeError("unsupported connection scheme", unknown_scheme)
-    else:
-        match sys.platform:
-            case "linux" | "darwin":
-                search_paths = [
-                    Path("/run/docker.sock"),
-                    Path("/var/run/docker.sock"),
-                    Path.home() / ".docker/run/docker.sock",
-                ]
-                connector_cls = aiohttp.UnixConnector
-            case "win32":
-                search_paths = [
-                    Path(r"\\.\pipe\docker_engine"),
-                ]
-                connector_cls = aiohttp.NamedPipeConnector
-            case _ as platform_name:
-                raise RuntimeError("unsupported platform", platform_name)
+class DockerConnectorSource(enum.Enum):
+    ENV_VAR = enum.auto()
+    USER_CONTEXT = enum.auto()
+    KNOWN_LOCATION = enum.auto()
+
+
+@dataclass()
+class DockerConnector:
+    sock_path: Path | None
+    docker_host: yarl.URL
+    connector: aiohttp.BaseConnector
+    source: DockerConnectorSource
+
+
+@functools.lru_cache()
+def get_docker_context_host() -> str | None:
+    try:
+        docker_config_path = Path.home() / ".docker" / "config.json"
+        docker_config = json.loads(docker_config_path.read_bytes())
+    except IOError:
+        return None
+    current_context_name = docker_config.get("currentContext", "default")
+    for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
+        context_data = json.loads(meta_path.read_bytes())
+        if context_data["Name"] == current_context_name:
+            return context_data["Endpoints"]["docker"]["Host"]
+    return None
+
+
+def parse_docker_host_url(
+    docker_host: yarl.URL,
+) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    match docker_host.scheme:
+        case "http" | "https":
+            return None, docker_host, aiohttp.TCPConnector()
+        case "unix":
+            path = Path(docker_host.path)
+            if not path.exists() or not path.is_socket():
+                raise RuntimeError(f"DOCKER_HOST {path} is not a valid socket file.")
+            decoded_path = os.fsdecode(path)
+            connector_cls = aiohttp.UnixConnector
+        case "npipe":
+            path = Path(docker_host.path.replace("/", "\\"))
+            if not path.exists() or not path.is_fifo():
+                raise RuntimeError(f"DOCKER_HOST {path} is not a valid named pipe.")
+            decoded_path = os.fsdecode(path)
+            connector_cls = aiohttp.NamedPipeConnector
+        case _ as unknown_scheme:
+            raise RuntimeError("unsupported connection scheme", unknown_scheme)
+    return (
+        path,
+        yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
+        connector_cls(decoded_path, force_close=True),
+    )
+
+
+# We may cache the connector type but not connector instances!
+@functools.lru_cache()
+def _search_docker_socket_files_impl() -> (
+    tuple[Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]]
+):
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    match sys.platform:
+        case "linux" | "darwin":
+            search_paths = [
+                Path("/run/docker.sock"),
+                Path("/var/run/docker.sock"),
+                Path.home() / ".docker/run/docker.sock",
+            ]
+            connector_cls = aiohttp.UnixConnector
+        case "win32":
+            search_paths = [
+                Path(r"\\.\pipe\docker_engine"),
+            ]
+            connector_cls = aiohttp.NamedPipeConnector
+        case _ as platform_name:
+            raise RuntimeError(f"unsupported platform: {platform_name}")
     for p in search_paths:
         if p.exists() and (p.is_socket() or p.is_fifo()):
-            decoded_path = os.fsdecode(p)
             return (
-                yarl.URL("http://localhost"),
-                connector_cls(decoded_path),
+                p,
+                yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
+                connector_cls,
             )
     else:
-        raise RuntimeError("could not find the docker socket")
+        searched_paths = ", ".join(map(os.fsdecode, search_paths))
+        raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
+
+
+def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    sock_path, docker_host, connector_cls = _search_docker_socket_files_impl()
+    return (
+        sock_path,
+        docker_host,
+        connector_cls(os.fsdecode(sock_path), force_close=True),
+    )
+
+
+def get_docker_connector() -> DockerConnector:
+    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
+        sock_path, docker_host, connector = parse_docker_host_url(yarl.URL(raw_docker_host))
+        return DockerConnector(
+            sock_path,
+            docker_host,
+            connector,
+            DockerConnectorSource.ENV_VAR,
+        )
+    if raw_docker_host := get_docker_context_host():
+        sock_path, docker_host, connector = parse_docker_host_url(yarl.URL(raw_docker_host))
+        return DockerConnector(
+            sock_path,
+            docker_host,
+            connector,
+            DockerConnectorSource.USER_CONTEXT,
+        )
+    sock_path, docker_host, connector = search_docker_socket_files()
+    return DockerConnector(
+        sock_path,
+        docker_host,
+        connector,
+        DockerConnectorSource.KNOWN_LOCATION,
+    )
 
 
 async def login(
@@ -210,7 +292,10 @@ async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
     return results
 
 
-def is_known_registry(val: str, known_registries: Union[Mapping[str, Any], Sequence[str]] = None):
+def is_known_registry(
+    val: str,
+    known_registries: Union[Mapping[str, Any], Sequence[str]] | None = None,
+):
     if val == default_registry:
         return True
     if known_registries is not None and val in known_registries:
@@ -224,7 +309,7 @@ def is_known_registry(val: str, known_registries: Union[Mapping[str, Any], Seque
     return False
 
 
-async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]:
+async def get_registry_info(etcd: AsyncEtcd, name: str) -> tuple[yarl.URL, dict]:
     reg_path = f"config/docker/registry/{etcd_quote(name)}"
     item = await etcd.get_prefix(reg_path)
     if not item:
@@ -272,20 +357,20 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 
 class PlatformTagSet(Mapping):
     __slots__ = ("_data",)
-    _data: Dict[str, str]
-    _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
+    _data: dict[str, str]
+    _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str]):
+    def __init__(self, tags: Iterable[str], value: str = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
             match = rx.search(tag)
             if match is None:
-                raise InvalidImageTag(tag)
+                raise InvalidImageTag(tag, value)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise InvalidImageTag(tag)
+                raise InvalidImageTag(tag, value)
             if value is None:
                 value = ""
             self._data[key] = value
@@ -318,7 +403,15 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
-    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local")
+    _value: str
+    _is_local: bool
+    _arch: str
+    _registry: str
+
+    _name: str
+    _tag: str
+
+    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local", "_value")
 
     _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
@@ -328,18 +421,19 @@ class ImageRef:
         known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
         architecture: str = "x86_64",
         is_local: bool = False,
-    ):
+    ) -> None:
+        self._value = value
         self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
-        if "://" in value or value.startswith("//"):
-            raise InvalidImageName(value)
-        parts = value.split("/", maxsplit=1)
+        if "://" in self._value or self._value.startswith("//"):
+            raise InvalidImageName(self._value)
+        parts = self._value.split("/", maxsplit=1)
         if len(parts) == 1:
             self._registry = default_registry
-            self._name, self._tag = ImageRef._parse_image_tag(value, True)
+            self._name, self._tag = ImageRef._parse_image_tag(self._value, True)
             if not rx_slug.search(self._tag):
-                raise InvalidImageTag(self._tag)
+                raise InvalidImageTag(self._tag, self._value)
         else:
             if is_known_registry(parts[0], known_registries):
                 self._registry = parts[0]
@@ -351,13 +445,13 @@ class ImageRef:
                 self._name, self._tag = ImageRef._parse_image_tag(parts[1], False)
             else:
                 self._registry = default_registry
-                self._name, self._tag = ImageRef._parse_image_tag(value, True)
+                self._name, self._tag = ImageRef._parse_image_tag(self._value, True)
             if not rx_slug.search(self._tag):
-                raise InvalidImageTag(self._tag)
+                raise InvalidImageTag(self._tag, self._value)
         self._update_tag_set()
 
     @staticmethod
-    def _parse_image_tag(s: str, using_default_registry: bool = False) -> Tuple[str, str]:
+    def _parse_image_tag(s: str, using_default_registry: bool = False) -> tuple[str, str]:
         image_tag = s.rsplit(":", maxsplit=1)
         if len(image_tag) == 1:
             image = image_tag[0]
@@ -373,10 +467,10 @@ class ImageRef:
 
     def _update_tag_set(self):
         if self._tag is None:
-            self._tag_set = (None, PlatformTagSet([]))
+            self._tag_set = (None, PlatformTagSet([], self._value))
             return
         tags = self._tag.split("-")
-        self._tag_set = (tags[0], PlatformTagSet(tags[1:]))
+        self._tag_set = (tags[0], PlatformTagSet(tags[1:], self._value))
 
     def generate_aliases(self) -> Mapping[str, "ImageRef"]:
         basename = self.name.split("/")[-1]
@@ -450,7 +544,7 @@ class ImageRef:
         return self._arch
 
     @property
-    def tag_set(self) -> Tuple[str, PlatformTagSet]:
+    def tag_set(self) -> tuple[str, PlatformTagSet]:
         # e.g., '3.6', {'ubuntu', 'cuda', ...}
         return self._tag_set
 
@@ -501,13 +595,15 @@ class ImageRef:
         ptagset_self, ptagset_other = self.tag_set[1], other.tag_set[1]
         for key_self in ptagset_self:
             if ptagset_other.has(key_self):
-                version_self, version_other = ptagset_self.get(key_self), ptagset_other.get(
-                    key_self
+                version_self, version_other = (
+                    ptagset_self.get(key_self),
+                    ptagset_other.get(key_self),
                 )
                 if version_self and version_other:
-                    parsed_version_self, parsed_version_other = version.parse(
-                        version_self
-                    ), version.parse(version_other)
+                    parsed_version_self, parsed_version_other = (
+                        version.parse(version_self),
+                        version.parse(version_other),
+                    )
                     if parsed_version_self != parsed_version_other:
                         return parsed_version_self < parsed_version_other
         return len(ptagset_self) > len(ptagset_other)

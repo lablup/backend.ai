@@ -19,10 +19,11 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: jsoref/labeler@v0-5.0.0
+    - uses: actions/labeler@v5
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
     - name: size-label
       uses: "lablup/size-label-action@master"
       env:
         GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        IGNORED: "**/*.lock"

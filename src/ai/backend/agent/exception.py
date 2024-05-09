@@ -17,6 +17,10 @@ class ResourceError(ValueError):
     pass
 
 
+class InvalidArgumentError(RuntimeError):
+    pass
+
+
 class UnsupportedResource(ResourceError):
     pass
 
@@ -70,9 +74,10 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, *args, **kwargs):
+    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.container_id = container_id
+        self.message = message
 
 
 class K8sError(Exception):

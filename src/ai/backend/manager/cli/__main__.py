@@ -12,14 +12,16 @@ import click
 from more_itertools import chunked
 from setproctitle import setproctitle
 
+from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
+from ai.backend.manager.models import error_logs
+from ai.backend.manager.models.utils import vacuum_db
 
-from ..config import load as load_config
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -46,23 +48,22 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogSeverity], case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: pathlib.Path,
-    log_level: str,
+    log_level: LogSeverity,
     debug: bool,
 ) -> None:
     """
     Manager Administration CLI
     """
-    local_config = load_config(config_path, "DEBUG" if debug else log_level)
-    setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
-    ctx.obj = ctx.with_resource(CLIContext(local_config=local_config))
+    setproctitle("backend.ai: manager.cli")
+    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
 @main.command(
@@ -209,7 +210,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.option(
     "-v",
     "--vacuum-full",
-    type=bool,
+    type=OptionalType(BoolExprType),
     default=False,
     help=(
         "Reclaim storage occupied by dead tuples."
@@ -222,7 +223,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     """
-    Delete old records from the kernels table and
+    Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
     import sqlalchemy as sa
@@ -306,10 +307,6 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                 )
                 deleted_count = result.rowcount
 
-                vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-                log.info(f"Perfoming {vacuum_sql} operation...")
-                await conn.exec_driver_sql(vacuum_sql)
-
                 curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
                 if ret := curs.fetchone():
                     table_size = ret[0]
@@ -323,8 +320,25 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             expiration_date,
         )
 
+    async def _clear_old_error_logs():
+        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+            async with db.begin() as conn:
+                log.info("Deleting old error logs...")
+                result = await conn.execute(
+                    sa.delete(error_logs).where(error_logs.c.created_at < expiration_date),
+                )
+                deleted_count = result.rowcount
+
+        log.info(
+            "Cleaned up {:,} error log records older than {}.",
+            deleted_count,
+            expiration_date,
+        )
+
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
+    asyncio.run(_clear_old_error_logs())
+    asyncio.run(vacuum_db(cli_ctx.local_config, vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
@@ -342,9 +356,15 @@ def fixture():
     """Command set for managing fixtures."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
+def api():
+    """Command set for API schema inspection and manipulation."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
 def gql():
     """Command set for GraphQL schema."""
+    # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")

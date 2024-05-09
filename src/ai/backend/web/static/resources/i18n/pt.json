@@ -1,8 +1,7 @@
 {
   "webui": {
     "menu": {
-      "WelcomeMessage": "Receber,",
-      "WelcomeMessage_2": " .",
+      "WelcomeMessage": "Bem vindo, {{userName }}.",
       "Summary": "Resumo",
       "Sessions": "Sessões",
       "Import&Run": "Importar e executar",
@@ -61,7 +60,12 @@
       "PasswordChangePlace": "Clique no ícone da pessoa na barra superior e aceda ao menu \"A minha conta\".",
       "Notifications": "Notificações",
       "Tasks": "Tarefas",
-      "FastTrack": "FastTrack"
+      "FastTrack": "FastTrack",
+      "Data&Model": "Dados",
+      "InvalidBlankPassword": "Coloque sua senha",
+      "InvalidBlankEmail": "Digite seu e-mail",
+      "DisMatchUserEmail": "E-mail do usuário não corresponde",
+      "MyEnvironments": "Meus ambientes"
     },
     "YouAreOffline": "Agora você está offline",
     "YouAreOnline": "Agora você está online",
@@ -110,7 +114,8 @@
     "ATOMEnabled": "ATOM NPU Ativado",
     "WarboyEnabled": "NPU do Warboy activada",
     "DownloadWebUIApp": "Descarregar a aplicação Backend.AI Web UI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel habilitada"
   },
   "session": {
     "launcher": {
@@ -232,7 +237,43 @@
       "PortsTitleWithRange": "Valor da porta (entre 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Quaisquer portas pré-abertas não guardadas desaparecerão.",
       "StartModelServing": "Iniciar modelo de serviço",
-      "ModelStorage": "Modelo de armazenamento"
+      "ModelStorage": "Modelo de armazenamento",
+      "PreOpenPortRangeGuide": "Insira vários valores separados por vírgula (,) ou espaço.",
+      "preopen": "pré-abrir",
+      "Network": "Rede",
+      "Enable": "Habilitar",
+      "FolderAliasInvalid": "Somente caracteres alfanuméricos, sublinhado (_), barra (/) e traço (-) são permitidos.",
+      "PreOpenPortMaxCountLimit": "Pode definir até {{count}} portas pré-abertas.",
+      "StartTimeMustBeInTheFuture": "A hora de início deve ser posterior à hora atual.",
+      "EnqueueComputeSessionWarning": "Se você definir um valor maior que os recursos atualmente disponíveis, a criação da sessão será atrasada na fila até que fique disponível.",
+      "SessionName": "Nome da sessão",
+      "ResetFormConfirm": "Deseja redefinir todas as suas entradas?",
+      "TemplateAndHistory": "Modelos",
+      "ScheduleTimeSimple": "Definir horário de início",
+      "ResourceAllocationPerContainer": "Atribuição de recursos por contentor",
+      "NumberOfContainer": "Número de contentores",
+      "ErrorCanNotExceedRemaining": "Não pode ser definido como superior aos recursos restantes ({{amount}}).",
+      "EnterEnvironmentVariable": "Introduzir o nome da variável",
+      "EnvironmentVariableNamePatternError": "O nome da variável deve começar com uma letra ou um sublinhado e só pode conter letras, números e sublinhados.",
+      "EnvironmentVariableDuplicateName": "Um nome de variável que já existe.",
+      "Template": "Modelo de sessão",
+      "EnableAutomaticMiniumShmem": "Definir a memória partilhada mínima",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "OnlyAllowsDiscreteNumberByClusterSize": "Somente números inteiros são permitidos quando o tamanho do cluster não é menor que 2.",
+      "StartAfter": "Comece depois:",
+      "StartTimeDoesNotApply": "Se a hora de início não estiver definida, ela não se aplica.",
+      "MiniumAllocation": "Requisitos mínimos",
+      "MiniumAllocationTooltip": "Selecionar como requisito mínimo para o ambiente de execução selecionado",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Está a utilizar o iniciador de sessão \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Saltar para a revisão",
+      "InteractiveModeDesc": "permite-lhe criar, testar e executar código de forma interactiva através do jupyter notebook, visual studio code, etc.",
+      "BatchModeDesc": "Pode executar o seu código com vários nós e clusters para escalar a sua ideia",
+      "AddEnvironmentVariable": "Adicionar variáveis de ambiente",
+      "EnvironmentVariableValueRequired": "Introduzir um valor.",
+      "PleaseCompleteForm": "O formulário está incompleto ou contém erros. Por favor, verifique os seus dados.",
+      "FailedToStartNewSession": "Falha na criação da sessão. \nPor favor, verifique a guia 'Finalizado' na página da sessão."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -266,7 +307,8 @@
       "Prepared": "Preparado",
       "NoExistingConnectionExample": "Não há exemplo de ligação a copiar.",
       "SSHConnectionExampleClipboardCopy": "O exemplo de ligação SSH foi copiado para a área de transferência.",
-      "App": "Aplicação"
+      "App": "Aplicação",
+      "ConnectUrlIsNotValid": "O URL de conexão não é válido."
     },
     "TensorboardPath": "Diretório de registro para TensorBoard",
     "InputTensorboardPath": "Insira o diretório de registro ao qual o TensorBoard se referirá. Observe que o diretório de log não será criado automaticamente.",
@@ -285,10 +327,16 @@
     "Architecture": "Arquitetura",
     "SessionType": "Tipo de sessão",
     "Validation": {
-      "EnterValidSessionName": "Introduzir um nome de sessão válido",
+      "EnterValidSessionName": "Insira uma combinação de pelo menos quatro letras do alfabeto, ou números, ou hífen, ou sublinhado.",
       "SessionNameRequired": "O nome da sessão é obrigatório",
       "SluggedStrings": "Cadeias de caracteres com slugged (>3 caracteres)",
-      "SessionNameAlreadyExist": "O nome da sessão já existe"
+      "SessionNameAlreadyExist": "O nome da sessão já existe",
+      "SessionNameTooLong64": "Insira 64 caracteres ou menos.",
+      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 4 letras, números, '.', '_' e '-'.",
+      "SessionNameTooShort": "Introduza pelo menos 4 caracteres.",
+      "SessionNameShouldStartWith": "Deve começar por uma letra do alfabeto, um número ou \"_\".",
+      "SessionNameShouldEndWith": "Deve terminar com uma letra do alfabeto, um número ou \"_\".",
+      "SessionNameInvalidCharacter": "O meio de um nome só pode conter letras do alfabeto, números e '_'."
     },
     "Interactive": "Interativo",
     "Batch": "Lote",
@@ -348,7 +396,15 @@
     "CPU": "CPU",
     "MEM": "Memória",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memória)"
+    "GPU(MEM)": "GPU (memória)",
+    "Agents": "Agentes",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memória)",
+    "ConvertSessionToImage": "Converter sessão em imagem",
+    "SessionName": "Nome da sessão",
+    "SessionId": "Identificação de sessão",
+    "EnvironmentAndVersion": "Ambiente e versão",
+    "Tags": "Tag"
   },
   "button": {
     "Cancel": "Cancelar",
@@ -369,7 +425,6 @@
     "DeleteAll": "Apagar tudo",
     "Update": "Atualizar",
     "Delete": "Excluir",
-    "Dismiss": "Liberar",
     "DismissAndProceed": "Dispensar e prosseguir",
     "Close": "Perto",
     "Confirm": "confirme",
@@ -380,7 +435,13 @@
     "Unset": "Não definido",
     "OK": "OK",
     "Commit": "Compromisso",
-    "EnterManually": "Introduzir manualmente"
+    "EnterManually": "Introduzir manualmente",
+    "Download": "Descarregar",
+    "Clone": "Clone",
+    "Config": "Configuração",
+    "Next": "Seguinte",
+    "Previous": "Anterior",
+    "PushToImage": "Enviar sessão para imagem personalizada"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -422,7 +483,12 @@
     "Control": "Ao controle",
     "NewPassword": "Nova Senha",
     "Enabled": "Habilitado",
-    "StorageProxies": "Armazéns"
+    "StorageProxies": "Armazéns",
+    "None": "Nenhum",
+    "Image": "Imagem",
+    "All": "Todos",
+    "InProgress": "Em curso",
+    "Session": "Sessão"
   },
   "credential": {
     "Permission": "Permissão",
@@ -499,7 +565,10 @@
     "KeypairDetail": "Detalhe do par de chaves",
     "SignoutSeccessfullyFinished": "O registo foi concluído com êxito",
     "Status": "Estado",
-    "NoUserToDisplay": "Nenhum utilizador a apresentar"
+    "NoUserToDisplay": "Nenhum utilizador a apresentar",
+    "EnableSudoSession": "Habilitar sessão sudo",
+    "MainAccessKey": "Chave de acesso principal",
+    "InactivateTheFollowingUsers": "Inative os seguintes usuários."
   },
   "data": {
     "Folders": "Pastas",
@@ -552,7 +621,7 @@
       "FolderRenamed": "Pasta renomeada",
       "FolderNameMismatched": "Nome da pasta incompatível. Verifique se o caractere de espaço no campo de entrada ou não.",
       "SameFileName": "O valor de entrada é igual ao nome do arquivo a ser atualizado. Por favor, mude para um nome diferente.",
-      "FolderDeleted": "Pasta excluída",
+      "FolderDeleted": "A pasta {{ folderName }} foi excluída.",
       "FolderUpdated": "Opção (ões) de pasta atualizada (s)",
       "FolderDisconnected": "A pasta foi desconectada.",
       "FileRenamed": "Arquivo renomeado",
@@ -579,7 +648,13 @@
       "CloneFolder": "Clonar pasta",
       "ShareFolder": "Partilhar pasta",
       "ModifyPermissions": "Modificar permissões",
-      "LeaveFolder": "Pasta de saída"
+      "LeaveFolder": "Pasta de saída",
+      "Restore": "Restaurar",
+      "DeleteForever": "Apagar para sempre",
+      "FolderRestored": "A pasta {{ folderName }} foi restaurada.",
+      "FolderDeletedForever": "A pasta {{ folderName }} foi excluída definitivamente.",
+      "MoveToTrashBin": "Mover para a lixeira",
+      "MovedToTrashBin": "A pasta {{ folderName }} foi movida para a lixeira."
     },
     "explorer": {
       "Delete": "Excluir...",
@@ -630,7 +705,8 @@
       "SFTPSessionNotAvailable": "A sessão SFTP não está disponível neste momento",
       "StartingSSH/SFTPSession": "Iniciando a sessão SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Atingiu o limite da contagem de sessões de carregamento em execução",
-      "NumberOfSFTPSessionsExceededBody": "Está a executar todas as sessões de carregamento disponíveis que tem permissão para criar. Termine as sessões de carregamento não utilizadas antes de iniciar uma nova sessão."
+      "NumberOfSFTPSessionsExceededBody": "Está a executar todas as sessões de carregamento disponíveis que tem permissão para criar. Termine as sessões de carregamento não utilizadas antes de iniciar uma nova sessão.",
+      "DownloadNotAllowed": "O download de arquivo/pasta não é permitido nesta pasta."
     },
     "invitation": {
       "NoValidEmails": "Nenhum e-mail válido foi inserido",
@@ -664,21 +740,29 @@
     },
     "Pipeline": "Pastas de pipelines",
     "DialogDataFolder": "Pastas dedicadas ao pipeline que são criadas automaticamente ao criar pipelines no FastTrack.",
-    "DialogModelFolder": "Pode servir e gerir modelos."
+    "DialogModelFolder": "Pode servir e gerir modelos.",
+    "SearchByName": "Procura por nome",
+    "ModelStore": "Loja de modelos",
+    "New": "Novo",
+    "Add": "Adicionar",
+    "CloningIsOnlyPossibleSameHost": "Atualmente, a clonagem só é possível no mesmo host.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "AVISO: isso não pode ser desfeito!",
       "LogDeletion": "Tem certeza de que deseja excluir todas as mensagens de log?",
       "WillBeAppliedToNewSessions": "Esta atualização será aplicada a novas sessões.",
-      "Required": "Necessário"
+      "Required": "Necessário",
+      "DeleteForeverDesc": "AVISO: os itens selecionados serão excluídos para sempre e você não poderá restaurá-los."
     },
     "ask": {
       "DoYouWantToProceed": "Você quer prosseguir?"
     },
     "title": {
       "LetsDouble-Check": "Vamos verificar novamente",
-      "Notice": "Aviso"
+      "Notice": "Aviso",
+      "DeleteForever": "Apagar para sempre?"
     },
     "ErrorOccurred": "Ocorreu um erro",
     "error": {
@@ -733,7 +817,8 @@
     "PasswordsDoNotMatch": "A senha e a confirmação não coincidem.",
     "NoChangeMade": "Não foram efectuadas alterações",
     "Architecture": "Arquitetura",
-    "NoImageToDisplay": "Não há imagens a apresentar"
+    "NoImageToDisplay": "Não há imagens a apresentar",
+    "CustomizedImageSuccessfullyDeleted": "Imagem personalizada excluída com sucesso."
   },
   "resourcePreset": {
     "ResourcePresets": "Predefinições de recursos",
@@ -755,7 +840,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Memória compartilhada (GB)",
     "NoResourcePresetToDisplay": "Não há predefinições de recursos a apresentar",
-    "Deleted": "A predefinição de recurso foi eliminada com êxito."
+    "Deleted": "A predefinição de recurso foi eliminada com êxito.",
+    "SHMEMShouldBeSmallerThanMemory": "A memória partilhada deve ser mais pequena do que a memória"
   },
   "usersettings": {
     "General": "Em geral",
@@ -808,7 +894,14 @@
     "DescAutoLogout": "Saia automaticamente se todas as páginas logadas forem fechadas, exceto as páginas originadas da sessão para aplicativos (por exemplo, notebook jupyter, terminal da web, etc.)",
     "SSHKeypairEnterManuallyFinished": "O par de chaves SSH foi registado com sucesso.",
     "BootstrapScriptDescription": "O script bootstrap será executado apenas uma vez após a criação da sessão",
-    "SSHKeypairEnterManually": "Par de chaves SSH"
+    "SSHKeypairEnterManually": "Par de chaves SSH",
+    "MyKeypairInfo": "Minhas informações de par de chaves",
+    "DescMyKeypairInfo": "Ver as informações do meu par de chaves",
+    "DarkMode": "Modo escuro",
+    "LightMode": "Modo claro",
+    "UseSystemSetting": "Usar configuração do sistema",
+    "DescThemeMode": "Personalize a aparência do Backend.AI WebUI em seu dispositivo.",
+    "ThemeMode": "Modo Tema"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -830,7 +923,9 @@
     "Parameters": "Parâmetros",
     "ErrorType": "Tipo de Erro",
     "LogMessageRemoved": "As mensagens de log foram removidas.",
-    "NoLogToDisplay": "Não há registos a apresentar"
+    "NoLogToDisplay": "Não há registos a apresentar",
+    "ShowOnlyError": "Exibir apenas erro",
+    "SearchLogs": "Registros de pesquisa"
   },
   "resourcePolicy": {
     "Resources": "Recursos",
@@ -891,7 +986,9 @@
     "PleaseSelectOption": "Por favor selecione uma opção.",
     "RegistrySuccessfullyModified": "Registo modificado com sucesso.",
     "NoRegistryToDisplay": "Não há registos a apresentar",
-    "ModifyRegistry": "Modificar o registo"
+    "ModifyRegistry": "Modificar o registo",
+    "ConfirmNoUserName": "Utilizador e palavra-passe não especificados, pretende guardar?",
+    "DescURLFormat": "Tipo de URL inválido"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupos de Recursos",
@@ -1031,8 +1128,6 @@
     "Scaling": "Dimensionamento",
     "AllowAgentSideRegistration": "Permitir registro do lado do agente",
     "DescAllowAgentSideRegistration": "Permitir que o agente se registre no gerente. <br/> Use apenas se o cluster Backend.AI for gerenciado em local seguro.",
-    "Plugins": "Plugins",
-    "CUDAGPUsupport": "Suporte para GPU CUDA",
     "DescCUDAGPUsupport": "Suporte para GPU NVIDIA CUDA. <br/> Requer Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Desativado porque o sistema usa o plugin de GPU fracionário",
     "ROCMGPUsupport": "Suporte para GPU ROCm",
@@ -1082,13 +1177,23 @@
     "OverlayNetworkSettings": "Definições de rede de sobreposição",
     "OverlayNetworkSettingsDescription": "Uma rede de sobreposição é uma rede de computadores que é colocada em camadas sobre outra rede. A rede de sobreposição cria uma rede distribuída entre vários hosts daemon do Docker do gerenciador Backend.AI.",
     "MTUDescription": "Unidade máxima de transmissão, o tamanho do maior pacote que um protocolo de rede pode transmitir.",
-    "OutOfRange": "Fora de alcance."
+    "OutOfRange": "Fora de alcance.",
+    "Plugins": "Plug-ins",
+    "OpenSourceCUDAGPUsupport": "Suporte para GPU CUDA de código aberto",
+    "ShowOnlyChanged": "Exibir apenas alterações",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Use o acelerador Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Requer plug-in Backend.AI Hyperaccel LPU."
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
     "Visit": "Visita",
     "SeeDetail": "Veja detalhes",
-    "Initializing": "Inicializando ..."
+    "Initializing": "Inicializando ...",
+    "NoNotification": "Nenhuma notificação.",
+    "Notifications": "Notificações",
+    "ClearNotifications": "Limpar notificações",
+    "AreYouSureToClearAllNotifications": "Tem certeza de que deseja limpar todas as notificações?"
   },
   "information": {
     "Core": "Testemunho",
@@ -1131,14 +1236,12 @@
     "LeaveService": "Sair do serviço",
     "DescConfirmLeave": "Para confirmar, digite seu e-mail e senha novamente.",
     "Password": "Senha",
-    "E-mail": "E-mail",
     "APIKey": "Chave API",
     "SecretKey": "Chave secreta",
     "Endpoint": "Endpoint",
     "NotAUser": "Não é um usuário?",
     "LoginAnotherway": "Quer fazer o login de outra maneira?",
     "SignUp": "Inscrever-se",
-    "LoginWithE-mail": "Login com e-mail",
     "LoginWithIAM": "Login com IAM",
     "ClickToUseIAM": "Clique para usar IAM",
     "ClickToUseID": "Clique para usar o ID",
@@ -1166,7 +1269,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Iniciar sessão com SAML",
       "LoginWithRealm": "Iniciar sessão com {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Login com e-mail ou nome de usuário",
+    "E-mailorUsername": "Email ou nome de usuário"
   },
   "signup": {
     "SignupBETA": "Inscrição (somente convite beta)",
@@ -1224,7 +1329,7 @@
     "CouldNotCopyText": "Não foi possível copiar o texto:",
     "NotebookBadgeURL": "URL do notebook",
     "GetAndRunNotebook": "Importar e executar",
-    "ImportGithubRepo": "Importar Repositório Github",
+    "ImportGithubRepo": "Importar Repositório GitHub",
     "GitHubURL": "URL do GitHub",
     "GetToFolder": "Obter para a pasta",
     "RepoWillBeFolder": "Os repositórios GitHub importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
@@ -1238,13 +1343,13 @@
     "FolderName": "Nome da pasta importada:",
     "NotebookBadgeCodeHTML": "Código do emblema do notebook (HTML)",
     "NotebookBadgeCodeMarkdown": "Código do emblema do notebook (Markdown)",
-    "GithubInternalError": "Erro interno do Github.",
-    "GithubAPILimitError": "Erro de limitação da API do Github.",
-    "GithubAPIEtcError": "Problema no servidor do Github.",
-    "ImportGitlabRepo": "Importar o repositório Gitlab",
-    "GitlabRepoWillBeFolder": "Os repositórios Gitlab importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
-    "GitlabURL": "URL do Gitlab",
-    "GitlabDefaultBranch": "Nome do ramo do Gitlab"
+    "GithubInternalError": "Erro interno do GitHub.",
+    "GithubAPILimitError": "Erro de limitação da API do GitHub.",
+    "GithubAPIEtcError": "Problema no servidor do GitHub.",
+    "ImportGitlabRepo": "Importar o repositório GitLab",
+    "GitlabRepoWillBeFolder": "Os repositórios GitLab importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
+    "GitlabURL": "URL do GitLab",
+    "GitlabDefaultBranch": "Nome do ramo do GitLab"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Estatísticas para este mês",
@@ -1298,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Existem pares de chaves que fazem referência a esta política de recursos.",
     "SmallerResourceThenImageRequires": "O seu pedido de recursos é mais pequeno do que o mínimo exigido pela imagem. Tente mais recursos.",
     "APINotSupported": "API não suportada. Requer a versão mais recente do gestor Backend.AI.",
-    "WrongAPIServerAddress": "Endereço do servidor API incorreto."
+    "WrongAPIServerAddress": "Endereço do servidor API incorreto.",
+    "ReachedResourceLimitPleaseContact": "Atingiu seu limite de recursos. \nEntre em contato com o administrador."
   },
   "maxLength": {
     "64chars": "(máximo de 64 caracteres)",
@@ -1350,7 +1456,8 @@
     "ForUser": "Para o utilizador",
     "ForProject": "Para o projeto",
     "QuotaDoesNotSupported": "Este backend de armazenamento não suporta quotas.",
-    "BeCarefulToSetUserResourcePolicy": "A alteração de uma política de recursos pode afetar todos os utilizadores que utilizam essa política de recursos do utilizador, pelo que deve ser utilizada com cuidado."
+    "BeCarefulToSetUserResourcePolicy": "A alteração de uma política de recursos pode afetar todos os utilizadores que utilizam essa política de recursos do utilizador, pelo que deve ser utilizada com cuidado.",
+    "StorageSetting": "Configuração de armazenamento"
   },
   "modelService": {
     "TokenGenerated": "Token gerado",
@@ -1369,7 +1476,7 @@
     "FormValidationFailed": "Falha na validação do formulário",
     "StartNewServing": "Iniciar nova dose",
     "ServiceName": "Nome do serviço",
-    "ServiceNameRule": "Só são permitidos 4 a 64 caracteres alfanuméricos, sublinhado(_), hífen(-) e ponto(.) e deve terminar com um carácter alfanumérico.",
+    "ServiceNameRule": "Só são permitidos 4 a 24 caracteres alfanuméricos, sublinhado(_), hífen(-) e ponto(.) e deve terminar com um carácter alfanumérico.",
     "OpenToPublic": "Aberto ao público",
     "DesiredRoutingCount": "Contagem de roteiros desejada",
     "ServingRouteErrorModalTitle": "Erro de rota de serviço",
@@ -1397,7 +1504,14 @@
     "Active/Total": "Ativo/Total",
     "Public": "Público",
     "YouAreAboutToTerminate": "Está prestes a terminar",
-    "Image": "Imagem"
+    "Image": "Imagem",
+    "Owner": "Proprietário",
+    "ServiceDelegatedFrom": "O serviço de modelo é criado por {{ createdUser }} mas a propriedade da sessão será delegada a {{ sessionOwner }}",
+    "FailedToTerminateService": "O pedido para terminar o serviço falhou.",
+    "FailedToUpdateService": "Falha ao atualizar o serviço.",
+    "ServiceCreated": "O serviço de modelo {{ name }} foi criado com sucesso.",
+    "ServiceUpdated": "O serviço de modelo {{ name }} foi atualizado com sucesso.",
+    "ServiceTerminated": "O serviço de modelo {{ name }} foi encerrado com sucesso."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1408,10 +1522,49 @@
     "TurnOffTotp": "Desativar a autenticação de dois factores",
     "ConfirmTotpRemovalBody": "Tem a certeza de que não quer utilizar a autenticação de dois factores?",
     "RemoveTotpSetupCompleted": "2FA desactivada",
-    "OTP": "Palavra-passe única"
+    "OTP": "Palavra-passe única",
+    "EnterConfirmationCode": "Agora insira o OTP gerado pelo autenticador para verificar.",
+    "RequireOTP": "Escreva OTP."
   },
   "OpenVSCodeRemote": "Abrir o código local do Visual Studio",
   "inputLimit": {
-    "4to64chars": "(4~64 caracteres)"
+    "4to64chars": "(4~64 caracteres)",
+    "4to32chars": "(4~32 caracteres)"
+  },
+  "modelStore": {
+    "Description": "Descrição",
+    "Model": "Modelo",
+    "FilterByName": "Filtrar por nome",
+    "ServiceDetails": "Detalhes do serviço",
+    "Metadata": "Metadados",
+    "ModelPath": "Caminho do modelo",
+    "SearchModels": "Pesquisar modelos",
+    "MinResource": "Recurso mínimo",
+    "LastModified": "Última modificação",
+    "Created": "Criada",
+    "Version": "Versão",
+    "Author": "Autor",
+    "MaxRetries": "Máximo de tentativas",
+    "Path": "Caminho",
+    "HealthCheck": "Exame de saúde",
+    "Port": "Porta",
+    "StartCommand": "Comando Iniciar",
+    "PreStartActions": "Ações pré-início",
+    "Framework": "Enquadramento",
+    "Category": "Categoria",
+    "Label": "Etiqueta",
+    "Task": "Tarefa",
+    "CloneAsFolder": "Clonar como Pasta",
+    "CloneSuccess": "O pedido de clone foi enviado com sucesso.",
+    "category": "Categoria",
+    "CloneInfo": "__NOT_TRANSLATED__"
+  },
+  "table": {
+    "SettingTable": "Configuração de mesa",
+    "SelectColumnToDisplay": "Selecione as colunas a serem exibidas",
+    "SearchTableColumn": "Pesquisar colunas da tabela"
+  },
+  "setting": {
+    "SearchPlaceholder": "Insira o termo de pesquisa"
   }
 }

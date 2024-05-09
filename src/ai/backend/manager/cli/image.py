@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import Optional
 
 import click
 
 from ai.backend.common.cli import MinMaxRange
 from ai.backend.common.logging import BraceStyleAdapter
 
+from .context import CLIContext
 from .image_impl import alias as alias_impl
 from .image_impl import dealias as dealias_impl
 from .image_impl import forget_image as forget_image_impl
@@ -13,6 +17,8 @@ from .image_impl import inspect_image as inspect_image_impl
 from .image_impl import list_images as list_images_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
+from .image_impl import validate_image_alias as validate_image_alias_impl
+from .image_impl import validate_image_canonical as validate_image_canonical_impl
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -22,11 +28,11 @@ def cli() -> None:
     pass
 
 
-@cli.command()
+@cli.command(name="list")
 @click.option("-s", "--short", is_flag=True, help="Show only the image references and digests.")
 @click.option("-i", "--installed", is_flag=True, help="Show only the installed images.")
 @click.pass_obj
-def list(cli_ctx, short, installed) -> None:
+def list_images(cli_ctx, short, installed) -> None:
     """List all configured images."""
     asyncio.run(list_images_impl(cli_ctx, short, installed))
 
@@ -75,7 +81,7 @@ def set_resource_limit(
 
 
 @cli.command()
-@click.argument("registry", required=False, default="")
+@click.argument("registry_or_image", required=False, default="")
 @click.option(
     "--local",
     is_flag=True,
@@ -83,13 +89,13 @@ def set_resource_limit(
     help="Scan the local Docker daemon instead of a registry",
 )
 @click.pass_obj
-def rescan(cli_ctx, registry: str, local: bool) -> None:
+def rescan(cli_ctx, registry_or_image: str, local: bool) -> None:
     """
     Update the kernel image metadata from all configured docker registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
-    asyncio.run(rescan_images_impl(cli_ctx, registry, local))
+    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, local))
 
 
 @cli.command()
@@ -108,3 +114,40 @@ def alias(cli_ctx, alias, target, architecture) -> None:
 def dealias(cli_ctx, alias) -> None:
     """Remove an alias."""
     asyncio.run(dealias_impl(cli_ctx, alias))
+
+
+@cli.command()
+@click.argument("alias")
+@click.pass_obj
+def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
+    """Validate a local/remote image's labels and platform tag formats by image alias."""
+    asyncio.run(validate_image_alias_impl(cli_ctx, alias))
+
+
+@cli.command()
+@click.argument("canonical")
+@click.option(
+    "--arch",
+    "-a",
+    type=str,
+    help="Specify architecture, Can't use with --current option",
+)
+@click.option(
+    "--current",
+    "-c",
+    is_flag=True,
+    default=False,
+    help="Use default architecture as the current client's architecture",
+)
+@click.pass_obj
+def validate_image_canonical(
+    cli_ctx: CLIContext, canonical: str, current: bool, arch: Optional[str] = None
+) -> None:
+    """
+    Validate a local/remote image's labels and platform tag formats by image canonical.
+
+    Write in the format registry/name:tag
+    """
+    if arch and current:
+        raise click.UsageError("Cannot use both --architecture and --current together")
+    asyncio.run(validate_image_canonical_impl(cli_ctx, canonical, current, arch))

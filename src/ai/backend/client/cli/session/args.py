@@ -2,20 +2,24 @@ from typing import Any, Callable
 
 import click
 
+from ai.backend.common.types import SessionTypes
+
 START_OPTION = [
     click.option(
         "-t",
         "--name",
         "--client-token",
         metavar="NAME",
+        type=str,
+        default=None,
         help="Specify a human-readable session name. If not set, a random hex string is used.",
     ),
     # job scheduling options
     click.option(
         "--type",
         metavar="SESSTYPE",
-        type=click.Choice(["batch", "interactive"]),
-        default="interactive",
+        type=click.Choice([*SessionTypes], case_sensitive=False),
+        default=SessionTypes.INTERACTIVE,
         help="Either batch or interactive",
     ),
     click.option(
@@ -38,7 +42,9 @@ START_OPTION = [
         help="The maximum duration to wait until the session starts.",
     ),
     click.option(
-        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
+        "--no-reuse",
+        is_flag=True,
+        help="Do not reuse existing sessions but return an error.",
     ),
     click.option(
         "--callback-url",
@@ -58,7 +64,10 @@ START_OPTION = [
     ),
     # extra options
     click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
+        "--tag",
+        type=str,
+        default=None,
+        help="User-defined tag string to annotate sessions.",
     ),
     # resource spec
     click.option(
@@ -67,7 +76,7 @@ START_OPTION = [
         "-m",
         "--mount",
         "mount",
-        metavar="NAME[=PATH]",
+        metavar="NAME[=PATH] or NAME[:PATH]",
         type=str,
         multiple=True,
         help=(
@@ -82,6 +91,7 @@ START_OPTION = [
     click.option(
         "--scaling-group",
         "--sgroup",
+        metavar="SCALING_GROUP",
         type=str,
         default=None,
         help=(
