@@ -211,7 +211,7 @@ def str_to_timedelta(tstr: str) -> timedelta:
 
 def compile_slug_re_pattern(allow_space: bool, allow_unicode: bool) -> re.Pattern[str]:
     if allow_space:
-        _pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+        _pattern = r"^\w([a-zA-Z0-9._-]*\w)?$"
     else:
         _pattern = r"^\w(?!\s)([\w._-]*\w)?$"
 
