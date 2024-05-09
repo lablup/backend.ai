@@ -3250,10 +3250,15 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
+        image_ref = ImageRef(kernel.image, [registry], kernel.architecture)
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(
-                    str(kernel.id), email, filename=filename, extra_labels=extra_labels
+                    str(kernel.id),
+                    email,
+                    filename=filename,
+                    extra_labels=extra_labels,
+                    canonical=image_ref.canonical,
                 )
         return resp
 
