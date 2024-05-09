@@ -601,6 +601,38 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for slug type string
+    """
+
+    impl = sa.types.Unicode
+    cache_ok = True
+
+    def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
+        self._allow_unicode = allow_unicode
+        self._length = length
+        if not self._allow_unicode:
+            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$", flags=re.ASCII)
+        else:
+            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$")
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: str, dialect):
+        if self._length is not None and len(value) > self._length:
+            raise ValueError(f"value is too long (max length {self._length}")
+        if self._rx_slug.search(string=value) is None:
+            return ValueError("invalid name format. slug format required.", value)
+        return value
+
+    def process_result_value(self, value: str, dialect):
+        if self._rx_slug.search(string=value) is None:
+            return ValueError("invalid name format. slug format required.", value)
+        return value
+
+
 class EndpointIDColumnType(GUID[EndpointId]):
     uuid_subtype_func = EndpointId
     cache_ok = True
@@ -763,38 +795,6 @@ class _SQLBasedGQLObject(Protocol):
         ctx: GraphQueryContext,
         row: Row,
     ) -> _GenericSQLBasedGQLObject: ...
-
-
-class SlugType(TypeDecorator):
-    """
-    A type wrapper for allowing unicode
-    """
-
-    impl = sa.types.Unicode
-    cache_ok = True
-
-    def __init__(self, *, length: int = 64, allow_unicode: bool = False) -> None:
-        self._allow_unicode = allow_unicode
-        self._length = length
-        if not self._allow_unicode:
-            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$", flags=re.ASCII)
-        else:
-            self._rx_slug = re.compile(r"^\w(?!\s)([\w._-]*\w)?$")
-
-    def load_dialect_impl(self, dialect):
-        return dialect.type_descriptor(sa.String(64))
-
-    def process_bind_param(self, value: str, dialect):
-        if self._length is not None and len(value) > self._length:
-            raise ValueError(f"value is too long (max length {self._length}")
-        if self._rx_slug.search(string=value) is None:
-            return ValueError("invalid name format. slug format required.", value)
-        return value
-
-    def process_result_value(self, value: str, dialect):
-        if self._rx_slug.search(string=value) is None:
-            return ValueError("invalid name format. slug format required.", value)
-        return value
 
 
 async def batch_result(
