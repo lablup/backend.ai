@@ -19,10 +19,30 @@ depends_on = None
 
 
 def upgrade():
-    op.alter_column("domains", column_name="name", type_=SlugType(length=64, allow_unicode=True))
-    op.alter_column("groups", column_name="name", type_=SlugType(length=64, allow_unicode=True))
+    op.alter_column(
+        "domains",
+        column_name="name",
+        type_=SlugType(length=64, allow_unicode=True),
+        existing_type=sa.String(length=64),
+    )
+    op.alter_column(
+        "groups",
+        column_name="name",
+        type_=SlugType(length=64, allow_unicode=True),
+        existing_type=sa.String(length=64),
+    )
 
 
 def downgrade():
-    op.alter_column("domains", column_name="name", type_=sa.String(length=64))
-    op.alter_column("groups", column_name="name", type_=sa.String(length=64))
+    op.alter_column(
+        "domains",
+        column_name="name",
+        type_=sa.String(length=64),
+        existing_type=SlugType(length=64, allow_unicode=True),
+    )
+    op.alter_column(
+        "groups",
+        column_name="name",
+        type_=sa.String(length=64),
+        existing_type=SlugType(length=64, allow_unicode=True),
+    )
