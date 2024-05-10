@@ -19,30 +19,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractGlobalTimer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    async def generate_tick(self) -> None:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    async def join(self) -> None:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    async def leave(self) -> None:
-        raise NotImplementedError
-
-
-class RaftGlobalTimer(AbstractGlobalTimer):
-    """
-    Executes the given async function only once in the given interval,
-    uniquely among multiple manager instances across multiple nodes.
-    """
-
     _event_producer: Final[EventProducer]
+    _event_factory: Final[Callable[[], AbstractEvent]]
+    _stopped: bool
+    interval: float
+    initial_delay: float
+    task_name: str | None
 
     def __init__(
         self,
-        raft_node: RaftNode,
         event_producer: EventProducer,
         event_factory: Callable[[], AbstractEvent],
         interval: float = 10.0,
@@ -56,6 +41,46 @@ class RaftGlobalTimer(AbstractGlobalTimer):
         self.interval = interval
         self.initial_delay = initial_delay
         self.task_name = task_name
+
+    async def join(self) -> None:
+        self._tick_task = asyncio.create_task(self.generate_tick())
+        if self.task_name is not None:
+            self._tick_task.set_name(self.task_name)
+
+    async def leave(self) -> None:
+        self._stopped = True
+        await asyncio.sleep(0)
+        if not self._tick_task.done():
+            try:
+                self._tick_task.cancel()
+                await self._tick_task
+            except asyncio.CancelledError:
+                pass
+
+    @abc.abstractmethod
+    async def generate_tick(self) -> None:
+        raise NotImplementedError
+
+
+class RaftGlobalTimer(AbstractGlobalTimer):
+    """
+    Executes the given async function only once in the given interval,
+    uniquely among multiple manager instances across multiple nodes.
+    """
+
+    def __init__(
+        self,
+        raft_node: RaftNode,
+        event_producer: EventProducer,
+        event_factory: Callable[[], AbstractEvent],
+        interval: float = 10.0,
+        initial_delay: float = 0.0,
+        *,
+        task_name: str | None = None,
+    ) -> None:
+        super().__init__(
+            event_producer, event_factory, interval, initial_delay, task_name=task_name
+        )
         self.raft_node = raft_node
 
     async def generate_tick(self) -> None:
@@ -77,29 +102,12 @@ class RaftGlobalTimer(AbstractGlobalTimer):
         except asyncio.CancelledError:
             pass
 
-    async def join(self) -> None:
-        self._tick_task = asyncio.create_task(self.generate_tick())
-        if self.task_name is not None:
-            self._tick_task.set_name(self.task_name)
-
-    async def leave(self) -> None:
-        self._stopped = True
-        await asyncio.sleep(0)
-        if not self._tick_task.done():
-            try:
-                self._tick_task.cancel()
-                await self._tick_task
-            except asyncio.CancelledError:
-                pass
-
 
 class DistributedLockGlobalTimer(AbstractGlobalTimer):
     """
     Executes the given async function only once in the given interval,
     uniquely among multiple manager instances across multiple nodes.
     """
-
-    _event_producer: Final[EventProducer]
 
     def __init__(
         self,
@@ -111,13 +119,10 @@ class DistributedLockGlobalTimer(AbstractGlobalTimer):
         *,
         task_name: str | None = None,
     ) -> None:
+        super().__init__(
+            event_producer, event_factory, interval, initial_delay, task_name=task_name
+        )
         self._dist_lock = dist_lock
-        self._event_producer = event_producer
-        self._event_factory = event_factory
-        self._stopped = False
-        self.interval = interval
-        self.initial_delay = initial_delay
-        self.task_name = task_name
 
     @preserve_termination_log
     async def generate_tick(self) -> None:
@@ -140,18 +145,3 @@ class DistributedLockGlobalTimer(AbstractGlobalTimer):
                     log.warning("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass
-
-    async def join(self) -> None:
-        self._tick_task = asyncio.create_task(self.generate_tick())
-        if self.task_name is not None:
-            self._tick_task.set_name(self.task_name)
-
-    async def leave(self) -> None:
-        self._stopped = True
-        await asyncio.sleep(0)
-        if not self._tick_task.done():
-            try:
-                self._tick_task.cancel()
-                await self._tick_task
-            except asyncio.CancelledError:
-                pass
