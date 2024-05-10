@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import enum
 from typing import TYPE_CHECKING, Optional, cast
 
 import attrs
-from raftify import Raft, RaftNode
+from raftify import Raft
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -27,23 +28,25 @@ class BaseContext:
     pass
 
 
-class RaftClusterContext:
-    _cluster: Optional[Raft] = None
+class GlobalTimerKind(enum.StrEnum):
+    RAFT = "raft"
+    DISTRIBUTED_LOCK = "distributed-lock"
 
-    def use_raft(self) -> bool:
-        return self._cluster is not None
 
-    @property
-    def cluster(self) -> Raft:
-        return cast(Raft, self._cluster)
+class GlobalTimerContext:
+    timer_kind: GlobalTimerKind
+    _raft: Optional[Raft] = None
 
-    @cluster.setter
-    def cluster(self, rhs: Raft) -> None:
-        self._cluster = rhs
+    def __init__(self, timer_kind: GlobalTimerKind) -> None:
+        self.timer_kind = timer_kind
 
     @property
-    def raft_node(self) -> RaftNode:
-        return self.cluster.get_raft_node()
+    def raft(self) -> Raft:
+        return cast(Raft, self._raft)
+
+    @raft.setter
+    def raft(self, rhs: Raft) -> None:
+        self._raft = rhs
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -74,4 +77,4 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
-    raft_ctx: RaftClusterContext
+    global_timer_ctx: GlobalTimerContext

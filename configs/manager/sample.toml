@@ -129,6 +129,9 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 # compatibility issues.
 # event-loop = "asyncio"
 
+# One of: "raft", "distributed_lock"
+global-timer = "raft"
+
 # One of: "filelock", "pg_advisory", "redlock", "etcd"
 # Choose the implementation of distributed lock.
 # "filelock" is the simplest one when the manager is deployed on only one node.

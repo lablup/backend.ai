@@ -32,6 +32,8 @@ disabled-plugins = []
 
 hide-agents = true
 
+global-timer = "raft"
+
 # The order of agent selection.
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 

@@ -26,7 +26,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.api.context import RaftClusterContext
+from ai.backend.manager.api.context import GlobalTimerContext, GlobalTimerKind
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
@@ -1106,7 +1106,7 @@ async def test_manually_assign_agent_available(
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
-    raft_ctx = RaftClusterContext()
+    global_timer_ctx = GlobalTimerContext(GlobalTimerKind.DISTRIBUTED_LOCK)
 
     dispatcher = SchedulerDispatcher(
         local_config=mock_local_config,
@@ -1114,7 +1114,7 @@ async def test_manually_assign_agent_available(
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
-        raft_ctx=raft_ctx,
+        global_timer_ctx=global_timer_ctx,
         registry=registry,
     )
 

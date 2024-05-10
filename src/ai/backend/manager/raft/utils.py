@@ -93,7 +93,7 @@ def pickle_deserialize(data: bytes) -> str | None:
     return None
 
 
-def register_custom_deserializer() -> None:
+def register_raft_custom_deserializer() -> None:
     """
     Initialize the custom deserializers.
     """

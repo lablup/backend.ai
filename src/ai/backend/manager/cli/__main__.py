@@ -31,7 +31,7 @@ from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.models import error_logs
 from ai.backend.manager.models.utils import vacuum_db
-from ai.backend.manager.raft.utils import register_custom_deserializer
+from ai.backend.manager.raft.utils import register_raft_custom_deserializer
 
 from .context import CLIContext, redis_ctx
 
@@ -436,7 +436,7 @@ async def handle_raft_cli_main(argv: list[str]):
 @click.pass_obj
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def raft(cli_ctx: CLIContext, args) -> None:
-    register_custom_deserializer()
+    register_raft_custom_deserializer()
 
     argv = sys.argv
     # Remove "backend.ai", "mgr", "raft" from the argv

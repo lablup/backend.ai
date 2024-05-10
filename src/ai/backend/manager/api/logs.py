@@ -20,8 +20,10 @@ from ai.backend.common.distributed import (
     RaftGlobalTimer,
 )
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.api.context import GlobalTimerKind
 
 from ..defs import LockID
 from ..models import UserRole, error_logs, groups
@@ -251,23 +253,27 @@ async def init(app: web.Application) -> None:
         log_cleanup_task,
     )
 
-    if root_ctx.raft_ctx.use_raft():
-        app_ctx.log_cleanup_timer = RaftGlobalTimer(
-            root_ctx.raft_ctx.raft_node,
-            root_ctx.event_producer,
-            lambda: DoLogCleanupEvent(),
-            20.0,
-            initial_delay=17.0,
-        )
-    else:
-        app_ctx.log_cleanup_timer = DistributedLockGlobalTimer(
-            root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
-            root_ctx.event_producer,
-            lambda: DoLogCleanupEvent(),
-            20.0,
-            initial_delay=17.0,
-            task_name="log_cleanup_task",
-        )
+    match root_ctx.global_timer_ctx.timer_kind:
+        case GlobalTimerKind.RAFT:
+            app_ctx.log_cleanup_timer = RaftGlobalTimer(
+                root_ctx.global_timer_ctx.raft.get_raft_node(),
+                root_ctx.event_producer,
+                lambda: DoLogCleanupEvent(),
+                20.0,
+                initial_delay=17.0,
+                task_name="log_cleanup_task",
+            )
+        case GlobalTimerKind.DISTRIBUTED_LOCK:
+            app_ctx.log_cleanup_timer = DistributedLockGlobalTimer(
+                root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
+                root_ctx.event_producer,
+                lambda: DoLogCleanupEvent(),
+                20.0,
+                initial_delay=17.0,
+                task_name="log_cleanup_task",
+            )
+        case _:
+            assert False, f"Unknown global timer backend: {root_ctx.global_timer_ctx.timer_kind}"
     await app_ctx.log_cleanup_timer.join()
 
 

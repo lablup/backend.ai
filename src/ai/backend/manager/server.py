@@ -59,12 +59,12 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.raft.logger import Logger as RaftLogger
 from ai.backend.manager.raft.state_machine import HashStore
-from ai.backend.manager.raft.utils import WebServer, register_custom_deserializer
+from ai.backend.manager.raft.utils import WebServer, register_raft_custom_deserializer
 
 from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
-from .api.context import RaftClusterContext, RootContext
+from .api.context import GlobalTimerContext, GlobalTimerKind, RootContext
 from .api.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -440,7 +440,7 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
-        root_ctx.raft_ctx,
+        root_ctx.global_timer_ctx,
         root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
@@ -519,7 +519,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
     sched_dispatcher = await SchedulerDispatcher.new(
-        root_ctx.raft_ctx,
+        root_ctx.global_timer_ctx,
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
@@ -668,11 +668,13 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
 @actxmgr
 async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    register_custom_deserializer()
-    raft_configs = root_ctx.local_config.get("raft")
-    raft_cluster_configs = root_ctx.raft_cluster_config
+    if root_ctx.global_timer_ctx.timer_kind == GlobalTimerKind.RAFT:
+        register_raft_custom_deserializer()
 
-    if raft_configs is not None:
+        raft_configs = root_ctx.local_config.get("raft")
+        assert raft_configs is not None, "Raft configuration missing in the manager.toml"
+
+        raft_cluster_configs = root_ctx.raft_cluster_config
         assert raft_cluster_configs is not None
 
         other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
@@ -729,14 +731,14 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
         )
 
-        root_ctx.raft_ctx.cluster = Raft.bootstrap(
+        root_ctx.global_timer_ctx.raft = Raft.bootstrap(
             node_id,
             raft_addr,
             store,  # type: ignore
             raft_cfg,
             raft_logger,  # type: ignore
         )
-        raft_cluster = root_ctx.raft_ctx.cluster
+        raft_cluster = root_ctx.global_timer_ctx.raft
         raft_cluster.run()  # type: ignore
 
         if raft_cluster_configs["raft-debug-webserver-enabled"]:
@@ -975,7 +977,9 @@ async def server_main(
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], _args[1], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
-    root_ctx.raft_ctx = RaftClusterContext()
+    root_ctx.global_timer_ctx = GlobalTimerContext(
+        root_ctx.local_config["manager"].get("global-timer")
+    )
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
