@@ -587,9 +587,12 @@ class ModifyGroup(graphene.Mutation):
                     )
                 if users_to_add:
                     values = [{"user_id": uuid, "group_id": gid} for uuid in users_to_add]
-                    await db_session.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
+                    try:
+                        await db_session.execute(
+                            sa.insert(association_groups_users).values(values),
+                        )
+                    except sa.exc.IntegrityError:
+                        raise ValueError("User already belongs to the given project(user group)")
                 if users_to_remove:
                     await db_session.execute(
                         (
