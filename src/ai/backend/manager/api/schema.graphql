@@ -47,6 +47,12 @@ type Queries {
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
+
+  """Added in 24.09.0."""
+  image_node(id: String!): ImageNode
+
+  """Added in 24.09.0."""
+  image_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ImageConnection
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -216,6 +222,9 @@ scalar UUID
 type ImageNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.09.0. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   humanized_name: String
   tag: String
@@ -227,6 +236,9 @@ type ImageNode implements Node {
   size_bytes: BigInt
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
+
+  """Added in 24.09.0. The array of aliases."""
+  aliases: [String]
 }
 
 type KVPair {
@@ -431,6 +443,26 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+type ImageConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ImageEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `Image` and its cursor."""
+type ImageEdge {
+  """The item at the end of the edge"""
+  node: ImageNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type User implements Item {
