@@ -64,7 +64,7 @@ class RaftNodeInitialRole(str, enum.Enum):
     LEARNER = "learner"
 
 
-class RaftLogLovel(str, enum.Enum):
+class RaftLogLovel(enum.StrEnum):
     TRACE = "trace"
     DEBUG = "debug"
     INFO = "info"
