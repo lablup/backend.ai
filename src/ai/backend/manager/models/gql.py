@@ -70,6 +70,7 @@ from .image import (
     ForgetImage,
     ForgetImageById,
     Image,
+    ImageConnection,
     ImageLoadFilter,
     ImageNode,
     ModifyImage,
@@ -364,6 +365,11 @@ class Queries(graphene.ObjectType):
     )
 
     customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
+
+    image_node = graphene.Field(
+        ImageNode, id=graphene.String(required=True), description="Added in 24.09.0."
+    )
+    image_nodes = PaginatedConnectionField(ImageConnection, description="Added in 24.09.0.")
 
     user = graphene.Field(
         User,
@@ -1060,6 +1066,37 @@ class Queries(graphene.ObjectType):
         else:
             raise InvalidAPIParameters("Unknown client role")
         return [ImageNode.from_legacy_image(i) for i in items]
+
+    @staticmethod
+    async def resolve_image_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ImageNode.get_node(info, id)
+
+    async def resolve_image_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ImageNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     async def resolve_images(

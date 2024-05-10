@@ -43,16 +43,25 @@ from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
     Base,
     BigInt,
+    FilterExprArg,
     ForeignKeyIDColumn,
     IDColumn,
     KVPair,
     KVPairInput,
+    OrderExprArg,
+    QueryFilterParser,
+    QueryOrderParser,
     ResourceLimit,
     ResourceLimitInput,
     StructuredJSONColumn,
+    generate_sql_info_for_gql_connection,
     set_if_set,
 )
-from .gql_relay import AsyncNode
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
+)
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
 
@@ -800,6 +809,61 @@ class ImageNode(graphene.ObjectType):
             if image_row is None:
                 raise ValueError(f"Image not found (id: {image_id})")
             return cls.from_row(image_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
+        )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            ImageRow,
+            ImageRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        query = query.options(
+            selectinload(ImageRow.aliases).options(load_only(ImageAliasRow.alias))
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(ImageRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            img_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(row) for row in img_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class ImageConnection(Connection):
+    class Meta:
+        node = ImageNode
 
 
 class PreloadImage(graphene.Mutation):
