@@ -30,7 +30,7 @@ class BaseContext:
 
 class GlobalTimerKind(enum.StrEnum):
     RAFT = "raft"
-    DISTRIBUTED_LOCK = "distributed-lock"
+    DISTRIBUTED_LOCK = "distributed_lock"
 
 
 class GlobalTimerContext:
