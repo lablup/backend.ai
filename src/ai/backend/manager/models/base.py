@@ -1334,8 +1334,9 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     cursor_id, pagination_order, requested_page_size = connection_args
@@ -1413,7 +1414,8 @@ def _build_sql_stmt_from_connection_args(
 
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 def _build_sql_stmt_from_sql_arg(
@@ -1425,8 +1427,9 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int | None = None,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
@@ -1447,11 +1450,13 @@ def _build_sql_stmt_from_sql_arg(
         stmt = stmt.offset(offset)
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
     sql_stmt: sa.sql.Select
+    sql_count_stmt: sa.sql.Select
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
@@ -1490,7 +1495,7 @@ def generate_sql_info_for_gql_connection(
         connection_args = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt, conditions = _build_sql_stmt_from_connection_args(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
             orm_class,
             id_column,
@@ -1500,6 +1505,7 @@ def generate_sql_info_for_gql_connection(
         )
         return GraphQLConnectionSQLInfo(
             stmt,
+            count_stmt,
             conditions,
             connection_args.cursor,
             connection_args.pagination_order,
@@ -1507,7 +1513,7 @@ def generate_sql_info_for_gql_connection(
         )
     else:
         page_size = first
-        stmt, conditions = _build_sql_stmt_from_sql_arg(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
             id_column,
@@ -1516,4 +1522,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
+        return GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
