@@ -341,6 +341,7 @@ def vfolder_check_exists(
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
         tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
         tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
+        tx.AliasedKey(["domain", "domain_name", "domainName"], default=None): t.String | t.Null,
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
@@ -353,6 +354,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
+    vfolder_domain = params["domain"] or domain_name
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -576,6 +578,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "permission": params["permission"],
             "last_used": None,
             "host": folder_host,
+            "domain_name": vfolder_domain,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid if ownership_type == "user" else None,
@@ -589,6 +592,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "name": params["name"],
             "quota_scope_id": str(quota_scope_id),
             "host": folder_host,
+            "domain_name": vfolder_domain,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
             "max_size": 0,  # migrated to quota scopes, no longer valid

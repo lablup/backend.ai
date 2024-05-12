@@ -4,9 +4,22 @@ import enum
 import logging
 import os.path
 import uuid
+from collections.abc import Container, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    List,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Sequence,
+    TypeAlias,
+    cast,
+)
 
 import aiohttp
 import aiotools
@@ -54,6 +67,13 @@ from ..defs import (
     VFOLDER_DSTPATHS_MAP,
 )
 from ..types import UserScope
+from .acl import (
+    AbstractACLPermission,
+    AbstractScopePermissionMap,
+    AbstractScopePermissionMapBuilder,
+    RequestedScope,
+    RequesterContext,
+)
 from .base import (
     GUID,
     Base,
@@ -71,7 +91,7 @@ from .base import (
     metadata,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from .group import GroupRow, ProjectType
+from .group import AssocGroupUserRow, GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
@@ -88,6 +108,7 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
+    "VFolderACLPermission",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
@@ -116,6 +137,11 @@ __all__: Sequence[str] = (
     "SOFT_DELETED_VFOLDER_STATUSES",
     "HARD_DELETED_VFOLDER_STATUSES",
     "VFolderPermissionSetAlias",
+    "get_vfolders",
+    "VFolderACLObject",
+    "OWNER_PERMISSIONS",
+    "ScopePermissionMap",
+    "ScopePermissionMapBuilder",
 )
 
 
@@ -307,7 +333,9 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
+    sa.Column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    ),  # legacy
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
     sa.Column("num_files", sa.Integer(), default=0),
@@ -423,6 +451,8 @@ class VFolderPermissionRow(Base):
 
 class VFolderRow(Base):
     __table__ = vfolders
+    user_row = relationship("UserRow", back_populates="vfolders")
+    project_row = relationship("GroupRow", back_populates="vfolders")
 
     endpoints = relationship("EndpointRow", back_populates="model_row")
     user_row = relationship("UserRow", back_populates="vfolder_row")
@@ -650,6 +680,576 @@ async def query_accessible_vfolders(
                 entry["permission"] = overriding_permissions[entry["id"]]
 
     return entries
+
+
+class VFolderACLPermission(AbstractACLPermission):
+    # Only owners can do
+    CLONE = "clone"
+    OVERRIDE_PERMISSION_TO_OTHERS = "override-permission"  # Invite, share
+
+    # `create_vfolder` action should be in {Domain, Project, or User} permissions, not here
+    READ_ATTRIBUTE = "read-attribute"
+    UPDATE_ATTRIBUTE = "update-attribute"
+    DELETE_VFOLDER = "delete-vfolder"
+
+    READ_CONTENT = "read-content"
+    WRITE_CONTENT = "write-content"
+    DELETE_CONTENT = "delete-content"
+
+    MOUNT_RO = "mount-ro"
+    MOUNT_RW = "mount-rw"
+    MOUNT_WD = "mount-wd"
+
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+# TypeAlias is deprecated since 3.12
+
+OWNER_PERMISSIONS: frozenset[VFolderACLPermission] = frozenset([
+    perm for perm in VFolderACLPermission
+])
+DEFAULT_ADDED_PERMISSIONS_BY_VF_PERM: frozenset[VFolderACLPermission] = frozenset([
+    VFolderACLPermission.READ_ATTRIBUTE,
+    VFolderACLPermission.READ_CONTENT,
+    VFolderACLPermission.WRITE_CONTENT,
+    VFolderACLPermission.DELETE_CONTENT,
+    VFolderACLPermission.MOUNT_RO,
+    VFolderACLPermission.MOUNT_RW,
+    VFolderACLPermission.MOUNT_WD,
+])
+DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS: frozenset[VFolderACLPermission] = frozenset([
+    VFolderACLPermission.READ_ATTRIBUTE,
+    VFolderACLPermission.UPDATE_ATTRIBUTE,
+    VFolderACLPermission.DELETE_VFOLDER,
+])
+DEFAULT_ADMIN_PERMISSIONS_ON_UNASSOCIATED_PROJECT_VFOLDERS: frozenset[VFolderACLPermission] = (
+    frozenset([
+        VFolderACLPermission.READ_ATTRIBUTE,
+        VFolderACLPermission.UPDATE_ATTRIBUTE,
+        VFolderACLPermission.DELETE_VFOLDER,
+    ])
+)
+DEFAULT_ADMIN_PERMISSIONS_ON_USER_INVITED_VFOLDERS: frozenset[VFolderACLPermission] = frozenset([
+    VFolderACLPermission.READ_ATTRIBUTE,
+])
+DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS: frozenset[VFolderACLPermission] = (
+    frozenset([
+        VFolderACLPermission.READ_ATTRIBUTE,
+        VFolderACLPermission.READ_CONTENT,
+        VFolderACLPermission.WRITE_CONTENT,
+        VFolderACLPermission.DELETE_CONTENT,
+        VFolderACLPermission.MOUNT_RO,
+        VFolderACLPermission.MOUNT_RW,
+        VFolderACLPermission.MOUNT_WD,
+    ])
+)
+PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderACLPermission]] = {
+    VFolderPermission.READ_ONLY: frozenset([
+        VFolderACLPermission.READ_ATTRIBUTE,
+        VFolderACLPermission.READ_CONTENT,
+    ]),
+    VFolderPermission.READ_WRITE: frozenset([
+        VFolderACLPermission.READ_ATTRIBUTE,
+        VFolderACLPermission.UPDATE_ATTRIBUTE,
+        VFolderACLPermission.DELETE_VFOLDER,
+        VFolderACLPermission.READ_CONTENT,
+        VFolderACLPermission.WRITE_CONTENT,
+        VFolderACLPermission.DELETE_CONTENT,
+        VFolderACLPermission.MOUNT_RO,
+        VFolderACLPermission.MOUNT_RW,
+    ]),
+    VFolderPermission.RW_DELETE: frozenset([
+        VFolderACLPermission.READ_ATTRIBUTE,
+        VFolderACLPermission.UPDATE_ATTRIBUTE,
+        VFolderACLPermission.DELETE_VFOLDER,
+        VFolderACLPermission.READ_CONTENT,
+        VFolderACLPermission.WRITE_CONTENT,
+        VFolderACLPermission.DELETE_CONTENT,
+        VFolderACLPermission.MOUNT_RO,
+        VFolderACLPermission.MOUNT_RW,
+        VFolderACLPermission.MOUNT_WD,
+    ]),
+    VFolderPermission.OWNER_PERM: OWNER_PERMISSIONS,
+}
+
+
+@dataclass
+class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolderRow]):
+    additional: Mapping[
+        uuid.UUID, frozenset[VFolderACLPermission]
+    ]  # Key: vfolder id / Value: set of VFolderACLPermissions
+    overriden: Mapping[
+        uuid.UUID, frozenset[VFolderACLPermission]
+    ]  # Key: vfolder id / Value: set of VFolderACLPermissions
+
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _coalesce(
+            base_cond: WhereClauseType | None,
+            or_cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | or_cond if base_cond is not None else or_cond
+
+        if self.user:
+            cond = _coalesce(cond, VFolderRow.user.in_(self.user.keys()))
+        if self.project:
+            cond = _coalesce(cond, VFolderRow.group.in_(self.project.keys()))
+        if self.domain:
+            cond = _coalesce(cond, VFolderRow.domain_name.in_(self.domain.keys()))
+        if self.additional:
+            cond = _coalesce(cond, VFolderRow.id.in_(self.additional.keys()))
+        if self.overriden:
+            cond = _coalesce(cond, VFolderRow.id.in_(self.overriden.keys()))
+        return cond
+
+    @property
+    def query_stmt(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(VFolderRow).where(cond)
+
+    async def determine_permission(self, acl_obj: VFolderRow) -> frozenset[VFolderACLPermission]:
+        vfolder_row = acl_obj
+        if (vfolder_id := acl_obj.id) in self.overriden:
+            return self.overriden[vfolder_id]
+        permissions: set[VFolderACLPermission] = set()
+        permissions |= self.additional.get(vfolder_id, set())
+        permissions |= self.user.get(vfolder_row.user, set())
+        permissions |= self.project.get(vfolder_row.group, set())
+        permissions |= self.domain.get(vfolder_row.domain_name, set())
+        return frozenset(permissions)
+
+
+class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissionMap]):
+    @classmethod
+    async def _build_in_user_scope(
+        cls,
+        db_session: SASession,
+        ctx: RequesterContext,
+        user_id: uuid.UUID,
+    ) -> ScopePermissionMap:
+        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        match ctx.user_role:
+            case UserRole.SUPERADMIN:
+                if ctx.user_id == user_id:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+
+                    user = {user_id: OWNER_PERMISSIONS}
+                else:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: DEFAULT_ADMIN_PERMISSIONS_ON_USER_INVITED_VFOLDERS
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+                    user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
+            case UserRole.ADMIN:
+                if ctx.user_id == user_id:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+
+                    user = {user_id: OWNER_PERMISSIONS}
+                else:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: DEFAULT_ADMIN_PERMISSIONS_ON_USER_INVITED_VFOLDERS
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+                    user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
+            case UserRole.USER:
+                if ctx.user_id == user_id:
+                    overriden_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    overriden = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(overriden_stmt)
+                    }
+
+                    user = {ctx.user_id: OWNER_PERMISSIONS}
+            case UserRole.MONITOR:
+                raise RuntimeError("Moditor users cannot fetch vfolders")
+        return ScopePermissionMap(
+            user=user,
+            project=project,
+            domain=domain,
+            additional=additional,
+            overriden=overriden,
+        )
+
+    @classmethod
+    async def _build_in_project_scope(
+        cls,
+        db_session: SASession,
+        ctx: RequesterContext,
+        project_id: uuid.UUID,
+    ) -> ScopePermissionMap:
+        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+
+        project_ctx = await ctx.get_or_init_project_ctx()
+        role_in_project = project_ctx.get(project_id)
+        match ctx.user_role:
+            case UserRole.SUPERADMIN:
+                if role_in_project is not None:
+                    project = {
+                        project_id: OWNER_PERMISSIONS
+                        if role_in_project == UserRoleInProject.ADMIN
+                        else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    }
+
+                    # Admin/user is associated with the project, fetch owned/invited vfolders
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                (VFolderRow.group == project_id)
+                                | (VFolderRow.ownership_type == VFolderOwnershipType.USER)
+                            )
+                            # project vfolders or invited user vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+
+                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                else:
+                    # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
+                    project = {
+                        project_id: DEFAULT_ADMIN_PERMISSIONS_ON_UNASSOCIATED_PROJECT_VFOLDERS,
+                    }
+            case UserRole.ADMIN:
+                if role_in_project is not None:
+                    project = {
+                        project_id: OWNER_PERMISSIONS
+                        if role_in_project == UserRoleInProject.ADMIN
+                        else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    }
+
+                    # Admin/user is associated with the project, fetch owned/invited vfolders
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                (VFolderRow.group == project_id)
+                                | (VFolderRow.ownership_type == VFolderOwnershipType.USER)
+                            )
+                            # project vfolders or invited user vfolders
+                        )
+                    )
+                    additional = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(additional_stmt)
+                    }
+
+                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                else:
+                    # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
+                    project = {
+                        project_id: DEFAULT_ADMIN_PERMISSIONS_ON_UNASSOCIATED_PROJECT_VFOLDERS,
+                    }
+            case UserRole.USER:
+                if role_in_project is not None:
+                    project = {
+                        project_id: OWNER_PERMISSIONS
+                        if role_in_project == UserRoleInProject.ADMIN
+                        else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    }
+
+                    # Admin/user is associated with the project, fetch owned/invited vfolders
+                    overriden_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                (VFolderRow.group == project_id)
+                                | (VFolderRow.ownership_type == VFolderOwnershipType.USER)
+                            )
+                            # project vfolders or invited user vfolders
+                        )
+                    )
+                    overriden = {
+                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                        for row in await db_session.scalars(overriden_stmt)
+                    }
+
+                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                else:
+                    # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
+                    pass
+            case UserRole.MONITOR:
+                raise RuntimeError("Moditor users cannot fetch vfolders")
+        return ScopePermissionMap(
+            user=user,
+            project=project,
+            domain=domain,
+            additional=additional,
+            overriden=overriden,
+        )
+
+    @classmethod
+    async def _build_in_domain_scope(
+        cls,
+        db_session: SASession,
+        ctx: RequesterContext,
+        domain_name: str,
+    ) -> ScopePermissionMap:
+        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        match ctx.user_role:
+            case UserRole.SUPERADMIN:
+                domain = {
+                    domain_name: frozenset([
+                        VFolderACLPermission.READ_ATTRIBUTE,
+                        VFolderACLPermission.UPDATE_ATTRIBUTE,
+                        VFolderACLPermission.DELETE_VFOLDER,
+                    ])
+                }
+                if ctx.domain_name != domain_name:
+                    return ScopePermissionMap(
+                        user=user,
+                        project=project,
+                        domain=domain,
+                        additional=additional,
+                        overriden=overriden,
+                    )
+                project_ctx = await ctx.get_or_init_project_ctx()
+                project = {
+                    project_id: OWNER_PERMISSIONS
+                    if role == UserRoleInProject.ADMIN
+                    else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    for project_id, role in project_ctx.items()
+                }
+                additional_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.domain_name == domain_name)
+                    )
+                )
+                additional = {
+                    row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                    for row in await db_session.scalars(additional_stmt)
+                }
+
+                user = {ctx.user_id: OWNER_PERMISSIONS}
+
+                project_stmt = (
+                    sa.select(AssocGroupUserRow)
+                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
+                    .where(
+                        (AssocGroupUserRow.user_id == ctx.user_id)
+                        & (GroupRow.domain_name == domain_name)
+                    )
+                )
+                project = {
+                    row.group_id: OWNER_PERMISSIONS
+                    for row in await db_session.scalars(project_stmt)
+                }
+            case UserRole.ADMIN:
+                if ctx.domain_name != domain_name:
+                    # Only superadmin can access to another domains
+                    return ScopePermissionMap(
+                        user=user,
+                        project=project,
+                        domain=domain,
+                        additional=additional,
+                        overriden=overriden,
+                    )
+                project_ctx = await ctx.get_or_init_project_ctx()
+                project = {
+                    project_id: OWNER_PERMISSIONS
+                    if role == UserRoleInProject.ADMIN
+                    else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    for project_id, role in project_ctx.items()
+                }
+                additional_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.domain_name == domain_name)
+                    )
+                )
+                additional = {
+                    row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                    for row in await db_session.scalars(additional_stmt)
+                }
+
+                user = {ctx.user_id: OWNER_PERMISSIONS}
+
+                project_stmt = (
+                    sa.select(AssocGroupUserRow)
+                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
+                    .where(
+                        (AssocGroupUserRow.user_id == ctx.user_id)
+                        & (GroupRow.domain_name == domain_name)
+                    )
+                )
+                project = {
+                    row.group_id: OWNER_PERMISSIONS
+                    for row in await db_session.scalars(project_stmt)
+                }
+
+                domain = {
+                    domain_name: frozenset([
+                        VFolderACLPermission.READ_ATTRIBUTE,
+                        VFolderACLPermission.UPDATE_ATTRIBUTE,
+                        VFolderACLPermission.DELETE_VFOLDER,
+                    ])
+                }
+            case UserRole.USER:
+                if ctx.domain_name != domain_name:
+                    # Only superadmin can access to another domains
+                    return ScopePermissionMap(
+                        user=user,
+                        project=project,
+                        domain=domain,
+                        additional=additional,
+                        overriden=overriden,
+                    )
+                project_ctx = await ctx.get_or_init_project_ctx()
+                project = {
+                    project_id: DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                    if role == UserRoleInProject.USER
+                    else OWNER_PERMISSIONS
+                    for project_id, role in project_ctx.items()
+                }
+                overriden_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.domain_name == domain_name)
+                    )
+                )
+                overriden = {
+                    row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                    for row in await db_session.scalars(overriden_stmt)
+                }
+
+                user = {ctx.user_id: OWNER_PERMISSIONS}
+
+            case UserRole.MONITOR:
+                raise RuntimeError("Moditor users cannot fetch vfolders")
+        return ScopePermissionMap(
+            user=user,
+            project=project,
+            domain=domain,
+            additional=additional,
+            overriden=overriden,
+        )
+
+
+class VFolderACLObject(NamedTuple):
+    vfolder_row: VFolderRow
+    permissions: frozenset[VFolderACLPermission]
+
+
+async def get_vfolders(
+    ctx: RequesterContext,
+    requested_scope: RequestedScope,
+    requested_permission: VFolderACLPermission | None = None,
+    *,
+    vfolder_id: uuid.UUID | None = None,
+    vfolder_name: str | None = None,
+    usage_mode: VFolderUsageMode | None = None,
+    allowed_status: Container[VFolderOperationStatus] | None = None,
+    blocked_status: Container[VFolderOperationStatus] | None = None,
+) -> list[VFolderACLObject]:
+    async with SASession(ctx.db_conn) as db_session:
+        scope_ctx = await ScopePermissionMapBuilder.build(db_session, ctx, requested_scope)
+        stmt = scope_ctx.query_stmt
+        if stmt is None:
+            return []
+        if vfolder_id is not None:
+            stmt = stmt.where(VFolderRow.id == vfolder_id)
+        if vfolder_name is not None:
+            stmt = stmt.where(VFolderRow.name == vfolder_name)
+        if usage_mode is not None:
+            stmt = stmt.where(VFolderRow.usage_mode == usage_mode)
+        if allowed_status is not None:
+            stmt = stmt.where(VFolderRow.status.in_(allowed_status))
+        if blocked_status is not None:
+            stmt = stmt.where(VFolderRow.status.not_in(blocked_status))
+
+        result: list[VFolderACLObject] = []
+        for row in await db_session.scalars(stmt):
+            permissions = await scope_ctx.determine_permission(row)
+            if requested_permission is None or requested_permission in permissions:
+                result.append(VFolderACLObject(row, permissions))
+        return result
 
 
 async def get_allowed_vfolder_hosts_by_group(
@@ -1295,6 +1895,7 @@ class VirtualFolder(graphene.ObjectType):
     group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
     group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
     creator = graphene.String()  # User.email (always set)
+    domain_name = graphene.String(description="Added in 24.09.0.")
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
     permission = graphene.String()
@@ -1331,6 +1932,7 @@ class VirtualFolder(graphene.ObjectType):
             group=row["group"],
             group_name=_get_field("groups_name"),
             creator=row["creator"],
+            domain_name=row["domain_name"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
             permission=row["permission"],
@@ -1359,6 +1961,7 @@ class VirtualFolder(graphene.ObjectType):
         "user": ("vfolders_user", uuid.UUID),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
+        "domain_name": ("vfolders_domain_name", None),
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
@@ -1390,6 +1993,7 @@ class VirtualFolder(graphene.ObjectType):
         "name": ("vfolders_name", None),
         "group": ("vfolders_group", None),
         "group_name": ("groups_name", None),
+        "domain_name": ("domain_name", None),
         "user": ("vfolders_user", None),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
