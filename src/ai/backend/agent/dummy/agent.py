@@ -174,6 +174,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
