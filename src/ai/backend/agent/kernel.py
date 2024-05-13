@@ -165,6 +165,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     session_id: SessionId
     kernel_id: KernelId
     agent_id: AgentId
+    network_id: str
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -186,6 +187,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        network_id: str,
         image: ImageRef,
         version: int,
         *,
@@ -199,6 +201,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
+        self.network_id = network_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
