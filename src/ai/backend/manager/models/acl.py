@@ -92,6 +92,23 @@ class AbstractScopePermissionMap(Generic[ACLPermissionType, ACLObjectType], meta
     project: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
     domain: Mapping[str, frozenset[ACLPermissionType]]
 
+    def apply_permission_filter(self, permission_to_include: ACLPermissionType) -> None:
+        self.user = {
+            uid: permissions
+            for uid, permissions in self.user.items()
+            if permission_to_include in permissions
+        }
+        self.project = {
+            pid: permissions
+            for pid, permissions in self.project.items()
+            if permission_to_include in permissions
+        }
+        self.domain = {
+            dname: permissions
+            for dname, permissions in self.domain.items()
+            if permission_to_include in permissions
+        }
+
     @abstractmethod
     async def determine_permission(self, acl_obj: ACLObjectType) -> frozenset[ACLPermissionType]:
         pass
@@ -100,7 +117,7 @@ class AbstractScopePermissionMap(Generic[ACLPermissionType, ACLObjectType], meta
 ScopePermissionMapType = TypeVar("ScopePermissionMapType", bound=AbstractScopePermissionMap)
 
 
-class AbstractScopePermissionMapBuilder(Generic[ScopePermissionMapType], metaclass=ABCMeta):
+class AbstractScopePermissionMapFactory(Generic[ScopePermissionMapType], metaclass=ABCMeta):
     @classmethod
     async def build(
         cls,
@@ -110,14 +127,26 @@ class AbstractScopePermissionMapBuilder(Generic[ScopePermissionMapType], metacla
     ) -> ScopePermissionMapType:
         match requested_scope:
             case RequestedUserScope(user_id=user_id):
-                return await cls._build_in_user_scope(db_session, ctx, user_id)
+                result = await cls._build_in_user_scope(
+                    db_session,
+                    ctx,
+                    user_id,
+                )
             case RequestedProjectScope(project_id=project_id):
-                return await cls._build_in_project_scope(db_session, ctx, project_id)
+                result = await cls._build_in_project_scope(
+                    db_session,
+                    ctx,
+                    project_id,
+                )
             case RequestedDomainScope(domain_name=domain_name):
-                return await cls._build_in_domain_scope(db_session, ctx, domain_name)
+                result = await cls._build_in_domain_scope(
+                    db_session,
+                    ctx,
+                    domain_name,
+                )
             case _:
-                pass
-        raise RuntimeError(f"invalid request scope {requested_scope}")
+                raise RuntimeError(f"invalid request scope {requested_scope}")
+        return result
 
     @classmethod
     @abstractmethod

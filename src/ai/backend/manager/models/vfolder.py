@@ -70,7 +70,7 @@ from ..types import UserScope
 from .acl import (
     AbstractACLPermission,
     AbstractScopePermissionMap,
-    AbstractScopePermissionMapBuilder,
+    AbstractScopePermissionMapFactory,
     RequestedScope,
     RequesterContext,
 )
@@ -141,7 +141,7 @@ __all__: Sequence[str] = (
     "VFolderACLObject",
     "OWNER_PERMISSIONS",
     "ScopePermissionMap",
-    "ScopePermissionMapBuilder",
+    "ScopePermissionMapFactory",
 )
 
 
@@ -779,9 +779,22 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
     additional: Mapping[
         uuid.UUID, frozenset[VFolderACLPermission]
     ]  # Key: vfolder id / Value: set of VFolderACLPermissions
-    overriden: Mapping[
+    overridden: Mapping[
         uuid.UUID, frozenset[VFolderACLPermission]
     ]  # Key: vfolder id / Value: set of VFolderACLPermissions
+
+    def apply_permission_filter(self, permission_to_include: VFolderACLPermission) -> None:
+        super().apply_permission_filter(permission_to_include)
+        self.additional = {
+            vfid: permissions
+            for vfid, permissions in self.additional.items()
+            if permission_to_include in permissions
+        }
+        self.overridden = {
+            vfid: permissions
+            for vfid, permissions in self.overridden.items()
+            if permission_to_include in permissions
+        }
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -801,8 +814,8 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
             cond = _coalesce(cond, VFolderRow.domain_name.in_(self.domain.keys()))
         if self.additional:
             cond = _coalesce(cond, VFolderRow.id.in_(self.additional.keys()))
-        if self.overriden:
-            cond = _coalesce(cond, VFolderRow.id.in_(self.overriden.keys()))
+        if self.overridden:
+            cond = _coalesce(cond, VFolderRow.id.in_(self.overridden.keys()))
         return cond
 
     @property
@@ -814,8 +827,8 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
 
     async def determine_permission(self, acl_obj: VFolderRow) -> frozenset[VFolderACLPermission]:
         vfolder_row = acl_obj
-        if (vfolder_id := acl_obj.id) in self.overriden:
-            return self.overriden[vfolder_id]
+        if (vfolder_id := acl_obj.id) in self.overridden:
+            return self.overridden[vfolder_id]
         permissions: set[VFolderACLPermission] = set()
         permissions |= self.additional.get(vfolder_id, set())
         permissions |= self.user.get(vfolder_row.user, set())
@@ -824,7 +837,7 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
         return frozenset(permissions)
 
 
-class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissionMap]):
+class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissionMap]):
     @classmethod
     async def _build_in_user_scope(
         cls,
@@ -836,7 +849,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
         additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 if ctx.user_id == user_id:
@@ -908,7 +921,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                     user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
             case UserRole.USER:
                 if ctx.user_id == user_id:
-                    overriden_stmt = (
+                    overridden_stmt = (
                         sa.select(VFolderPermissionRow)
                         .select_from(sa.join(VFolderPermissionRow, VFolderRow))
                         .where(
@@ -918,9 +931,9 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                             )  # filter out project vfolders
                         )
                     )
-                    overriden = {
+                    overridden = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
-                        for row in await db_session.scalars(overriden_stmt)
+                        for row in await db_session.scalars(overridden_stmt)
                     }
 
                     user = {ctx.user_id: OWNER_PERMISSIONS}
@@ -931,7 +944,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
             project=project,
             domain=domain,
             additional=additional,
-            overriden=overriden,
+            overridden=overridden,
         )
 
     @classmethod
@@ -945,7 +958,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
         additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
 
         project_ctx = await ctx.get_or_init_project_ctx()
         role_in_project = project_ctx.get(project_id)
@@ -1023,7 +1036,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                     }
 
                     # Admin/user is associated with the project, fetch owned/invited vfolders
-                    overriden_stmt = (
+                    overridden_stmt = (
                         sa.select(VFolderPermissionRow)
                         .select_from(sa.join(VFolderPermissionRow, VFolderRow))
                         .where(
@@ -1035,9 +1048,9 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                             # project vfolders or invited user vfolders
                         )
                     )
-                    overriden = {
+                    overridden = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
-                        for row in await db_session.scalars(overriden_stmt)
+                        for row in await db_session.scalars(overridden_stmt)
                     }
 
                     user = {ctx.user_id: OWNER_PERMISSIONS}
@@ -1051,7 +1064,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
             project=project,
             domain=domain,
             additional=additional,
-            overriden=overriden,
+            overridden=overridden,
         )
 
     @classmethod
@@ -1065,7 +1078,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
         additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overriden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 domain = {
@@ -1081,7 +1094,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                         project=project,
                         domain=domain,
                         additional=additional,
-                        overriden=overriden,
+                        overridden=overridden,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
                 project = {
@@ -1125,7 +1138,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                         project=project,
                         domain=domain,
                         additional=additional,
-                        overriden=overriden,
+                        overridden=overridden,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
                 project = {
@@ -1177,7 +1190,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                         project=project,
                         domain=domain,
                         additional=additional,
-                        overriden=overriden,
+                        overridden=overridden,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
                 project = {
@@ -1186,7 +1199,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                     else OWNER_PERMISSIONS
                     for project_id, role in project_ctx.items()
                 }
-                overriden_stmt = (
+                overridden_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
                     .where(
@@ -1194,9 +1207,9 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
                         & (VFolderRow.domain_name == domain_name)
                     )
                 )
-                overriden = {
+                overridden = {
                     row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
-                    for row in await db_session.scalars(overriden_stmt)
+                    for row in await db_session.scalars(overridden_stmt)
                 }
 
                 user = {ctx.user_id: OWNER_PERMISSIONS}
@@ -1208,7 +1221,7 @@ class ScopePermissionMapBuilder(AbstractScopePermissionMapBuilder[ScopePermissio
             project=project,
             domain=domain,
             additional=additional,
-            overriden=overriden,
+            overridden=overridden,
         )
 
 
@@ -1229,7 +1242,9 @@ async def get_vfolders(
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
     async with SASession(ctx.db_conn) as db_session:
-        scope_ctx = await ScopePermissionMapBuilder.build(db_session, ctx, requested_scope)
+        scope_ctx = await ScopePermissionMapFactory.build(db_session, ctx, requested_scope)
+        if requested_permission is not None:
+            scope_ctx.apply_permission_filter(requested_permission)
         stmt = scope_ctx.query_stmt
         if stmt is None:
             return []
@@ -1247,8 +1262,7 @@ async def get_vfolders(
         result: list[VFolderACLObject] = []
         for row in await db_session.scalars(stmt):
             permissions = await scope_ctx.determine_permission(row)
-            if requested_permission is None or requested_permission in permissions:
-                result.append(VFolderACLObject(row, permissions))
+            result.append(VFolderACLObject(row, permissions))
         return result
 
 
