@@ -1404,7 +1404,9 @@ class AgentRegistry:
                 try:
                     network_config = await network_plugin.create_network(scheduled_session)
                 except Exception:
-                    log.exception(f"Failed to create the inter-container network {network_name}")
+                    log.exception(
+                        f"Failed to create the inter-container network (plugin: {self.shared_config["network"]["inter-container"]["plugin"]})"
+                    )
                     raise
         else:
             network_config = {"mode": "host"}
