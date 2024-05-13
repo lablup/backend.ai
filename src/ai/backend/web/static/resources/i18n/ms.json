@@ -64,7 +64,8 @@
       "Data&Model": "Data",
       "InvalidBlankPassword": "Masukkan kata laluan anda",
       "InvalidBlankEmail": "Masukkan emel anda",
-      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan"
+      "DisMatchUserEmail": "E-mel Pengguna tidak sepadan",
+      "MyEnvironments": "Persekitaran Saya"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Anda boleh menjalankan kod anda dengan berbilang nod",
       "AddEnvironmentVariable": "Tambah pembolehubah persekitaran",
       "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
-      "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda."
+      "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -305,7 +307,8 @@
       "Prepared": "Bersedia",
       "NoExistingConnectionExample": "Tiada Contoh Sambungan untuk disalin.",
       "SSHConnectionExampleClipboardCopy": "Contoh Sambungan SSH telah disalin ke papan keratan.",
-      "App": "Aplikasi"
+      "App": "Aplikasi",
+      "ConnectUrlIsNotValid": "URL Sambung tidak sah."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Sila masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahawa direktori log tidak akan dibuat secara automatik ..",
@@ -795,7 +798,8 @@
     "PasswordsDoNotMatch": "Kata Laluan dan Pengesahan tidak sepadan.",
     "NoChangeMade": "Tiada perubahan dibuat",
     "Architecture": "Seni bina",
-    "NoImageToDisplay": "Tiada Imej untuk dipaparkan"
+    "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
+    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1380,7 +1384,8 @@
     "UserHasNoGroup": "Pengguna tidak mempunyai kumpulan. \nSila hubungi pentadbir untuk membetulkannya.",
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
-    "WrongAPIServerAddress": "Alamat pelayan API salah."
+    "WrongAPIServerAddress": "Alamat pelayan API salah.",
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",

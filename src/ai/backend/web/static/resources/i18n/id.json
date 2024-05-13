@@ -64,7 +64,8 @@
       "Data&Model": "Data",
       "InvalidBlankPassword": "Masukkan kata sandi Anda",
       "InvalidBlankEmail": "Masukkan email Anda",
-      "DisMatchUserEmail": "Email Pengguna tidak cocok"
+      "DisMatchUserEmail": "Email Pengguna tidak cocok",
+      "MyEnvironments": "Lingkungan Saya"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -268,7 +269,8 @@
       "StartAfter": "Mulai setelah:",
       "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku.",
       "PreviousLauncher": "Classic",
-      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda."
+      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSilakan periksa tab 'SELESAI' di halaman sesi."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -302,7 +304,8 @@
       "Prepared": "Siap",
       "App": "Aplikasi",
       "NoExistingConnectionExample": "Tidak Ada Koneksi Contoh untuk disalin.",
-      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard."
+      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard.",
+      "ConnectUrlIsNotValid": "URL koneksi tidak valid."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
@@ -808,7 +811,8 @@
     "PasswordsDoNotMatch": "Password dan Konfirmasi tidak cocok.",
     "NoChangeMade": "Tidak ada perubahan yang dibuat",
     "Architecture": "Arsitektur",
-    "NoImageToDisplay": "Tidak ada gambar yang akan ditampilkan"
+    "NoImageToDisplay": "Tidak ada gambar yang akan ditampilkan",
+    "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus."
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -1393,7 +1397,8 @@
     "ResourcePolicyStillReferenced": "Ada pasangan kunci yang merujuk pada kebijakan sumber daya ini.",
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
-    "WrongAPIServerAddress": "Alamat server API salah."
+    "WrongAPIServerAddress": "Alamat server API salah.",
+    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",

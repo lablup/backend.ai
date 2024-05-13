@@ -64,7 +64,8 @@
       "Data&Model": "Dữ liệu",
       "InvalidBlankPassword": "Nhập mật khẩu của bạn",
       "InvalidBlankEmail": "Nhập email của bạn",
-      "DisMatchUserEmail": "E-mail của người dùng không khớp"
+      "DisMatchUserEmail": "E-mail của người dùng không khớp",
+      "MyEnvironments": "Môi trường của tôi"
     },
     "YouAreOffline": "Bạn hiện đang ngoại tuyến",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Bạn có thể chạy mã của mình với nhiều nút",
       "AddEnvironmentVariable": "Thêm biến môi trường",
       "EnvironmentVariableValueRequired": "Vui lòng nhập một giá trị.",
-      "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn."
+      "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn.",
+      "FailedToStartNewSession": "Tạo phiên không thành công. \nVui lòng kiểm tra tab 'Đã kết thúc' trên trang phiên."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -305,7 +307,8 @@
       "Prepared": "Chuẩn bị",
       "NoExistingConnectionExample": "Không có ví dụ kết nối nào được sao chép.",
       "SSHConnectionExampleClipboardCopy": "Ví dụ về kết nối SSH đã được sao chép vào bảng nhớ tạm.",
-      "App": "Ứng dụng"
+      "App": "Ứng dụng",
+      "ConnectUrlIsNotValid": "URL kết nối không hợp lệ."
     },
     "TensorboardPath": "Thư mục nhật ký cho TensorBoard",
     "InputTensorboardPath": "Vui lòng nhập thư mục nhật ký mà TensorBoard sẽ tham chiếu đến. Lưu ý rằng thư mục nhật ký sẽ không được tạo tự động ..",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "Mật khẩu và xác minh mật khẩu không trùng khớp.",
     "NoChangeMade": "Không có thay đổi nào được thực hiện",
     "Architecture": "Ngành kiến ​​​​trúc",
-    "NoImageToDisplay": "Không có hình ảnh để hiển thị"
+    "NoImageToDisplay": "Không có hình ảnh để hiển thị",
+    "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công."
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -1399,7 +1403,8 @@
     "UserHasNoGroup": "Người dùng không có nhóm. \nHãy liên hệ với quản trị viên để sửa nó.",
     "UserNameAlreadyExist": "Tên này đã có người dùng. \nNó không thể bị trùng lặp.",
     "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
-    "WrongAPIServerAddress": "Địa chỉ máy chủ API sai."
+    "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
+    "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên."
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",

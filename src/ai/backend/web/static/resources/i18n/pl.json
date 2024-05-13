@@ -64,7 +64,8 @@
       "Data&Model": "Dane",
       "InvalidBlankPassword": "Wprowadź hasło",
       "InvalidBlankEmail": "Wprowadź swój email",
-      "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny"
+      "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny",
+      "MyEnvironments": "Moje Środowiska"
     },
     "YouAreOffline": "Jesteś teraz offline",
     "YouAreOnline": "Jesteś teraz online",
@@ -273,7 +274,8 @@
       "BatchModeDesc": "Możesz uruchomić swój kod z wieloma węzłami i klastrami, aby skalować swój pomysł",
       "AddEnvironmentVariable": "Dodaj zmienne środowiskowe",
       "EnvironmentVariableValueRequired": "Wprowadź wartość.",
-      "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane."
+      "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane.",
+      "FailedToStartNewSession": "Utworzenie sesji nie powiodło się. \nSprawdź zakładkę „Skończone” na stronie sesji."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -307,7 +309,8 @@
       "Prepared": "Przygotowany",
       "NoExistingConnectionExample": "Brak przykładu połączenia do skopiowania.",
       "SSHConnectionExampleClipboardCopy": "Przykład połączenia SSH został skopiowany do schowka.",
-      "App": "Aplikacja"
+      "App": "Aplikacja",
+      "ConnectUrlIsNotValid": "Adres URL połączenia jest nieprawidłowy."
     },
     "TensorboardPath": "Katalog dziennika dla TensorBoard",
     "InputTensorboardPath": "Wprowadź katalog dziennika, do którego będzie się odwoływać TensorBoard. Pamiętaj, że katalog dziennika nie zostanie utworzony automatycznie.",
@@ -816,7 +819,8 @@
     "PasswordsDoNotMatch": "Hasło i Potwierdzenie nie pasują.",
     "NoChangeMade": "Nie wprowadzono żadnych zmian",
     "Architecture": "Architektura",
-    "NoImageToDisplay": "Brak obrazów do wyświetlenia"
+    "NoImageToDisplay": "Brak obrazów do wyświetlenia",
+    "CustomizedImageSuccessfullyDeleted": "Dostosowany obraz został pomyślnie usunięty."
   },
   "resourcePreset": {
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
@@ -1401,7 +1405,8 @@
     "ResourcePolicyStillReferenced": "Istnieją pary kluczy, które odwołują się do tej polityki zasobów.",
     "SmallerResourceThenImageRequires": "Żądanie zasobów jest mniejsze niż minimum wymagane przez obraz. Spróbuj użyć więcej zasobów.",
     "APINotSupported": "Interfejs API nie jest obsługiwany. Wymaga najnowszej wersji menedżera Backend.AI.",
-    "WrongAPIServerAddress": "Nieprawidłowy adres serwera API."
+    "WrongAPIServerAddress": "Nieprawidłowy adres serwera API.",
+    "ReachedResourceLimitPleaseContact": "Osiągnięto limit zasobów. \nSkontaktuj się z administratorem."
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",

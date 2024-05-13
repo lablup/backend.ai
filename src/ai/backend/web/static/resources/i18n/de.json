@@ -64,7 +64,8 @@
       "Data&Model": "Daten",
       "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
       "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
-      "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein"
+      "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein",
+      "MyEnvironments": "Meine Umgebungen"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -271,7 +272,8 @@
       "BatchModeDesc": "Sie können Ihren Code mit mehreren Knoten und Clustern ausführen, um Ihre Idee zu skalieren",
       "AddEnvironmentVariable": "Umgebungsvariablen hinzufügen",
       "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
-      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben."
+      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben.",
+      "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -305,7 +307,8 @@
       "Prepared": "Bereit",
       "NoExistingConnectionExample": "Keine Verbindung Zu kopierendes Beispiel.",
       "SSHConnectionExampleClipboardCopy": "SSH Connection Example wurde in die Zwischenablage kopiert.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "Die Verbindungs-URL ist ungültig."
     },
     "TensorboardPath": "Protokollverzeichnis für TensorBoard",
     "InputTensorboardPath": "Bitte geben Sie das Protokollverzeichnis ein, auf das sich TensorBoard bezieht. Beachten Sie, dass das Protokollverzeichnis nicht automatisch erstellt wird.",
@@ -814,7 +817,8 @@
     "PasswordsDoNotMatch": "Passwort und Bestätigung stimmen nicht überein.",
     "NoChangeMade": "Es wurden keine Änderungen vorgenommen.",
     "Architecture": "Architektur",
-    "NoImageToDisplay": "Keine Bilder zum Anzeigen"
+    "NoImageToDisplay": "Keine Bilder zum Anzeigen",
+    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht."
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -1399,7 +1403,8 @@
     "ResourcePolicyStillReferenced": "Es gibt Schlüsselpaare, die auf diese Ressourcenpolitik verweisen.",
     "SmallerResourceThenImageRequires": "Ihre Ressourcenanforderung ist kleiner als das für das Bild erforderliche Minimum. Versuchen Sie es mit mehr Ressourcen.",
     "APINotSupported": "API wird nicht unterstützt. Erfordert die neueste Version des Backend.AI-Managers.",
-    "WrongAPIServerAddress": "Falsche API-Serveradresse."
+    "WrongAPIServerAddress": "Falsche API-Serveradresse.",
+    "ReachedResourceLimitPleaseContact": "Ihr Ressourcenlimit wurde erreicht. \nBitte wenden Sie sich an den Administrator."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
