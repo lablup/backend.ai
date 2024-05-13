@@ -760,6 +760,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
+            cluster_info["network_config"].get("mode", "bridge"),
             agent_config=self.local_config,
             service_ports=service_ports,
             resource_spec=resource_spec,
@@ -1040,6 +1041,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 network = await docker.networks.get(name)
                 await network.connect({"Container": container._id})
 
+            kernel_obj.container_id = container._id
             container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
@@ -1756,6 +1758,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     self.local_config["container"]["scratch-root"],
                     kernel_id,
                 )
+                if kernel_obj:
+                    kernel = cast(DockerKernel, kernel_obj)
+                    if kernel.network_driver != "bridge":
+                        try:
+                            plugin = self.network_plugin_ctx.plugins[kernel.network_driver]
+                        except KeyError:
+                            raise RuntimeError(
+                                f"Network plugin {kernel.network_driver} not loaded!"
+                            )
+                        await plugin.leave_network(kernel)
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
