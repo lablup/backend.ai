@@ -1063,7 +1063,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 assert "replin" in port_map and "replout" in port_map
 
                 repl_in_port = port_map["replin"][2000]
-                repl_out_port = port_map["replout"][2000]
+                repl_out_port = port_map["replout"][2001]
                 stdin_port = 0  # left for legacy
                 stdout_port = 0  # left for legacy
 
