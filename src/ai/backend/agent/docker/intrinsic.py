@@ -1,11 +1,24 @@
 import asyncio
+import json
 import logging
 import os
 import platform
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 import aiohttp
 import async_timeout
@@ -14,7 +27,11 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.plugin.network import AbstractNetworkAgentPlugin
+from ai.backend.agent.plugin.network import (
+    AbstractNetworkAgentPlugin,
+    ContainerNetworkCapability,
+    ContainerNetworkInfo,
+)
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
@@ -963,10 +980,75 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
             },
         }
 
-    async def expose_ports(
-        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int]], **kwargs
-    ) -> None:
+    async def leave_network(self, kernel: DockerKernel) -> None:
         pass
+
+
+class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set([ContainerNetworkCapability.GLOBAL])
+
+    async def join_network(
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+    ) -> Dict[str, Any]:
+        if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
+            return {
+                "HostConfig": {
+                    "ExtraHosts": [
+                        f"{hostname}:{host_port[0]}"
+                        for hostname, host_port in _cluster_ssh_port_mapping.items()
+                    ],
+                    "NetworkMode": "host",
+                }
+            }
+        else:
+            return {
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            }
 
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass
+
+    async def prepare_port_forward(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> None:
+        host_ports = [p[0] for p in ports]
+        scratch_dir = (
+            self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
+        ).resolve()
+        config_dir = scratch_dir / "config"
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        await current_loop().run_in_executor(
+            None,
+            lambda: (config_dir / "intrinsic-ports.json").write_text(json.dumps(intrinsic_ports)),
+        )
+
+    async def expose_ports(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> ContainerNetworkInfo:
+        host_ports = [p[0] for p in ports]
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        return ContainerNetworkInfo(
+            bind_host,
+            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
+        )
