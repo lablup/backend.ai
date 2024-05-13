@@ -159,8 +159,8 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
-    max_pending_session_count = graphene.Int(description="Added in 24.03.1.")
-    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.1.")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
     @classmethod
     def from_row(
@@ -320,8 +320,8 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_pending_session_count = graphene.Int(description="Added in 24.03.1.")
-    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.1.")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -336,8 +336,8 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_pending_session_count = graphene.Int(description="Added in 24.03.1.")
-    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.1.")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
