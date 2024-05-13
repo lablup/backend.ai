@@ -94,6 +94,7 @@ def _init_subapp(
 
 
 class RootContext:
+    volumes: dict[str, AbstractVolume]
     pid: int
     etcd: AsyncEtcd
     local_config: Mapping[str, Any]
@@ -115,6 +116,7 @@ class RootContext:
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
     ) -> None:
+        self.volumes = {}
         self.pid = pid
         self.pidx = pidx
         self.node_id = node_id
@@ -170,6 +172,9 @@ class RootContext:
         return {name: VolumeInfo(**info) for name, info in self.local_config["volume"].items()}
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
+        for volume in self.volumes.values():
+            await volume.shutdown()
+
         await self.storage_plugin_ctx.cleanup()
         await self.manager_webapp_plugin_ctx.cleanup()
         await self.client_webapp_plugin_ctx.cleanup()
@@ -177,21 +182,24 @@ class RootContext:
 
     @actxmgr
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
-        try:
-            volume_config = self.local_config["volume"][name]
-        except KeyError:
-            raise InvalidVolumeError(name)
-        volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
-        volume_obj = volume_cls(
-            local_config=self.local_config,
-            mount_path=Path(volume_config["path"]),
-            options=volume_config["options"] or {},
-            etcd=self.etcd,
-            event_dispathcer=self.event_dispatcher,
-            event_producer=self.event_producer,
-        )
-        await volume_obj.init()
-        try:
+        if name in self.volumes:
+            yield self.volumes[name]
+        else:
+            try:
+                volume_config = self.local_config["volume"][name]
+            except KeyError:
+                raise InvalidVolumeError(name)
+            volume_cls: Type[AbstractVolume] = self.backends[volume_config["backend"]]
+            volume_obj = volume_cls(
+                local_config=self.local_config,
+                mount_path=Path(volume_config["path"]),
+                options=volume_config["options"] or {},
+                etcd=self.etcd,
+                event_dispathcer=self.event_dispatcher,
+                event_producer=self.event_producer,
+            )
+
+            await volume_obj.init()
+            self.volumes[name] = volume_obj
+
             yield volume_obj
-        finally:
-            await volume_obj.shutdown()

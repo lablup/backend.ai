@@ -29,7 +29,7 @@ jobs:
         cache-lmdb-store: 'true'
     - uses: CycloneDX/gh-python-generate-sbom@v2
     - name: Upload SBOM report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: SBOM report
         path: ./bom.xml

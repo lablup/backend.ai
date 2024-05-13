@@ -37,7 +37,8 @@
     "Using": "Utilizando",
     "WarboyEnabled": "Warboy NPU Activado",
     "connectingToCluster": "Conectando al Cluster Backend.AI...",
-    "reserved": "reservado"
+    "reserved": "reservado",
+    "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada"
   },
   "error": {
     "WrongAPIServerAddress": "Dirección del servidor API incorrecta.",
@@ -63,7 +64,8 @@
     "UpdateError": "Error de actualización",
     "UserHasNoGroup": "El usuario no tiene grupo. Póngase en contacto con el administrador para solucionarlo.",
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
-    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación."
+    "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
+    "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador."
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -130,7 +132,10 @@
     "Yes": "Sí",
     "Download": "Descargar",
     "Clone": "Clon",
-    "Config": "Configurar"
+    "Config": "Configurar",
+    "Next": "Siguiente",
+    "Previous": "Anterior",
+    "PushToImage": "Enviar sesión a una imagen personalizada"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -209,7 +214,8 @@
       "ValidationFailed": "Validación fallida"
     },
     "EnableSudoSession": "Habilitar sesión sudo",
-    "MainAccessKey": "Clave de acceso principal"
+    "MainAccessKey": "Clave de acceso principal",
+    "InactivateTheFollowingUsers": "Desactivar los siguientes usuarios."
   },
   "data": {
     "Allowslettersnumbersand-_": "Permite letras, números y -_",
@@ -298,7 +304,8 @@
       "UseNewFileExtension": "Utilice",
       "ValueRequired": "Se requiere valor",
       "ValueShouldBeStarted": "La ruta debe empezar por .(punto) o letras, sólo números.",
-      "WritePermissionRequiredInUploadFiles": "Se requiere permiso de escritura para cargar archivos."
+      "WritePermissionRequiredInUploadFiles": "Se requiere permiso de escritura para cargar archivos.",
+      "DownloadNotAllowed": "No se permite descargar archivos/carpetas en esta carpeta."
     },
     "folders": {
       "CannotDeleteFolder": "No se puede eliminar la carpeta montada en una o más sesiones. Por favor, termine la sesión primero.",
@@ -315,7 +322,7 @@
       "FileRenamed": "Archivo renombrado",
       "FolderCloned": "Carpeta clonada",
       "FolderCreated": "Carpeta creada",
-      "FolderDeleted": "Carpeta eliminada",
+      "FolderDeleted": "La carpeta {{ folderName }} ha sido eliminada.",
       "FolderDisconnected": "Se ha desconectado la carpeta.",
       "FolderInfo": "Información",
       "FolderNameMismatched": "El nombre de la carpeta no coincide. Compruebe si hay espacios en blanco en el campo de entrada.",
@@ -351,7 +358,13 @@
       "TypeFolderNameToDelete": "Escriba el nombre de la carpeta que desea eliminar",
       "TypeFolderNameToLeave": "Escriba el nombre de la carpeta que desea abandonar",
       "TypeNewFolderName": "Escriba el nombre de la nueva carpeta",
-      "View": "Ver"
+      "View": "Ver",
+      "MoveToTrashBin": "Mover a la papelera",
+      "MovedToTrashBin": "La carpeta {{ folderName }} se ha movido a la papelera.",
+      "DeleteForever": "Borrar para siempre",
+      "Restore": "Restaurar",
+      "FolderRestored": "La carpeta {{ folderName }} ha sido restaurada.",
+      "FolderDeletedForever": "La carpeta {{ folderName }} se ha eliminado para siempre."
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "El uso compartido de carpetas no está disponible para los usuarios solicitados:",
@@ -379,28 +392,12 @@
     "ModelStore": "Tienda de modelos",
     "New": "Nuevo",
     "Add": "Añadir",
-    "CloningIsOnlyPossibleSameHost": "Actualmente, la clonación sólo es posible en el mismo host."
+    "CloningIsOnlyPossibleSameHost": "Actualmente, la clonación sólo es posible en el mismo host.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
-    "ErrorOccurred": "Se ha producido un error",
-    "ask": {
-      "DoYouWantToProceed": "¿Quieres continuar?"
-    },
-    "error": {
-      "Error": "Error"
-    },
-    "hide": {
-      "DonotShowThisAgain": "No vuelvas a mostrar esto."
-    },
-    "title": {
-      "LetsDouble-Check": "Doble comprobación",
-      "Notice": "Aviso"
-    },
     "warning": {
-      "CannotBeUndone": "ATENCIÓN: ¡esto no se puede deshacer!",
-      "LogDeletion": "¿Estás seguro de que quieres borrar todos los mensajes de registro?",
-      "Required": "Requerido",
-      "WillBeAppliedToNewSessions": "Esta actualización se aplicará a las nuevas sesiones."
+      "DeleteForeverDesc": "ADVERTENCIA: los elementos seleccionados se eliminarán para siempre y no podrás restaurarlos."
     }
   },
   "eduapi": {
@@ -461,7 +458,8 @@
     "Status": "Estado",
     "SuccessfullyModified": "Modificado con éxito",
     "TakesTime": ". Lleva tiempo, así que tómate un café.",
-    "Version": "Versión"
+    "Version": "Versión",
+    "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -561,7 +559,8 @@
     "UsesSSL": "Utiliza SSL"
   },
   "inputLimit": {
-    "4to64chars": "(4~64 caracteres)"
+    "4to64chars": "(4~64 caracteres)",
+    "4to32chars": "(4~32 caracteres)"
   },
   "language": {
     "English": "English",
@@ -631,7 +630,9 @@
       "LoginWithSAML": "Inicio de sesión con SAML"
     },
     "TooManyAttempt": "Ha habido demasiados intentos de inicio de sesión. Los intentos de inicio de sesión se han bloqueado durante un tiempo.",
-    "UpdatePasswordMessage": "Escribe tu correo electrónico y una nueva contraseña, y pulsa el botón Actualizar."
+    "UpdatePasswordMessage": "Escribe tu correo electrónico y una nueva contraseña, y pulsa el botón Actualizar.",
+    "LoginWithE-mailorUsername": "Iniciar sesión con correo electrónico o nombre de usuario",
+    "E-mailorUsername": "Correo electrónico o nombre de usuario"
   },
   "logs": {
     "ErrorMessage": "Mensaje de error",
@@ -991,12 +992,16 @@
     "VSCodeRemoteNoticeSSHConfig": "Para configurar una conexión transparente para Visual Studio Code con la sesión de computación remota, cree o edite el archivo $HOME/.ssh/config y añada el siguiente bloque.",
     "VSCodeRemotePasswordTitle": "Contraseña SSH remota de Visual Studio Code",
     "Validation": {
-      "EnterValidSessionName": "Introduzca un nombre de sesión válido",
+      "EnterValidSessionName": "Ingrese una combinación de al menos 4 letras del alfabeto, números, guiones o guiones bajos.",
       "SessionNameAlreadyExist": "El nombre de la sesión ya existe",
       "SessionNameRequired": "El nombre de la sesión es obligatorio",
       "SluggedStrings": "Cadenas babosas (>3 caracteres)",
       "SessionNameTooLong64": "Introduzca 64 caracteres o menos.",
-      "PleaseFollowSessionNameRule": "Ingrese una combinación de al menos 4 letras, números, '.', '_' y '-'."
+      "PleaseFollowSessionNameRule": "Ingrese una combinación de al menos 4 letras, números, '.', '_' y '-'.",
+      "SessionNameTooShort": "Introduzca al menos 4 caracteres.",
+      "SessionNameShouldStartWith": "Debe empezar por una letra del alfabeto, un número o '_'.",
+      "SessionNameShouldEndWith": "Debe terminar con una letra del alfabeto, un número o '_'.",
+      "SessionNameInvalidCharacter": "El centro de un nombre sólo puede contener letras del alfabeto, números y \"_\"."
     },
     "XRDPconnection": "Conexión RDP",
     "applauncher": {
@@ -1006,7 +1011,8 @@
       "ConfirmAndRun": "Lo he comprobado y voy a empezar",
       "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
       "Prepared": "Preparado",
-      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles."
+      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles.",
+      "ConnectUrlIsNotValid": "La URL de conexión no es válida."
     },
     "core": "núcleo",
     "exportCSV": "exportar CSV",
@@ -1149,17 +1155,37 @@
       "EnvironmentVariableNamePatternError": "El nombre de la variable debe empezar por una letra o un guión bajo, y sólo puede contener letras, números y guiones bajos.",
       "EnvironmentVariableDuplicateName": "Un nombre de variable que ya existe.",
       "Template": "Plantilla de sesión",
-      "EnableAutomaticShmem": "Memoria compartida automática",
+      "EnableAutomaticMiniumShmem": "Establecer la memoria compartida mínima",
       "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Solo se permiten números enteros cuando el tamaño del clúster no es inferior a 2.",
       "StartAfter": "Empezar después:",
-      "StartTimeDoesNotApply": "Si no se establece la hora de inicio, no se aplica."
+      "StartTimeDoesNotApply": "Si no se establece la hora de inicio, no se aplica.",
+      "MiniumAllocation": "Requisitos mínimos",
+      "MiniumAllocationTooltip": "Seleccione como requisito mínimo para el entorno de ejecución seleccionado",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Estás utilizando el lanzador de sesiones \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Ir a la reseña",
+      "InteractiveModeDesc": "permite crear, probar y ejecutar código de forma interactiva a través de jupyter notebook, visual studio code, etc.",
+      "BatchModeDesc": "Puedes ejecutar tu código con múltiples nodos y clusters para escalar tu idea",
+      "AddEnvironmentVariable": "Añadir variables de entorno",
+      "EnvironmentVariableValueRequired": "Por favor, introduzca un valor.",
+      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos.",
+      "FailedToStartNewSession": "Error al crear la sesión. \nPor favor marque la pestaña 'TERMINADO' en la página de la sesión."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
     "MEM": "Memoria",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memoria)"
+    "GPU(MEM)": "GPU (memoria)",
+    "Agents": "Agentes",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memoria)",
+    "ConvertSessionToImage": "Convertir sesión en imagen",
+    "SessionName": "Nombre de la sesión",
+    "SessionId": "ID de sesión",
+    "EnvironmentAndVersion": "Entorno y versión",
+    "Tags": "Etiquetas"
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1224,7 +1250,10 @@
     },
     "Plugins": "Complementos",
     "OpenSourceCUDAGPUsupport": "Compatibilidad con GPU CUDA de código abierto",
-    "ShowOnlyChanged": "Mostrar solo cambios"
+    "ShowOnlyChanged": "Mostrar solo cambios",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Utilice el acelerador Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel."
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",
@@ -1312,7 +1341,8 @@
       "SelectProject": "Seleccionar proyecto",
       "SelectUser": "Buscar y seleccionar Usuario",
       "UnsetCustomSettings": "Desactivar la configuración personalizada"
-    }
+    },
+    "StorageSetting": "Configuración de almacenamiento"
   },
   "totp": {
     "ConfirmTotpRemovalBody": "¿Está seguro de que no desea utilizar la autenticación de dos factores?",
@@ -1480,7 +1510,8 @@
       "Data&Model": "Datos",
       "InvalidBlankPassword": "Ingresa tu contraseña",
       "InvalidBlankEmail": "Introduce tu correo electrónico",
-      "DisMatchUserEmail": "El correo electrónico del usuario no coincide"
+      "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
+      "MyEnvironments": "Mis ambientes"
     }
   },
   "modelStore": {
