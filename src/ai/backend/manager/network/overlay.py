@@ -34,6 +34,9 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
     async def cleanup(self) -> None:
         await self.docker.close()
 
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
     async def create_network(
         self, session: SessionRow, *, options: dict[str, Any] = {}
     ) -> dict[str, Any]:
