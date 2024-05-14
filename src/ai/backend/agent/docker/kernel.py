@@ -38,13 +38,17 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
+    network_driver: str
+
     def __init__(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        network_id: str,
         image: ImageRef,
         version: int,
+        network_driver: str,
         *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
@@ -56,6 +60,7 @@ class DockerKernel(AbstractKernel):
             kernel_id,
             session_id,
             agent_id,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -64,6 +69,8 @@ class DockerKernel(AbstractKernel):
             data=data,
             environ=environ,
         )
+
+        self.network_driver = network_driver
 
     async def close(self) -> None:
         pass
