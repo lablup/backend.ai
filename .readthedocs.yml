@@ -15,9 +15,6 @@ build:
         then
           exit 183;
         fi
-    pre_build:
-      # Auto-generate REST API reference
-      - PYTHONPATH="src" python -m ai.backend.manager.openapi -o docs/manager/rest-reference/openapi.json
 python:
   install:
     - requirements: requirements.txt
