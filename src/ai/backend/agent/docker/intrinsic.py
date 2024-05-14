@@ -960,6 +960,18 @@ class MemoryPlugin(AbstractComputePlugin):
 
 
 class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set()
+
     async def join_network(
         self,
         kernel_config: KernelCreationConfig,
@@ -985,6 +997,15 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
 
 
 class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
     async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
         return set([ContainerNetworkCapability.GLOBAL])
 
