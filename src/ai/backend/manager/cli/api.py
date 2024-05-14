@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
-import aiohttp_cors
 import click
 import graphene
-from aiohttp import web
 
-from ai.backend.manager.openapi import generate_openapi
+from ai.backend.manager.openapi import _generate
 
 from ..models.gql import Mutations, Queries
 
@@ -49,23 +46,6 @@ async def generate_gql_schema(output_path: Path) -> None:
 )
 def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
     asyncio.run(generate_gql_schema(output))
-
-
-async def _generate():
-    from ai.backend.manager.server import global_subapp_pkgs
-
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=False, expose_headers="*", allow_headers="*"
-        ),
-    }
-
-    subapps: list[web.Application] = []
-    for subapp in global_subapp_pkgs:
-        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
-        app, _ = pkg.create_app(cors_options)
-        subapps.append(app)
-    return generate_openapi(subapps, verbose=True)
 
 
 @cli.command()
