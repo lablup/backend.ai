@@ -49,4 +49,4 @@ def pass_ctx_obj(f: F) -> F:
                 raise RuntimeError("Invalid Context from client command")
         return inner
 
-    return update_wrapper(cast(F, new_func), f)
+    return update_wrapper(cast(F, new_func), f)  # type: ignore[return-value]
