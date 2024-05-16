@@ -386,6 +386,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
+        sudo_session_enabled: bool = False,
     ) -> None:
         def _mount(
             type,
@@ -466,6 +467,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
+
+        if sudo_session_enabled:
+            sudoers_path = self.resolve_krunner_filepath("runner/sudoers/work")
+            _mount(MountTypes.BIND, sudoers_path, "/etc/sudoers.d/work")
+
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
         _mount(
@@ -1783,7 +1789,11 @@ class AbstractAgent(
                 vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
                 if not restarting:
                     await ctx.mount_vfolders(vfolder_mounts, resource_spec)
-                    await ctx.mount_krunner(resource_spec, environ)
+                    await ctx.mount_krunner(
+                        resource_spec,
+                        environ,
+                        "sudo_session_enabled" in (kernel_config["internal_data"] or {}),
+                    )
 
                 # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
                 label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")

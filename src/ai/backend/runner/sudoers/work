@@ -1,0 +1,5 @@
+# 
+# The file is automatically mounted to the kernel when sudo_session_enabled is set to True. 
+# The mounting of this file allows the work account to use sudo without a password 
+# 
+work ALL=(ALL:ALL) NOPASSWD:ALL 

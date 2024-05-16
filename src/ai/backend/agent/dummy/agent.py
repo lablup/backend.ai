@@ -194,6 +194,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
+        sudo_session_enabled: bool = False,
     ) -> None:
         delay = self.creation_ctx_config["delay"]["mount-krunner"]
         await asyncio.sleep(delay)
