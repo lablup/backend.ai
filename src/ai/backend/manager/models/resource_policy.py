@@ -159,6 +159,8 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
     @classmethod
     def from_row(
@@ -168,6 +170,11 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     ) -> KeyPairResourcePolicy | None:
         if row is None:
             return None
+
+        if row["max_pending_session_resource_slots"] is not None:
+            max_pending_session_resource_slots = row["max_pending_session_resource_slots"].to_json()
+        else:
+            max_pending_session_resource_slots = None
         return cls(
             name=row["name"],
             created_at=row["created_at"],
@@ -178,6 +185,8 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             max_containers_per_session=row["max_containers_per_session"],
             idle_timeout=row["idle_timeout"],
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            max_pending_session_count=row["max_pending_session_count"],
+            max_pending_session_resource_slots=max_pending_session_resource_slots,
         )
 
     @classmethod
@@ -311,6 +320,8 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -325,6 +336,8 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
+    max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
@@ -357,6 +370,13 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
             "idle_timeout": props.idle_timeout,
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
         }
+        set_if_set(props, data, "max_pending_session_count")
+        set_if_set(
+            props,
+            data,
+            "max_pending_session_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
         insert_query = sa.insert(keypair_resource_policies).values(data)
         return await simple_db_mutate_returning_item(
             cls,
@@ -403,6 +423,13 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         set_if_set(props, data, "max_containers_per_session")
         set_if_set(props, data, "idle_timeout")
         set_if_set(props, data, "allowed_vfolder_hosts")
+        set_if_set(props, data, "max_pending_session_count")
+        set_if_set(
+            props,
+            data,
+            "max_pending_session_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
         update_query = (
             sa.update(keypair_resource_policies)
             .values(data)
