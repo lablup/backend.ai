@@ -363,7 +363,11 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(),
     )
 
-    customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
+    customized_images = graphene.List(
+        ImageNode,
+        owned_only=graphene.Boolean(description="Added in 24.03.4"),
+        description="Added in 24.03.1",
+    )
 
     user = graphene.Field(
         User,
@@ -1044,11 +1048,16 @@ class Queries(graphene.ObjectType):
     async def resolve_customized_images(
         root: Any,
         info: graphene.ResolveInfo,
+        *,
+        owned_only: bool = True,
     ) -> Sequence[ImageNode]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        _owned_only = owned_only if client_role in (UserRole.SUPERADMIN, UserRole.ADMIN) else True
+        items = await Image.load_all(
+            ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)), owned_only=_owned_only
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
