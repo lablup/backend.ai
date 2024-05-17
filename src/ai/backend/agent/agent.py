@@ -1043,6 +1043,8 @@ class AbstractAgent(
                             ),
                         )
                     else:
+                        # Items in `terminating_kernels` are deleted only in _handle_clean_event()
+                        # Should delete the kernel_id that will not be cleaned
                         self.terminating_kernels.discard(ev.kernel_id)
         except asyncio.CancelledError:
             pass
