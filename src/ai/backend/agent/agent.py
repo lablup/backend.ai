@@ -997,7 +997,6 @@ class AbstractAgent(
             assert current_task is not None
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
-            self.terminating_kernels.add(ev.kernel_id)
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
@@ -1018,6 +1017,7 @@ class AbstractAgent(
                             ev.done_future.set_result(None)
                         return
                 else:
+                    self.terminating_kernels.add(ev.kernel_id)
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
@@ -1042,6 +1042,8 @@ class AbstractAgent(
                                 done_future=ev.done_future,
                             ),
                         )
+                    else:
+                        self.terminating_kernels.discard(ev.kernel_id)
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1304,7 +1306,7 @@ class AbstractAgent(
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
-                # Check if: there are containers not spawned by me.
+                # Check if: there are containers not spawned by me or already deleted from my registry.
                 for kernel_id in alive_kernels.keys() - known_kernels.keys():
                     if kernel_id in self.restarting_kernels:
                         continue
