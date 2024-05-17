@@ -30,9 +30,9 @@ class Resource(BaseFunction):
         """
         rqst = Request("POST", "/resource/check-presets")
         data = {}
-        if group:
+        if group is not None:
             data["group"] = group
-        if scaling_group:
+        if scaling_group is not None:
             data["scaling_group"] = scaling_group
         rqst.set_json(data)
         async with rqst.fetch() as resp:
