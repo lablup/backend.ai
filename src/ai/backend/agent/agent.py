@@ -1017,12 +1017,12 @@ class AbstractAgent(
                             ev.done_future.set_result(None)
                         return
                 else:
-                    self.terminating_kernels.add(ev.kernel_id)
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
                     kernel_obj.clean_event = ev.done_future
+                self.terminating_kernels.add(ev.kernel_id)
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
                 except Exception as e:
