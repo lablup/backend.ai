@@ -597,6 +597,9 @@ type KeyPairResourcePolicy {
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
   max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
 
+  """Added in 23.03.3."""
+  max_concurrent_sftp_sessions: Int
+
   """Added in 24.03.4."""
   max_pending_session_count: Int
 
