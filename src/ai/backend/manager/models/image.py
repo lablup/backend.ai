@@ -83,10 +83,10 @@ __all__ = (
 )
 
 
-class ImageLoadFilter(str, enum.Enum):
+class ImageLoadFilter(enum.StrEnum):
     INSTALLED = "installed"
-    EXCLUDE_OPERATIONAL = "operational"
-    CUSTOMIZED_ONLY = "customized"
+    OPERATIONAL = "operational"
+    CUSTOMIZED = "customized"
 
 
 async def rescan_images(
@@ -700,14 +700,14 @@ class Image(graphene.ObjectType):
         is_customized_image = False
         for label in self.labels:
             match label.key:
-                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.EXCLUDE_OPERATIONAL in filters:
+                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
                     if label.value != f"user:{ctx.user['uuid']}":
                         return False
                     is_customized_image = True
 
-        if not is_customized_image and ImageLoadFilter.CUSTOMIZED_ONLY in filters:
+        if not is_customized_image and ImageLoadFilter.CUSTOMIZED in filters:
             return False
 
         return True
@@ -717,7 +717,7 @@ class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    row_id = graphene.UUID(description="Added in 24.09.0. The undecoded id value stored in DB.")
+    row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -729,7 +729,7 @@ class ImageNode(graphene.ObjectType):
     size_bytes = BigInt()
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
-    aliases = graphene.List(graphene.String, description="Added in 24.09.0. The array of aliases.")
+    aliases = graphene.List(graphene.String, description="Added in 24.03.4. The array of aliases.")
 
     @overload
     @classmethod
@@ -909,7 +909,7 @@ class ForgetImageById(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, _image_id)
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:

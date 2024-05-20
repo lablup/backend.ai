@@ -359,8 +359,13 @@ class Queries(graphene.ObjectType):
 
     images = graphene.List(
         Image,
-        is_installed=graphene.Boolean(),
-        is_operation=graphene.Boolean(),
+        is_installed=graphene.Boolean(deprecation_reason="Deprecated since 24.03.4."),
+        is_operation=graphene.Boolean(deprecation_reason="Deprecated since 24.03.4."),
+        image_filters=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=("Added in 24.03.4."),
+        ),
     )
 
     customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
@@ -1048,7 +1053,7 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED,)))
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1068,6 +1073,7 @@ class Queries(graphene.ObjectType):
         *,
         is_installed=None,
         is_operation=False,
+        image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1076,7 +1082,16 @@ class Queries(graphene.ObjectType):
         if is_installed is not None:
             image_load_filters.add(ImageLoadFilter.INSTALLED)
         if is_operation is not None:
-            image_load_filters.add(ImageLoadFilter.EXCLUDE_OPERATIONAL)
+            image_load_filters.add(ImageLoadFilter.OPERATIONAL)
+        if image_filters is not None:
+            try:
+                _filters = [ImageLoadFilter(f) for f in image_filters]
+            except ValueError as e:
+                allowed_filter_values = ", ".join([f.value for f in ImageLoadFilter])
+                raise InvalidAPIParameters(
+                    f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
+                )
+            image_load_filters.update(_filters)
 
         items = await Image.load_all(ctx, filters=image_load_filters)
         if client_role == UserRole.SUPERADMIN:
