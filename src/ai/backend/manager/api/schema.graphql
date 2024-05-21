@@ -43,7 +43,13 @@ type Queries {
     reference: String
     architecture: String = "x86_64"
   ): Image
-  images(is_installed: Boolean, is_operation: Boolean): [Image]
+  images(
+    is_installed: Boolean @deprecated(reason: "Deprecated since 24.03.4.")
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4.")
+
+    """Added in 24.03.4."""
+    image_filters: [String] = null
+  ): [Image]
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
@@ -217,7 +223,7 @@ type ImageNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.09.0. The undecoded id value stored in DB."""
+  """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
   name: String
   humanized_name: String
@@ -231,7 +237,7 @@ type ImageNode implements Node {
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
-  """Added in 24.09.0. The array of aliases."""
+  """Added in 24.03.4. The array of aliases."""
   aliases: [String]
 }
 
