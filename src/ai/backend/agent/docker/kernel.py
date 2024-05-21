@@ -455,7 +455,7 @@ async def prepare_sudo_session_enabler() -> None:
                 "cp /tmp/work /mnt/work",
             ])
             if await proc.wait() != 0:
-                raise RuntimeError("Creating 'backendai-sudoers' volume has failed!")
+                raise RuntimeError(f'Creating "{volume_name}" volume has failed!')
     except Exception:
         log.exception("unexpected error")
         return None
