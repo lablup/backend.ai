@@ -378,6 +378,15 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
+async def prepare_sudo_session_enabler() -> None:
+    """
+    Check if the volume "backendai-sudoer-enabler" exists and is up-to-date.
+    If not, automatically create it and copy the sudoer configuration file to the volume.
+    """
+    # TODO: Implement this function
+    pass
+
+
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
 ) -> Tuple[str, Optional[str]]:
