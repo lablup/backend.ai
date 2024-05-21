@@ -123,11 +123,9 @@ else
   fi
 
   # Create symbolic links for the sudo session
-  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
-    for file in /etc/sudoers.d/backendai-sudoers/*; do
-      ln -s "$file" "/etc/sudoers.d/$(basename $file)"
-    done
-  fi
+  for file in /etc/sudoers.d/backendai-sudoers/*; do
+    ln -s "$file" "/etc/sudoers.d/$(basename $file)"
+  done
 
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
