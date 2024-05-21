@@ -90,6 +90,7 @@ from .kernel import DockerKernel
 from .metadata.server import MetadataServer
 from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
+from .utils import resolve_krunner_filepath as _resolve_krunner_filepath
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -414,12 +415,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return mounts
 
     def resolve_krunner_filepath(self, filename) -> Path:
-        return Path(
-            pkg_resources.resource_filename(
-                "ai.backend.runner",
-                "../" + filename,
-            )
-        ).resolve()
+        return _resolve_krunner_filepath(filename)
 
     def get_runner_mount(
         self,
