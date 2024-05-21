@@ -454,7 +454,7 @@ async def prepare_sudo_session_enabler() -> None:
                 f"{volume_name}:/mnt",
                 "-v",
                 f"{sudoer_filepath}:/tmp/work",
-                "busybox",
+                "alpine",
                 "sh",
                 "-c",
                 "cp /tmp/work /mnt/work",
