@@ -469,8 +469,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
 
         if sudo_session_enabled:
-            sudoers_path = self.resolve_krunner_filepath("runner/sudoers/work")
-            _mount(MountTypes.BIND, sudoers_path, "/etc/sudoers.d/work")
+            _mount(
+                MountTypes.VOLUME, "backendai-sudoer-enabler", "/etc/sudoers.d/backendai-sudoers"
+            )
 
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")

@@ -17,7 +17,7 @@ from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
-from ai.backend.agent.docker.utils import PersistentServiceContainer
+from ai.backend.agent.docker.utils import PersistentServiceContainer, resolve_krunner_filepath
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
@@ -420,6 +420,47 @@ class DockerCodeRunner(AbstractCodeRunner):
 
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
+
+
+async def prepare_sudo_session_enabler() -> None:
+    docker = Docker()
+    volume_name = "backendai-sudoer-enabler"
+
+    try:
+        vol = DockerVolume(docker, volume_name)
+        await vol.show()
+    except DockerError as e:
+        if e.status == 404:
+            do_create = True
+        if do_create:
+            await docker.volumes.create({
+                "Name": volume_name,
+                "Driver": "local",
+            })
+
+            sudoer_filepath = resolve_krunner_filepath("runner/sudoers/work")
+
+            # Copy the sudoer configuration file to the "backendai-sudoer-enabler" volume using a temporarily created container.
+            proc = await asyncio.create_subprocess_exec(*[
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{volume_name}:/mnt",
+                "-v",
+                f"{sudoer_filepath}:/tmp/work",
+                "alpine",
+                "sh",
+                "-c",
+                "cp /tmp/work /mnt/work",
+            ])
+            if await proc.wait() != 0:
+                raise RuntimeError("Creating 'backendai-sudoers' volume has failed!")
+    except Exception:
+        log.exception("unexpected error")
+        return None
+    finally:
+        await docker.close()
 
 
 async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[str, Optional[str]]:

@@ -172,3 +172,12 @@ class PersistentServiceContainer:
         async with closing_async(Docker()) as docker:
             c = docker.containers.container(self.container_name)
             await c.start()
+
+
+def resolve_krunner_filepath(filename: str) -> Path:
+    return Path(
+        pkg_resources.resource_filename(
+            "ai.backend.runner",
+            "../" + filename,
+        )
+    ).resolve()
