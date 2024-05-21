@@ -423,6 +423,11 @@ class DockerCodeRunner(AbstractCodeRunner):
 
 
 async def prepare_sudo_session_enabler() -> None:
+    """
+    Check if the volume "backendai-sudoer-enabler" exists and is up-to-date.
+    If not, automatically create it and copy the sudoer configuration file to the volume.
+    """
+
     docker = Docker()
     volume_name = "backendai-sudoer-enabler"
 
