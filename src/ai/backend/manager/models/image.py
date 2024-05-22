@@ -657,11 +657,14 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         filters: set[ImageLoadFilter] = set(),
+        user_role: UserRole | None = None,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+            item
+            async for item in cls.bulk_load(ctx, rows)
+            if item.matches_filter(ctx, filters, user_role)
         ]
 
         return items
@@ -693,6 +696,7 @@ class Image(graphene.ObjectType):
         self,
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
+        user_role: UserRole | None = None,
     ) -> bool:
         if ImageLoadFilter.INSTALLED in filters and not self.installed:
             return False
@@ -703,8 +707,9 @@ class Image(graphene.ObjectType):
                 case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if label.value != f"user:{ctx.user['uuid']}":
-                        return False
+                    if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+                        if label.value != f"user:{ctx.user['uuid']}":
+                            return False
                     is_customized_image = True
 
         if not is_customized_image and ImageLoadFilter.CUSTOMIZED in filters:

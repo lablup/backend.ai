@@ -1053,7 +1053,9 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED,)))
+        items = await Image.load_all(
+            ctx, filters=set((ImageLoadFilter.CUSTOMIZED,)), user_role=client_role
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1093,7 +1095,7 @@ class Queries(graphene.ObjectType):
                 )
             image_load_filters.update(_filters)
 
-        items = await Image.load_all(ctx, filters=image_load_filters)
+        items = await Image.load_all(ctx, filters=image_load_filters, user_role=client_role)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
