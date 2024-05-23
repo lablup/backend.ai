@@ -1011,7 +1011,9 @@ class AbstractAgent(
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
                     log.warning(
-                        "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
+                        "destroy_kernel(k:{0}, c:{1}) kernel missing (already dead?)",
+                        ev.kernel_id,
+                        ev.container_id,
                     )
                     if ev.container_id is None:
                         await self.reconstruct_resource_usage()
@@ -1025,6 +1027,7 @@ class AbstractAgent(
                             )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
+                        self.terminating_kernels.discard(ev.kernel_id)
                         return
                 else:
                     kernel_obj.stats_enabled = False
@@ -1051,6 +1054,10 @@ class AbstractAgent(
                                 done_future=ev.done_future,
                             ),
                         )
+                    else:
+                        # Items in `terminating_kernels` are deleted only in _handle_clean_event()
+                        # Should delete the kernel_id that will not be cleaned
+                        self.terminating_kernels.discard(ev.kernel_id)
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1266,7 +1273,7 @@ class AbstractAgent(
         alive_kernels: Dict[KernelId, ContainerId] = {}
         kernel_session_map: Dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
-        terminated_kernels = {}
+        terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
         async with self.registry_lock:
             try:
@@ -1286,7 +1293,7 @@ class AbstractAgent(
                     terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                         kernel_id,
                         session_id,
-                        known_kernels[kernel_id],
+                        container.id,
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
@@ -1313,7 +1320,7 @@ class AbstractAgent(
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
-                # Check if: there are containers not spawned by me.
+                # Check if: there are containers already deleted from my registry or not spawned by me.
                 for kernel_id in alive_kernels.keys() - known_kernels.keys():
                     if kernel_id in self.restarting_kernels:
                         continue
