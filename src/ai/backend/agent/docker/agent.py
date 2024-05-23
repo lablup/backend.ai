@@ -29,6 +29,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -849,6 +850,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if self.local_config["debug"]["log-kernel-config"]:
             log.debug("full container config: {!r}", pretty(container_config))
 
+        async def _rollback_container_creation() -> None:
+            scratch_type = self.local_config["container"]["scratch-type"]
+            scratch_root = self.local_config["container"]["scratch-root"]
+            if sys.platform.startswith("linux") and scratch_type == "memory":
+                await destroy_scratch_filesystem(self.scratch_dir)
+                await destroy_scratch_filesystem(self.tmp_dir)
+                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
+                await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
+            elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+                await destroy_loop_filesystem(scratch_root, self.kernel_id)
+            else:
+                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
+            self.port_pool.update(host_ports)
+            async with self.resource_lock:
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    self.computers[dev_name].alloc_map.free(device_alloc)
+
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
             container: Optional[DockerContainer] = None
@@ -857,7 +875,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     config=container_config, name=kernel_name
                 )
                 assert container is not None
-                cid = container._id
+                cid = cast(str, container._id)
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -871,51 +889,46 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         kvpairs = await computer_ctx.instance.generate_resource_data(device_alloc)
                         for k, v in kvpairs.items():
                             await writer.write(f"{k}={v}\n")
-
-                await container.start()
-
-                if self.internal_data.get("sudo_session_enabled", False):
-                    exec = await container.exec(
-                        [
-                            # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
-                            "sh",
-                            "-c",
-                            'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
-                        ],
-                        user="root",
-                    )
-                    shell_response = await exec.start(detach=True)
-                    if shell_response:
-                        raise ContainerCreationError(
-                            container_id=cid,
-                            message=f"sudoers provision failed: {shell_response.decode()}",
-                        )
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=cid, message="Container creation cancelled"
+                        container_id=container._id, message="Container creation cancelled"
                     )
                 raise
-            except Exception:
-                # Oops, we have to restore the allocated resources!
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                if sys.platform.startswith("linux") and scratch_type == "memory":
-                    await destroy_scratch_filesystem(self.scratch_dir)
-                    await destroy_scratch_filesystem(self.tmp_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-                elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                    await destroy_loop_filesystem(scratch_root, self.kernel_id)
-                else:
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                self.port_pool.update(host_ports)
-                async with self.resource_lock:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        self.computers[dev_name].alloc_map.free(device_alloc)
+            except Exception as e:
+                await _rollback_container_creation()
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid, message="unknown")
+                    raise ContainerCreationError(
+                        container_id=container._id, message=f"unknown. {repr(e)}"
+                    )
                 raise
+
+            try:
+                await container.start()
+            except asyncio.CancelledError:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message="Container start cancelled")
+            except Exception as e:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message=f"unknown. {repr(e)}")
+
+            if self.internal_data.get("sudo_session_enabled", False):
+                exec = await container.exec(
+                    [
+                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                        "sh",
+                        "-c",
+                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                    ],
+                    user="root",
+                )
+                shell_response = await exec.start(detach=True)
+                if shell_response:
+                    await _rollback_container_creation()
+                    raise ContainerCreationError(
+                        container_id=cid,
+                        message=f"sudoers provision failed: {shell_response.decode()}",
+                    )
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
