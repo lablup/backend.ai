@@ -16,6 +16,7 @@ import weakref
 import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import Container as ContainerT
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from pathlib import Path
@@ -1076,27 +1077,10 @@ class AbstractAgent(
                     ev.done_future.set_exception(e)
                 await self.produce_error_event()
             finally:
-                if ev.kernel_id in self.restarting_kernels:
-                    # Don't forget as we are restarting it.
-                    kernel_obj = self.kernel_registry.get(ev.kernel_id, None)
-                else:
-                    # Forget as we are done with this kernel.
-                    kernel_obj = self.kernel_registry.pop(ev.kernel_id, None)
+                kernel_obj = self.kernel_registry.get(ev.kernel_id, None)
                 try:
                     if kernel_obj is not None:
-                        # Restore used ports to the port pool.
-                        port_range = self.local_config["container"]["port-range"]
-                        # Exclude out-of-range ports, because when the agent restarts
-                        # with a different port range, existing containers' host ports
-                        # may not belong to the new port range.
-                        if host_ports := kernel_obj.get("host_ports"):
-                            restored_ports = [
-                                *filter(
-                                    lambda p: port_range[0] <= p <= port_range[1],
-                                    host_ports,
-                                )
-                            ]
-                            self.port_pool.update(restored_ports)
+                        await self._restore_port_pool(kernel_obj)
                         await kernel_obj.close()
                 finally:
                     self.terminating_kernels.discard(ev.kernel_id)
@@ -1115,6 +1099,20 @@ class AbstractAgent(
                         kernel_obj.clean_event.set_result(None)
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
+
+    async def _restore_port_pool(self, kernel_obj: AbstractKernel) -> None:
+        port_range = self.local_config["container"]["port-range"]
+        # Exclude out-of-range ports, because when the agent restarts
+        # with a different port range, existing containers' host ports
+        # may not belong to the new port range.
+        if host_ports := kernel_obj.get("host_ports"):
+            restored_ports = [
+                *filter(
+                    lambda p: port_range[0] <= p <= port_range[1],
+                    host_ports,
+                )
+            ]
+            self.port_pool.update(restored_ports)
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
@@ -1260,6 +1258,8 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
+        all_detected_kernels: set[KernelId] = set()
+
         known_kernels: Dict[KernelId, ContainerId] = {}
         alive_kernels: Dict[KernelId, ContainerId] = {}
         kernel_session_map: Dict[KernelId, SessionId] = {}
@@ -1270,6 +1270,7 @@ class AbstractAgent(
             try:
                 # Check if: there are dead containers
                 for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
+                    all_detected_kernels.add(kernel_id)
                     if (
                         kernel_id in self.restarting_kernels
                         or kernel_id in self.terminating_kernels
@@ -1289,6 +1290,7 @@ class AbstractAgent(
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
+                    all_detected_kernels.add(kernel_id)
                     alive_kernels[kernel_id] = container.id
                     session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                     kernel_session_map[kernel_id] = session_id
@@ -1323,12 +1325,40 @@ class AbstractAgent(
                         KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                     )
             finally:
+                await self.prune_kernel_registry(all_detected_kernels)
                 # Enqueue the events.
                 for kernel_id, ev in terminated_kernels.items():
                     await self.container_lifecycle_queue.put(ev)
 
                 # Set container count
                 await self.set_container_count(len(own_kernels.keys()))
+
+    async def prune_kernel_registry(
+        self, detected_kernels: ContainerT[KernelId], *, ensure_cleaned: bool = True
+    ) -> None:
+        """
+        Deregister containerless kernels from `kernel_registry`
+        since `_handle_clean_event()` does not deregister them.
+        """
+        any_container_pruned = False
+        for kernel_id in [*self.kernel_registry.keys()]:
+            if kernel_id not in detected_kernels:
+                if ensure_cleaned:
+                    # Don't need to process this through event task
+                    # since there is no communication with any container here.
+                    kernel_obj = self.kernel_registry[kernel_id]
+                    kernel_obj.stats_enabled = False
+                    if kernel_obj.runner is not None:
+                        await kernel_obj.runner.close()
+                    if kernel_obj.clean_event is not None and not kernel_obj.clean_event.done():
+                        kernel_obj.clean_event.set_result(None)
+                    await self._restore_port_pool(kernel_obj)
+                    await kernel_obj.close()
+                del self.kernel_registry[kernel_id]
+                self.terminating_kernels.discard(kernel_id)
+                any_container_pruned = True
+        if any_container_pruned:
+            await self.reconstruct_resource_usage()
 
     async def set_container_count(self, container_count: int) -> None:
         await redis_helper.execute(
@@ -2035,8 +2065,6 @@ class AbstractAgent(
                         " unregistered.",
                         kernel_id,
                     )
-                    async with self.registry_lock:
-                        del self.kernel_registry[kernel_id]
                     raise
                 async with self.registry_lock:
                     self.kernel_registry[ctx.kernel_id].data.update(container_data)
