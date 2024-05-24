@@ -12,6 +12,7 @@ import typing
 import uuid
 import zlib
 from collections import defaultdict
+from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -87,6 +88,7 @@ from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
+    AgentKernelRegistryByStatus,
     BinarySize,
     ClusterInfo,
     ClusterMode,
@@ -3055,6 +3057,19 @@ class AgentRegistry:
                 return await rpc.call.sync_kernel_registry([
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
                 ])
+
+    async def sync_and_get_kernels(
+        self,
+        agent_id: AgentId,
+        running_kernels: Collection[KernelId],
+        terminating_kernels: Collection[KernelId],
+    ) -> AgentKernelRegistryByStatus:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            resp: dict[str, Any] = await rpc.call.sync_and_get_kernels(
+                running_kernels,
+                terminating_kernels,
+            )
+        return AgentKernelRegistryByStatus.from_json(resp)
 
     async def mark_kernel_terminated(
         self,
