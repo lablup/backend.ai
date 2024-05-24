@@ -272,7 +272,8 @@
       "BatchModeDesc": "È possibile eseguire il codice con più nodi e cluster per scalare la propria idea.",
       "AddEnvironmentVariable": "Aggiungere le variabili d'ambiente",
       "EnvironmentVariableValueRequired": "Inserire un valore.",
-      "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti."
+      "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti.",
+      "FailedToStartNewSession": "Creazione della sessione non riuscita. \nControlla la scheda \"FINITO\" nella pagina della sessione."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -306,7 +307,8 @@
       "Prepared": "Preparato",
       "NoExistingConnectionExample": "Nessun esempio di connessione da copiare.",
       "SSHConnectionExampleClipboardCopy": "L'esempio di connessione SSH è stato copiato negli appunti.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "L'URL di connessione non è valido."
     },
     "TensorboardPath": "Directory di registro per TensorBoard",
     "InputTensorboardPath": "Si prega di inserire la directory di registro a cui farà riferimento TensorBoard. Si noti che la directory del registro non verrà creata automaticamente..",
