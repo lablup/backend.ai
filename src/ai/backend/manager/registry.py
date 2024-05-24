@@ -2053,7 +2053,8 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        # Do full scan if entire system does not have ANY sessions/sftp-sessions
+        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
+        # to set all concurrency_used to 0
         _do_fullscan = do_fullscan or (
             not concurrency_used_per_key and not sftp_concurrency_used_per_key
         )
