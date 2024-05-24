@@ -1279,3 +1279,27 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
+
+
+@dataclass
+class AgentKernelRegistryByStatus(JSONSerializableMixin):
+    from .events import KernelLifecycleEventReason
+
+    all_running_kernels: list[KernelId]
+    actual_terminating_kernels: list[tuple[KernelId, KernelLifecycleEventReason]]
+    actual_terminated_kernels: list[tuple[KernelId, KernelLifecycleEventReason]]
+
+    def to_json(self) -> dict[str, list[KernelId]]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> AgentKernelRegistryByStatus:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("all_running_kernels"): t.List(t.String),
+            t.Key("actual_terminating_kernels"): t.List(t.Tuple(t.String, t.String)),
+            t.Key("actual_terminated_kernels"): t.List(t.Tuple(t.String, t.String)),
+        })
