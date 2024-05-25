@@ -14,10 +14,15 @@ from aiohttp import web
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed import (
+    AbstractGlobalTimer,
+    DistributedLockGlobalTimer,
+    RaftGlobalTimer,
+)
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity
+from ai.backend.manager.api.context import GlobalTimerKind
 
 from ..defs import LockID
 from ..models import UserRole, error_logs, groups
@@ -234,7 +239,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    log_cleanup_timer: GlobalTimer
+    log_cleanup_timer: AbstractGlobalTimer
     log_cleanup_timer_evh: EventHandler[web.Application, DoLogCleanupEvent]
 
 
@@ -246,14 +251,28 @@ async def init(app: web.Application) -> None:
         app,
         log_cleanup_task,
     )
-    app_ctx.log_cleanup_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
-        root_ctx.event_producer,
-        lambda: DoLogCleanupEvent(),
-        20.0,
-        initial_delay=17.0,
-        task_name="log_cleanup_task",
-    )
+
+    match root_ctx.global_timer_ctx.timer_kind:
+        case GlobalTimerKind.RAFT:
+            app_ctx.log_cleanup_timer = RaftGlobalTimer(
+                root_ctx.global_timer_ctx.raft.get_raft_node(),
+                root_ctx.event_producer,
+                lambda: DoLogCleanupEvent(),
+                20.0,
+                initial_delay=17.0,
+                task_name="log_cleanup_task",
+            )
+        case GlobalTimerKind.DISTRIBUTED_LOCK:
+            app_ctx.log_cleanup_timer = DistributedLockGlobalTimer(
+                root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
+                root_ctx.event_producer,
+                lambda: DoLogCleanupEvent(),
+                20.0,
+                initial_delay=17.0,
+                task_name="log_cleanup_task",
+            )
+        case _:
+            assert False, f"Unknown global timer backend: {root_ctx.global_timer_ctx.timer_kind}"
     await app_ctx.log_cleanup_timer.join()
 
 
