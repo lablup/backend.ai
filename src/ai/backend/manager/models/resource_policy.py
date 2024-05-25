@@ -336,6 +336,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4.")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4.")
     max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.6.")
+    max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
 
