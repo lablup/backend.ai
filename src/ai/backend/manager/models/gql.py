@@ -359,8 +359,12 @@ class Queries(graphene.ObjectType):
 
     images = graphene.List(
         Image,
-        is_installed=graphene.Boolean(deprecation_reason="Deprecated since 24.03.4."),
-        is_operation=graphene.Boolean(deprecation_reason="Deprecated since 24.03.4."),
+        is_installed=graphene.Boolean(
+            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
+        ),
+        is_operation=graphene.Boolean(
+            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
+        ),
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
@@ -1081,10 +1085,6 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         image_load_filters: set[ImageLoadFilter] = set()
-        if is_installed is not None:
-            image_load_filters.add(ImageLoadFilter.INSTALLED)
-        if is_operation is not None:
-            image_load_filters.add(ImageLoadFilter.OPERATIONAL)
         if image_filters is not None:
             try:
                 _filters = [ImageLoadFilter(f) for f in image_filters]
@@ -1094,6 +1094,11 @@ class Queries(graphene.ObjectType):
                     f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
                 )
             image_load_filters.update(_filters)
+        else:
+            if is_installed is not None:
+                image_load_filters.add(ImageLoadFilter.INSTALLED)
+            if is_operation is not None:
+                image_load_filters.add(ImageLoadFilter.OPERATIONAL)
 
         items = await Image.load_all(ctx, filters=image_load_filters, user_role=client_role)
         if client_role == UserRole.SUPERADMIN:
