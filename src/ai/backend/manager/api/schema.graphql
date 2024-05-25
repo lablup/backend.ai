@@ -1420,6 +1420,9 @@ input ModifyKeyPairResourcePolicyInput {
   max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
+  max_pending_session_count: Int
+
+  """Added in 24.03.4."""
   max_pending_session_resource_slots: JSONString
 }
 
