@@ -44,8 +44,8 @@ type Queries {
     architecture: String = "x86_64"
   ): Image
   images(
-    is_installed: Boolean @deprecated(reason: "Deprecated since 24.03.4.")
-    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4.")
+    is_installed: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
 
     """Added in 24.03.4."""
     image_filters: [String] = null
