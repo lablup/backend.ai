@@ -137,8 +137,5 @@ logs/
 .DS_Store
 ._.DS_Store
 
-# Generated files
-docs/manager/rest-reference/openapi.json
-
 /DIST-INFO
 /INSTALL-INFO

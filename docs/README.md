@@ -26,11 +26,16 @@ $ pip install -U -r requirements.txt
 
 
 ## Building API Reference JSON file
+REST API
 ```console
 $ ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ```
+Graphql API
+```console
+$ ./backend.ai mgr api dump-graphql-schema --output docs/manager/graphql-reference/schema.graphql
+```
 This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
-Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
+Generated OpenAPI file will be located at under `manager/rest-reference/openapi.json` and `manager/graphql-reference/schema.graphql`.
 
 
 ## Building HTML document
@@ -151,26 +156,23 @@ To preview the full documentation including the REST API reference seamlessly, y
 
 ### Interactive REST API browser
 
-You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
-to interact and inspect the Backend.AI Manager's GraphQL API.
-
-1. Ensure you have the access to the manager server.  
+1. Ensure you have the access to the manager server.
    The manager's *etcd* configuration should say `config/api/allow-openapi-schema-introspection` is true.
-2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
+2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.
    Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
-3. From your web browser, avigate to `/spec/openapi` under proxy server set up at step 2. 
+3. From your web browser, avigate to `/spec/openapi` under proxy server set up at step 2.
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
-### Interactive GraphQL browser
+### Interactive GraphQL API browser
 
 You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
 to interact and inspect the Backend.AI Manager's GraphQL API.
 
-1. Ensure you have the access to the manager server.  
+1. Ensure you have the access to the manager server.
    The manager's *etcd* configuration should say `config/api/allow-graphql-schema-introspection` is true.
-2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
+2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.
    Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
-3. From your web browser, avigate to `/spec/graphiql` under proxy server set up at step 2. 
+3. From your web browser, avigate to `/spec/graphiql` under proxy server set up at step 2.
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
 
