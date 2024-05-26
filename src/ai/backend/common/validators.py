@@ -218,6 +218,23 @@ class Enum(t.Trafaret, Generic[T_enum]):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
+class EnumList(t.Trafaret, Generic[T_enum]):
+    def __init__(self, enum_cls: Type[T_enum], *, use_name: bool = False) -> None:
+        self.enum_cls = enum_cls
+        self.use_name = use_name
+
+    def check_and_return(self, value: Any) -> list[T_enum]:
+        try:
+            if self.use_name:
+                return [self.enum_cls[val] for val in value]
+            else:
+                return [self.enum_cls(val) for val in value]
+        except TypeError:
+            self._failure("cannot parse value into list", value=value)
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+
+
 class JSONString(t.Trafaret):
     def check_and_return(self, value: Any) -> dict:
         try:

@@ -56,3 +56,12 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+
+
+class AgentResourceSyncTrigger(enum.StrEnum):
+    AFTER_SCHEDULING = "after-scheduling"
+    BEFORE_KERNEL_CREATION = "before-kernel-creation"
+    ON_CREATION_FAILURE = "on-creation-failure"
+
+
+DEFAULT_AGENT_RESOURE_SYNC_TRIGGERS: list[AgentResourceSyncTrigger] = []
