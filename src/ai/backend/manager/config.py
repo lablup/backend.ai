@@ -224,6 +224,7 @@ from .api import ManagerStatus
 from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
+from .types import DEFAULT_AGENT_RESOURE_SYNC_TRIGGERS, AgentResourceSyncTrigger
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -295,6 +296,9 @@ manager_local_config_iv = (
                 "agent-selection-resource-priority",
                 default=["cuda", "rocm", "tpu", "cpu", "mem"],
             ): t.List(t.String),
+            t.Key(
+                "agent-resource-sync-trigger", default=DEFAULT_AGENT_RESOURE_SYNC_TRIGGERS
+            ): tx.EnumList(AgentResourceSyncTrigger),
             t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
             t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
             tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48100): t.ToInt[

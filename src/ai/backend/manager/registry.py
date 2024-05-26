@@ -182,7 +182,7 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
-from .types import UserScope
+from .types import AgentResourceSyncTrigger, UserScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.row import Row
@@ -1694,6 +1694,10 @@ class AgentRegistry:
         is_local = image_info["is_local"]
         resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
+        agent_resource_sync_trigger = cast(
+            list[AgentResourceSyncTrigger],
+            self.local_config["manager"]["agent-resource-sync-policy"],
+        )
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
 
