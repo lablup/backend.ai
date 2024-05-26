@@ -302,12 +302,15 @@ class SchedulerDispatcher(aobject):
                     schedulable_scaling_groups = [row.scaling_group for row in result.fetchall()]
 
                 async with self.db.begin() as db_conn:
+                    produce_do_prepare = False
                     for sgroup_name in schedulable_scaling_groups:
                         try:
                             kernel_agent_bindings = await self._schedule_in_sgroup(
                                 sched_ctx,
                                 sgroup_name,
                             )
+                            if kernel_agent_bindings:
+                                produce_do_prepare = True
                             await redis_helper.execute(
                                 self.redis_live,
                                 lambda r: r.hset(
@@ -340,6 +343,8 @@ class SchedulerDispatcher(aobject):
                         datetime.now(tzutc()).isoformat(),
                     ),
                 )
+                if produce_do_prepare:
+                    await self.event_producer.produce_event(DoPrepareEvent())
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -444,7 +449,6 @@ class SchedulerDispatcher(aobject):
             len(cancelled_sessions),
         )
         zero = ResourceSlot()
-        num_scheduled = 0
         kernel_agent_bindings_in_sgroup: list[KernelAgentBinding] = []
 
         while len(pending_sessions) > 0:
@@ -717,9 +721,6 @@ class SchedulerDispatcher(aobject):
                 continue
             else:
                 kernel_agent_bindings_in_sgroup.extend(kernel_agent_bindings)
-            num_scheduled += 1
-        if num_scheduled > 0:
-            await self.event_producer.produce_event(DoPrepareEvent())
         return kernel_agent_bindings_in_sgroup
 
     async def _filter_agent_by_container_limit(
