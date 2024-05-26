@@ -487,7 +487,7 @@ class AgentRPCServer(aobject):
         terminating_kernels_from_truth: Collection[str],
     ) -> dict[str, Any]:
         """
-        Sync kernel_registry and containers to truth
+        Sync kernel_registry and containers to truth data
         and return kernel infos whose status is irreversible.
         """
 
@@ -553,8 +553,7 @@ class AgentRPCServer(aobject):
                             kernel_id,
                             kernel_obj.session_id,
                             LifecycleEvent.DESTROY,
-                            kernel_obj.termination_reason
-                            or KernelLifecycleEventReason.ALREADY_TERMINATED,
+                            kernel_obj.termination_reason or KernelLifecycleEventReason.UNKNOWN,
                             suppress_events=True,
                         )
 
