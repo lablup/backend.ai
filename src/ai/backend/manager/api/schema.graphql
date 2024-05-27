@@ -34,7 +34,7 @@ type Queries {
     domain_name: String
     is_active: Boolean
 
-    """Added in 24.03.0."""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(
@@ -184,7 +184,7 @@ type ComputeContainer implements Item {
   """Deprecated since 24.03.0; use image_object.name"""
   image: String
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0."""
   image_object: ImageNode
   architecture: String
   registry: String
@@ -406,10 +406,10 @@ type Group {
   integration_id: String
   resource_policy: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   type: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   container_registry: JSONString
   scaling_groups: [String]
 }
@@ -565,7 +565,7 @@ type ComputeSession implements Item {
   occupying_slots: JSONString
   occupied_slots: JSONString
 
-  """Added in 24.03.0"""
+  """Added in 24.03.0."""
   requested_slots: JSONString
   num_queries: BigInt
   containers: [ComputeContainer]
@@ -593,9 +593,9 @@ type KeyPairResourcePolicy {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -609,20 +609,22 @@ type UserResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -632,12 +634,14 @@ type ProjectResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 24.03.1. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 24.03.1. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ResourcePreset {
@@ -671,10 +675,10 @@ type StorageVolume implements Item {
   performance_metric: JSONString
   usage: JSONString
 
-  """Added since 24.03.0. Name of the proxy which this volume belongs to."""
+  """Added in 24.03.0. Name of the proxy which this volume belongs to."""
   proxy: String
 
-  """Added since 24.03.0. Name of the storage."""
+  """Added in 24.03.0. Name of the storage."""
   name: String
 }
 
@@ -777,9 +781,9 @@ type PredefinedAtomicPermission {
 type Endpoint implements Item {
   id: ID
   endpoint_id: UUID
-  image: String @deprecated(reason: "Deprecated since 23.09.9; use `image_object`")
+  image: String @deprecated(reason: "Deprecated since 23.09.9. use `image_object`")
 
-  """Added at 23.09.9"""
+  """Added in 23.09.9."""
   image_object: ImageNode
   domain: String
   project: String
@@ -788,19 +792,19 @@ type Endpoint implements Item {
   url: String
   model: UUID
   model_mount_destiation: String
-  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   created_user_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   created_user_id: UUID
-  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8; use `session_owner_id`")
+  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8. use `session_owner_id`")
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_id: UUID
   tag: String
   startup_command: String
@@ -1119,7 +1123,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added in 24.03.0."""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -1334,7 +1338,7 @@ input ResourceLimitInput {
   max: String
 }
 
-"""Added since 24.03.0."""
+"""Added in 24.03.0."""
 type ForgetImageById {
   ok: Boolean
   msg: String
@@ -1390,9 +1394,9 @@ input CreateKeyPairResourcePolicyInput {
   max_containers_per_session: Int!
   idle_timeout: BigInt!
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -1415,9 +1419,9 @@ input ModifyKeyPairResourcePolicyInput {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -1438,19 +1442,22 @@ type CreateUserResourcePolicy {
 }
 
 input CreateUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -1461,19 +1468,21 @@ type ModifyUserResourcePolicy {
 }
 
 input ModifyUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -1490,11 +1499,14 @@ type CreateProjectResourcePolicy {
 }
 
 input CreateProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 24.03.1. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 24.03.1. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ModifyProjectResourcePolicy {
@@ -1503,11 +1515,14 @@ type ModifyProjectResourcePolicy {
 }
 
 input ModifyProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """Added in 23.09.6. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """Added in 23.09.2. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type DeleteProjectResourcePolicy {
@@ -1669,7 +1684,7 @@ type ModifyEndpoint {
   ok: Boolean
   msg: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   endpoint: Endpoint
 }
 
