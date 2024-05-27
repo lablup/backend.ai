@@ -557,8 +557,8 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.1. Limitation of the quota size of user vfolders."
     )  # Added in (24.03.1, 23.09.2)
     max_session_count_per_model_session = graphene.Int(
-        description="Added in 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
-    )  #  Added in (24.03.1, 23.09.10)
+        description="Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
+    )
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
     max_customized_image_count = graphene.Int(
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
@@ -573,8 +573,8 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.1. Limitation of the quota size of user vfolders."
     )  # Added in (24.03.1, 23.09.2)
     max_session_count_per_model_session = graphene.Int(
-        description="Added in 24.03.1. Maximum available number of sessions per single model service which the user is in charge of."
-    )  #  Added in (24.03.1, 23.09.10)
+        description="Added in 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
+    )
     max_customized_image_count = graphene.Int(
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
