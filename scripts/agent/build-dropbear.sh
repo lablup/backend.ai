@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8" "centos8")
+distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8" "centos8.0")
 
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
@@ -77,7 +77,7 @@ echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu18.0
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu20.04.dockerfile"
 echo "$ubuntu2204_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu22.04.dockerfile"
 echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.alpine3.8.dockerfile"
-echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.centos8.dockerfile"
+echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.centos8.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t dropbear-builder:$distro \
