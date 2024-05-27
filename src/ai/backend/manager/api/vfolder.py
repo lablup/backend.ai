@@ -405,15 +405,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
-                    group_row.id,
+                    cast(uuid.UUID | None, group_row.id),
                     cast(int, group_row.resource_policy_row.max_vfolder_count),
                     cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
-                group_uuid = cast(uuid.UUID, _gid)
+                group_uuid = _gid
                 group_type = cast(ProjectType, group_row.type)
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
@@ -426,7 +428,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
                     cast(int, group_row.resource_policy_row.max_vfolder_count),
