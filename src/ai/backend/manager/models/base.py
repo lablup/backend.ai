@@ -417,6 +417,9 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
+    def coerce_compared_value(self, op, value):
+        return JSONB()
+
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
 
