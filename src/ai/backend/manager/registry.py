@@ -978,6 +978,9 @@ class AgentRegistry:
         internal_data = {} if internal_data is None else internal_data
         internal_data.update(dotfile_data)
 
+        if sudo_session_enabled:
+            internal_data["sudo_session_enabled"] = True
+
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
