@@ -333,7 +333,7 @@ class APIConfig:
     @property
     def storage_proxy_address_map(self) -> Mapping[str, str]:
         """The storage proxy address map for overriding."""
-        return self.storage_proxy_address_map
+        return self._storage_proxy_address_map
 
     @property
     def user_agent(self) -> str:
