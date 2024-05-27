@@ -1098,7 +1098,9 @@ class Queries(graphene.ObjectType):
             if is_installed is not None:
                 image_load_filters.add(ImageLoadFilter.INSTALLED)
             if is_operation is not None:
-                image_load_filters.add(ImageLoadFilter.OPERATIONAL)
+                # `is_operation` parameter had excluded operational images if `is_operation` is not None.
+                # We respected how it had worked and deprecated use of it.
+                pass
 
         items = await Image.load_all(ctx, filters=image_load_filters, user_role=client_role)
         if client_role == UserRole.SUPERADMIN:
