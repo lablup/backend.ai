@@ -243,7 +243,7 @@ class User(graphene.ObjectType):
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Used as the default authentication credential for password-based"
+            "Added in 23.09.8. Used as the default authentication credential for password-based"
             " logins and sets the user's total resource usage limit. User's main_access_key cannot"
             " be deleted, and only super-admin can replace main_access_key."
         )
@@ -1318,7 +1318,7 @@ class UserNode(graphene.ObjectType):
     full_name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean(
-        deprecation_reason="Deprecated since 24.03.0. Recommend to use `status` field."
+        deprecation_reason="Deprecated since 23.09.10. Recommend to use `status` field."
     )
     status = graphene.String(
         description="The status is one of `active`, `inactive`, `deleted` or `before-verification`."

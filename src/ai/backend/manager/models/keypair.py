@@ -184,7 +184,7 @@ class KeyPair(graphene.ObjectType):
     # Deprecated
     concurrency_limit = graphene.Int(
         deprecation_reason=(
-            "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
+            "Deprecated since 22.03.0. Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
         )
     )
 
