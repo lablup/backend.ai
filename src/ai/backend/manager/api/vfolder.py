@@ -25,6 +25,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeAlias,
+    cast,
 )
 
 import aiohttp
@@ -388,6 +389,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     group_uuid: uuid.UUID | None = None
     group_type: ProjectType | None = None
+    max_vfolder_count: int
+    max_quota_scope_size: int
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -405,13 +408,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 group_row = result.scalar()
                 _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
-                group_uuid = _gid
-                group_type = group_row.type
+                group_uuid = cast(uuid.UUID, _gid)
+                group_type = cast(ProjectType, group_row.type)
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 log.debug("group_id_or_name(uuid):{}", group_id_or_name)
@@ -426,13 +429,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 group_row = result.scalar()
                 _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
-                group_type = group_row.type
+                group_type = cast(ProjectType, group_row.type)
             case None:
                 query = (
                     sa.select(UserRow)
@@ -442,8 +445,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 result = await sess.execute(query)
                 user_row = result.scalar()
                 max_vfolder_count, max_quota_scope_size = (
-                    user_row.resource_policy_row.max_vfolder_count,
-                    user_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, user_row.resource_policy_row.max_vfolder_count),
+                    cast(int, user_row.resource_policy_row.max_quota_scope_size),
                 )
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
@@ -491,16 +494,27 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
-            query = (
-                sa.select([sa.func.count()])
-                .select_from(vfolders)
-                .where(
-                    (vfolders.c.user == user_uuid)
-                    & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
+            if ownership_type == "user":
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.user == user_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
                 )
-            )
-            result = await conn.scalar(query)
-            if result >= max_vfolder_count and ownership_type == "user":
+            else:
+                assert group_uuid is not None
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.group == group_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
+                )
+            result = cast(int, await conn.scalar(query))
+            if result >= max_vfolder_count:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
