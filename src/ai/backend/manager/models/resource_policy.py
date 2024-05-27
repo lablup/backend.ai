@@ -770,11 +770,11 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
-        description="Added in 23.09.6. Limitation of the number of project vfolders."
-    )
+        description="Added in 24.03.1. Limitation of the number of project vfolders."
+    )  #  Added in (24.03.1, 23.09.6)
     max_quota_scope_size = BigInt(
-        description="Added in 23.09.2. Limitation of the quota size of project vfolders."
-    )
+        description="Added in 24.03.1. Limitation of the quota size of project vfolders."
+    )  #  Added in (24.03.1, 23.09.2)
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
 
 
