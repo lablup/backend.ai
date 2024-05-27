@@ -1098,7 +1098,7 @@ class Queries(graphene.ObjectType):
             if is_installed is not None:
                 image_load_filters.add(ImageLoadFilter.INSTALLED)
             if is_operation is not None:
-                # `is_operation` parameter had excluded operational images if `is_operation` is not None.
+                # Operational images had been excluded if `is_operation` is not None.
                 # We respected how it had worked and deprecated use of it.
                 pass
 

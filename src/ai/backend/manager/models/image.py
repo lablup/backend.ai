@@ -734,7 +734,9 @@ class ImageNode(graphene.ObjectType):
     size_bytes = BigInt()
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
-    aliases = graphene.List(graphene.String, description="Added in 24.03.4. The array of aliases.")
+    aliases = graphene.List(
+        graphene.String, description="Added in 24.03.4. The array of image aliases."
+    )
 
     @overload
     @classmethod
