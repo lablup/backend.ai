@@ -676,6 +676,7 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
+        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
     )
 
     @property
