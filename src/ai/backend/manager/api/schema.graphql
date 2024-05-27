@@ -610,9 +610,11 @@ type UserResourcePolicy {
   created_at: DateTime!
 
   """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
@@ -633,9 +635,11 @@ type ProjectResourcePolicy {
   created_at: DateTime!
 
   """Added in 24.03.1. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 24.03.1. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
@@ -1436,9 +1440,11 @@ type CreateUserResourcePolicy {
 
 input CreateUserResourcePolicyInput {
   """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
 
   """
@@ -1460,9 +1466,11 @@ type ModifyUserResourcePolicy {
 
 input ModifyUserResourcePolicyInput {
   """Added in 24.03.1. Limitation of the number of user vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 24.03.1. Limitation of the quota size of user vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
 
   """
@@ -1489,9 +1497,11 @@ type CreateProjectResourcePolicy {
 
 input CreateProjectResourcePolicyInput {
   """Added in 24.03.1. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 24.03.1. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
@@ -1503,9 +1513,11 @@ type ModifyProjectResourcePolicy {
 
 input ModifyProjectResourcePolicyInput {
   """Added in 23.09.6. Limitation of the number of project vfolders."""
+  # Added in (24.03.1, 23.09.6)
   max_vfolder_count: Int
 
   """Added in 23.09.2. Limitation of the quota size of project vfolders."""
+  # Added in (24.03.1, 23.09.2)
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
