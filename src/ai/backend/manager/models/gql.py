@@ -1073,6 +1073,7 @@ class Queries(graphene.ObjectType):
         return [ImageNode.from_legacy_image(i) for i in items]
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_images(
         root: Any,
         info: graphene.ResolveInfo,
