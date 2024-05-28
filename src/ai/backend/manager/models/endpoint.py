@@ -2,6 +2,7 @@ import datetime
 import logging
 import uuid
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
 
 import graphene
@@ -153,6 +154,8 @@ class EndpointRow(Base):
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
 
+    model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
+
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     url = sa.Column("url", sa.String(length=1024))
     resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
@@ -202,6 +205,7 @@ class EndpointRow(Base):
     def __init__(
         self,
         name: str,
+        model_definition_path: str | None,
         created_user: uuid.UUID,
         session_owner: uuid.UUID,
         desired_session_count: int,
@@ -226,6 +230,7 @@ class EndpointRow(Base):
     ):
         self.id = uuid.uuid4()
         self.name = name
+        self.model_definition_path = model_definition_path
         self.created_user = created_user
         self.session_owner = session_owner
         self.desired_session_count = desired_session_count
@@ -571,12 +576,34 @@ class ModelServicePredicateChecker:
         return vfolder_mounts
 
     @staticmethod
+    async def _listdir(
+        storage_manager: StorageSessionManager,
+        proxy_name: str,
+        volume_name: str,
+        vfid: VFolderID,
+        relpath: str,
+    ) -> dict[str, Any]:
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": relpath,
+            },
+        ) as (client_api_url, storage_resp):
+            return await storage_resp.json()
+
+    @staticmethod
     async def validate_model_definition(
         storage_manager: StorageSessionManager,
         model_vfolder_row: VFolderRow | Mapping[str, Any],
-    ) -> None:
+        model_definition_path: str | None,
+    ) -> str | None:
         """
         Checks if model definition YAML exists and is syntactically perfect.
+        Returns relative path to customized model-definition.yaml (if any) or None.
         """
         match model_vfolder_row:
             case VFolderRow():
@@ -590,26 +617,32 @@ class ModelServicePredicateChecker:
 
         proxy_name, volume_name = storage_manager.split_host(folder_host)
 
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfid),
-                "relpath": ".",
-            },
-        ) as (client_api_url, storage_resp):
-            storage_reply = await storage_resp.json()
-
-        for item in storage_reply["items"]:
-            if item["name"] == "model-definition.yml" or item["name"] == "model-definition.yaml":
-                yaml_name = item["name"]
-                break
-        else:
-            raise InvalidAPIParameters(
-                "Model definition YAML file not found inside the model storage"
+        if model_definition_path:
+            path = Path(model_definition_path)
+            storage_reply = await ModelServicePredicateChecker._listdir(
+                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
             )
+            for item in storage_reply["items"]:
+                if item["name"] == path.name:
+                    yaml_name = model_definition_path
+                    break
+            else:
+                raise InvalidAPIParameters(
+                    f"Model definition YAML file {model_definition_path} not found inside the model storage"
+                )
+        else:
+            storage_reply = await ModelServicePredicateChecker._listdir(
+                storage_manager, proxy_name, volume_name, vfid, "."
+            )
+            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
+            for item in storage_reply["items"]:
+                if item["name"] in model_definition_candidates:
+                    yaml_name = item["name"]
+                    break
+            else:
+                raise InvalidAPIParameters(
+                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
+                )
 
         chunks = bytes()
         async with storage_manager.request(
@@ -639,6 +672,8 @@ class ModelServicePredicateChecker:
             ) from e
         except yaml.error.YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+
+        return yaml_name
 
 
 class Endpoint(graphene.ObjectType):
@@ -889,9 +924,7 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            vfolder_row = await VFolderRow.get(
-                sess, uuid.UUID(self.model), load_user=True, load_group=True
-            )
+            vfolder_row = await VFolderRow.get(sess, self.model, load_user=True, load_group=True)
             return VirtualFolderNode.from_row(info, vfolder_row)
 
     async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
@@ -901,7 +934,7 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            endpoint_row = await EndpointRow.get(sess, uuid.UUID(self.endpoint_id))
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id)
             extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
             query = (
                 sa.select(VFolderRow)
@@ -1101,6 +1134,7 @@ class ModifyEndpoint(graphene.Mutation):
                 await ModelServicePredicateChecker.validate_model_definition(
                     graph_ctx.storage_manager,
                     endpoint_row.model_row,
+                    None,
                 )
 
                 # from AgentRegistry.handle_route_creation()
