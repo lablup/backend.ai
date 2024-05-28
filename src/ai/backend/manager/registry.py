@@ -1970,12 +1970,14 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
+                    session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
-                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                        session_status = cast(SessionStatus, session_row.status)
+                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
                                 kernel.occupied_slots
                             )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                        if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             if kernel.role in PRIVATE_KERNEL_ROLES:
                                 sftp_concurrency_used_per_key[session_row.access_key].add(
                                     session_row.id
@@ -2054,7 +2056,12 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan or not concurrency_used_per_key:
+        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
+        # to set all concurrency_used to 0
+        _do_fullscan = do_fullscan or (
+            not concurrency_used_per_key and not sftp_concurrency_used_per_key
+        )
+        if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
