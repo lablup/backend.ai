@@ -659,6 +659,33 @@ class Endpoint(graphene.ObjectType):
                 return "DEGRADED"
         return "PROVISIONING"
 
+    async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
+        if not self.model:
+            raise ObjectNotFound(object_name="VFolder")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            vfolder_row = await VFolderRow.get(sess, self.model, load_user=True, load_group=True)
+            return VirtualFolderNode.from_row(info, vfolder_row)
+
+    async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
+        if not self.endpoint_id:
+            raise ObjectNotFound(object_name="Endpoint")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id)
+            extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
+            query = (
+                sa.select(VFolderRow)
+                .where(VFolderRow.id.in_(extra_mount_folder_ids))
+                .options(selectinload(VFolderRow.user_row))
+                .options(selectinload(VFolderRow.group_row))
+            )
+            return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
+
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []

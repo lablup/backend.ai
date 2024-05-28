@@ -683,6 +683,51 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
+type VirtualFolderNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  user_email: String
+  group: UUID
+  group_name: String
+  creator: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type VirtualFolderConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [VirtualFolderEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `VirtualFolder` and its cursor."""
+type VirtualFolderEdge {
+  """The item at the end of the edge"""
+  node: VirtualFolderNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type VirtualFolderList implements PaginatedList {
   items: [VirtualFolder]!
   total_count: Int!
