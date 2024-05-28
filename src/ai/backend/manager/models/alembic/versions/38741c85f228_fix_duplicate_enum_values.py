@@ -1,7 +1,7 @@
 """fix duplicate enum values
 
 Revision ID: 38741c85f228
-Revises: 31463788c713
+Revises: dddf9be580f5
 Create Date: 2024-05-27 15:33:27.394135
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "38741c85f228"
-down_revision = "31463788c713"
+down_revision = "dddf9be580f5"
 branch_labels = None
 depends_on = None
 
