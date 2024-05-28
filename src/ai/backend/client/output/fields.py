@@ -305,7 +305,7 @@ service_fields = FieldSet([
     FieldSpec("resource_slots", formatter=nested_dict_formatter),
     FieldSpec("url"),
     FieldSpec("model"),
-    FieldSpec("model_mount_destiation"),
+    FieldSpec("model_mount_destination"),
     FieldSpec("created_user"),
     FieldSpec("session_owner"),
     FieldSpec("tag"),
