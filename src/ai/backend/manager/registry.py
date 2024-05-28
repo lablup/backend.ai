@@ -1696,7 +1696,7 @@ class AgentRegistry:
         auto_pull = image_info["auto_pull"]
         agent_resource_sync_trigger = cast(
             list[AgentResourceSyncTrigger],
-            self.local_config["manager"]["agent-resource-sync-policy"],
+            self.local_config["manager"]["agent-resource-sync-trigger"],
         )
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
