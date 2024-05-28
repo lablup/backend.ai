@@ -160,10 +160,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
+        if row is None:
+            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
-            raise InvalidAPIParameters("Unknown user group")
+            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
         group_resource_policy = {
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,

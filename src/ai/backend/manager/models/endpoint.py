@@ -49,6 +49,7 @@ from .image import ImageNode, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
 from .user import UserRole
+from .vfolder import VFolderRow, VirtualFolderNode
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -99,8 +100,8 @@ class EndpointRow(Base):
         sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
-    model_mount_destiation = sa.Column(
-        "model_mount_destiation",
+    model_mount_destination = sa.Column(
+        "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
@@ -167,6 +168,7 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -553,25 +555,29 @@ class Endpoint(graphene.ObjectType):
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
-    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
+    image = graphene.String(deprecation_reason="Deprecated since 23.09.9. use `image_object`")
+    image_object = graphene.Field(ImageNode, description="Added in 23.09.9.")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
-    model_mount_destiation = graphene.String()
+    model_vfolder = VirtualFolderNode()
+    model_mount_destiation = graphene.String(
+        deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
+    )
+    model_mount_destination = graphene.String(description="Added at 24.03.4")
     created_user = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
-    created_user_email = graphene.String(description="Added at 23.09.8")
-    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    created_user_email = graphene.String(description="Added in 23.09.8.")
+    created_user_id = graphene.UUID(description="Added in 23.09.8.")
     session_owner = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `session_owner_id`"
     )
-    session_owner_email = graphene.String(description="Added at 23.09.8")
-    session_owner_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner_email = graphene.String(description="Added in 23.09.8.")
+    session_owner_id = graphene.UUID(description="Added in 23.09.8.")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -611,7 +617,8 @@ class Endpoint(graphene.ObjectType):
             resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
-            model_mount_destiation=row.model_mount_destiation,
+            model_mount_destiation=row.model_mount_destination,
+            model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
             created_user_email=row.created_user_row.email,
@@ -783,6 +790,18 @@ class Endpoint(graphene.ObjectType):
                 return "DEGRADED"
         return "PROVISIONING"
 
+    async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
+        if not self.model:
+            raise ObjectNotFound(object_name="VFolder")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            vfolder_row = await VFolderRow.get(
+                sess, uuid.UUID(self.model), load_user=True, load_group=True
+            )
+            return VirtualFolderNode.from_row(info, vfolder_row)
+
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
@@ -833,7 +852,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added at 23.09.8")
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added in 23.09.8.")
 
     @classmethod
     async def mutate(
