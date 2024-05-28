@@ -849,6 +849,9 @@ type Endpoint implements Item {
   resource_slots: JSONString
   url: String
   model: UUID
+
+  """Added at 24.03.3"""
+  model_definition_path: String
   model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
 
   """Added in 24.03.4."""
@@ -1769,6 +1772,9 @@ input ModifyEndpointInput {
   image: ImageRefType
   name: String
   resource_group: String
+
+  """Added at 24.03.3"""
+  model_definition_path: String
   open_to_public: Boolean
 
   """Added in 24.03.4."""
