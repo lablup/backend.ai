@@ -87,8 +87,8 @@ class EndpointRow(Base):
         sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
-    model_mount_destiation = sa.Column(
-        "model_mount_destiation",
+    model_mount_destination = sa.Column(
+        "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
@@ -437,7 +437,10 @@ class Endpoint(graphene.ObjectType):
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
-    model_mount_destiation = graphene.String()
+    model_mount_destiation = graphene.String(
+        deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
+    )
+    model_mount_destination = graphene.String(description="Added at 24.03.4")
     created_user = graphene.UUID(
         deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
@@ -487,7 +490,8 @@ class Endpoint(graphene.ObjectType):
             resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
-            model_mount_destiation=row.model_mount_destiation,
+            model_mount_destiation=row.model_mount_destination,
+            model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
             created_user_email=row.created_user_row.email,
