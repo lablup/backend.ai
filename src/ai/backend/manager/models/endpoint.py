@@ -11,6 +11,7 @@ import trafaret as t
 import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
@@ -22,6 +23,7 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionTypes, VFolderID
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.types import UserScope
 
 from ..api.exceptions import (
     EndpointNotFound,
@@ -42,13 +44,13 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     URLColumn,
-    set_if_set,
-    simple_db_mutate_returning_item,
+    gql_mutation_wrapper,
 )
 from .image import ImageNode, ImageRefType, ImageRow
+from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
-from .user import UserRole
+from .user import UserRole, UserRow
 from .vfolder import VFolderRow, VirtualFolderNode
 
 if TYPE_CHECKING:
@@ -234,6 +236,7 @@ class EndpointRow(Base):
         load_image=False,
         load_created_user=False,
         load_session_owner=False,
+        load_model=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -249,6 +252,8 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
             query = query.options(selectinload(EndpointRow.session_owner_row))
+        if load_model:
+            query = query.options(selectinload(EndpointRow.model_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -863,86 +868,150 @@ class ModifyEndpoint(graphene.Mutation):
         props: ModifyEndpointInput,
     ) -> "ModifyEndpoint":
         graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(
-            props,
-            data,
-            "resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        set_if_set(props, data, "resource_opts")
-        set_if_set(props, data, "cluster_mode")
-        set_if_set(props, data, "cluster_size")
-        set_if_set(props, data, "desired_session_count")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "resource_group")
-        image = data.pop("image", None)
 
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    domain_name = graph_ctx.user["domain_name"]
-                    stmt = (
-                        sa.select(EndpointRow)
-                        .where(EndpointRow.id == endpoint_id)
-                        .where(EndpointRow.domain == domain_name)
-                    )
-                    endpoint_row = (await db_session.scalars(stmt)).first()
-                    if endpoint_row is None:
-                        raise EndpointNotFound
-                case _:
-                    user_id = graph_ctx.user["uuid"]
-                    stmt = (
-                        sa.select(EndpointRow)
-                        .where(EndpointRow.id == endpoint_id)
-                        .where(
-                            (EndpointRow.session_owner == user_id)
-                            | (EndpointRow.created_user == user_id)
-                        )
-                    )
-                    endpoint_row = (await db_session.scalars(stmt)).first()
-                    if endpoint_row is None:
-                        raise EndpointNotFound
-
-            if image is not None:
-                image_name = image["name"]
-                registry = image.get("registry") or ["*"]
-                arch = image.get("architecture")
-                if arch is not None:
-                    image_ref = ImageRef(image_name, registry, arch)
-                else:
-                    image_ref = ImageRef(
-                        image_name,
-                        registry,
-                    )
-                image_object = await ImageRow.resolve(db_session, [image_ref])
-                data["image"] = image_object.id
-
-        update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
-
-        async def _post(conn, result) -> EndpointRow:
-            endpoint = result.first()
-            try:
-                async with AsyncSession(conn) as session:
-                    row = await EndpointRow.get(
-                        session,
-                        endpoint_id=endpoint.id,
-                        domain=endpoint.domain,
-                        user_uuid=endpoint.created_user,
-                        project=endpoint.project,
-                        load_image=True,
-                        load_routes=True,
-                        load_created_user=True,
+        async def _do_mutate() -> ModifyEndpoint:
+            async with graph_ctx.db.begin_session() as db_session:
+                try:
+                    endpoint_row = await EndpointRow.get(
+                        db_session,
+                        endpoint_id,
                         load_session_owner=True,
+                        load_model=True,
+                        load_routes=True,
                     )
-                return row
-            except NoResultFound:
-                raise EndpointNotFound
+                    match graph_ctx.user["role"]:
+                        case UserRole.SUPERADMIN:
+                            pass
+                        case UserRole.ADMIN:
+                            domain_name = graph_ctx.user["domain_name"]
+                            if endpoint_row.domain != domain_name:
+                                raise EndpointNotFound
+                        case _:
+                            user_id = graph_ctx.user["uuid"]
+                            if endpoint_row.session_owner != user_id:
+                                raise EndpointNotFound
+                except NoResultFound:
+                    raise EndpointNotFound
 
-        return await simple_db_mutate_returning_item(
-            cls, graph_ctx, update_query, item_cls=Endpoint, post_func=_post
+                if (_newval := props.resource_slots) and _newval is not Undefined:
+                    endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
+
+                if (_newval := props.resource_opts) and _newval is not Undefined:
+                    endpoint_row.resource_opts = _newval
+
+                if (_newval := props.cluster_mode) and _newval is not Undefined:
+                    endpoint_row.cluster_mode = _newval
+
+                if (_newval := props.cluster_size) and _newval is not Undefined:
+                    endpoint_row.cluster_size = _newval
+
+                if (
+                    _newval := props.desired_session_count
+                ) is not None and _newval is not Undefined:
+                    endpoint_row.desired_session_count = _newval
+
+                if (_newval := props.resource_group) and _newval is not Undefined:
+                    endpoint_row.resource_group = _newval
+
+                if (image := props.image) and image is not Undefined:
+                    image_name = image["name"]
+                    registry = image.get("registry") or ["*"]
+                    arch = image.get("architecture")
+                    if arch is not None:
+                        image_ref = ImageRef(image_name, registry, arch)
+                    else:
+                        image_ref = ImageRef(
+                            image_name,
+                            registry,
+                        )
+                    image_object = await ImageRow.resolve(db_session, [image_ref])
+                    endpoint_row.image = image_object.id
+
+                session_owner: UserRow = endpoint_row.session_owner_row
+
+                conn = await db_session.connection()
+                assert conn
+
+                await ModelServicePredicateChecker.check_scaling_group(
+                    conn,
+                    endpoint_row.resource_group,
+                    session_owner.main_access_key,
+                    endpoint_row.domain,
+                    endpoint_row.project,
+                )
+
+                user_scope = UserScope(
+                    domain_name=endpoint_row.domain,
+                    group_id=endpoint_row.project,
+                    user_uuid=session_owner.uuid,
+                    user_role=session_owner.role,
+                )
+
+                query = (
+                    sa.select([keypair_resource_policies])
+                    .select_from(keypair_resource_policies)
+                    .where(keypair_resource_policies.c.name == session_owner.resource_policy)
+                )
+                result = await conn.execute(query)
+
+                resource_policy = result.first()
+
+                await ModelServicePredicateChecker.validate_model_definition(
+                    graph_ctx.storage_manager,
+                    endpoint_row.model_row,
+                )
+
+                # from AgentRegistry.handle_route_creation()
+                await graph_ctx.registry.create_session(
+                    "",
+                    endpoint_row.image_row.name,
+                    endpoint_row.image_row.architecture,
+                    user_scope,
+                    session_owner.main_access_key,
+                    resource_policy,
+                    SessionTypes.INFERENCE,
+                    {
+                        "mounts": [
+                            endpoint_row.model,
+                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
+                        ],
+                        "mount_map": {
+                            endpoint_row.model: endpoint_row.model_mount_destination,
+                            **{
+                                m.vfid.folder_id: m.kernel_path.as_posix()
+                                for m in endpoint_row.extra_mounts
+                            },
+                        },
+                        "mount_options": {
+                            m.vfid.folder_id: {"permission": m.mount_perm}
+                            for m in endpoint_row.extra_mounts
+                        },
+                        "environ": endpoint_row.environ,
+                        "scaling_group": endpoint_row.resource_group,
+                        "resources": endpoint_row.resource_slots,
+                        "resource_opts": endpoint_row.resource_opts,
+                        "preopen_ports": None,
+                        "agent_list": None,
+                    },
+                    ClusterMode[endpoint_row.cluster_mode],
+                    endpoint_row.cluster_size,
+                    bootstrap_script=endpoint_row.bootstrap_script,
+                    startup_command=endpoint_row.startup_command,
+                    tag=endpoint_row.tag,
+                    callback_url=endpoint_row.callback_url,
+                    sudo_session_enabled=session_owner.sudo_session_enabled,
+                    dry_run=True,
+                )
+
+                await db_session.commit()
+
+                return ModifyEndpoint(
+                    True, "success", await Endpoint.from_row(graph_ctx, endpoint_row)
+                )
+
+        return await gql_mutation_wrapper(
+            cls,
+            _do_mutate,
         )
 
 
