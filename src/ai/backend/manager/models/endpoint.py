@@ -19,7 +19,7 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 
-from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound
+from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound, ObjectNotFound
 from .base import (
     GUID,
     Base,
@@ -38,6 +38,7 @@ from .base import (
 from .image import ImageNode, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
 from .user import UserRole
+from .vfolder import VFolderRow, VirtualFolderNode
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -155,6 +156,7 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -437,6 +439,7 @@ class Endpoint(graphene.ObjectType):
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
+    model_vfolder = VirtualFolderNode()
     model_mount_destiation = graphene.String(
         deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
     )
@@ -662,6 +665,18 @@ class Endpoint(graphene.ObjectType):
             if unhealthy_service_count > 0:
                 return "DEGRADED"
         return "PROVISIONING"
+
+    async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
+        if not self.model:
+            raise ObjectNotFound(object_name="VFolder")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            vfolder_row = await VFolderRow.get(
+                sess, uuid.UUID(self.model), load_user=True, load_group=True
+            )
+            return VirtualFolderNode.from_row(info, vfolder_row)
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
