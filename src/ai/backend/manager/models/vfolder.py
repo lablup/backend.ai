@@ -2026,7 +2026,9 @@ class QuotaDetails(graphene.ObjectType):
     usage_bytes = BigInt(required=False)
     usage_count = BigInt(required=False)
     hard_limit_bytes = BigInt(required=False)
-    hard_limit_inodes = BigInt(required=False)
+    hard_limit_inodes = BigInt(
+        required=False, description="Added in 24.09.0. Limitation of the number of inodes."
+    )
 
 
 class QuotaScope(graphene.ObjectType):
@@ -2103,7 +2105,9 @@ class QuotaScope(graphene.ObjectType):
 
 class QuotaScopeInput(graphene.InputObjectType):
     hard_limit_bytes = BigInt(required=False)
-    hard_limit_inodes = BigInt(required=False)
+    hard_limit_inodes = BigInt(
+        required=False, description="Added in 24.09.0. Limitation of the number of inodes."
+    )
 
 
 class SetQuotaScope(graphene.Mutation):
