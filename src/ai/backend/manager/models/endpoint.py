@@ -689,7 +689,7 @@ class Endpoint(graphene.ObjectType):
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
-    model_definition_path = graphene.String(description="Added at 24.03.3")
+    model_definition_path = graphene.String(description="Added in 24.03.4.")
     model_vfolder = VirtualFolderNode()
     model_mount_destiation = graphene.String(
         deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
@@ -995,7 +995,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
-    model_definition_path = graphene.String(description="Added at 24.03.3")
+    model_definition_path = graphene.String(description="Added in 24.03.4.")
     open_to_public = graphene.Boolean()
     extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
 
