@@ -57,8 +57,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import enum
 import uuid
-from collections.abc import Container
+from collections.abc import Iterable
 from pathlib import Path
 from typing import (
     Any,
@@ -74,11 +75,16 @@ from typing import (
 
 import aiohttp
 
+from ..exception import ExternalError
 from ..types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
 QTreeID: TypeAlias = int
+
+
+class JobResponseCode(enum.StrEnum):
+    QUOTA_ALEADY_ENABLED = "5308507"
 
 
 class AsyncJobResult(TypedDict):
@@ -116,7 +122,7 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
-class NetAppClientError(RuntimeError):
+class NetAppClientError(ExternalError):
     pass
 
 
@@ -185,9 +191,10 @@ class NetAppClient:
                 }
 
     @staticmethod
-    def check_job_result(result: AsyncJobResult, allowed_codes: Container[str]) -> None:
+    def check_job_result(result: AsyncJobResult, allowed_codes: Iterable[JobResponseCode]) -> None:
+        _allowed_codes = {code.value for code in allowed_codes}
         if result["state"] == "failure":
-            if result["code"] in allowed_codes:
+            if result["code"] in _allowed_codes:
                 pass
             else:
                 raise NetAppClientError(f"{result['state']} [{result['code']}] {result['message']}")
