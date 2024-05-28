@@ -364,7 +364,7 @@ class Queries(graphene.ObjectType):
     images = graphene.List(
         Image,
         is_installed=graphene.Boolean(
-            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
+            description="Added in 19.09.0. If it is specified, fetch images installed on at least one agent."
         ),
         is_operation=graphene.Boolean(
             deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
@@ -1116,7 +1116,6 @@ class Queries(graphene.ObjectType):
         return [ImageNode.from_legacy_image(i) for i in items]
 
     @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_images(
         root: Any,
         info: graphene.ResolveInfo,
@@ -1139,8 +1138,6 @@ class Queries(graphene.ObjectType):
                 )
             image_load_filters.update(_filters)
         else:
-            if is_installed is not None:
-                image_load_filters.add(ImageLoadFilter.INSTALLED)
             if is_operation is not None:
                 # Operational images had been excluded if `is_operation` is not None.
                 # We respected how it had worked and deprecated use of it.
@@ -1157,6 +1154,8 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
+        if is_installed is not None:
+            items = [item for item in items if item.installed]
         return items
 
     @staticmethod

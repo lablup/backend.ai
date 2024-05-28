@@ -84,7 +84,6 @@ __all__ = (
 
 
 class ImageLoadFilter(enum.StrEnum):
-    INSTALLED = "installed"
     OPERATIONAL = "operational"
     CUSTOMIZED = "customized"
 
@@ -695,8 +694,6 @@ class Image(graphene.ObjectType):
         filters: set[ImageLoadFilter],
     ) -> bool:
         user_role = ctx.user["role"]
-        if ImageLoadFilter.INSTALLED in filters and not self.installed:
-            return False
 
         is_customized_image = False
         for label in self.labels:
