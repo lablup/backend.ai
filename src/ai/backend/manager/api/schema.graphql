@@ -76,6 +76,12 @@ type Queries {
   storage_volume(id: String): StorageVolume
   storage_volume_list(limit: Int!, offset: Int!, filter: String, order: String): StorageVolumeList
   vfolder(id: String): VirtualFolder
+
+  """Added in 24.03.4."""
+  vfolder_node(id: String!): VirtualFolderNode
+
+  """Added in 24.03.4."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
@@ -683,6 +689,52 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
+type VirtualFolderNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  user_email: String
+  group: UUID
+  group_name: String
+  creator: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  modified_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type VirtualFolderConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [VirtualFolderEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `VirtualFolder` and its cursor."""
+type VirtualFolderEdge {
+  """The item at the end of the edge"""
+  node: VirtualFolderNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type VirtualFolderList implements PaginatedList {
   items: [VirtualFolder]!
   total_count: Int!
@@ -787,7 +839,10 @@ type Endpoint implements Item {
   resource_slots: JSONString
   url: String
   model: UUID
-  model_mount_destiation: String
+  model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
+
+  """Added at 24.03.4"""
+  model_mount_destination: String
   created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
 
   """Added at 23.09.8"""
