@@ -799,7 +799,7 @@ type Endpoint implements Item {
 
   """Added at 24.03.4"""
   model_mount_destination: String
-  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
 
   """Added in 23.09.8."""
   created_user_email: String
