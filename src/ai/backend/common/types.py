@@ -1298,8 +1298,10 @@ class AgentKernelRegistryByStatus(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
         return t.Dict({
-            t.Key("all_running_kernels"): t.List(t.String),
-            t.Key("actual_terminating_kernels"): t.List(t.Tuple(t.String, t.String)),
-            t.Key("actual_terminated_kernels"): t.List(t.Tuple(t.String, t.String)),
+            t.Key("all_running_kernels"): tx.ToList(t.String),
+            t.Key("actual_terminating_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
+            t.Key("actual_terminated_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
         })

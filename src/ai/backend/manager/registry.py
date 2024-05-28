@@ -46,6 +46,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
@@ -180,7 +181,6 @@ from .types import AgentResourceSyncTrigger, UserScope
 if TYPE_CHECKING:
     from sqlalchemy.engine.row import Row
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.common.auth import PublicKey, SecretKey
     from ai.backend.common.events import EventDispatcher, EventProducer
@@ -1664,7 +1664,7 @@ class AgentRegistry:
         auto_pull = image_info["auto_pull"]
         agent_resource_sync_trigger = cast(
             list[AgentResourceSyncTrigger],
-            self.local_config["manager"]["agent-resource-sync-policy"],
+            self.local_config["manager"]["agent-resource-sync-trigger"],
         )
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
@@ -1686,24 +1686,7 @@ class AgentRegistry:
 
         if AgentResourceSyncTrigger.BEFORE_KERNEL_CREATION in agent_resource_sync_trigger:
             async with self.db.begin() as db_conn:
-                results = await self.sync_agent_resource(
-                    [agent_alloc_ctx.agent_id], db_connection=db_conn
-                )
-                for agent_id, result in results.items():
-                    match result:
-                        case AgentKernelRegistryByStatus(
-                            all_running_kernels,
-                            actual_terminating_kernels,
-                            actual_terminated_kernels,
-                        ):
-                            pass
-                        case MultiAgentError():
-                            pass
-                        case _:
-                            pass
-                    pass
-                async with SASession(bind=db_conn) as db_session:
-                    pass
+                await self.sync_agent_resource(db_conn, [agent_alloc_ctx.agent_id])
 
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
@@ -1795,24 +1778,10 @@ class AgentRegistry:
                 if AgentResourceSyncTrigger.ON_CREATION_FAILURE in agent_resource_sync_trigger:
                     if _has_insufficient_resource_err(err_info["error"]):
                         async with self.db.begin() as db_conn:
-                            results = await self.sync_agent_resource(
-                                [agent_alloc_ctx.agent_id], db_connection=db_conn
+                            await self.sync_agent_resource(
+                                db_conn,
+                                [agent_alloc_ctx.agent_id],
                             )
-                            for agent_id, result in results.items():
-                                match result:
-                                    case AgentKernelRegistryByStatus(
-                                        all_running_kernels,
-                                        actual_terminating_kernels,
-                                        actual_terminated_kernels,
-                                    ):
-                                        pass
-                                    case MultiAgentError():
-                                        pass
-                                    case _:
-                                        pass
-                                pass
-                            async with SASession(bind=db_conn) as db_session:
-                                pass
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
                 for binding in items:
@@ -3132,24 +3101,37 @@ class AgentRegistry:
 
     async def sync_agent_resource(
         self,
-        agent_ids: Collection[AgentId],
-        *,
         db_connection: SAConnection,
+        agent_ids: Collection[AgentId],
     ) -> dict[AgentId, AgentKernelRegistryByStatus | MultiAgentError]:
         result: dict[AgentId, AgentKernelRegistryByStatus | MultiAgentError] = {}
         agent_kernel_by_status: dict[AgentId, dict[str, list[KernelId]]] = {}
-        stmt = sa.select(KernelRow).where(
-            (KernelRow.agent.in_(agent_ids))
-            & (KernelRow.status.in_([KernelStatus.RUNNING, KernelStatus.TERMINATING]))
+        stmt = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(agent_ids))
+            .options(
+                selectinload(
+                    AgentRow.kernels.and_(
+                        KernelRow.status.in_([KernelStatus.RUNNING, KernelStatus.TERMINATING])
+                    ),
+                ).options(load_only(KernelRow.id, KernelRow.status))
+            )
         )
-        for kernel_row in cast(list[KernelRow], await SASession(bind=db_connection).scalars(stmt)):
-            if kernel_row.agent not in agent_kernel_by_status:
-                agent_kernel_by_status[kernel_row.agent] = {
-                    "running_kernels": [],
-                    "terminating_kernels": [],
+        async with SASession(bind=db_connection) as db_session:
+            for _agent_row in await db_session.scalars(stmt):
+                agent_row = cast(AgentRow, _agent_row)
+                agent_kernel_by_status[AgentId(agent_row.id)] = {
+                    "running_kernels": [
+                        KernelId(kern.id)
+                        for kern in agent_row.kernels
+                        if kern.status == KernelStatus.RUNNING
+                    ],
+                    "terminating_kernels": [
+                        KernelId(kern.id)
+                        for kern in agent_row.kernels
+                        if kern.status == KernelStatus.TERMINATING
+                    ],
                 }
-            agent_kernel_by_status[kernel_row.agent]["running_kernels"].append(kernel_row.id)
-            agent_kernel_by_status[kernel_row.agent]["terminating_kernels"].append(kernel_row.id)
         tasks = []
         for agent_id in agent_ids:
             tasks.append(

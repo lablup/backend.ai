@@ -56,7 +56,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
-    AgentKernelRegistryByStatus,
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
@@ -70,7 +69,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
 from ..defs import SERVICE_MAX_RETRIES, LockID
-from ..exceptions import MultiAgentError, convert_to_status_data
+from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
     AgentStatus,
@@ -264,7 +263,7 @@ class SchedulerDispatcher(aobject):
         redis_key = f"manager.{manager_id}.schedule"
         agent_resource_sync_trigger = cast(
             list[AgentResourceSyncTrigger],
-            self.local_config["manager"]["agent-resource-sync-policy"],
+            self.local_config["manager"]["agent-resource-sync-trigger"],
         )
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -301,51 +300,38 @@ class SchedulerDispatcher(aobject):
                     )
                     result = await db_sess.execute(query)
                     schedulable_scaling_groups = [row.scaling_group for row in result.fetchall()]
-                for sgroup_name in schedulable_scaling_groups:
-                    try:
-                        kernel_agent_bindings = await self._schedule_in_sgroup(
-                            sched_ctx,
-                            sgroup_name,
-                        )
-                        await redis_helper.execute(
-                            self.redis_live,
-                            lambda r: r.hset(
-                                redis_key,
-                                "resource_group",
+
+                async with self.db.begin() as db_conn:
+                    for sgroup_name in schedulable_scaling_groups:
+                        try:
+                            kernel_agent_bindings = await self._schedule_in_sgroup(
+                                sched_ctx,
                                 sgroup_name,
-                            ),
-                        )
-                    except Exception as e:
-                        log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
-                    else:
-                        if (
-                            AgentResourceSyncTrigger.AFTER_SCHEDULING in agent_resource_sync_trigger
-                            and kernel_agent_bindings
-                        ):
-                            selected_agent_ids = [
-                                binding.agent_alloc_ctx.agent_id
-                                for binding in kernel_agent_bindings
-                                if binding.agent_alloc_ctx.agent_id is not None
-                            ]
-                            async with self.db.begin() as db_conn:
-                                results = await self.registry.sync_agent_resource(
-                                    selected_agent_ids, db_connection=db_conn
-                                )
-                                for agent_id, result in results.items():
-                                    match result:
-                                        case AgentKernelRegistryByStatus(
-                                            all_running_kernels,
-                                            actual_terminating_kernels,
-                                            actual_terminated_kernels,
-                                        ):
-                                            pass
-                                        case MultiAgentError():
-                                            pass
-                                        case _:
-                                            pass
-                                    pass
-                                async with SASession(bind=db_conn) as db_session:
-                                    pass
+                            )
+                            await redis_helper.execute(
+                                self.redis_live,
+                                lambda r: r.hset(
+                                    redis_key,
+                                    "resource_group",
+                                    sgroup_name,
+                                ),
+                            )
+                        except Exception as e:
+                            log.exception(
+                                "schedule({}): scheduling error!\n{}", sgroup_name, repr(e)
+                            )
+                        else:
+                            if (
+                                AgentResourceSyncTrigger.AFTER_SCHEDULING
+                                in agent_resource_sync_trigger
+                                and kernel_agent_bindings
+                            ):
+                                selected_agent_ids = [
+                                    binding.agent_alloc_ctx.agent_id
+                                    for binding in kernel_agent_bindings
+                                    if binding.agent_alloc_ctx.agent_id is not None
+                                ]
+                                await self.registry.sync_agent_resource(db_conn, selected_agent_ids)
                 await redis_helper.execute(
                     self.redis_live,
                     lambda r: r.hset(
