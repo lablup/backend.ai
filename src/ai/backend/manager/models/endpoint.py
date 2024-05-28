@@ -7,19 +7,29 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequen
 import graphene
 import jwt
 import sqlalchemy as sa
+import trafaret as t
+import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, ResourceSlot
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionTypes, VFolderID
+from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
+from ai.backend.manager.models.storage import StorageSessionManager
 
-from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound, ObjectNotFound
+from ..api.exceptions import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
+    InvalidAPIParameters,
+    ObjectNotFound,
+    ServiceUnavailable,
+)
 from .base import (
     GUID,
     Base,
@@ -37,6 +47,7 @@ from .base import (
 )
 from .image import ImageNode, ImageRefType, ImageRow
 from .routing import RouteStatus, Routing
+from .scaling_group import scaling_groups
 from .user import UserRole
 from .vfolder import VFolderRow, VirtualFolderNode
 
@@ -48,6 +59,7 @@ __all__ = (
     "Endpoint",
     "EndpointLifecycle",
     "EndpointList",
+    "ModelServicePredicateChecker",
     "ModifyEndpoint",
     "EndpointTokenRow",
     "EndpointToken",
@@ -424,6 +436,118 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
+
+
+class ModelServicePredicateChecker:
+    @staticmethod
+    async def check_scaling_group(
+        conn: AsyncConnection,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        target_domain: str,
+        target_project: str | uuid.UUID,
+    ) -> str:
+        """
+        Wrapper of `registry.check_scaling_group()` with additional guards flavored for
+        model service included
+        """
+        from ai.backend.manager.registry import check_scaling_group
+
+        checked_scaling_group = await check_scaling_group(
+            conn,
+            scaling_group,
+            SessionTypes.INFERENCE,
+            owner_access_key,
+            target_domain,
+            target_project,
+        )
+
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == checked_scaling_group))
+        )
+
+        result = await conn.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
+
+        if not sgroup["wsproxy_api_token"]:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
+        return checked_scaling_group
+
+    @staticmethod
+    async def validate_model_definition(
+        storage_manager: StorageSessionManager,
+        model_vfolder_row: VFolderRow | Mapping[str, Any],
+    ) -> None:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        """
+        match model_vfolder_row:
+            case VFolderRow():
+                folder_name = model_vfolder_row.name
+                vfid = model_vfolder_row.vfid
+                folder_host = model_vfolder_row.host
+            case _:
+                folder_name = model_vfolder_row["name"]
+                vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
+                folder_host = model_vfolder_row["host"]
+
+        proxy_name, volume_name = storage_manager.split_host(folder_host)
+
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": ".",
+            },
+        ) as (client_api_url, storage_resp):
+            storage_reply = await storage_resp.json()
+
+        for item in storage_reply["items"]:
+            if item["name"] == "model-definition.yml" or item["name"] == "model-definition.yaml":
+                yaml_name = item["name"]
+                break
+        else:
+            raise InvalidAPIParameters(
+                "Model definition YAML file not found inside the model storage"
+            )
+
+        chunks = bytes()
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": f"./{yaml_name}",
+            },
+        ) as (client_api_url, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        model_definition_yaml = chunks.decode("utf-8")
+        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+        try:
+            model_definition = model_definition_iv.check(model_definition_dict)
+            assert model_definition is not None
+        except t.DataError as e:
+            raise InvalidAPIParameters(
+                f"Failed to validate model definition from vFolder {folder_name} (ID"
+                f" {vfid.folder_id}): {e}",
+            ) from e
+        except yaml.error.YAMLError as e:
+            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
 
 class Endpoint(graphene.ObjectType):
