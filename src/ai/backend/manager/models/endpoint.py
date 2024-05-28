@@ -7,14 +7,17 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequen
 import graphene
 import jwt
 import sqlalchemy as sa
+import trafaret as t
+import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionTypes, VFolderID
@@ -58,6 +61,7 @@ __all__ = (
     "Endpoint",
     "EndpointLifecycle",
     "EndpointList",
+    "ModelServicePredicateChecker",
     "ModifyEndpoint",
     "EndpointTokenRow",
     "EndpointToken",
@@ -98,8 +102,8 @@ class EndpointRow(Base):
         sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
-    model_mount_destiation = sa.Column(
-        "model_mount_destiation",
+    model_mount_destination = sa.Column(
+        "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
@@ -166,6 +170,7 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -438,30 +443,146 @@ class EndpointTokenRow(Base):
         return row
 
 
+class ModelServicePredicateChecker:
+    @staticmethod
+    async def check_scaling_group(
+        conn: AsyncConnection,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        target_domain: str,
+        target_project: str | uuid.UUID,
+    ) -> str:
+        """
+        Wrapper of `registry.check_scaling_group()` with additional guards flavored for
+        model service included
+        """
+        from ai.backend.manager.registry import check_scaling_group
+
+        checked_scaling_group = await check_scaling_group(
+            conn,
+            scaling_group,
+            SessionTypes.INFERENCE,
+            owner_access_key,
+            target_domain,
+            target_project,
+        )
+
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == checked_scaling_group))
+        )
+
+        result = await conn.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
+
+        if not sgroup["wsproxy_api_token"]:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
+        return checked_scaling_group
+
+    @staticmethod
+    async def validate_model_definition(
+        storage_manager: StorageSessionManager,
+        model_vfolder_row: VFolderRow | Mapping[str, Any],
+    ) -> None:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        """
+        match model_vfolder_row:
+            case VFolderRow():
+                folder_name = model_vfolder_row.name
+                vfid = model_vfolder_row.vfid
+                folder_host = model_vfolder_row.host
+            case _:
+                folder_name = model_vfolder_row["name"]
+                vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
+                folder_host = model_vfolder_row["host"]
+
+        proxy_name, volume_name = storage_manager.split_host(folder_host)
+
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": ".",
+            },
+        ) as (client_api_url, storage_resp):
+            storage_reply = await storage_resp.json()
+
+        for item in storage_reply["items"]:
+            if item["name"] == "model-definition.yml" or item["name"] == "model-definition.yaml":
+                yaml_name = item["name"]
+                break
+        else:
+            raise InvalidAPIParameters(
+                "Model definition YAML file not found inside the model storage"
+            )
+
+        chunks = bytes()
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": f"./{yaml_name}",
+            },
+        ) as (client_api_url, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        model_definition_yaml = chunks.decode("utf-8")
+        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+        try:
+            model_definition = model_definition_iv.check(model_definition_dict)
+            assert model_definition is not None
+        except t.DataError as e:
+            raise InvalidAPIParameters(
+                f"Failed to validate model definition from vFolder {folder_name} (ID"
+                f" {vfid.folder_id}): {e}",
+            ) from e
+        except yaml.error.YAMLError as e:
+            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
-    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
+    image = graphene.String(deprecation_reason="Deprecated since 23.09.9. use `image_object`")
+    image_object = graphene.Field(ImageNode, description="Added in 23.09.9.")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
-    model_mount_destiation = graphene.String()
+    model_vfolder = VirtualFolderNode()
+    model_mount_destiation = graphene.String(
+        deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
+    )
+    model_mount_destination = graphene.String(description="Added at 24.03.4")
     created_user = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
-    created_user_email = graphene.String(description="Added at 23.09.8")
-    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    created_user_email = graphene.String(description="Added in 23.09.8.")
+    created_user_id = graphene.UUID(description="Added in 23.09.8.")
     session_owner = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `session_owner_id`"
     )
-    session_owner_email = graphene.String(description="Added at 23.09.8")
-    session_owner_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner_email = graphene.String(description="Added in 23.09.8.")
+    session_owner_id = graphene.UUID(description="Added in 23.09.8.")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -501,7 +622,8 @@ class Endpoint(graphene.ObjectType):
             resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
-            model_mount_destiation=row.model_mount_destiation,
+            model_mount_destiation=row.model_mount_destination,
+            model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
             created_user_email=row.created_user_row.email,
@@ -673,6 +795,18 @@ class Endpoint(graphene.ObjectType):
                 return "DEGRADED"
         return "PROVISIONING"
 
+    async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
+        if not self.model:
+            raise ObjectNotFound(object_name="VFolder")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            vfolder_row = await VFolderRow.get(
+                sess, uuid.UUID(self.model), load_user=True, load_group=True
+            )
+            return VirtualFolderNode.from_row(info, vfolder_row)
+
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
@@ -723,7 +857,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added at 23.09.8")
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added in 23.09.8.")
 
     @classmethod
     async def mutate(
