@@ -689,6 +689,7 @@ class Endpoint(graphene.ObjectType):
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
+    model_definition_path = graphene.String(description="Added at 24.03.3")
     model_vfolder = VirtualFolderNode()
     model_mount_destiation = graphene.String(
         deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
@@ -744,6 +745,7 @@ class Endpoint(graphene.ObjectType):
             resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
+            model_definition_path=row.model_definition_path,
             model_mount_destiation=row.model_mount_destination,
             model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
@@ -993,6 +995,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
+    model_definition_path = graphene.String(description="Added at 24.03.3")
     open_to_public = graphene.Boolean()
     extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
 
@@ -1051,6 +1054,9 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (_newval := props.cluster_size) and _newval is not Undefined:
                     endpoint_row.cluster_size = _newval
+
+                if (_newval := props.model_definition_path) and _newval is not Undefined:
+                    endpoint_row.model_definition_path = _newval
 
                 if (
                     _newval := props.desired_session_count
@@ -1134,7 +1140,7 @@ class ModifyEndpoint(graphene.Mutation):
                 await ModelServicePredicateChecker.validate_model_definition(
                     graph_ctx.storage_manager,
                     endpoint_row.model_row,
-                    None,
+                    endpoint_row.model_definition_path,
                 )
 
                 # from AgentRegistry.handle_route_creation()

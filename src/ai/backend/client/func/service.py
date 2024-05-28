@@ -111,6 +111,7 @@ class Service(BaseFunction):
         architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
+        model_definition_path: Optional[str] = None,
         expose_to_public=False,
     ) -> Any:
         """
@@ -138,6 +139,7 @@ class Service(BaseFunction):
         :param tag: An optional string to annotate extra information.
         :param owner: An optional access key that owns the created session. (Only
             available to administrators)
+        :param model_definition_path: Relative path to model definition file. Defaults to `model-definition.yaml`.
         :param expose_to_public: Visibility of API Endpoint which serves inference workload.
             If set to true, no authentication will be required to access the endpoint.
 
@@ -181,6 +183,7 @@ class Service(BaseFunction):
             "scaling_group": scaling_group,
             "resources": resources,
             "resource_opts": resource_opts,
+            "model_definition_path": model_definition_path,
         }
         if model_version:
             model_config["model_version"] = model_version

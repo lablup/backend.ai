@@ -248,6 +248,12 @@ def info(ctx: CLIContext, service_name_or_id: str):
     help="Set the owner of the target session explicitly.",
 )
 @click.option(
+    "--model-definition-path",
+    metavar="PATH",
+    default=None,
+    help="Relative path to model definition file. Defaults to `model-definition.yaml`.",
+)
+@click.option(
     "--public",
     "--expose-to-public",
     is_flag=True,
@@ -279,6 +285,7 @@ def create(
     architecture: Optional[str],
     scaling_group: Optional[str],
     owner: Optional[str],
+    model_definition_path: Optional[str],
     public: bool,
 ):
     """
@@ -309,6 +316,7 @@ def create(
         "architecture": architecture,
         "scaling_group": scaling_group,
         "expose_to_public": public,
+        "model_definition_path": model_definition_path,
     }
     if model_mount_destination:
         body["model_mount_destination"] = model_mount_destination
