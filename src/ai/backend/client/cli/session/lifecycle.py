@@ -96,9 +96,6 @@ def _create_cmd(docs: str = None):
         help="A user-defined script to execute on startup.",
     )
     @click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
-    )
-    @click.option(
         "--arch",
         "--architecture",
         "architecture",

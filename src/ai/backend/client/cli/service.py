@@ -8,6 +8,7 @@ import click
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
+from ai.backend.client.utils import validate_key_value
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
@@ -197,7 +198,13 @@ def info(ctx: CLIContext, service_name_or_id: str):
     help="A user-defined script to execute on startup.",
 )
 # extra options
-@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
+@click.option(
+    "--tag",
+    type=str,
+    callback=validate_key_value,
+    default=None,
+    help="User-defined tag string to annotate sessions.",
+)
 @click.option(
     "--arch",
     "--architecture",
