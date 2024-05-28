@@ -141,7 +141,9 @@ from .vfolder import (
     SetQuotaScope,
     UnsetQuotaScope,
     VirtualFolder,
+    VirtualFolderConnection,
     VirtualFolderList,
+    VirtualFolderNode,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
@@ -512,6 +514,13 @@ class Queries(graphene.ObjectType):
         id=graphene.String(),
     )
 
+    vfolder_node = graphene.Field(
+        VirtualFolderNode, id=graphene.String(required=True), description="Added in 24.03.4."
+    )
+    vfolder_nodes = PaginatedConnectionField(
+        VirtualFolderConnection, description="Added in 24.03.4."
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -846,6 +855,7 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    @staticmethod
     async def resolve_group_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -853,6 +863,7 @@ class Queries(graphene.ObjectType):
     ):
         return await GroupNode.get_node(info, id)
 
+    @staticmethod
     async def resolve_group_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -866,6 +877,38 @@ class Queries(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         return await GroupNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    async def resolve_vfolder_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await VirtualFolderNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_vfolder_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await VirtualFolderNode.get_connection(
             info,
             filter,
             order,

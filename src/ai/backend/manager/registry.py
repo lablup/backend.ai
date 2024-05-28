@@ -3813,15 +3813,25 @@ async def handle_route_creation(
                 UserScope(
                     domain_name=endpoint.domain,
                     group_id=group_id,
-                    user_uuid=created_user.uuid,
-                    user_role=created_user.role,
+                    user_uuid=session_owner["uuid"],
+                    user_role=session_owner["role"],
                 ),
                 session_owner["access_key"],
                 resource_policy,
                 SessionTypes.INFERENCE,
                 {
-                    "mounts": [endpoint.model],
-                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "mounts": [endpoint.model, *[m.vfid.folder_id for m in endpoint.extra_mounts]],
+                    "mount_map": {
+                        endpoint.model: endpoint.model_mount_destination,
+                        **{
+                            m.vfid.folder_id: m.kernel_path.as_posix()
+                            for m in endpoint.extra_mounts
+                        },
+                    },
+                    "mount_options": {
+                        m.vfid.folder_id: {"permission": m.mount_perm}
+                        for m in endpoint.extra_mounts
+                    },
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,
