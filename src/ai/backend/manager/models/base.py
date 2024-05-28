@@ -41,7 +41,13 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
-from graphql.language import ast  # pants: no-infer-dep
+
+try:
+    from graphql.language.ast import IntValueNode
+except ImportError:
+    from graphql.language.ast import (  # type: ignore[no-redef, attr-defined]
+        IntValue as IntValueNode,
+    )
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
@@ -735,7 +741,7 @@ class BigInt(Scalar):
 
     @staticmethod
     def parse_literal(node):
-        if isinstance(node, ast.IntValue):
+        if isinstance(node, IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
                 raise ValueError("Cannot parse integer out of the safe range.")
