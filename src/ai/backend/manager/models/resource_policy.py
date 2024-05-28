@@ -156,9 +156,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     idle_timeout = BigInt()
     allowed_vfolder_hosts = graphene.JSONString()
 
-    max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
-    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
-    max_quota_scope_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4.")
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4.")
+    max_quota_scope_size = BigInt(deprecation_reason="Deprecated since 23.09.6.")
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
@@ -317,9 +317,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4.")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4.")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.6.")
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
@@ -333,9 +333,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
-    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4.")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4.")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.6.")
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
@@ -475,7 +475,7 @@ class UserResourcePolicy(graphene.ObjectType):
         description="Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
     )
     max_customized_image_count = graphene.Int(
-        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+        description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
     @classmethod
@@ -559,8 +559,9 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
     max_session_count_per_model_session = graphene.Int(
         description="Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
     )
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
     max_customized_image_count = graphene.Int(
-        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+        description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
 
@@ -575,7 +576,7 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of."
     )
     max_customized_image_count = graphene.Int(
-        description="Added since 24.03.0. Maximum available number of customized images one can publish to."
+        description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
 
