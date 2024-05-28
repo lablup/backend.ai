@@ -850,7 +850,7 @@ type Endpoint implements Item {
   url: String
   model: UUID
 
-  """Added at 24.03.3"""
+  """Added in 24.03.4."""
   model_definition_path: String
   model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
 
@@ -1773,7 +1773,7 @@ input ModifyEndpointInput {
   name: String
   resource_group: String
 
-  """Added at 24.03.3"""
+  """Added in 24.03.4."""
   model_definition_path: String
   open_to_public: Boolean
 
