@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -42,6 +42,7 @@ from ai.backend.common.types import (
 
 from ..api.exceptions import (
     InvalidAPIParameters,
+    ObjectNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -417,6 +418,29 @@ vfolder_permissions = sa.Table(
 class VFolderRow(Base):
     __table__ = vfolders
 
+    endpoints = relationship("EndpointRow", back_populates="model_row")
+    user_row = relationship("UserRow", back_populates="vfolder_row")
+    group_row = relationship("GroupRow", back_populates="vfolder_row")
+
+    @classmethod
+    async def get(
+        cls,
+        session: SASession,
+        id: uuid.UUID,
+        load_user=False,
+        load_group=False,
+    ) -> "VFolderRow":
+        query = sa.select(VFolderRow).where(VFolderRow.id == id)
+        if load_user:
+            query = query.options(selectinload(VFolderRow.user_row))
+        if load_group:
+            query = query.options(selectinload(VFolderRow.group_row))
+
+        result = await session.scalar(query)
+        if not result:
+            raise ObjectNotFound(object_name="VFolder")
+        return result
+
     def __contains__(self, key):
         return key in self.__dir__()
 
@@ -425,6 +449,10 @@ class VFolderRow(Base):
             return getattr(self, item)
         except AttributeError:
             raise KeyError(item)
+
+    @property
+    def vfid(self) -> VFolderID:
+        return VFolderID(self.quota_scope_id, self.id)
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -1695,6 +1723,197 @@ class VirtualFolderList(graphene.ObjectType):
     items = graphene.List(VirtualFolder, required=True)
 
 
+class VirtualFolderNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    host = graphene.String()
+    quota_scope_id = graphene.String()
+    name = graphene.String()
+    user = graphene.UUID()  # User.id (current owner, null in project vfolders)
+    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
+    group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
+    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
+    creator = graphene.String()  # User.email (always set)
+    unmanaged_path = graphene.String()
+    usage_mode = graphene.String()
+    permission = graphene.String()
+    ownership_type = graphene.String()
+    max_files = graphene.Int()
+    max_size = BigInt()  # in MiB
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    last_used = GQLDateTime()
+
+    num_files = graphene.Int()
+    cur_size = BigInt()
+    # num_attached = graphene.Int()
+    cloneable = graphene.Boolean()
+    status = graphene.String()
+
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("vfolders_id", uuid.UUID),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", uuid.UUID),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", uuid.UUID),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "unmanaged_path": ("vfolders_unmanaged_path", None),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            enum_field_getter(VFolderUsageMode),
+        ),
+        "permission": (
+            "vfolders_permission",
+            enum_field_getter(VFolderPermission),
+        ),
+        "ownership_type": (
+            "vfolders_ownership_type",
+            enum_field_getter(VFolderOwnershipType),
+        ),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", dtparse),
+        "last_used": ("vfolders_last_used", dtparse),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": (
+            "vfolders_status",
+            enum_field_getter(VFolderOperationStatus),
+        ),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("vfolders_id", None),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", None),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", None),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "usage_mode": ("vfolders_usage_mode", None),
+        "permission": ("vfolders_permission", None),
+        "ownership_type": ("vfolders_ownership_type", None),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", None),
+        "last_used": ("vfolders_last_used", None),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
+    }
+
+    def resolve_created_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
+        try:
+            return dtparse(self.created_at)
+        except ParserError:
+            return self.created_at
+
+    @classmethod
+    def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
+        return cls(
+            id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user_row,
+            user_email=row.user_row.email if row.user_row else None,
+            group=row.group_row,
+            group_name=row.group_row.name if row.group_row else None,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,  # in B
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VirtualFolderNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
+            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+                raise ValueError(
+                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+                )
+            return cls.from_row(info, vfolder_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            conditions,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            VFolderRow,
+            VFolderRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
+
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            result = [(cls.from_row(info, vf)) for vf in vfolder_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class VirtualFolderConnection(Connection):
+    class Meta:
+        node = VirtualFolderNode
+
+
 class VirtualFolderPermission(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -2220,9 +2439,8 @@ class ModelCard(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = (await db_session.scalars(query)).first()
+            vfolder_row = await VFolderRow.get(db_session, uuid.UUID(vfolder_row_id))
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
