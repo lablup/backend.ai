@@ -131,7 +131,8 @@ from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    PRIVATE_KERNEL_ROLES,
+    PRIVATE_SESSION_TYPES,
+    SESSION_TYPE_IMAGE_ROLE_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
@@ -140,7 +141,6 @@ from .models import (
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
@@ -537,9 +537,7 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-        public_sgroup_only = True
-        if _role_str := image_row.labels.get("ai.backend.role"):
-            public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
+        public_sgroup_only = sess.session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
             return {}
         try:
@@ -1065,6 +1063,15 @@ class AgentRegistry:
             known_slot_types = await self.shared_config.get_resource_slots()
 
             labels = image_row.labels
+
+            # Check if the image is available for a given session type.
+            if (_img_role := labels.get("ai.backend.role")) is not None:
+                if _img_role != SESSION_TYPE_IMAGE_ROLE_MAP[session_type]:
+                    raise InvalidAPIParameters(
+                        f"Cannot create {session_type} session with the given image. (img:"
+                        f" {image_ref.name}, img role: {_img_role})"
+                    )
+
             # Parse service ports to check for port errors
             parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
@@ -1203,7 +1210,7 @@ class AgentRegistry:
                 # "image_id": image_row.id,
                 "architecture": image_ref.architecture,
                 "registry": image_ref.registry,
-                "role": KernelRole(image_row.labels.get("ai.backend.role", KernelRole.COMPUTE)),
+                "role": session_type,
                 "startup_command": kernel.get("startup_command"),
                 "occupied_slots": requested_slots,
                 "requested_slots": requested_slots,
@@ -1794,7 +1801,7 @@ class AgentRegistry:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.user_uuid == user_id)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                    & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
                 )
                 zero = ResourceSlot()
                 user_occupied = sum(
@@ -1813,10 +1820,14 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                query = (
+                    sa.select(KernelRow.occupied_slots)
+                    .select_from(KernelRow)
+                    .where(
+                        (KernelRow.access_key == access_key)
+                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                    )
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1836,10 +1847,14 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.domain_name == domain_name)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                query = (
+                    sa.select(KernelRow.occupied_slots)
+                    .select_from(KernelRow)
+                    .where(
+                        (KernelRow.domain_name == domain_name)
+                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                    )
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1860,10 +1875,14 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.group_id == group_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                query = (
+                    sa.select(KernelRow.occupied_slots)
+                    .select_from(KernelRow)
+                    .where(
+                        (KernelRow.group_id == group_id)
+                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                    )
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1969,6 +1988,7 @@ class AgentRegistry:
                         ),
                     )
                 )
+                session_row: SessionRow
                 async for session_row in await db_sess.stream_scalars(session_query):
                     for kernel in session_row.kernels:
                         if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
@@ -1976,7 +1996,7 @@ class AgentRegistry:
                                 kernel.occupied_slots
                             )
                         if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                            if session_row.session_type in PRIVATE_SESSION_TYPES:
                                 sftp_concurrency_used_per_key[session_row.access_key].add(
                                     session_row.id
                                 )
