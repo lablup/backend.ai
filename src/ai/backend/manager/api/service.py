@@ -648,6 +648,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
                 "mount_options": {
                     m.vfid: {"permission": m.mount_perm} for m in validation_result.extra_mounts
                 },
+                "model_definition_path": validation_result.model_definition_path,
                 "environ": creation_config["environ"],
                 "scaling_group": validation_result.scaling_group,
                 "resources": creation_config["resources"],

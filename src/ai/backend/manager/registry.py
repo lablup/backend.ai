@@ -977,6 +977,8 @@ class AgentRegistry:
         # Prepare internal data.
         internal_data = {} if internal_data is None else internal_data
         internal_data.update(dotfile_data)
+        if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
+            internal_data["model_definition_path"] = _fname
 
         if sudo_session_enabled:
             internal_data["sudo_session_enabled"] = True
@@ -3839,6 +3841,7 @@ async def handle_route_creation(
                         m.vfid.folder_id: {"permission": m.mount_perm}
                         for m in endpoint.extra_mounts
                     },
+                    "model_definition_path": endpoint.model_definition_path,
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,
