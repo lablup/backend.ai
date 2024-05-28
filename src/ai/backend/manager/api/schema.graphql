@@ -849,8 +849,11 @@ type Endpoint implements Item {
   model: UUID
   model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
 
-  """Added at 24.03.4"""
+  """Added in 24.03.4."""
   model_mount_destination: String
+
+  """Added in 24.03.4."""
+  extra_mounts: [VirtualFolderNode]
   created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
 
   """Added in 23.09.8."""
@@ -1765,10 +1768,19 @@ input ModifyEndpointInput {
   name: String
   resource_group: String
   open_to_public: Boolean
+
+  """Added in 24.03.4."""
+  extra_mounts: [ExtraMountInput]
 }
 
 input ImageRefType {
   name: String!
   registry: String
   architecture: String
+}
+
+"""Added in 24.03.4."""
+input ExtraMountInput {
+  vfolder_id: String
+  mount_destination: String
 }
