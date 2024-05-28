@@ -136,10 +136,14 @@ keypair_resource_policy_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("created_at"),
     FieldSpec("total_resource_slots"),
+    FieldSpec("max_session_lifetime"),
     FieldSpec("max_concurrent_sessions"),  # formerly concurrency_limit
     FieldSpec("idle_timeout"),
     FieldSpec("max_containers_per_session"),
     FieldSpec("allowed_vfolder_hosts"),
+    FieldSpec("max_pending_session_count"),
+    FieldSpec("max_pending_session_resource_slots"),
+    FieldSpec("max_concurrent_sftp_sessions"),
 ])
 
 

@@ -121,6 +121,18 @@ def list(ctx: CLIContext) -> None:
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
+@click.option(
+    "--max-pending-session-count",
+    type=int,
+    default=None,
+    help="Number of maximum pending sessions.",
+)
+@click.option(
+    "--max-pending-session-resource-slots",
+    type=str,
+    default=None,
+    help="Set maximum resource slots for pending sessions.",
+)
 def add(
     ctx: CLIContext,
     name: str,
@@ -132,6 +144,8 @@ def add(
     max_containers_per_session: int,
     idle_timeout: int,
     vfolder_host_perms: str,  # JSON string
+    max_pending_session_count: int,
+    max_pending_session_resource_slots: str,  # JSON string
 ) -> None:
     """
     Add a new keypair resource policy.
@@ -150,6 +164,8 @@ def add(
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,
+                max_pending_session_count=max_pending_session_count,
+                max_pending_session_resource_slots=max_pending_session_resource_slots,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -228,6 +244,18 @@ def add(
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
+@click.option(
+    "--max-pending-session-count",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum pending sessions.",
+)
+@click.option(
+    "--max-pending-session-resource-slots",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set maximum resource slots for pending sessions.",
+)
 def update(
     ctx: CLIContext,
     name: str,
@@ -239,6 +267,8 @@ def update(
     max_containers_per_session: int | Undefined,
     idle_timeout: int | Undefined,
     vfolder_host_perms: str | Undefined,  # JSON string
+    max_pending_session_count: int | Undefined,
+    max_pending_session_resource_slots: str | Undefined,  # JSON string
 ) -> None:
     """
     Update an existing keypair resource policy.
@@ -257,6 +287,8 @@ def update(
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,
+                max_pending_session_count=max_pending_session_count,
+                max_pending_session_resource_slots=max_pending_session_resource_slots,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
