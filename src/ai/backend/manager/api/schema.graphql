@@ -44,10 +44,15 @@ type Queries {
     architecture: String = "x86_64"
   ): Image
   images(
-    is_installed: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+    """
+    Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
+    """
+    is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
 
-    """Added in 24.03.4."""
+    """
+    Added in 24.03.4. All elements should be values in this (operational, customized)
+    """
     image_filters: [String] = null
   ): [Image]
 
