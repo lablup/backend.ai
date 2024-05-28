@@ -20,10 +20,20 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionTypes, VFolderID
+from ai.backend.common.types import (
+    AccessKey,
+    ClusterMode,
+    MountPermission,
+    MountTypes,
+    ResourceSlot,
+    SessionTypes,
+    VFolderID,
+    VFolderMount,
+)
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
+from ai.backend.manager.models.gql_relay import AsyncNode
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.types import UserScope
+from ai.backend.manager.types import MountOptionModel, UserScope
 
 from ..api.exceptions import (
     EndpointNotFound,
@@ -43,6 +53,7 @@ from .base import (
     Item,
     PaginatedList,
     ResourceSlotColumn,
+    StructuredJSONObjectListColumn,
     URLColumn,
     gql_mutation_wrapper,
 )
@@ -51,9 +62,11 @@ from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
 from .user import UserRole, UserRow
-from .vfolder import VFolderRow, VirtualFolderNode
+from .vfolder import VFolderRow, VirtualFolderNode, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
+    from ai.backend.manager.config import SharedConfig
+
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -154,6 +167,14 @@ class EndpointRow(Base):
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
 
+    extra_mounts = sa.Column(
+        "extra_mounts",
+        StructuredJSONObjectListColumn(VFolderMount),
+        nullable=False,
+        default=[],
+        server_default="[]",
+    )
+
     retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
     created_at = sa.Column(
         "created_at",
@@ -192,6 +213,8 @@ class EndpointRow(Base):
         resource_slots: Mapping[str, Any],
         cluster_mode: ClusterMode,
         cluster_size: int,
+        extra_mounts: Sequence[VFolderMount],
+        *,
         model_mount_destination: Optional[str] = None,
         tag: Optional[str] = None,
         startup_command: Optional[str] = None,
@@ -214,7 +237,8 @@ class EndpointRow(Base):
         self.resource_slots = resource_slots
         self.cluster_mode = cluster_mode.name
         self.cluster_size = cluster_size
-        self.model_mount_destination = model_mount_destination
+        self.extra_mounts = extra_mounts
+        self.model_mount_destination = model_mount_destination or "/models"
         self.tag = tag
         self.startup_command = startup_command
         self.bootstrap_script = bootstrap_script
@@ -485,6 +509,68 @@ class ModelServicePredicateChecker:
         return checked_scaling_group
 
     @staticmethod
+    async def check_extra_mounts(
+        conn: AsyncConnection,
+        shared_config: "SharedConfig",
+        storage_manager: StorageSessionManager,
+        model_id: uuid.UUID,
+        model_mount_destination: str,
+        extra_mounts: dict[uuid.UUID, MountOptionModel],
+        user_scope: UserScope,
+        resource_policy: dict[str, Any],
+    ) -> Sequence[VFolderMount]:
+        """
+        check if user is allowed to access every folders eagering to mount (other than model VFolder)
+        on general session creation lifecycle this check will be completed by `enqueue_session()` function,
+        which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
+        so we have to manually cover this part here.
+        """
+
+        if model_id in extra_mounts:
+            raise InvalidAPIParameters(
+                "Same VFolder appears on both model specification and VFolder mount"
+            )
+
+        requested_mounts = [*extra_mounts.keys()]
+        requested_mount_map: dict[str | uuid.UUID, str] = {
+            folder_id: options.mount_destination
+            for folder_id, options in extra_mounts.items()
+            if options.mount_destination
+        }
+        requested_mount_options: dict[str | uuid.UUID, Any] = {
+            folder_id: {
+                "type": options.type,
+                "permission": options.permission,
+            }
+            for folder_id, options in extra_mounts.items()
+        }
+        log.debug(
+            "requested mounts: {}, mount_map: {}, mount_options: {}",
+            requested_mounts,
+            requested_mount_map,
+            requested_mount_options,
+        )
+        allowed_vfolder_types = await shared_config.get_vfolder_types()
+        vfolder_mounts = await prepare_vfolder_mounts(
+            conn,
+            storage_manager,
+            allowed_vfolder_types,
+            user_scope,
+            resource_policy,
+            requested_mounts,
+            requested_mount_map,
+            requested_mount_options,
+        )
+
+        for vfolder in vfolder_mounts:
+            if vfolder.kernel_path == model_mount_destination:
+                raise InvalidAPIParameters(
+                    "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
+                )
+
+        return vfolder_mounts
+
+    @staticmethod
     async def validate_model_definition(
         storage_manager: StorageSessionManager,
         model_vfolder_row: VFolderRow | Mapping[str, Any],
@@ -572,7 +658,8 @@ class Endpoint(graphene.ObjectType):
     model_mount_destiation = graphene.String(
         deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
     )
-    model_mount_destination = graphene.String(description="Added at 24.03.4")
+    model_mount_destination = graphene.String(description="Added in 24.03.4.")
+    extra_mounts = graphene.List(lambda: VirtualFolderNode, description="Added in 24.03.4.")
     created_user = graphene.UUID(
         deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
@@ -807,6 +894,23 @@ class Endpoint(graphene.ObjectType):
             )
             return VirtualFolderNode.from_row(info, vfolder_row)
 
+    async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
+        if not self.endpoint_id:
+            raise ObjectNotFound(object_name="Endpoint")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            endpoint_row = await EndpointRow.get(sess, uuid.UUID(self.endpoint_id))
+            extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
+            query = (
+                sa.select(VFolderRow)
+                .where(VFolderRow.id.in_(extra_mount_folder_ids))
+                .options(selectinload(VFolderRow.user_row))
+                .options(selectinload(VFolderRow.group_row))
+            )
+            return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
+
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
@@ -838,6 +942,15 @@ class EndpointList(graphene.ObjectType):
     items = graphene.List(Endpoint, required=True)
 
 
+class ExtraMountInput(graphene.InputObjectType):
+    """Added in 24.03.4."""
+
+    vfolder_id = graphene.String()
+    mount_destination = graphene.String()
+    type = graphene.Enum.from_enum(MountTypes)
+    permission = graphene.Enum.from_enum(MountPermission)
+
+
 class ModifyEndpointInput(graphene.InputObjectType):
     resource_slots = graphene.JSONString()
     resource_opts = graphene.JSONString()
@@ -848,6 +961,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     name = graphene.String()
     resource_group = graphene.String()
     open_to_public = graphene.Boolean()
+    extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -940,6 +1054,12 @@ class ModifyEndpoint(graphene.Mutation):
                     endpoint_row.project,
                 )
 
+                def _get_vfolder_id(id_input: str) -> uuid.UUID:
+                    _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
+                    if not raw_vfolder_id:
+                        raw_vfolder_id = id_input
+                    return uuid.UUID(raw_vfolder_id)
+
                 user_scope = UserScope(
                     domain_name=endpoint_row.domain,
                     group_id=endpoint_row.project,
@@ -955,6 +1075,28 @@ class ModifyEndpoint(graphene.Mutation):
                 result = await conn.execute(query)
 
                 resource_policy = result.first()
+                if (
+                    extra_mounts_input := props.extra_mounts
+                ) and extra_mounts_input is not Undefined:
+                    extra_mounts = {
+                        _get_vfolder_id(m.id): MountOptionModel(
+                            mount_destination=m.mount_destination,
+                            type=m.type,
+                            permission=m.permission,
+                        )
+                        for m in extra_mounts_input
+                    }
+                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                        conn,
+                        graph_ctx.shared_config,
+                        graph_ctx.storage_manager,
+                        endpoint_row.model,
+                        endpoint_row.model_mount_destination,
+                        extra_mounts,
+                        user_scope,
+                        resource_policy,
+                    )
+                    endpoint_row.extra_mounts = vfolder_mounts
 
                 await ModelServicePredicateChecker.validate_model_definition(
                     graph_ctx.storage_manager,
