@@ -372,7 +372,7 @@ class Queries(graphene.ObjectType):
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=("Added in 24.03.4."),
+            description=f"Added in 24.03.4. All elements should be values in this ({', '.join([f.value for f in ImageLoadFilter])})",
         ),
     )
 
