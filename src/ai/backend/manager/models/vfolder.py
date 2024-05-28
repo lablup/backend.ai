@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -41,6 +41,7 @@ from ai.backend.common.types import (
 
 from ..api.exceptions import (
     InvalidAPIParameters,
+    ObjectNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -415,6 +416,29 @@ vfolder_permissions = sa.Table(
 class VFolderRow(Base):
     __table__ = vfolders
 
+    endpoints = relationship("EndpointRow", back_populates="model_row")
+    user_row = relationship("UserRow", back_populates="vfolder_row")
+    group_row = relationship("GroupRow", back_populates="vfolder_row")
+
+    @classmethod
+    async def get(
+        cls,
+        session: SASession,
+        id: uuid.UUID,
+        load_user=False,
+        load_group=False,
+    ) -> "VFolderRow":
+        query = sa.select(VFolderRow).where(VFolderRow.id == id)
+        if load_user:
+            query = query.options(selectinload(VFolderRow.user_row))
+        if load_group:
+            query = query.options(selectinload(VFolderRow.group_row))
+
+        result = await session.scalar(query)
+        if not result:
+            raise ObjectNotFound(object_name="VFolder")
+        return result
+
     def __contains__(self, key):
         return key in self.__dir__()
 
@@ -423,6 +447,10 @@ class VFolderRow(Base):
             return getattr(self, item)
         except AttributeError:
             raise KeyError(item)
+
+    @property
+    def vfid(self) -> VFolderID:
+        return VFolderID(self.quota_scope_id, self.id)
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -2377,9 +2405,8 @@ class ModelCard(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = (await db_session.scalars(query)).first()
+            vfolder_row = await VFolderRow.get(db_session, uuid.UUID(vfolder_row_id))
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
