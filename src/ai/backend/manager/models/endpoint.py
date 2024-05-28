@@ -429,8 +429,8 @@ class Endpoint(graphene.ObjectType):
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
-    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
+    image = graphene.String(deprecation_reason="Deprecated since 23.09.9. use `image_object`")
+    image_object = graphene.Field(ImageNode, description="Added in 23.09.9.")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
@@ -439,15 +439,15 @@ class Endpoint(graphene.ObjectType):
     model = graphene.UUID()
     model_mount_destiation = graphene.String()
     created_user = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
-    created_user_email = graphene.String(description="Added at 23.09.8")
-    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    created_user_email = graphene.String(description="Added in 23.09.8.")
+    created_user_id = graphene.UUID(description="Added in 23.09.8.")
     session_owner = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `session_owner_id`"
     )
-    session_owner_email = graphene.String(description="Added at 23.09.8")
-    session_owner_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner_email = graphene.String(description="Added in 23.09.8.")
+    session_owner_id = graphene.UUID(description="Added in 23.09.8.")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -709,7 +709,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added at 23.09.8")
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added in 23.09.8.")
 
     @classmethod
     async def mutate(

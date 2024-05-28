@@ -801,7 +801,7 @@ class ComputeContainer(graphene.ObjectType):
 
     # image
     image = graphene.String(description="Deprecated since 24.03.0; use image_object.name")
-    image_object = graphene.Field(ImageNode, description="Added since 24.03.0")
+    image_object = graphene.Field(ImageNode, description="Added in 24.03.0.")
     architecture = graphene.String()
     registry = graphene.String()
 
