@@ -715,7 +715,6 @@ type VirtualFolderNode implements Node {
   max_files: Int
   max_size: BigInt
   created_at: DateTime
-  modified_at: DateTime
   last_used: DateTime
   num_files: Int
   cur_size: BigInt
