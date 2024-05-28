@@ -889,9 +889,7 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            vfolder_row = await VFolderRow.get(
-                sess, uuid.UUID(self.model), load_user=True, load_group=True
-            )
+            vfolder_row = await VFolderRow.get(sess, self.model, load_user=True, load_group=True)
             return VirtualFolderNode.from_row(info, vfolder_row)
 
     async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
@@ -901,7 +899,7 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            endpoint_row = await EndpointRow.get(sess, uuid.UUID(self.endpoint_id))
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id)
             extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
             query = (
                 sa.select(VFolderRow)
