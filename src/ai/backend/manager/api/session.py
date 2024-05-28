@@ -43,7 +43,11 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+)
 from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
@@ -967,6 +971,36 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
     return web.json_response({}, status=200)
+
+
+class SyncAgentResourceRequestModel(BaseModel):
+    agent_id: AgentId = Field(
+        validation_alias=AliasChoices("agent_id", "agent"),
+        description="Target agent id to sync resource.",
+    )
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@pydantic_params_api_handler(SyncAgentResourceRequestModel)
+async def sync_agent_resource(
+    request: web.Request, params: SyncAgentResourceRequestModel
+) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    agent_id = params.agent_id
+    log.info(
+        "SYNC_AGENT_RESOURCE (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
+    )
+
+    async with root_ctx.db.begin() as db_conn:
+        try:
+            await root_ctx.registry.sync_agent_resource(db_conn, [agent_id])
+        except BackendError:
+            log.exception("SYNC_AGENT_RESOURCE: exception")
+            raise
+        return web.Response(status=204)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -2315,6 +2349,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
+    cors.add(app.router.add_route("POST", "/_/sync-agent-resource", sync_agent_resource))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
