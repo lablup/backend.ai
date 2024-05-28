@@ -237,7 +237,7 @@ type ImageNode implements Node {
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
-  """Added in 24.03.4. The array of aliases."""
+  """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
 }
 
