@@ -978,6 +978,9 @@ class AgentRegistry:
         internal_data = {} if internal_data is None else internal_data
         internal_data.update(dotfile_data)
 
+        if sudo_session_enabled:
+            internal_data["sudo_session_enabled"] = True
+
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
@@ -1967,12 +1970,14 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
+                    session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
-                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                        session_status = cast(SessionStatus, session_row.status)
+                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
                                 kernel.occupied_slots
                             )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                        if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             if kernel.role in PRIVATE_KERNEL_ROLES:
                                 sftp_concurrency_used_per_key[session_row.access_key].add(
                                     session_row.id
@@ -2051,7 +2056,12 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan or not concurrency_used_per_key:
+        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
+        # to set all concurrency_used to 0
+        _do_fullscan = do_fullscan or (
+            not concurrency_used_per_key and not sftp_concurrency_used_per_key
+        )
+        if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
@@ -3810,15 +3820,25 @@ async def handle_route_creation(
                 UserScope(
                     domain_name=endpoint.domain,
                     group_id=group_id,
-                    user_uuid=created_user.uuid,
-                    user_role=created_user.role,
+                    user_uuid=session_owner["uuid"],
+                    user_role=session_owner["role"],
                 ),
                 session_owner["access_key"],
                 resource_policy,
                 SessionTypes.INFERENCE,
                 {
-                    "mounts": [endpoint.model],
-                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "mounts": [endpoint.model, *[m.vfid.folder_id for m in endpoint.extra_mounts]],
+                    "mount_map": {
+                        endpoint.model: endpoint.model_mount_destination,
+                        **{
+                            m.vfid.folder_id: m.kernel_path.as_posix()
+                            for m in endpoint.extra_mounts
+                        },
+                    },
+                    "mount_options": {
+                        m.vfid.folder_id: {"permission": m.mount_perm}
+                        for m in endpoint.extra_mounts
+                    },
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,

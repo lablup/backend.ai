@@ -122,11 +122,6 @@ else
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
-  # Enable sudo
-  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
-    echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
-  fi
-
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
