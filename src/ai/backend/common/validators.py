@@ -690,6 +690,19 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToList(t.List):
+    def check_common(self, value: Any) -> None:
+        return super().check_common(self.check_and_return(value))  # type: ignore[misc]
+
+    def check_and_return(self, value: Any) -> list:
+        try:
+            return list(value)
+        except TypeError:
+            self._failure(
+                f"Cannot parse {type(value)} to list. value must be Iterable", value=value
+            )
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value

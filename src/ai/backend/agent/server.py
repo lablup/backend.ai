@@ -542,7 +542,7 @@ class AgentRPCServer(aobject):
                             kernel_obj.session_id,
                             LifecycleEvent.DESTROY,
                             kernel_obj.termination_reason
-                            or KernelLifecycleEventReason.ALREADY_TERMINATED,
+                            or KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                             suppress_events=False,
                         )
                 elif kernel_id not in running_kernels_from_truth:
@@ -553,7 +553,8 @@ class AgentRPCServer(aobject):
                             kernel_id,
                             kernel_obj.session_id,
                             LifecycleEvent.DESTROY,
-                            kernel_obj.termination_reason or KernelLifecycleEventReason.UNKNOWN,
+                            kernel_obj.termination_reason
+                            or KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                             suppress_events=True,
                         )
 

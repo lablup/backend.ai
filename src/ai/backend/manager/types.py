@@ -64,4 +64,6 @@ class AgentResourceSyncTrigger(enum.StrEnum):
     ON_CREATION_FAILURE = "on-creation-failure"
 
 
-DEFAULT_AGENT_RESOURE_SYNC_TRIGGERS: list[AgentResourceSyncTrigger] = []
+DEFAULT_AGENT_RESOURE_SYNC_TRIGGERS: list[AgentResourceSyncTrigger] = [
+    AgentResourceSyncTrigger.ON_CREATION_FAILURE
+]
