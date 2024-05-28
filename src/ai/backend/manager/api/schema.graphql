@@ -947,6 +947,8 @@ type QuotaDetails {
   usage_bytes: BigInt
   usage_count: BigInt
   hard_limit_bytes: BigInt
+
+  """Added in 24.09.0. Limitation of the number of inodes."""
   hard_limit_inodes: BigInt
 }
 
@@ -1715,6 +1717,8 @@ type SetQuotaScope {
 
 input QuotaScopeInput {
   hard_limit_bytes: BigInt
+
+  """Added in 24.09.0. Limitation of the number of inodes."""
   hard_limit_inodes: BigInt
 }
 
