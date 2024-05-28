@@ -228,7 +228,7 @@ def update(
 @click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name: str) -> None:
     """
-    Inactive an existing domain.
+    Deletes an existing domain. This action only deletes the primary record and might leave behind some associated data or metadata that can be manually cleaned up or ignored. Ideal for removing items that may be re-created or restored.
 
     NAME: Name of a domain to inactive.
     """
@@ -262,7 +262,7 @@ def delete(ctx: CLIContext, name: str) -> None:
 @click.argument("name", type=str, metavar="NAME")
 def purge(ctx: CLIContext, name: str) -> None:
     """
-    Delete an existing domain.
+    Purges an existing domain. This action is irreversible and should be used when you need to ensure that no trace of the resource remains.
 
     NAME: Name of a domain to delete.
     """

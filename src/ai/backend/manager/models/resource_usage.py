@@ -267,10 +267,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             session_row=usage_group.session_row,
             kernel_row=usage_group.kernel_row,
             agent=usage_group.kernel_row.agent,
-            **{
-                **usage_group.to_map(),
-                "total_usage": ResourceUsage(),
-            },
+            **usage_group.to_map(),
         )
 
     def register_resource_group(
