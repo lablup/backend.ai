@@ -3818,7 +3818,7 @@ async def handle_route_creation(
                 SessionTypes.INFERENCE,
                 {
                     "mounts": [endpoint.model],
-                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "mount_map": {endpoint.model: endpoint.model_mount_destination},
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,
