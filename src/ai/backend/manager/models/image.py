@@ -657,14 +657,11 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         filters: set[ImageLoadFilter] = set(),
-        user_role: UserRole | None = None,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item
-            async for item in cls.bulk_load(ctx, rows)
-            if item.matches_filter(ctx, filters, user_role)
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
         ]
 
         return items
@@ -696,8 +693,8 @@ class Image(graphene.ObjectType):
         self,
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
-        user_role: UserRole | None = None,
     ) -> bool:
+        user_role = ctx.user["role"]
         if ImageLoadFilter.INSTALLED in filters and not self.installed:
             return False
 
