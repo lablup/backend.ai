@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Annotated, Protocol
 
 import attr
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+from ai.backend.common.types import MountPermission, MountTypes
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -41,3 +44,15 @@ class UserScope:
 
 class DistributedLockFactory(Protocol):
     def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock: ...
+
+
+class MountOptionModel(BaseModel):
+    mount_destination: Annotated[
+        str | None,
+        Field(description="Mount destination, defaults to /home/work/{folder_name}.", default=None),
+    ]
+    type: Annotated[MountTypes, Field(default=MountTypes.BIND)]
+    permission: Annotated[
+        MountPermission | None,
+        Field(validation_alias=AliasChoices("permission", "perm"), default=None),
+    ]

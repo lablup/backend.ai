@@ -5,7 +5,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -47,6 +47,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ImageAlias,
     SessionTypes,
+    VFolderMount,
     VFolderUsageMode,
 )
 
@@ -62,13 +63,14 @@ from ..models import (
     RouteStatus,
     RoutingRow,
     SessionRow,
+    UserRole,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
-from ..types import UserScope
+from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -191,6 +193,11 @@ class RouteInfoModel(BaseModel):
 
 class ServeInfoModel(BaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    model_id: Annotated[uuid.UUID, Field(description="ID of model VFolder.")]
+    extra_mounts: Annotated[
+        Sequence[uuid.UUID],
+        Field(description="List of extra VFolders which will be mounted to model service session."),
+    ]
     name: str = Field(description="Name of the model service.")
     desired_session_count: NonNegativeInt = Field(
         description="Number of identical inference sessions."
@@ -236,6 +243,8 @@ async def get_info(request: web.Request) -> ServeInfoModel:
 
     return ServeInfoModel(
         endpoint_id=endpoint.id,
+        model_id=endpoint.model,
+        extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=endpoint.name,
         desired_session_count=endpoint.desired_session_count,
         active_routes=[
@@ -262,6 +271,15 @@ class ServiceConfigModel(BaseModel):
             "Mount destination for the model VFolder will be mounted inside the inference session"
         ),
     )
+
+    extra_mounts: Annotated[
+        dict[uuid.UUID, MountOptionModel],
+        Field(
+            description="Specifications about extra VFolders mounted to model service session",
+            default={},
+        ),
+    ]
+
     environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
@@ -344,9 +362,11 @@ class ValidationResult:
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
+    owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict
     scaling_group: str
+    extra_mounts: Sequence[VFolderMount]
 
 
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
@@ -420,6 +440,22 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
         model_id = folder_row["id"]
 
+        vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+            conn,
+            root_ctx.shared_config,
+            root_ctx.storage_manager,
+            model_id,
+            params.config.model_mount_destination,
+            params.config.extra_mounts,
+            UserScope(
+                domain_name=params.domain,
+                group_id=group_id,
+                user_uuid=owner_uuid,
+                user_role=owner_role,
+            ),
+            resource_policy,
+        )
+
     await ModelServicePredicateChecker.validate_model_definition(
         root_ctx.storage_manager,
         folder_row,
@@ -430,9 +466,11 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         requester_access_key,
         owner_access_key,
         owner_uuid,
+        owner_role,
         group_id,
         resource_policy,
         checked_scaling_group,
+        vfolder_mounts,
     )
 
 
@@ -458,8 +496,16 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         )
 
     creation_config = params.config.model_dump()
+    creation_config["mounts"] = [
+        validation_result.model_id,
+        *[m.vfid.folder_id for m in validation_result.extra_mounts],
+    ]
     creation_config["mount_map"] = {
-        validation_result.model_id: params.config.model_mount_destination
+        validation_result.model_id: params.config.model_mount_destination,
+        **{m.vfid.folder_id: m.kernel_path.as_posix() for m in validation_result.extra_mounts},
+    }
+    creation_config["mount_options"] = {
+        m.vfid.folder_id: {"permission": m.mount_perm} for m in validation_result.extra_mounts
     }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
@@ -471,8 +517,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         UserScope(
             domain_name=params.domain,
             group_id=validation_result.group_id,
-            user_uuid=request["user"]["uuid"],
-            user_role=request["user"]["role"],
+            user_uuid=validation_result.owner_uuid,
+            user_role=validation_result.owner_role,
         ),
         validation_result.owner_access_key,
         validation_result.resource_policy,
@@ -516,6 +562,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.config.resources,
             params.cluster_mode,
             params.cluster_size,
+            validation_result.extra_mounts,
             model_mount_destination=params.config.model_mount_destination,
             tag=params.tag,
             startup_command=params.startup_command,
@@ -531,6 +578,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
 
     return ServeInfoModel(
         endpoint_id=endpoint_id,
+        model_id=endpoint.model,
+        extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=params.service_name,
         desired_session_count=params.desired_session_count,
         active_routes=[],
@@ -588,9 +637,16 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             validation_result.resource_policy,
             SessionTypes.INFERENCE,
             {
-                "mounts": [validation_result.model_id],
+                "mounts": [
+                    validation_result.model_id,
+                    *[m.vfid for m in validation_result.extra_mounts],
+                ],
                 "mount_map": {
-                    validation_result.model_id: creation_config["model_mount_destination"]
+                    validation_result.model_id: params.config.model_mount_destination,
+                    **{m.vfid: m.kernel_path for m in validation_result.extra_mounts},
+                },
+                "mount_options": {
+                    m.vfid: {"permission": m.mount_perm} for m in validation_result.extra_mounts
                 },
                 "environ": creation_config["environ"],
                 "scaling_group": validation_result.scaling_group,
