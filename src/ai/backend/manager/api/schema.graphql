@@ -1795,4 +1795,6 @@ input ImageRefType {
 input ExtraMountInput {
   vfolder_id: String
   mount_destination: String
+  type: String
+  permission: String
 }
