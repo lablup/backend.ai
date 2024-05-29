@@ -68,10 +68,10 @@ from ..defs import (
 from ..types import UserScope
 from .acl import (
     AbstractACLPermission,
-    AbstractScopePermissionMap,
-    AbstractScopePermissionMapFactory,
-    RequestedScope,
-    RequesterContext,
+    AbstractACLPermissionContext,
+    AbstractACLPermissionContextBuilder,
+    BaseACLScope,
+    ClientContext,
 )
 from .base import (
     GUID,
@@ -139,8 +139,8 @@ __all__: Sequence[str] = (
     "get_vfolders",
     "VFolderACLObject",
     "OWNER_PERMISSIONS",
-    "ScopePermissionMap",
-    "ScopePermissionMapFactory",
+    "ACLPermissionContext",
+    "ACLPermissionContextBuilder",
 )
 
 
@@ -774,27 +774,9 @@ PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderAC
 
 
 @dataclass
-class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolderRow]):
-    additional: Mapping[
-        uuid.UUID, frozenset[VFolderACLPermission]
-    ]  # Key: vfolder id / Value: set of VFolderACLPermissions
-    overridden: Mapping[
-        uuid.UUID, frozenset[VFolderACLPermission]
-    ]  # Key: vfolder id / Value: set of VFolderACLPermissions
-
-    def apply_permission_filter(self, permission_to_include: VFolderACLPermission) -> None:
-        super().apply_permission_filter(permission_to_include)
-        self.additional = {
-            vfid: permissions
-            for vfid, permissions in self.additional.items()
-            if permission_to_include in permissions
-        }
-        self.overridden = {
-            vfid: permissions
-            for vfid, permissions in self.overridden.items()
-            if permission_to_include in permissions
-        }
-
+class ACLPermissionContext(
+    AbstractACLPermissionContext[VFolderACLPermission, VFolderRow, uuid.UUID]
+):
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -824,10 +806,13 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
             return None
         return sa.select(VFolderRow).where(cond)
 
-    async def determine_permission(self, acl_obj: VFolderRow) -> frozenset[VFolderACLPermission]:
+    async def determine_permission_on_obj(
+        self, acl_obj: VFolderRow
+    ) -> frozenset[VFolderACLPermission]:
         vfolder_row = acl_obj
-        if (vfolder_id := acl_obj.id) in self.overridden:
-            return self.overridden[vfolder_id]
+        vfolder_id = cast(uuid.UUID, acl_obj.id)
+        if (overriden_perm := self.overridden.get(vfolder_id)) is not None:
+            return overriden_perm
         permissions: set[VFolderACLPermission] = set()
         permissions |= self.additional.get(vfolder_id, set())
         permissions |= self.user.get(vfolder_row.user, set())
@@ -836,14 +821,16 @@ class ScopePermissionMap(AbstractScopePermissionMap[VFolderACLPermission, VFolde
         return frozenset(permissions)
 
 
-class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissionMap]):
+class ACLPermissionContextBuilder(
+    AbstractACLPermissionContextBuilder[VFolderACLPermission, ACLPermissionContext]
+):
     @classmethod
     async def _build_in_user_scope(
         cls,
         db_session: SASession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         user_id: uuid.UUID,
-    ) -> ScopePermissionMap:
+    ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
@@ -911,7 +898,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                     )
                     user_row = cast(UserRow, await db_session.scalar(user_domain_stmt))
                     if user_row.domain_name != ctx.domain_name:
-                        return ScopePermissionMap(
+                        return ACLPermissionContext(
                             user=user,
                             project=project,
                             domain=domain,
@@ -953,7 +940,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                     user = {ctx.user_id: OWNER_PERMISSIONS}
             case UserRole.MONITOR:
                 raise RuntimeError("Moditor users cannot fetch vfolders")
-        return ScopePermissionMap(
+        return ACLPermissionContext(
             user=user,
             project=project,
             domain=domain,
@@ -965,9 +952,9 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
     async def _build_in_project_scope(
         cls,
         db_session: SASession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         project_id: uuid.UUID,
-    ) -> ScopePermissionMap:
+    ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
@@ -1063,7 +1050,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                     pass
             case UserRole.MONITOR:
                 raise RuntimeError("Moditor users cannot fetch vfolders")
-        return ScopePermissionMap(
+        return ACLPermissionContext(
             user=user,
             project=project,
             domain=domain,
@@ -1075,9 +1062,9 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
     async def _build_in_domain_scope(
         cls,
         db_session: SASession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         domain_name: str,
-    ) -> ScopePermissionMap:
+    ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
@@ -1094,7 +1081,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                     ])
                 }
                 if ctx.domain_name != domain_name:
-                    return ScopePermissionMap(
+                    return ACLPermissionContext(
                         user=user,
                         project=project,
                         domain=domain,
@@ -1121,7 +1108,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
             case UserRole.ADMIN:
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
-                    return ScopePermissionMap(
+                    return ACLPermissionContext(
                         user=user,
                         project=project,
                         domain=domain,
@@ -1158,7 +1145,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
             case UserRole.USER:
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
-                    return ScopePermissionMap(
+                    return ACLPermissionContext(
                         user=user,
                         project=project,
                         domain=domain,
@@ -1189,7 +1176,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
 
             case UserRole.MONITOR:
                 raise RuntimeError("Moditor users cannot fetch vfolders")
-        return ScopePermissionMap(
+        return ACLPermissionContext(
             user=user,
             project=project,
             domain=domain,
@@ -1204,8 +1191,8 @@ class VFolderACLObject(NamedTuple):
 
 
 async def get_vfolders(
-    ctx: RequesterContext,
-    requested_scope: RequestedScope,
+    ctx: ClientContext,
+    target_scope: BaseACLScope,
     requested_permission: VFolderACLPermission | None = None,
     *,
     vfolder_id: uuid.UUID | None = None,
@@ -1215,10 +1202,10 @@ async def get_vfolders(
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
     async with SASession(ctx.db_conn) as db_session:
-        scope_ctx = await ScopePermissionMapFactory.build(db_session, ctx, requested_scope)
-        if requested_permission is not None:
-            scope_ctx.apply_permission_filter(requested_permission)
-        stmt = scope_ctx.query_stmt
+        permission_ctx = await ACLPermissionContextBuilder.build(
+            db_session, ctx, target_scope, permission=requested_permission
+        )
+        stmt = permission_ctx.query_stmt
         if stmt is None:
             return []
         if vfolder_id is not None:
@@ -1234,7 +1221,8 @@ async def get_vfolders(
 
         result: list[VFolderACLObject] = []
         for row in await db_session.scalars(stmt):
-            permissions = await scope_ctx.determine_permission(row)
+            row = cast(VFolderRow, row)
+            permissions = await permission_ctx.determine_permission_on_obj(row)
             result.append(VFolderACLObject(row, permissions))
         return result
 

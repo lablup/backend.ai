@@ -34,7 +34,7 @@ ACLPermissionType = TypeVar("ACLPermissionType", bound=AbstractACLPermission)
 
 
 @dataclass
-class RequesterContext:
+class ClientContext:
     db_conn: AsyncConnection
 
     domain_name: str
@@ -72,35 +72,54 @@ class RequesterContext:
         return self.project_ctx
 
 
-class RequestedScope:
+class BaseACLScope:
     pass
 
 
 @dataclass(frozen=True)
-class RequestedDomainScope(RequestedScope):
+class DomainScope(BaseACLScope):
     domain_name: str
 
 
 @dataclass(frozen=True)
-class RequestedProjectScope(RequestedScope):
+class ProjectScope(BaseACLScope):
     project_id: uuid.UUID
 
 
 @dataclass(frozen=True)
-class RequestedUserScope(RequestedScope):
+class UserScope(BaseACLScope):
     user_id: uuid.UUID
 
 
 ACLObjectType = TypeVar("ACLObjectType")
+ACLObjectIDType = TypeVar("ACLObjectIDType")
 
 
 @dataclass
-class AbstractScopePermissionMap(Generic[ACLPermissionType, ACLObjectType], metaclass=ABCMeta):
+class AbstractACLPermissionContext(
+    Generic[ACLPermissionType, ACLObjectType, ACLObjectIDType], metaclass=ABCMeta
+):
+    """
+    Each field of this class represents a mapping of "accessible scope id" and "permissions under the scope".
+    For example, `project` field has a mapping of "accessible project id" and "permissions under the project"
+    {
+        "PROJECT_A_ID": {"READ", "WRITE", "DELETE"}
+        "PROJECT_B_ID": {"READ"}
+    }
+
+    `additional` and `overridden` fields have a mapping of "ACL object id" and "permissions applied to the object".
+    `additional` field can be used to add permissions for admins.
+    `overridden` field can be used to address exceptional cases such as permission overriding or other scopes(scaling groups or storage hosts etc).
+    """
+
     user: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
     project: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
     domain: Mapping[str, frozenset[ACLPermissionType]]
 
-    def apply_permission_filter(self, permission_to_include: ACLPermissionType) -> None:
+    additional: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
+    overridden: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
+
+    def filter_by_permission(self, permission_to_include: ACLPermissionType) -> None:
         self.user = {
             uid: permissions
             for uid, permissions in self.user.items()
@@ -116,44 +135,65 @@ class AbstractScopePermissionMap(Generic[ACLPermissionType, ACLObjectType], meta
             for dname, permissions in self.domain.items()
             if permission_to_include in permissions
         }
+        self.additional = {
+            obj_id: permissions
+            for obj_id, permissions in self.additional.items()
+            if permission_to_include in permissions
+        }
+        self.overridden = {
+            obj_id: permissions
+            for obj_id, permissions in self.overridden.items()
+            if permission_to_include in permissions
+        }
 
     @abstractmethod
-    async def determine_permission(self, acl_obj: ACLObjectType) -> frozenset[ACLPermissionType]:
+    async def determine_permission_on_obj(
+        self, acl_obj: ACLObjectType
+    ) -> frozenset[ACLPermissionType]:
+        """
+        Determine permissions applied to the ACL object based on the fields this class has.
+        """
         pass
 
 
-ScopePermissionMapType = TypeVar("ScopePermissionMapType", bound=AbstractScopePermissionMap)
+ACLPermissionSetterType = TypeVar("ACLPermissionSetterType", bound=AbstractACLPermissionContext)
 
 
-class AbstractScopePermissionMapFactory(Generic[ScopePermissionMapType], metaclass=ABCMeta):
+class AbstractACLPermissionContextBuilder(
+    Generic[ACLPermissionType, ACLPermissionSetterType], metaclass=ABCMeta
+):
     @classmethod
     async def build(
         cls,
         db_session: AsyncSession,
-        ctx: RequesterContext,
-        requested_scope: RequestedScope,
-    ) -> ScopePermissionMapType:
-        match requested_scope:
-            case RequestedUserScope(user_id=user_id):
+        ctx: ClientContext,
+        target_scope: BaseACLScope,
+        *,
+        permission: ACLPermissionType | None = None,
+    ) -> ACLPermissionSetterType:
+        match target_scope:
+            case UserScope(user_id=user_id):
                 result = await cls._build_in_user_scope(
                     db_session,
                     ctx,
                     user_id,
                 )
-            case RequestedProjectScope(project_id=project_id):
+            case ProjectScope(project_id=project_id):
                 result = await cls._build_in_project_scope(
                     db_session,
                     ctx,
                     project_id,
                 )
-            case RequestedDomainScope(domain_name=domain_name):
+            case DomainScope(domain_name=domain_name):
                 result = await cls._build_in_domain_scope(
                     db_session,
                     ctx,
                     domain_name,
                 )
             case _:
-                raise RuntimeError(f"invalid request scope {requested_scope}")
+                raise RuntimeError(f"invalid ACL scope `{target_scope}`")
+        if permission is not None:
+            result.filter_by_permission(permission)
         return result
 
     @classmethod
@@ -161,9 +201,9 @@ class AbstractScopePermissionMapFactory(Generic[ScopePermissionMapType], metacla
     async def _build_in_user_scope(
         cls,
         db_session: AsyncSession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         user_id: uuid.UUID,
-    ) -> ScopePermissionMapType:
+    ) -> ACLPermissionSetterType:
         pass
 
     @classmethod
@@ -171,9 +211,9 @@ class AbstractScopePermissionMapFactory(Generic[ScopePermissionMapType], metacla
     async def _build_in_project_scope(
         cls,
         db_session: AsyncSession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         project_id: uuid.UUID,
-    ) -> ScopePermissionMapType:
+    ) -> ACLPermissionSetterType:
         pass
 
     @classmethod
@@ -181,9 +221,9 @@ class AbstractScopePermissionMapFactory(Generic[ScopePermissionMapType], metacla
     async def _build_in_domain_scope(
         cls,
         db_session: AsyncSession,
-        ctx: RequesterContext,
+        ctx: ClientContext,
         domain_name: str,
-    ) -> ScopePermissionMapType:
+    ) -> ACLPermissionSetterType:
         pass
 
 
