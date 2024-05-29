@@ -1114,9 +1114,7 @@ class ModifyEndpoint(graphene.Mutation):
                 result = await conn.execute(query)
 
                 resource_policy = result.first()
-                if (
-                    extra_mounts_input := props.extra_mounts
-                ) and extra_mounts_input is not Undefined:
+                if (extra_mounts_input := props.extra_mounts) is not Undefined:
                     extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
                         _get_vfolder_id(m.vfolder_id): MountOptionModel(
