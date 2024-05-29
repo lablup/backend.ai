@@ -51,7 +51,7 @@ type Queries {
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
 
     """
-    Added in 24.03.4. All elements should be values in this (operational, customized, own_customized)
+    Added in 24.03.4. All elements should be values in this (operational, customized)
     """
     image_filters: [String] = null
   ): [Image]
