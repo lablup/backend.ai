@@ -700,9 +700,13 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.03.4."""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  row_id: UUID
   host: String
   quota_scope_id: String
   name: String
