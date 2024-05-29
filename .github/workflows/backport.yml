@@ -121,6 +121,8 @@ jobs:
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ needs.backport-target-branch.outputs.author }}
+      - run: |
+          gh pr view ${{ needs.backport-target-branch.outputs.pr_number }} --json labels | jq -r '.labels[].name' | xargs -I {} gh pr edit ${{ steps.pr.outputs.pull-request-number }} --add-label {}
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='
