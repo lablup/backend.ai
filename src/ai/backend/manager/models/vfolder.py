@@ -1727,6 +1727,7 @@ class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID()  # DB row id
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
@@ -1822,6 +1823,7 @@ class VirtualFolderNode(graphene.ObjectType):
     def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             host=row.host,
             quota_scope_id=row.quota_scope_id,
             name=row.name,
