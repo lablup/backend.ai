@@ -86,7 +86,6 @@ __all__ = (
 class ImageLoadFilter(enum.StrEnum):
     OPERATIONAL = "operational"
     CUSTOMIZED = "customized"
-    OWN_CUSTOMIZED = "own_customized"
 
 
 async def rescan_images(
@@ -657,11 +656,14 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         filters: set[ImageLoadFilter] = set(),
+        owned_only: bool = False,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+            item
+            async for item in cls.bulk_load(ctx, rows)
+            if item.matches_filter(ctx, filters, owned_only=owned_only)
         ]
 
         return items
@@ -693,6 +695,8 @@ class Image(graphene.ObjectType):
         self,
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
+        *,
+        owned_only: bool = False,
     ) -> bool:
         user_role = ctx.user["role"]
 
@@ -702,18 +706,15 @@ class Image(graphene.ObjectType):
                 case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if ImageLoadFilter.OWN_CUSTOMIZED in filters:
-                        if label.value != f"user:{ctx.user['uuid']}":
+                    if label.value != f"user:{ctx.user['uuid']}":
+                        if owned_only:
                             return False
-                    else:
-                        if user_role != UserRole.SUPERADMIN:
-                            if label.value != f"user:{ctx.user['uuid']}":
+                        else:
+                            if user_role != UserRole.SUPERADMIN:
                                 return False
                     is_customized_image = True
 
-        if not is_customized_image and (
-            ImageLoadFilter.CUSTOMIZED in filters or ImageLoadFilter.OWN_CUSTOMIZED in filters
-        ):
+        if not is_customized_image and ImageLoadFilter.CUSTOMIZED in filters:
             return False
 
         return True
