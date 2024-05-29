@@ -450,12 +450,10 @@ class VFolderPermissionRow(Base):
 
 class VFolderRow(Base):
     __table__ = vfolders
-    user_row = relationship("UserRow", back_populates="vfolders")
-    project_row = relationship("GroupRow", back_populates="vfolders")
 
     endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship("UserRow", back_populates="vfolder_row")
-    group_row = relationship("GroupRow", back_populates="vfolder_row")
+    user_row = relationship("UserRow", back_populates="vfolder_rows")
+    group_row = relationship("GroupRow", back_populates="vfolder_rows")
 
     @classmethod
     async def get(
