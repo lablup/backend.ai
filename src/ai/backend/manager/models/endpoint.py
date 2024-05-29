@@ -982,8 +982,12 @@ class ExtraMountInput(graphene.InputObjectType):
 
     vfolder_id = graphene.String()
     mount_destination = graphene.String()
-    type = graphene.String()
-    permission = graphene.String()
+    type = graphene.String(
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+    )
+    permission = graphene.String(
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
+    )
 
 
 class ModifyEndpointInput(graphene.InputObjectType):
@@ -1118,13 +1122,17 @@ class ModifyEndpoint(graphene.Mutation):
                     extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
                         _get_vfolder_id(m.vfolder_id): MountOptionModel(
-                            mount_destination=m.mount_destination
-                            if m.mount_destination is not Undefined
-                            else None,
+                            mount_destination=(
+                                m.mount_destination
+                                if m.mount_destination is not Undefined
+                                else None
+                            ),
                             type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
-                            permission=MountPermission(m.permission)
-                            if m.permission is not Undefined
-                            else None,
+                            permission=(
+                                MountPermission(m.permission)
+                                if m.permission is not Undefined
+                                else None
+                            ),
                         )
                         for m in extra_mounts_input
                     }
