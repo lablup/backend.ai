@@ -13,7 +13,6 @@ from typing import (
     Any,
     Final,
     List,
-    Mapping,
     NamedTuple,
     Optional,
     Sequence,
