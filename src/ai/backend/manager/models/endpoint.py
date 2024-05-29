@@ -3,7 +3,7 @@ import logging
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
 
 import graphene
 import jwt
@@ -1117,8 +1117,9 @@ class ModifyEndpoint(graphene.Mutation):
                 if (
                     extra_mounts_input := props.extra_mounts
                 ) and extra_mounts_input is not Undefined:
+                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
-                        _get_vfolder_id(m.id): MountOptionModel(
+                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
                             mount_destination=m.mount_destination,
                             type=m.type,
                             permission=m.permission,
