@@ -1120,9 +1120,11 @@ class ModifyEndpoint(graphene.Mutation):
                     extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
                         _get_vfolder_id(m.vfolder_id): MountOptionModel(
-                            mount_destination=m.mount_destination,
-                            type=m.type,
-                            permission=m.permission,
+                            mount_destination=m.mount_destination
+                            if m.mount_destination is not Undefined
+                            else None,
+                            type=m.type if m.type is not Undefined else MountTypes.BIND,
+                            permission=m.permission if m.permission is not Undefined else None,
                         )
                         for m in extra_mounts_input
                     }
