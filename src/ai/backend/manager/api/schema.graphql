@@ -1795,6 +1795,14 @@ input ImageRefType {
 input ExtraMountInput {
   vfolder_id: String
   mount_destination: String
+
+  """
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  """
   type: String
+
+  """
+  Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
+  """
   permission: String
 }
