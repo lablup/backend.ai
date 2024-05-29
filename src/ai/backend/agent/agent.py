@@ -1084,6 +1084,10 @@ class AbstractAgent(
                         await kernel_obj.close()
                 finally:
                     self.terminating_kernels.discard(ev.kernel_id)
+                    try:
+                        del self.kernel_registry[ev.kernel_id]
+                    except KeyError:
+                        pass
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
