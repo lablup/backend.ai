@@ -86,6 +86,7 @@ __all__ = (
 class ImageLoadFilter(enum.StrEnum):
     OPERATIONAL = "operational"
     CUSTOMIZED = "customized"
+    OWN_CUSTOMIZED = "own_customized"
 
 
 async def rescan_images(
@@ -701,12 +702,18 @@ class Image(graphene.ObjectType):
                 case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if user_role != UserRole.SUPERADMIN:
+                    if ImageLoadFilter.OWN_CUSTOMIZED in filters:
                         if label.value != f"user:{ctx.user['uuid']}":
                             return False
+                    else:
+                        if user_role != UserRole.SUPERADMIN:
+                            if label.value != f"user:{ctx.user['uuid']}":
+                                return False
                     is_customized_image = True
 
-        if not is_customized_image and ImageLoadFilter.CUSTOMIZED in filters:
+        if not is_customized_image and (
+            ImageLoadFilter.CUSTOMIZED in filters or ImageLoadFilter.OWN_CUSTOMIZED in filters
+        ):
             return False
 
         return True
