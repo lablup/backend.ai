@@ -49,14 +49,22 @@ class RequesterContext:
                 role_in_project = UserRoleInProject.ADMIN
             else:
                 role_in_project = UserRoleInProject.USER
-            stmt = (
-                sa.select(AssocGroupUserRow)
-                .select_from(sa.join(AssocGroupUserRow, GroupRow))
-                .where(
-                    (AssocGroupUserRow.user_id == self.user_id)
-                    & (GroupRow.domain_name == self.domain_name)
+
+            if self.user_role == UserRole.SUPERADMIN:
+                stmt = (
+                    sa.select(AssocGroupUserRow)
+                    .select_from(AssocGroupUserRow)
+                    .where(AssocGroupUserRow.user_id == self.user_id)
                 )
-            )
+            else:
+                stmt = (
+                    sa.select(AssocGroupUserRow)
+                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
+                    .where(
+                        (AssocGroupUserRow.user_id == self.user_id)
+                        & (GroupRow.domain_name == self.domain_name)
+                    )
+                )
             async with AsyncSession(self.db_conn) as db_session:
                 self.project_ctx = {
                     row.group_id: role_in_project for row in await db_session.scalars(stmt)

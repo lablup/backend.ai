@@ -90,11 +90,11 @@ from .base import (
     metadata,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from .group import AssocGroupUserRow, GroupRow, ProjectType, UserRoleInProject
+from .group import GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .user import UserRole
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
@@ -903,6 +903,21 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
 
                     user = {user_id: OWNER_PERMISSIONS}
                 else:
+                    # domain admins cannot access to users in another domain
+                    user_domain_stmt = (
+                        sa.select(UserRow)
+                        .where(UserRow.uuid == user_id)
+                        .options(load_only(UserRow.domain_name))
+                    )
+                    user_row = cast(UserRow, await db_session.scalar(user_domain_stmt))
+                    if user_row.domain_name != ctx.domain_name:
+                        return ScopePermissionMap(
+                            user=user,
+                            project=project,
+                            domain=domain,
+                            additional=additional,
+                            overridden=overridden,
+                        )
                     additional_stmt = (
                         sa.select(VFolderPermissionRow)
                         .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -963,13 +978,9 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
         role_in_project = project_ctx.get(project_id)
         match ctx.user_role:
             case UserRole.SUPERADMIN:
+                # superadmins have an owner permissions to any project folders in any domain
+                project = {project_id: OWNER_PERMISSIONS}
                 if role_in_project is not None:
-                    project = {
-                        project_id: OWNER_PERMISSIONS
-                        if role_in_project == UserRoleInProject.ADMIN
-                        else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
-                    }
-
                     # Admin/user is associated with the project, fetch owned/invited vfolders
                     additional_stmt = (
                         sa.select(VFolderPermissionRow)
@@ -989,17 +1000,11 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                     }
 
                     user = {ctx.user_id: OWNER_PERMISSIONS}
-                else:
-                    # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
-                    project = {
-                        project_id: DEFAULT_ADMIN_PERMISSIONS_ON_UNASSOCIATED_PROJECT_VFOLDERS,
-                    }
             case UserRole.ADMIN:
                 if role_in_project is not None:
+                    # domain admins have an owner permissions to any project folders in the same domain
                     project = {
-                        project_id: OWNER_PERMISSIONS
-                        if role_in_project == UserRoleInProject.ADMIN
-                        else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
+                        project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
                     }
 
                     # Admin/user is associated with the project, fetch owned/invited vfolders
@@ -1024,7 +1029,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                 else:
                     # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
                     project = {
-                        project_id: DEFAULT_ADMIN_PERMISSIONS_ON_UNASSOCIATED_PROJECT_VFOLDERS,
+                        project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
                     }
             case UserRole.USER:
                 if role_in_project is not None:
@@ -1080,6 +1085,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
         overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         match ctx.user_role:
             case UserRole.SUPERADMIN:
+                # superadmins have these permissions to any folders in any domain by default
                 domain = {
                     domain_name: frozenset([
                         VFolderACLPermission.READ_ATTRIBUTE,
@@ -1096,12 +1102,8 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                         overridden=overridden,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
-                project = {
-                    project_id: OWNER_PERMISSIONS
-                    if role == UserRoleInProject.ADMIN
-                    else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
-                    for project_id, role in project_ctx.items()
-                }
+                # superadmins have an owner permissions to any project folders in the same domain
+                project = {project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()}
                 additional_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1116,19 +1118,6 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                 }
 
                 user = {ctx.user_id: OWNER_PERMISSIONS}
-
-                project_stmt = (
-                    sa.select(AssocGroupUserRow)
-                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
-                    .where(
-                        (AssocGroupUserRow.user_id == ctx.user_id)
-                        & (GroupRow.domain_name == domain_name)
-                    )
-                )
-                project = {
-                    row.group_id: OWNER_PERMISSIONS
-                    for row in await db_session.scalars(project_stmt)
-                }
             case UserRole.ADMIN:
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
@@ -1140,12 +1129,9 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
                         overridden=overridden,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
-                project = {
-                    project_id: OWNER_PERMISSIONS
-                    if role == UserRoleInProject.ADMIN
-                    else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
-                    for project_id, role in project_ctx.items()
-                }
+
+                # domain admins have an owner permissions to any project folders in the same domain
+                project = {project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()}
                 additional_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1161,19 +1147,7 @@ class ScopePermissionMapFactory(AbstractScopePermissionMapFactory[ScopePermissio
 
                 user = {ctx.user_id: OWNER_PERMISSIONS}
 
-                project_stmt = (
-                    sa.select(AssocGroupUserRow)
-                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
-                    .where(
-                        (AssocGroupUserRow.user_id == ctx.user_id)
-                        & (GroupRow.domain_name == domain_name)
-                    )
-                )
-                project = {
-                    row.group_id: OWNER_PERMISSIONS
-                    for row in await db_session.scalars(project_stmt)
-                }
-
+                # domain admins default permissions for folders in the same domain
                 domain = {
                     domain_name: frozenset([
                         VFolderACLPermission.READ_ATTRIBUTE,
