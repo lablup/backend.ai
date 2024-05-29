@@ -1830,7 +1830,7 @@ class VirtualFolderNode(graphene.ObjectType):
             name=row.name,
             user=row.user,
             user_email=row.user_row.email if row.user_row else None,
-            group=row.group_row.id,
+            group=row.group_row.id if row.group_row else None,
             group_name=row.group_row.name if row.group_row else None,
             creator=row.creator,
             unmanaged_path=row.unmanaged_path,
