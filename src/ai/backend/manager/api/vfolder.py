@@ -34,11 +34,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    Field,
-)
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -119,12 +115,7 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
-from .utils import (
-    BaseResponseModel,
-    check_api_params,
-    get_user_scopes,
-    pydantic_params_api_handler,
-)
+from .utils import BaseResponseModel, check_api_params, get_user_scopes, pydantic_params_api_handler
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -663,7 +654,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
         for entry in entries:
             resp.append({
                 "name": entry["name"],
-                "id": entry["id"].hex,
+                "id": str(entry["id"]),
                 "quota_scope_id": str(entry["quota_scope_id"]),
                 "host": entry["host"],
                 "status": entry["status"],
