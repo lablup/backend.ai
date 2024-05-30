@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar, final
 
 import graphene
 import sqlalchemy as sa
@@ -26,11 +26,11 @@ __all__: Sequence[str] = (
 )
 
 
-class AbstractACLPermission(enum.StrEnum):
+class BaseACLPermission(enum.StrEnum):
     pass
 
 
-ACLPermissionType = TypeVar("ACLPermissionType", bound=AbstractACLPermission)
+ACLPermissionType = TypeVar("ACLPermissionType", bound=BaseACLPermission)
 
 
 @dataclass
@@ -160,6 +160,18 @@ class AbstractACLPermissionContext(
         }
 
     @abstractmethod
+    async def _build_query(self) -> sa.sql.Select | None:
+        pass
+
+    @final
+    async def build_query(
+        self, permission_to_include: ACLPermissionType | None = None
+    ) -> sa.sql.Select | None:
+        if permission_to_include is not None:
+            self.filter_by_permission(permission_to_include)
+        return await self._build_query()
+
+    @abstractmethod
     async def determine_permission_on_obj(
         self, acl_obj: ACLObjectType
     ) -> frozenset[ACLPermissionType]:
@@ -172,16 +184,13 @@ class AbstractACLPermissionContext(
 ACLPermissionContextType = TypeVar("ACLPermissionContextType", bound=AbstractACLPermissionContext)
 
 
-class AbstractACLPermissionContextBuilder(
-    Generic[ACLPermissionType, ACLPermissionContextType], metaclass=ABCMeta
-):
+class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], metaclass=ABCMeta):
     @classmethod
     async def build(
         cls,
         db_session: AsyncSession,
         ctx: ClientContext,
         target_scope: ACLObjectScope,
-        permission: ACLPermissionType | None = None,
     ) -> ACLPermissionContextType:
         match target_scope.base_scope:
             case UserScope(user_id=user_id):
@@ -198,8 +207,6 @@ class AbstractACLPermissionContextBuilder(
                 )
             case _:
                 raise RuntimeError(f"invalid ACL scope `{target_scope}`")
-        if permission is not None:
-            result.filter_by_permission(permission)
         return result
 
     @classmethod

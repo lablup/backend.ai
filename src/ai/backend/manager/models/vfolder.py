@@ -67,10 +67,10 @@ from ..defs import (
 )
 from ..types import UserScope
 from .acl import (
-    AbstractACLPermission,
     AbstractACLPermissionContext,
     AbstractACLPermissionContextBuilder,
     ACLObjectScope,
+    BaseACLPermission,
     ClientContext,
     ExtraACLScopeType,
 )
@@ -680,7 +680,7 @@ async def query_accessible_vfolders(
     return entries
 
 
-class VFolderACLPermission(AbstractACLPermission):
+class VFolderACLPermission(BaseACLPermission):
     # Only owners can do
     CLONE = "clone"
     OVERRIDE_PERMISSION_TO_OTHERS = "override-permission"  # Invite, share
@@ -798,8 +798,7 @@ class ACLPermissionContext(
             cond = _coalesce(cond, VFolderRow.id.in_(self.overridden.keys()))
         return cond
 
-    @property
-    def query_stmt(self) -> sa.sql.Select | None:
+    async def _build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -820,9 +819,7 @@ class ACLPermissionContext(
         return frozenset(permissions)
 
 
-class ACLPermissionContextBuilder(
-    AbstractACLPermissionContextBuilder[VFolderACLPermission, ACLPermissionContext]
-):
+class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermissionContext]):
     @classmethod
     async def _build_in_user_scope(
         cls,
@@ -1207,25 +1204,23 @@ async def get_vfolders(
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
     async with SASession(ctx.db_conn) as db_session:
-        permission_ctx = await ACLPermissionContextBuilder.build(
-            db_session, ctx, target_scope, permission=requested_permission
-        )
-        stmt = permission_ctx.query_stmt
-        if stmt is None:
+        permission_ctx = await ACLPermissionContextBuilder.build(db_session, ctx, target_scope)
+        query_stmt = await permission_ctx.build_query(requested_permission)
+        if query_stmt is None:
             return []
         if vfolder_id is not None:
-            stmt = stmt.where(VFolderRow.id == vfolder_id)
+            query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
         if vfolder_name is not None:
-            stmt = stmt.where(VFolderRow.name == vfolder_name)
+            query_stmt = query_stmt.where(VFolderRow.name == vfolder_name)
         if usage_mode is not None:
-            stmt = stmt.where(VFolderRow.usage_mode == usage_mode)
+            query_stmt = query_stmt.where(VFolderRow.usage_mode == usage_mode)
         if allowed_status is not None:
-            stmt = stmt.where(VFolderRow.status.in_(allowed_status))
+            query_stmt = query_stmt.where(VFolderRow.status.in_(allowed_status))
         if blocked_status is not None:
-            stmt = stmt.where(VFolderRow.status.not_in(blocked_status))
+            query_stmt = query_stmt.where(VFolderRow.status.not_in(blocked_status))
 
         result: list[VFolderACLObject] = []
-        for row in await db_session.scalars(stmt):
+        for row in await db_session.scalars(query_stmt):
             row = cast(VFolderRow, row)
             permissions = await permission_ctx.determine_permission_on_obj(row)
             result.append(VFolderACLObject(row, permissions))
