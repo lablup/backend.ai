@@ -59,6 +59,7 @@ from ..models import (
     DEAD_VFOLDER_STATUSES,
     HARD_DELETED_VFOLDER_STATUSES,
     OWNER_PERMISSIONS,
+    ACLPermissionContextBuilder,
     AgentStatus,
     EndpointLifecycle,
     EndpointRow,
@@ -66,7 +67,6 @@ from ..models import (
     KernelStatus,
     ProjectResourcePolicyRow,
     ProjectType,
-    ScopePermissionMapFactory,
     UserResourcePolicyRow,
     UserRole,
     UserRow,
@@ -103,10 +103,11 @@ from ..models import (
     vfolders,
 )
 from ..models.acl import (
-    RequestedDomainScope,
-    RequestedProjectScope,
-    RequestedScope,
-    RequesterContext,
+    ACLObjectScope,
+    BaseACLScope,
+    ClientContext,
+    DomainScope,
+    ProjectScope,
 )
 from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
@@ -241,8 +242,8 @@ async def resolve_vfolder_rows(
 
     async with root_ctx.db.begin_readonly() as db_conn:
         entries = await get_vfolders(
-            RequesterContext(db_conn, domain_name, user_uuid, user_role),
-            RequestedDomainScope(domain_name),
+            ClientContext(db_conn, domain_name, user_uuid, user_role),
+            ACLObjectScope(DomainScope(domain_name)),
             perm,
             vfolder_name=vfolder_name,
             vfolder_id=vfolder_id,
@@ -465,8 +466,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         #     params["quota"] = max_vfolder_size
 
         entries = await get_vfolders(
-            RequesterContext(conn, domain_name, user_uuid, user_role),
-            RequestedDomainScope(domain_name),
+            ClientContext(conn, domain_name, user_uuid, user_role),
+            ACLObjectScope(DomainScope(domain_name)),
             VFolderACLPermission.READ_ATTRIBUTE,
             vfolder_name=params["name"],
             blocked_status=HARD_DELETED_VFOLDER_STATUSES,
@@ -594,20 +595,20 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters("Deprecated use of 'all' option")
     else:
         async with root_ctx.db.begin_readonly_session() as db_session:
-            requested_scope: RequestedScope
+            requested_scope: BaseACLScope
             if (project_id := params["group_id"]) is not None:
-                requested_scope = RequestedProjectScope(project_id)
+                requested_scope = ProjectScope(project_id)
             else:
-                requested_scope = RequestedDomainScope(domain_name)
-            scope_ctx = await ScopePermissionMapFactory.build(
+                requested_scope = DomainScope(domain_name)
+            scope_ctx = await ACLPermissionContextBuilder.build(
                 db_session,
-                RequesterContext(
+                ClientContext(
                     db_session.bind,
                     domain_name,
                     owner_user_uuid,
                     owner_user_role,
                 ),
-                requested_scope,
+                ACLObjectScope(requested_scope),
             )
             if scope_ctx.query_condition is not None:
                 owned = []
@@ -623,7 +624,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 )
                 for _entry in await db_session.scalars(query_stmt):
                     entry = cast(VFolderRow, _entry)
-                    perm = await scope_ctx.determine_permission(entry)
+                    perm = await scope_ctx.determine_permission_on_obj(entry)
                     resp_data = {
                         "name": entry.name,
                         "id": entry.id.hex,
@@ -2148,13 +2149,13 @@ async def _delete(
 ) -> None:
     async with root_ctx.db.begin_session() as db_session:
         entries = await get_vfolders(
-            RequesterContext(
+            ClientContext(
                 db_session.bind,
                 domain_name,
                 user_uuid,
                 user_role,
             ),
-            RequestedDomainScope(domain_name),
+            ACLObjectScope(DomainScope(domain_name)),
             VFolderACLPermission.DELETE_VFOLDER,
             vfolder_id=vfolder_id,
             blocked_status=DEAD_VFOLDER_STATUSES,
@@ -2321,13 +2322,13 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
     )
     async with root_ctx.db.begin_readonly() as db_conn:
         entries = await get_vfolders(
-            RequesterContext(
+            ClientContext(
                 db_conn,
                 domain_name,
                 user_uuid,
                 user_role,
             ),
-            RequestedDomainScope(domain_name),
+            ACLObjectScope(DomainScope(domain_name)),
             VFolderACLPermission.READ_ATTRIBUTE,
             vfolder_name=folder_name,
         )
