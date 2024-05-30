@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0.dev6"
+pants_version = "2.21.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -82,13 +82,14 @@ setuptools = "tools/setuptools.lock"
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-version = "v2.3.0"
-known_versions = [
-    "v2.3.0|macos_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|macos_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-]
+# Pants 2.21.0 uses Pex 2.3.1 by default.
+# version = "v2.3.0"
+# known_versions = [
+#     "v2.3.0|macos_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+#     "v2.3.0|macos_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+#     "v2.3.0|linux_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+#     "v2.3.0|linux_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+# ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
