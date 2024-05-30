@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("glibc" "musl" "centos8")
+distros=("centos8.0")
 
 glibc_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:22.04
@@ -76,7 +76,7 @@ echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
 echo "$glibc_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.glibc.dockerfile"
 echo "$musl_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.musl.dockerfile"
-echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.centos8.dockerfile"
+echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.centos8.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t tmux-builder:$distro \
