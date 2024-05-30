@@ -5,13 +5,17 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Final, Iterator, List
+from typing import Iterator, List
 
 from ai.backend.cli.types import ExitCode
 
 from ..pretty import print_fail, print_info
 
-CLI_EXECUTABLE: Final = (sys.executable, "-m", "ai.backend.cli")
+CLI_EXECUTABLE: tuple[str, ...]
+if pex_path := os.environ.get("PEX", None):
+    CLI_EXECUTABLE = (sys.executable, pex_path)
+else:
+    CLI_EXECUTABLE = (sys.executable, "-m", "ai.backend.cli")
 
 
 @contextlib.contextmanager
