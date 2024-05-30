@@ -70,8 +70,9 @@ from .acl import (
     AbstractACLPermission,
     AbstractACLPermissionContext,
     AbstractACLPermissionContextBuilder,
-    BaseACLScope,
+    ACLObjectScope,
     ClientContext,
+    ExtraACLScopeType,
 )
 from .base import (
     GUID,
@@ -828,6 +829,8 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         user_id: uuid.UUID,
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -952,6 +955,8 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         project_id: uuid.UUID,
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1062,6 +1067,8 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         domain_name: str,
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
         user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1190,7 +1197,7 @@ class VFolderACLObject(NamedTuple):
 
 async def get_vfolders(
     ctx: ClientContext,
-    target_scope: BaseACLScope,
+    target_scope: ACLObjectScope,
     requested_permission: VFolderACLPermission | None = None,
     *,
     vfolder_id: uuid.UUID | None = None,

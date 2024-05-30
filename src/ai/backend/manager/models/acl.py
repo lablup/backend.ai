@@ -91,6 +91,19 @@ class UserScope(BaseACLScope):
     user_id: uuid.UUID
 
 
+# Extra ACL scope is used to address ACL object specific scopes
+# such as registries for images, scaling groups for agents, storage hosts for vfolders etc.
+ExtraACLScopeName = str
+ExtraACLScopeID = Any
+ExtraACLScopeType = Mapping[ExtraACLScopeName, ExtraACLScopeID]
+
+
+@dataclass(frozen=True)
+class ACLObjectScope:
+    base_scope: BaseACLScope
+    extra_scopes: ExtraACLScopeType | None = None
+
+
 ACLObjectType = TypeVar("ACLObjectType")
 ACLObjectIDType = TypeVar("ACLObjectIDType")
 
@@ -100,16 +113,16 @@ class AbstractACLPermissionContext(
     Generic[ACLPermissionType, ACLObjectType, ACLObjectIDType], metaclass=ABCMeta
 ):
     """
-    Each field of this class represents a mapping of "accessible scope id" and "permissions under the scope".
-    For example, `project` field has a mapping of "accessible project id" and "permissions under the project"
+    Each field of this class represents a mapping of ["accessible scope id", "permissions under the scope"].
+    For example, `project` field has a mapping of ["accessible project id", "permissions under the project"].
     {
         "PROJECT_A_ID": {"READ", "WRITE", "DELETE"}
         "PROJECT_B_ID": {"READ"}
     }
 
-    `additional` and `overridden` fields have a mapping of "ACL object id" and "permissions applied to the object".
-    `additional` field can be used to add permissions for admins.
-    `overridden` field can be used to address exceptional cases such as permission overriding or other scopes(scaling groups or storage hosts etc).
+    `additional` and `overridden` fields have a mapping of ["ACL object id", "permissions applied to the object"].
+    `additional` field is used to add permissions to specific ACL objects. It can be used for admins.
+    `overridden` field is used to address exceptional cases such as permission overriding or cover other scopes(scaling groups or storage hosts etc).
     """
 
     user: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
@@ -151,44 +164,37 @@ class AbstractACLPermissionContext(
         self, acl_obj: ACLObjectType
     ) -> frozenset[ACLPermissionType]:
         """
-        Determine permissions applied to the ACL object based on the fields this class has.
+        Determine permissions applied to the given ACL object based on the fields in this class.
         """
         pass
 
 
-ACLPermissionSetterType = TypeVar("ACLPermissionSetterType", bound=AbstractACLPermissionContext)
+ACLPermissionContextType = TypeVar("ACLPermissionContextType", bound=AbstractACLPermissionContext)
 
 
 class AbstractACLPermissionContextBuilder(
-    Generic[ACLPermissionType, ACLPermissionSetterType], metaclass=ABCMeta
+    Generic[ACLPermissionType, ACLPermissionContextType], metaclass=ABCMeta
 ):
     @classmethod
     async def build(
         cls,
         db_session: AsyncSession,
         ctx: ClientContext,
-        target_scope: BaseACLScope,
-        *,
+        target_scope: ACLObjectScope,
         permission: ACLPermissionType | None = None,
-    ) -> ACLPermissionSetterType:
-        match target_scope:
+    ) -> ACLPermissionContextType:
+        match target_scope.base_scope:
             case UserScope(user_id=user_id):
                 result = await cls._build_in_user_scope(
-                    db_session,
-                    ctx,
-                    user_id,
+                    db_session, ctx, user_id, extra_target_scopes=target_scope.extra_scopes
                 )
             case ProjectScope(project_id=project_id):
                 result = await cls._build_in_project_scope(
-                    db_session,
-                    ctx,
-                    project_id,
+                    db_session, ctx, project_id, extra_target_scopes=target_scope.extra_scopes
                 )
             case DomainScope(domain_name=domain_name):
                 result = await cls._build_in_domain_scope(
-                    db_session,
-                    ctx,
-                    domain_name,
+                    db_session, ctx, domain_name, extra_target_scopes=target_scope.extra_scopes
                 )
             case _:
                 raise RuntimeError(f"invalid ACL scope `{target_scope}`")
@@ -203,7 +209,9 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         user_id: uuid.UUID,
-    ) -> ACLPermissionSetterType:
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
+    ) -> ACLPermissionContextType:
         pass
 
     @classmethod
@@ -213,7 +221,9 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         project_id: uuid.UUID,
-    ) -> ACLPermissionSetterType:
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
+    ) -> ACLPermissionContextType:
         pass
 
     @classmethod
@@ -223,7 +233,9 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         domain_name: str,
-    ) -> ACLPermissionSetterType:
+        *,
+        extra_target_scopes: ExtraACLScopeType | None,
+    ) -> ACLPermissionContextType:
         pass
 
 
