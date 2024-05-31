@@ -918,7 +918,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                         for row in await db_session.scalars(additional_stmt)
                     }
                     user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
-            case UserRole.USER:
+            case UserRole.USER | UserRole.MONITOR:
                 if ctx.user_id == user_id:
                     overridden_stmt = (
                         sa.select(VFolderPermissionRow)
@@ -936,8 +936,8 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                     }
 
                     user = {ctx.user_id: OWNER_PERMISSIONS}
-            case UserRole.MONITOR:
-                raise RuntimeError("Moditor users cannot fetch vfolders")
+            case _:
+                raise RuntimeError("should not reach here")
         return ACLPermissionContext(
             user=user,
             project=project,
@@ -1018,7 +1018,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                     project = {
                         project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
                     }
-            case UserRole.USER:
+            case UserRole.USER | UserRole.MONITOR:
                 if role_in_project is not None:
                     project = {
                         project_id: OWNER_PERMISSIONS
@@ -1048,8 +1048,8 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                 else:
                     # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
                     pass
-            case UserRole.MONITOR:
-                raise RuntimeError("Moditor users cannot fetch vfolders")
+            case _:
+                raise RuntimeError("should not reach here")
         return ACLPermissionContext(
             user=user,
             project=project,
@@ -1144,7 +1144,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                         VFolderACLPermission.DELETE_VFOLDER,
                     ])
                 }
-            case UserRole.USER:
+            case UserRole.USER | UserRole.MONITOR:
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
                     return ACLPermissionContext(
@@ -1176,8 +1176,8 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
 
                 user = {ctx.user_id: OWNER_PERMISSIONS}
 
-            case UserRole.MONITOR:
-                raise RuntimeError("Moditor users cannot fetch vfolders")
+            case _:
+                raise RuntimeError("should not reach here")
         return ACLPermissionContext(
             user=user,
             project=project,
