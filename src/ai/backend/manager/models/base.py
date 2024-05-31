@@ -41,13 +41,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
-
-try:
-    from graphql.language.ast import IntValueNode
-except ImportError:
-    from graphql.language.ast import (  # type: ignore[no-redef, attr-defined]
-        IntValue as IntValueNode,
-    )
+from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
