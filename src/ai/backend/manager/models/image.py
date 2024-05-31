@@ -91,7 +91,11 @@ class PublicImageLoadFilter(enum.StrEnum):
     """Include customized images owned or accessible by API callee."""
 
 
-class ImageLoadFilter(PublicImageLoadFilter):
+class ImageLoadFilter(enum.StrEnum):
+    OPERATIONAL = "operational"
+    """Include operational images."""
+    CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
     CUSTOMIZED_GLOBAL = "customized-global"
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
