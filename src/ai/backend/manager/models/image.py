@@ -66,6 +66,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 __all__ = (
     "rescan_images",
+    "CustomizedImageLabelKey",
+    "CustomizedImageVisibilityScope",
+    "build_customized_img_owner_label",
+    "build_customized_img_email_label",
     "ImageType",
     "ImageAliasRow",
     "ImageLoadFilter",
@@ -87,6 +91,40 @@ class ImageLoadFilter(str, enum.Enum):
     INSTALLED = "installed"
     EXCLUDE_OPERATIONAL = "operational"
     CUSTOMIZED_ONLY = "customized"
+
+
+class CustomizedImageVisibilityScope(enum.StrEnum):
+    USER = "user"
+    PROJECT = "project"
+
+
+class CustomizedImageLabelKey(enum.StrEnum):
+    OWNER = "ai.backend.customized-image.owner"
+    NAME = "ai.backend.customized-image.name"
+    ID = "ai.backend.customized-image.id"
+    EMAIL = "ai.backend.customized-image.user.email"
+
+
+def build_customized_img_owner_label(
+    visibility: CustomizedImageVisibilityScope, owner_id: UUID
+) -> dict[str, str]:
+    return {CustomizedImageLabelKey.OWNER.value: f"{visibility.value}:{owner_id}"}
+
+
+def get_customized_img_owner_label(labels: dict[str, str]) -> UUID | None:
+    label_val = labels.get(CustomizedImageLabelKey.OWNER.value)
+    if label_val is None:
+        return None
+    _, _, owner_id = label_val.partition(":")
+    return UUID(owner_id)
+
+
+def build_customized_img_email_label(email: str) -> dict[str, str]:
+    return {CustomizedImageLabelKey.EMAIL.value: email}
+
+
+def get_customized_img_email_label(labels: dict[str, str]) -> str | None:
+    return labels.get(CustomizedImageLabelKey.EMAIL.value)
 
 
 async def rescan_images(
@@ -728,6 +766,8 @@ class ImageNode(graphene.ObjectType):
     size_bytes = BigInt()
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
+    owner_id = graphene.UUID(description="Added in 24.09.0.")
+    user_email = graphene.String(description="Added in 24.09.0.")
 
     @overload
     @classmethod
@@ -761,6 +801,8 @@ class ImageNode(graphene.ObjectType):
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
+            owner_id=get_customized_img_owner_label(row.labels),
+            user_email=get_customized_img_email_label(row.labels),
         )
 
     @classmethod
