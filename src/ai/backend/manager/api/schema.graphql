@@ -43,7 +43,18 @@ type Queries {
     reference: String
     architecture: String = "x86_64"
   ): Image
-  images(is_installed: Boolean, is_operation: Boolean): [Image]
+  images(
+    """
+    Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
+    """
+    is_installed: Boolean
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+
+    """
+    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    """
+    image_filters: [String] = null
+  ): [Image]
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
@@ -222,6 +233,9 @@ scalar UUID
 type ImageNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   humanized_name: String
   tag: String
@@ -233,6 +247,9 @@ type ImageNode implements Node {
   size_bytes: BigInt
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
+
+  """Added in 24.03.4. The array of image aliases."""
+  aliases: [String]
 }
 
 type KVPair {

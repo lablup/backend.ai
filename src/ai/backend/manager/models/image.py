@@ -28,7 +28,7 @@ from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
@@ -72,6 +72,7 @@ __all__ = (
     "ImageRow",
     "Image",
     "PreloadImage",
+    "PublicImageLoadFilter",
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
@@ -83,10 +84,20 @@ __all__ = (
 )
 
 
-class ImageLoadFilter(str, enum.Enum):
-    INSTALLED = "installed"
-    EXCLUDE_OPERATIONAL = "operational"
-    CUSTOMIZED_ONLY = "customized"
+class PublicImageLoadFilter(enum.StrEnum):
+    OPERATIONAL = "operational"
+    """Include operational images."""
+    CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
+
+
+class ImageLoadFilter(enum.StrEnum):
+    OPERATIONAL = "operational"
+    """Include operational images."""
+    CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
+    CUSTOMIZED_GLOBAL = "customized-global"
+    """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
 async def rescan_images(
@@ -694,22 +705,28 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
     ) -> bool:
-        if ImageLoadFilter.INSTALLED in filters and not self.installed:
-            return False
+        user_role = ctx.user["role"]
 
-        is_customized_image = False
         for label in self.labels:
             match label.key:
-                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.EXCLUDE_OPERATIONAL in filters:
+                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if label.value != f"user:{ctx.user['uuid']}":
+                    if (
+                        (
+                            ImageLoadFilter.CUSTOMIZED not in filters
+                            and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                        )
+                        or (
+                            ImageLoadFilter.CUSTOMIZED_GLOBAL in filters
+                            and user_role != UserRole.SUPERADMIN
+                        )
+                        or (
+                            ImageLoadFilter.CUSTOMIZED in filters
+                            and label.value != f"user:{ctx.user['uuid']}"
+                        )
+                    ):
                         return False
-                    is_customized_image = True
-
-        if not is_customized_image and ImageLoadFilter.CUSTOMIZED_ONLY in filters:
-            return False
-
         return True
 
 
@@ -717,6 +734,7 @@ class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -728,6 +746,9 @@ class ImageNode(graphene.ObjectType):
     size_bytes = BigInt()
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
+    aliases = graphene.List(
+        graphene.String, description="Added in 24.03.4. The array of image aliases."
+    )
 
     @overload
     @classmethod
@@ -743,6 +764,7 @@ class ImageNode(graphene.ObjectType):
             return None
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.image,
             humanized_name=row.image,
             tag=row.tag,
@@ -761,6 +783,7 @@ class ImageNode(graphene.ObjectType):
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
+            aliases=[alias_row.alias for alias_row in row.aliases],
         )
 
     @classmethod
@@ -778,6 +801,7 @@ class ImageNode(graphene.ObjectType):
             size_bytes=row.size_bytes,
             resource_limits=row.resource_limits,
             supported_accelerators=row.supported_accelerators,
+            aliases=row.aliases,
         )
 
     @classmethod
@@ -785,7 +809,11 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
 
         _, image_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id == image_id)
+            .options(selectinload(ImageRow.aliases).options(load_only(ImageAliasRow.alias)))
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             image_row = await db_session.scalar(query)
             if image_row is None:
@@ -900,7 +928,7 @@ class ForgetImageById(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, _image_id)
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
