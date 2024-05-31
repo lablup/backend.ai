@@ -1412,7 +1412,7 @@ class SchedulerDispatcher(aobject):
                         SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
                     )
                 )
-                .where(RoutingRow.status == RouteStatus.PROVISIONING)
+                .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
                 .options(selectinload(RoutingRow.session_row))
             )
             result = await session.execute(query)
