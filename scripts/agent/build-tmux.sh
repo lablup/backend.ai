@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("glibc" "musl")
+distros=("glibc" "musl" "oraclelinux9.0")
 
 glibc_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:22.04
@@ -17,6 +17,15 @@ musl_builder_dockerfile=$(cat <<'EOF'
 FROM alpine:3.8
 RUN apk add --no-cache make gcc g++ musl-dev file bison flex
 RUN apk add --no-cache pkgconfig
+EOF
+)
+
+oraclelinux9_builder_dockerfile=$(cat <<'EOF'
+FROM oraclelinux:9
+
+RUN dnf install -y make gcc automake autoconf dnf-plugins-core
+RUN dnf config-manager --set-enabled ol9_codeready_builder
+RUN dnf install -y zlib-static glibc-static libxcrypt-static
 EOF
 )
 
@@ -61,6 +70,7 @@ echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
 echo "$glibc_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.glibc.dockerfile"
 echo "$musl_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.musl.dockerfile"
+echo "$oraclelinux9_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.oraclelinux9.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t tmux-builder:$distro \
