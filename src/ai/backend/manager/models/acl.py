@@ -113,6 +113,7 @@ class AbstractACLPermissionContext(
     Generic[ACLPermissionType, ACLObjectType, ACLObjectIDType], metaclass=ABCMeta
 ):
     """
+    Define ACL permissions under given User, Project or Domain scopes.
     Each field of this class represents a mapping of ["accessible scope id", "permissions under the scope"].
     For example, `project` field has a mapping of ["accessible project id", "permissions under the project"].
     {
