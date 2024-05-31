@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8")
+distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8" "oraclelinux9.0")
 
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
@@ -29,6 +29,14 @@ alpine_builder_dockerfile=$(cat <<'EOF'
 FROM alpine:3.8
 RUN apk add --no-cache make gcc musl-dev
 RUN apk add --no-cache autoconf automake zlib-dev
+EOF
+)
+oraclelinux9_builder_dockerfile=$(cat <<'EOF'
+FROM oraclelinux:9
+
+RUN dnf install -y make gcc automake autoconf dnf-plugins-core
+RUN dnf config-manager --set-enabled ol9_codeready_builder
+RUN dnf install -y zlib-static glibc-static libxcrypt-static
 EOF
 )
 
@@ -67,6 +75,7 @@ echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu18.0
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu20.04.dockerfile"
 echo "$ubuntu2204_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu22.04.dockerfile"
 echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.alpine3.8.dockerfile"
+echo "$oraclelinux9_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.oraclelinux9.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t dropbear-builder:$distro \
