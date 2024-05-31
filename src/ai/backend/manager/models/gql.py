@@ -1142,7 +1142,7 @@ class Queries(graphene.ObjectType):
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
                 )
-            image_load_filters.update([PublicImageLoadFilter(f) for f in _filters])
+            image_load_filters.update([ImageLoadFilter(f) for f in _filters])
             if (
                 client_role == UserRole.SUPERADMIN
                 and ImageLoadFilter.CUSTOMIZED in image_load_filters
