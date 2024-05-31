@@ -50,9 +50,17 @@ jobs:
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
           echo $milestones
 
+          # Remove Backlog from the backport target branch
           milestones=($milestones)
           for i in "${!milestones[@]}"; do
             if [[ "${milestones[$i]}" == "Backlog" ]]; then
+              unset 'milestones[$i]'
+            fi
+          done
+          echo "${milestones[@]}"
+
+          for i in "${milestones[@]}"; do
+            if ! git branch -r | grep -q "^origin/$i\$"; then
               unset 'milestones[$i]'
             fi
           done

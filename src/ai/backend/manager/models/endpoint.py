@@ -3,7 +3,7 @@ import logging
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
 
 import graphene
 import jwt
@@ -982,8 +982,12 @@ class ExtraMountInput(graphene.InputObjectType):
 
     vfolder_id = graphene.String()
     mount_destination = graphene.String()
-    type = graphene.Enum.from_enum(MountTypes)
-    permission = graphene.Enum.from_enum(MountPermission)
+    type = graphene.String(
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+    )
+    permission = graphene.String(
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
+    )
 
 
 class ModifyEndpointInput(graphene.InputObjectType):
@@ -1114,14 +1118,21 @@ class ModifyEndpoint(graphene.Mutation):
                 result = await conn.execute(query)
 
                 resource_policy = result.first()
-                if (
-                    extra_mounts_input := props.extra_mounts
-                ) and extra_mounts_input is not Undefined:
+                if (extra_mounts_input := props.extra_mounts) is not Undefined:
+                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
-                        _get_vfolder_id(m.id): MountOptionModel(
-                            mount_destination=m.mount_destination,
-                            type=m.type,
-                            permission=m.permission,
+                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
+                            mount_destination=(
+                                m.mount_destination
+                                if m.mount_destination is not Undefined
+                                else None
+                            ),
+                            type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
+                            permission=(
+                                MountPermission(m.permission)
+                                if m.permission is not Undefined
+                                else None
+                            ),
                         )
                         for m in extra_mounts_input
                     }
