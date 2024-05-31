@@ -3,7 +3,7 @@ set -e
 
 arch=$(uname -m)
 # distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
-distros=("ubuntu16.04")
+distros=("oraclelinux9.0")
 
 if [ $arch = "arm64" ]; then
   arch="aarch64"
@@ -42,6 +42,12 @@ RUN apk add --no-cache make gcc musl-dev
 EOF
 )
 
+oraclelinux9_builder_dockerfile=$(cat <<'EOF'
+FROM oraclelinux:9
+RUN dnf install -y make gcc glibc-devel
+EOF
+)
+
 build_script=$(cat <<'EOF'
 #! /bin/sh
 set -e
@@ -62,6 +68,7 @@ echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu18.04.
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu20.04.dockerfile"
 echo "$centos_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.centos7.6.dockerfile"
 echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.alpine3.8.dockerfile"
+echo "$oraclelinux9_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.oraclelinux9.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t suexec-builder:$distro \
