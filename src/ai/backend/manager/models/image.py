@@ -672,9 +672,7 @@ class Image(graphene.ObjectType):
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item
-            async for item in cls.bulk_load(ctx, rows)
-            if item.matches_filter(ctx, filters)
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
         ]
 
         return items
@@ -715,9 +713,18 @@ class Image(graphene.ObjectType):
                     return False
                 case "ai.backend.customized-image.owner":
                     if (
-                        (ImageLoadFilter.CUSTOMIZED not in filters and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters) or
-                        (ImageLoadFilter.CUSTOMIZED_GLOBAL in filters and user_role != UserRole.SUPERADMIN) or
-                        (ImageLoadFilter.CUSTOMIZED in filters and label.value != f"user:{ctx.user['uuid']}")
+                        (
+                            ImageLoadFilter.CUSTOMIZED not in filters
+                            and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                        )
+                        or (
+                            ImageLoadFilter.CUSTOMIZED_GLOBAL in filters
+                            and user_role != UserRole.SUPERADMIN
+                        )
+                        or (
+                            ImageLoadFilter.CUSTOMIZED in filters
+                            and label.value != f"user:{ctx.user['uuid']}"
+                        )
                     ):
                         return False
         return True
