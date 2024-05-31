@@ -56,6 +56,8 @@ class CapacityUsage:
 class QuotaUsage:
     used_bytes: int
     limit_bytes: int
+    used_inodes: int | None = None
+    limit_inodes: int | None = None
 
 
 @attrs.define(slots=True, frozen=True)

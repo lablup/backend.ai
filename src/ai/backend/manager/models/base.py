@@ -735,7 +735,7 @@ class BigInt(Scalar):
 
     @staticmethod
     def parse_literal(node):
-        if isinstance(node, ast.IntValue):
+        if isinstance(node, ast.IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
                 raise ValueError("Cannot parse integer out of the safe range.")

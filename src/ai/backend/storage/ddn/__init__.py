@@ -62,6 +62,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return val
 
     async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
+        if options.limit_bytes is None:
+            return None
         quota_limit = _byte_to_kilobyte(options.limit_bytes)  # default unit for DDN quota is KB
         try:
             await run([
