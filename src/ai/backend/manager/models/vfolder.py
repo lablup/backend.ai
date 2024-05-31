@@ -1726,7 +1726,9 @@ class VirtualFolderList(graphene.ObjectType):
 class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
+        description = "Added in 24.03.4."
 
+    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
@@ -1742,7 +1744,6 @@ class VirtualFolderNode(graphene.ObjectType):
     max_files = graphene.Int()
     max_size = BigInt()  # in MiB
     created_at = GQLDateTime()
-    modified_at = GQLDateTime()
     last_used = GQLDateTime()
 
     num_files = graphene.Int()
@@ -1811,6 +1812,9 @@ class VirtualFolderNode(graphene.ObjectType):
         self,
         info: graphene.ResolveInfo,
     ) -> datetime:
+        if isinstance(self.created_at, datetime):
+            return self.created_at
+
         try:
             return dtparse(self.created_at)
         except ParserError:
@@ -1820,12 +1824,13 @@ class VirtualFolderNode(graphene.ObjectType):
     def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             host=row.host,
             quota_scope_id=row.quota_scope_id,
             name=row.name,
-            user=row.user_row,
+            user=row.user,
             user_email=row.user_row.email if row.user_row else None,
-            group=row.group_row,
+            group=row.group_row.id if row.group_row else None,
             group_name=row.group_row.name if row.group_row else None,
             creator=row.creator,
             unmanaged_path=row.unmanaged_path,

@@ -202,6 +202,9 @@ class ServeInfoModel(BaseResponseModel):
     desired_session_count: NonNegativeInt = Field(
         description="Number of identical inference sessions."
     )
+    model_definition_path: str | None = Field(
+        description="Path to the the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default."
+    )
     active_routes: list[RouteInfoModel] = Field(
         description="Information of routes which are bound with healthy sessions."
     )
@@ -246,6 +249,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         model_id=endpoint.model,
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=endpoint.name,
+        model_definition_path=endpoint.model_definition_path,
         desired_session_count=endpoint.desired_session_count,
         active_routes=[
             RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
@@ -259,6 +263,10 @@ async def get_info(request: web.Request) -> ServeInfoModel:
 
 class ServiceConfigModel(BaseModel):
     model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
+    model_definition_path: str | None = Field(
+        description="Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
+        default=None,
+    )
     model_version: int = Field(
         validation_alias=AliasChoices("model_version", "modelVersion"),
         description="Unused; Reserved for future works",
@@ -359,6 +367,7 @@ class NewServiceRequestModel(BaseModel):
 @dataclass
 class ValidationResult:
     model_id: uuid.UUID
+    model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
@@ -456,13 +465,15 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             resource_policy,
         )
 
-    await ModelServicePredicateChecker.validate_model_definition(
+    yaml_path = await ModelServicePredicateChecker.validate_model_definition(
         root_ctx.storage_manager,
         folder_row,
+        params.config.model_definition_path,
     )
 
     return ValidationResult(
         model_id,
+        yaml_path,
         requester_access_key,
         owner_access_key,
         owner_uuid,
@@ -551,6 +562,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
             params.service_name,
+            validation_result.model_definition_path,
             request["user"]["uuid"],
             validation_result.owner_uuid,
             params.desired_session_count,
@@ -581,6 +593,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         model_id=endpoint.model,
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=params.service_name,
+        model_definition_path=validation_result.model_definition_path,
         desired_session_count=params.desired_session_count,
         active_routes=[],
         service_endpoint=None,
@@ -648,6 +661,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
                 "mount_options": {
                     m.vfid: {"permission": m.mount_perm} for m in validation_result.extra_mounts
                 },
+                "model_definition_path": validation_result.model_definition_path,
                 "environ": creation_config["environ"],
                 "scaling_group": validation_result.scaling_group,
                 "resources": creation_config["resources"],
