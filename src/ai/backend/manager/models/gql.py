@@ -1144,10 +1144,10 @@ class Queries(graphene.ObjectType):
                 image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
                 image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
         else:
-            if is_operation is not None:
-                # Operational images had been excluded if `is_operation` is not None.
-                # We respected how it had worked and deprecated use of it.
-                pass
+            if is_operation is None:
+                # I know this logic is quite contradicts to the parameter name,
+                # but to conform with previous implementation...
+                image_load_filters.add(ImageLoadFilter.OPERATIONAL)
 
         items = await Image.load_all(ctx, filters=image_load_filters)
         if client_role == UserRole.SUPERADMIN:
