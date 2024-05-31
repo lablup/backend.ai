@@ -700,9 +700,13 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.03.4."""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  row_id: UUID
   host: String
   quota_scope_id: String
   name: String
@@ -850,7 +854,7 @@ type Endpoint implements Item {
   url: String
   model: UUID
 
-  """Added at 24.03.3"""
+  """Added in 24.03.4."""
   model_definition_path: String
   model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
 
@@ -1773,7 +1777,7 @@ input ModifyEndpointInput {
   name: String
   resource_group: String
 
-  """Added at 24.03.3"""
+  """Added in 24.03.4."""
   model_definition_path: String
   open_to_public: Boolean
 
@@ -1791,4 +1795,14 @@ input ImageRefType {
 input ExtraMountInput {
   vfolder_id: String
   mount_destination: String
+
+  """
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  """
+  type: String
+
+  """
+  Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
+  """
+  permission: String
 }

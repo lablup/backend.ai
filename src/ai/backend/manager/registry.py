@@ -3585,13 +3585,12 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_readonly_session() as db_sess:
-                route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
             async def _update() -> None:
                 new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
                     if isinstance(event, SessionCancelledEvent):
                         update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
@@ -3672,6 +3671,9 @@ async def invoke_session_callback(
 
             async def _clear_error() -> None:
                 async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+
                     query = sa.select([sa.func.count("*")]).where(
                         (RoutingRow.endpoint == endpoint.id)
                         & (RoutingRow.status == RouteStatus.HEALTHY)
