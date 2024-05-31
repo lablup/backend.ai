@@ -72,6 +72,7 @@ __all__ = (
     "ImageRow",
     "Image",
     "PreloadImage",
+    "PublicImageLoadFilter",
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
@@ -83,9 +84,16 @@ __all__ = (
 )
 
 
-class ImageLoadFilter(enum.StrEnum):
+class PublicImageLoadFilter(enum.StrEnum):
     OPERATIONAL = "operational"
+    """Include operational images."""
     CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
+
+
+class ImageLoadFilter(PublicImageLoadFilter):
+    CUSTOMIZED_GLOBAL = "customized-global"
+    """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
 async def rescan_images(
@@ -656,14 +664,13 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         filters: set[ImageLoadFilter] = set(),
-        owned_only: bool = False,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
             item
             async for item in cls.bulk_load(ctx, rows)
-            if item.matches_filter(ctx, filters, owned_only=owned_only)
+            if item.matches_filter(ctx, filters)
         ]
 
         return items
@@ -695,28 +702,20 @@ class Image(graphene.ObjectType):
         self,
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
-        *,
-        owned_only: bool = False,
     ) -> bool:
         user_role = ctx.user["role"]
 
-        is_customized_image = False
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
                     return False
                 case "ai.backend.customized-image.owner":
-                    if label.value != f"user:{ctx.user['uuid']}":
-                        if owned_only:
-                            return False
-                        else:
-                            if user_role != UserRole.SUPERADMIN:
-                                return False
-                    is_customized_image = True
-
-        if not is_customized_image and ImageLoadFilter.CUSTOMIZED in filters:
-            return False
-
+                    if (
+                        (ImageLoadFilter.CUSTOMIZED not in filters and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters) or
+                        (ImageLoadFilter.CUSTOMIZED_GLOBAL in filters and user_role != UserRole.SUPERADMIN) or
+                        (ImageLoadFilter.CUSTOMIZED in filters and label.value != f"user:{ctx.user['uuid']}")
+                    ):
+                        return False
         return True
 
 

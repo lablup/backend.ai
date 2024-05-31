@@ -74,6 +74,7 @@ from .image import (
     ImageNode,
     ModifyImage,
     PreloadImage,
+    PublicImageLoadFilter,
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
@@ -372,7 +373,7 @@ class Queries(graphene.ObjectType):
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.4. All elements should be values in this ({', '.join([f.value for f in ImageLoadFilter])})",
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
     )
 
@@ -1103,7 +1104,7 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         items = await Image.load_all(
-            ctx, filters=set((ImageLoadFilter.CUSTOMIZED,)), owned_only=True
+            ctx, filters=set((ImageLoadFilter.CUSTOMIZED,)),
         )
         if client_role == UserRole.SUPERADMIN:
             pass
@@ -1132,13 +1133,16 @@ class Queries(graphene.ObjectType):
         image_load_filters: set[ImageLoadFilter] = set()
         if image_filters is not None:
             try:
-                _filters = [ImageLoadFilter(f) for f in image_filters]
+                _filters = [PublicImageLoadFilter(f) for f in image_filters]
             except ValueError as e:
-                allowed_filter_values = ", ".join([f.value for f in ImageLoadFilter])
+                allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
                 )
             image_load_filters.update(_filters)
+            if client_role == UserRole.SUPERADMIN and ImageLoadFilter.CUSTOMIZED in image_load_filters:
+                image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
+                image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
         else:
             if is_operation is not None:
                 # Operational images had been excluded if `is_operation` is not None.
