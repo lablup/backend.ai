@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Enter your password",
       "InvalidBlankEmail": "Enter your e-mail",
       "DisMatchUserEmail": "User E-mail does not match",
-      "MyEnvironments": "My Environments"
+      "MyEnvironments": "My Environments",
+      "ResourcePolicy": "Resource Policy"
     },
     "YouAreOffline": "You are now offline",
     "YouAreOnline": "You are now online",
@@ -159,7 +160,7 @@
       "Start": "Start",
       "FolderToMount": "Folder to mount",
       "FolderToMountList": "Folder to mount",
-      "ModelStorageToMount": "Model storage to mount",
+      "ModelStorageToMount": "Model Storage To Mount",
       "MountedFolders": "Mounted folders",
       "ResourceAllocation": "Resource allocation",
       "NoSuitablePreset": "No suitable preset",
@@ -256,8 +257,9 @@
       "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
       "preopen": "preopen",
       "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed.",
-      "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open ports.",
-      "EnqueueComputeSessionWarning": "If you set it larger than the currently available resources, the session creation will be delayed in the queue until it becomes available.",
+      "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open port.",
+      "PreOpenPortMaxCountLimit_plural": "You can set up to {{count}} pre-open ports.",
+      "EnqueueComputeSessionWarning": "Insufficient resources. Session may be pending.",
       "TemplateAndHistory": "Templates & history",
       "StartTimeMustBeInTheFuture": "The start time must be after the current time.",
       "SessionName": "Session name",
@@ -272,7 +274,6 @@
       "EnvironmentVariableDuplicateName": "A variable name that already exists.",
       "Template": "Session Template",
       "EnableAutomaticMiniumShmem": "Set minimum shared memory",
-      "PreOpenPortMaxCountLimit_plural": "PreOpenPortMaxCountLimit",
       "StartAfter": "Start after: ",
       "StartTimeDoesNotApply": "If the start time is not set, it doesn't apply.",
       "MiniumAllocation": "Minimum requirements",
@@ -286,7 +287,8 @@
       "AddEnvironmentVariable": "Add environment variables",
       "EnvironmentVariableValueRequired": "Please enter a value.",
       "PleaseCompleteForm": "Form is incomplete or contains errors. Please check your inputs.",
-      "FailedToStartNewSession": "Session creation failed. Please check the 'FINISHED' tab on the session page."
+      "FailedToStartNewSession": "Session creation failed. Please check the 'FINISHED' tab on the session page.",
+      "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -413,11 +415,11 @@
     "GPU(MEM)": "GPU(Memory)",
     "IPU": "IPU",
     "IPU(MEM)": "IPU(Memory)",
-    "ConvertSessionToImage": "Convert Session to Image",
     "SessionName": "Session Name",
     "SessionId": "Session ID",
     "EnvironmentAndVersion": "Environment and Version",
-    "Tags": "Tags"
+    "Tags": "Tags",
+    "fGPU": "fGPU"
   },
   "modelService": {
     "Services": "Services",
@@ -439,17 +441,22 @@
     "ServiceInfo": "Service Info",
     "CreatedAt": "Created At",
     "StartService": "Start Service",
+    "Validate": "Validate",
+    "Cancel": "Cancel",
+    "Result": "Result",
+    "TimeStamp": "Timestamp",
+    "ValidationInfo": "Validation Info",
     "GenerateToken": "Generate Token",
     "GenerateNewToken": "Generate new token",
     "SessionOwner": "Session Owner",
     "ServiceEndpoint": "Service Endpoint",
+    "SeeContainerLogs": "See Container Logs",
     "NoServiceEndpoint": "No Service Endpoint",
     "RoutesInfo": "Routes Info",
     "GeneratedTokens": "Generated Tokens",
     "RouteId": "Route ID",
     "SessionId": "Session ID",
     "TrafficRatio": "Traffic Ratio",
-    "YouAreAboutToTerminate": "You are about to terminate ",
     "ClearErrors": "Clear error and retry",
     "ServingRouteErrorModalTitle": "Serving Route Error",
     "FailedToStartService": "Failed to create service.",
@@ -464,14 +471,24 @@
     "TokenExpiredDateError": "The token expiration time must be after the current time",
     "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
+    "CannotValidateNow": "Cannot validate service now. Please check resource allocation or other configurations.",
     "resources": "Resources",
     "Image": "Image",
     "Owner": "Owner",
+    "Processing": "Processing...",
+    "Success": "Success",
+    "Finished": "Finished",
+    "Error": "Error",
+    "Ready": "Ready",
     "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}",
     "FailedToTerminateService": "The request to terminate the service failed.",
     "ServiceCreated": "Model service {{ name }} has been created successfully.",
     "ServiceUpdated": "Model service {{ name }} has been updated successfully.",
-    "ServiceTerminated": "Model service {{ name }} has been terminated successfully."
+    "ServiceTerminated": "A shutdown request was sent for model service '{{ name }}'.",
+    "ModelMountDestination": "Mount Destination For Model Folder",
+    "AdditionalMounts": "Additional Mounts",
+    "ModelDefinitionPath": "Model Definition File Path",
+    "NoExtraMounts": "No extra mounts"
   },
   "button": {
     "Cancel": "Cancel",
@@ -533,7 +550,9 @@
     "Capabilities": "Capabilities",
     "NoAgentToDisplay": "No Agents to display",
     "NoNetworkSignal": "No network signals.",
-    "DiskPerc": "Disk %"
+    "DiskPerc": "Disk %",
+    "AutoRefreshEvery5s": "Auto refresh every 5s",
+    "Agent": "Agent"
   },
   "storageHost": {
     "Usage": "Usage",
@@ -590,7 +609,8 @@
     "Image": "Image",
     "All": "All",
     "InProgress": "In progress",
-    "Session": "Session"
+    "Session": "Session",
+    "General": "General"
   },
   "credential": {
     "Permission": "Permission",
@@ -859,7 +879,8 @@
       "DeleteForeverDesc": "WARNING: selected items will be deleted forever and you won't be able to restore them."
     },
     "ask": {
-      "DoYouWantToProceed": "Do you want to proceed?"
+      "DoYouWantToProceed": "Do you want to proceed?",
+      "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?"
     },
     "title": {
       "Notice": "Notice",
@@ -920,7 +941,10 @@
     "SuccessfullyModified": "Successfully modified",
     "ProblemOccurred": "Problem occurred",
     "PasswordsDoNotMatch": "Password and Confirmation do not match.",
-    "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted."
+    "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted.",
+    "DescImageResourceModified": "Resource limit successfully modified",
+    "DescImagePortsModified": "Image Ports successfully modified",
+    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1042,7 +1066,7 @@
     "ContainerPerSession": "Container Per Session",
     "IdleTimeoutSec": "Idle timeout (sec.)",
     "ConcurrentJobs": "Concurrent Jobs",
-    "MaxSessionLifeTime": "Session Lifetime (sec.)",
+    "MaxSessionLifetime": "Session Lifetime (sec.)",
     "Capacity": "Capacity",
     "Folders": "Folders",
     "Name": "Name",
@@ -1053,7 +1077,22 @@
     "SuccessfullyDeleted": "Resource policy successfully deleted.",
     "PolicyNameEmpty": "Policy name should not be empty.",
     "NoResourcePolicyToDisplay": "No Resource Policies to display",
-    "AboutToDeleteResourcePolicy": "You are about to delete this resource policy: "
+    "AboutToDeleteResourcePolicy": "You are about to delete this resource policy: ",
+    "Keypair": "Keypair",
+    "User": "User",
+    "Project": "Project",
+    "KeypairResourcePolicy": "Keypair Resource Policy",
+    "IdleTimeout": "Idle Timeout",
+    "CreateResourcePolicy": "Create Resource Policy",
+    "ResourcePolicyNameAlreadyExists": "Resource policy name already exists. Please change the name to add.",
+    "UserResourcePolicy": "User Resource Policy",
+    "MaxVFolderCount": "Max Folder Count",
+    "MaxSessionCountPerModelSession": "Max Session Count Per Model Session",
+    "MaxQuotaScopeSize": "Max Quota Scope Size (GB)",
+    "MaxCustomizedImageCount": "Max Customized Image Count",
+    "CreatedAt": "Created At",
+    "MaxFolderCount": "Max Folder Count",
+    "ProjectResourcePolicy": "Project Resource Policy"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1285,7 +1324,8 @@
     "ShowOnlyChanged": "Display Only Changes",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Use Hyperaccel LPU accelerator.",
-    "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin."
+    "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin.",
+    "SearchPlaceholder": "Search"
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1565,7 +1605,20 @@
     "CloneInfo": "It will be cloned as your user type folder.",
     "category": "Category"
   },
-  "setting": {
-    "SearchPlaceholder": "Enter Search Term"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Input field validation errors",
+      "ValidationErrorText": "If you don't enter a value in a required field or enter an invalid value, an error message displays in that field.",
+      "FixErrorAndTryAgainText": "If there is an error field, the Launch session button is disabled. Please correct the error and try again.",
+      "FixErrorFieldbyModifyButton": "For that error field, you can go directly to the Edit button in the top right corner to edit it."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Copy",
+    "Copied": "Copied"
+  },
+  "propertyFilter": {
+    "placeHolder": "Search",
+    "ResetFilter": "ResetFilter"
   }
 }

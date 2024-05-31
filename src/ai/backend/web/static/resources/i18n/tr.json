@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Şifrenizi girin",
       "InvalidBlankEmail": "E-postanızı giriniz",
       "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
-      "MyEnvironments": "Ortamlarım"
+      "MyEnvironments": "Ortamlarım",
+      "ResourcePolicy": "Kaynak Politikası"
     },
     "YouAreOffline": "Şu anda çevrimdışısın",
     "YouAreOnline": "artık çevrimiçisin",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "yuva",
       "Architecture": "Mimarlık",
-      "ModelStorageToMount": "Montaj için model depolama",
+      "ModelStorageToMount": "Monte Edilecek Model Depolama",
       "MinMemory": "Seçili çalışma zamanı ortamı için minimum bellek kapasitesi {{size}}iB'dir.",
       "AIAccelerator": "Yapay Zeka Hızlandırıcı",
       "ModelStorage": "Model Depolama",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı.",
       "Template": "Oturum Şablonu",
       "EnableAutomaticMiniumShmem": "Minimum paylaşılan belleği ayarlama",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Küme boyutu 2'den az olmadığında yalnızca tam sayılara izin verilir.",
       "StartAfter": "Şundan sonra başla:",
       "StartTimeDoesNotApply": "Başlangıç ​​zamanı ayarlanmamışsa geçerli değildir.",
@@ -273,7 +273,8 @@
       "AddEnvironmentVariable": "Ortam değişkenleri ekleme",
       "EnvironmentVariableValueRequired": "Lütfen bir değer girin.",
       "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin.",
-      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin."
+      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin.",
+      "ProxyDirectTCPNotSupported": "Proxy doğrudan TCP bağlantısı henüz desteklenmiyor"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -400,11 +401,11 @@
     "Agents": "Temsilciler",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (bellek)",
-    "ConvertSessionToImage": "Oturumu Resme Dönüştür",
     "SessionName": "Oturum Adı",
     "SessionId": "Oturum kimliği",
     "EnvironmentAndVersion": "Ortam ve Sürüm",
-    "Tags": "Etiketler"
+    "Tags": "Etiketler",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -466,7 +467,9 @@
     "Allocation": "Tahsis",
     "Utilization": "Kullanım",
     "DiskPerc": "Disk %",
-    "NoAgentToDisplay": "Görüntülenecek Temsilci Yok"
+    "NoAgentToDisplay": "Görüntülenecek Temsilci Yok",
+    "AutoRefreshEvery5s": "Her 5 saniyede bir otomatik yenile",
+    "Agent": "Ajan"
   },
   "general": {
     "cores": "çekirdek",
@@ -488,7 +491,8 @@
     "Image": "Resim",
     "All": "Tümü",
     "InProgress": "Devam Ediyor",
-    "Session": "Oturum"
+    "Session": "Oturum",
+    "General": "Genel"
   },
   "credential": {
     "Permission": "izin",
@@ -757,7 +761,8 @@
       "DeleteForeverDesc": "UYARI: seçilen öğeler kalıcı olarak silinecek ve bunları geri yükleyemeyeceksiniz."
     },
     "ask": {
-      "DoYouWantToProceed": "Devam etmek istiyor musunuz?"
+      "DoYouWantToProceed": "Devam etmek istiyor musunuz?",
+      "DoYouWantToDeleteSomething": "\"{{ name }}\" silmek istediğinizden emin misiniz?"
     },
     "title": {
       "LetsDouble-Check": "İki kez kontrol edelim",
@@ -818,7 +823,10 @@
     "NoChangeMade": "Herhangi bir değişiklik yapılmadı",
     "Architecture": "Mimarlık",
     "NoImageToDisplay": "Görüntülenecek Görüntü Yok",
-    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi."
+    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi.",
+    "DescImageResourceModified": "Kaynak sınırı başarıyla değiştirildi",
+    "DescImagePortsModified": "Görüntü Bağlantı Noktaları başarıyla değiştirildi",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -950,8 +958,23 @@
     "SuccessfullyDeleted": "Kaynak ilkesi başarıyla silindi.",
     "PolicyNameEmpty": "İlke adı boş bırakılmamalıdır.",
     "AboutToDeleteResourcePolicy": "Bu kaynak politikasını silmek üzeresiniz:",
-    "MaxSessionLifeTime": "Oturum Ömrü (sn.)",
-    "NoResourcePolicyToDisplay": "Görüntülenecek Kaynak İlkesi yok"
+    "MaxSessionLifetime": "Oturum Ömrü (sn.)",
+    "NoResourcePolicyToDisplay": "Görüntülenecek Kaynak İlkesi yok",
+    "Keypair": "Anahtar çifti",
+    "User": "Kullanıcı",
+    "Project": "Proje",
+    "KeypairResourcePolicy": "Anahtar Çifti Kaynak Politikası",
+    "IdleTimeout": "Boşta Kalma Zaman Aşımı",
+    "CreateResourcePolicy": "Kaynak Politikası Oluşturun",
+    "ResourcePolicyNameAlreadyExists": "Kaynak politikası adı zaten mevcut. \nLütfen eklenecek adı değiştirin.",
+    "UserResourcePolicy": "Kullanıcı Kaynağı Politikası",
+    "MaxVFolderCount": "Maksimum Klasör Sayısı",
+    "MaxSessionCountPerModelSession": "Model Oturumu Başına Maksimum Oturum Sayısı",
+    "MaxQuotaScopeSize": "Maksimum Kota Kapsamı Boyutu (GB)",
+    "MaxCustomizedImageCount": "Maksimum Özelleştirilmiş Görüntü Sayısı",
+    "CreatedAt": "Oluşturulma Tarihi",
+    "MaxFolderCount": "Maksimum Klasör Sayısı",
+    "ProjectResourcePolicy": "Proje Kaynak Politikası"
   },
   "registry": {
     "Hostname": "ana bilgisayar adı",
@@ -1183,7 +1206,8 @@
     "ShowOnlyChanged": "Yalnızca Değişiklikleri Görüntüle",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU hızlandırıcısını kullanın.",
-    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir."
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir.",
+    "SearchPlaceholder": "Arama"
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1463,14 +1487,29 @@
     "RoutingsCount": "Güzergah Sayısı",
     "Active/Total": "Aktif/Toplam",
     "Public": "Kamu",
-    "YouAreAboutToTerminate": "Sonlandırmak üzeresiniz",
     "Owner": "Mal sahibi",
+    "Validate": "Doğrula",
+    "Cancel": "İptal etmek",
+    "ValidationInfo": "Doğrulama Bilgisi",
+    "Processing": "İşleme...",
+    "Success": "Başarı",
+    "Error": "Hata",
+    "SeeContainerLogs": "Konteyner Günlüklerini görün",
+    "TimeStamp": "Zaman damgası",
+    "Result": "Sonuç",
+    "Finished": "Bitmiş",
     "ServiceDelegatedFrom": "Model hizmeti {{ createdUser }} tarafından oluşturulur ancak oturum sahipliği {{ sessionOwner }}'a devredilir.",
     "FailedToTerminateService": "Hizmeti sonlandırma isteği başarısız oldu.",
     "FailedToUpdateService": "Hizmet güncellenemedi.",
     "ServiceCreated": "Model hizmeti {{ name }} başarıyla oluşturuldu.",
     "ServiceUpdated": "Model hizmeti {{ name }} başarıyla güncellendi.",
-    "ServiceTerminated": "{{ name }} model hizmeti başarıyla sonlandırıldı."
+    "CannotValidateNow": "Hizmet şu anda doğrulanamıyor. \nLütfen kaynak tahsisini veya diğer yapılandırmaları kontrol edin.",
+    "Ready": "Hazır",
+    "ServiceTerminated": "'{{ name }}' model hizmeti için bir kapatma isteği gönderildi.",
+    "ModelMountDestination": "Model Klasörü İçin Montaj Hedefi",
+    "AdditionalMounts": "Ek Montajlar",
+    "ModelDefinitionPath": "Model Tanımı Dosya Yolu",
+    "NoExtraMounts": "Ekstra montaj yok"
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
@@ -1564,7 +1603,20 @@
     "SelectColumnToDisplay": "Görüntülenecek sütunları seçin",
     "SearchTableColumn": "Tablo sütunlarında arama yapın"
   },
-  "setting": {
-    "SearchPlaceholder": "Arama terimini gir"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Giriş alanı doğrulama hataları",
+      "ValidationErrorText": "Zorunlu bir alana değer girmezseniz veya geçersiz bir değer girerseniz o alanda bir hata mesajı görüntülenir.",
+      "FixErrorAndTryAgainText": "Bir hata alanı varsa Oturumu başlat düğmesi devre dışı bırakılır. \nLütfen hatayı düzeltip tekrar deneyin.",
+      "FixErrorFieldbyModifyButton": "Bu hata alanını düzenlemek için doğrudan sağ üst köşedeki Düzenle düğmesine gidebilirsiniz."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopyala",
+    "Copied": "Kopyalandı"
+  },
+  "propertyFilter": {
+    "placeHolder": "Arama",
+    "ResetFilter": "Filtreyi Sıfırla"
   }
 }
