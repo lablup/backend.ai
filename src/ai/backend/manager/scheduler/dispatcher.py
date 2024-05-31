@@ -1404,6 +1404,26 @@ class SchedulerDispatcher(aobject):
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
+        async with self.db.begin_session() as session:
+            query = (
+                sa.select(RoutingRow)
+                .join(
+                    RoutingRow.session_row.and_(
+                        SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
+                    )
+                )
+                .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
+                .options(selectinload(RoutingRow.session_row))
+            )
+            result = await session.execute(query)
+            zombie_routes = result.scalars().all()
+            if len(zombie_routes) > 0:
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.id.in_([r.id for r in zombie_routes])
+                )
+                result = await session.execute(query)
+                log.info("Cleared {} zombie routes", result.rowcount)
+
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(
                 session,
