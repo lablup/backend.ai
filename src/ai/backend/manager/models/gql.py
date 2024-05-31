@@ -1133,13 +1133,13 @@ class Queries(graphene.ObjectType):
         image_load_filters: set[ImageLoadFilter] = set()
         if image_filters is not None:
             try:
-                _filters = [PublicImageLoadFilter(f) for f in image_filters]
+                _filters: list[PublicImageLoadFilter] = [PublicImageLoadFilter(f) for f in image_filters]
             except ValueError as e:
                 allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
                 )
-            image_load_filters.update(_filters)
+            image_load_filters.update([PublicImageLoadFilter(f) for f in _filters])
             if client_role == UserRole.SUPERADMIN and ImageLoadFilter.CUSTOMIZED in image_load_filters:
                 image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
                 image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
