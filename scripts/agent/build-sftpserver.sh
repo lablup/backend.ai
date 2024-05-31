@@ -2,10 +2,10 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
+distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8" "oraclelinux9.0")
 
 static_libs_dockerfile_part=$(cat <<'EOF'
-ENV ZLIB_VER=1.2.11 \
+ENV ZLIB_VER=1.3.1 \
     SSL_VER=1.1.1i
 
 RUN wget https://www.zlib.net/zlib-${ZLIB_VER}.tar.gz -O /root/zlib-${ZLIB_VER}.tar.gz && \
@@ -80,6 +80,13 @@ RUN apk add --no-cache linux-headers
 EOF
 )
 
+oraclelinux9_builder_dockerfile=$(cat <<'EOF'
+FROM oraclelinux:9
+RUN dnf install -y make autoconf gcc perl perl-App-cpanminus perl-core zlib-devel wget
+RUN cpanm FindBin
+EOF
+)
+
 build_script=$(cat <<'EOF'
 #! /bin/sh
 echo "BUILD: OpenSSH"
@@ -109,6 +116,8 @@ echo -e "$ubuntu2004_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIP
 echo -e "$centos_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.centos7.6.dockerfile"
 echo -e "$alpine_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.alpine3.8.dockerfile"
 
+echo -e "$oraclelinux9_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.oraclelinux9.0.dockerfile"
+
 for distro in "${distros[@]}"; do
   docker build -t sftpserver-builder:$distro \
     -f $SCRIPT_DIR/sftpserver-builder.$distro.dockerfile $SCRIPT_DIR
@@ -129,8 +138,8 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp sftp-server.*.bin $SCRIPT_DIR/../src/ai/backend/runner
-cp scp.*.bin $SCRIPT_DIR/../src/ai/backend/runner
+cp sftp-server.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+cp scp.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 
 cd $SCRIPT_DIR/..
 rm -rf "$temp_dir"
