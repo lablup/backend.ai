@@ -957,6 +957,8 @@ class Endpoint(graphene.ObjectType):
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
         for route in error_routes:
+            if not route.error_data:
+                continue
             match route.error_data["type"]:
                 case "session_cancelled":
                     session_id = route.error_data["session_id"]
