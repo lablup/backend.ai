@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_relay import AsyncNode
@@ -574,6 +575,10 @@ class ModelServicePredicateChecker:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
+            if vfolder.usage_mode == VFolderUsageMode.MODEL:
+                raise InvalidAPIParameters(
+                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
+                )
 
         return vfolder_mounts
 
@@ -1005,7 +1010,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     resource_group = graphene.String()
     model_definition_path = graphene.String(description="Added in 24.03.4.")
     open_to_public = graphene.Boolean()
-    extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
+    extra_mounts = graphene.List(
+        ExtraMountInput,
+        description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
+    )
 
 
 class ModifyEndpoint(graphene.Mutation):
