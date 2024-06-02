@@ -988,7 +988,7 @@ class ComputeContainer(graphene.ObjectType):
             .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(KernelRow.image_row))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         if cluster_role is not None:
             query = query.where(KernelRow.cluster_role == cluster_role)
