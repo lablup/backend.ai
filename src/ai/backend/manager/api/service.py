@@ -283,7 +283,10 @@ class ServiceConfigModel(BaseModel):
     extra_mounts: Annotated[
         dict[uuid.UUID, MountOptionModel],
         Field(
-            description="Specifications about extra VFolders mounted to model service session",
+            description=(
+                "Specifications about extra VFolders mounted to model service session. "
+                "MODEL type VFolders are not allowed to be attached to model service session with this option."
+            ),
             default={},
         ),
     ]
