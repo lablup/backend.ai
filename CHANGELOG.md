@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.4b2 (2024-06-02)
+
+### Fixes
+* Fix GQL raising error when trying to resolve `endpoints.errors` field occasionally ([#2236](https://github.com/lablup/backend.ai/issues/2236))
+
+
 ## 24.03.4b1 (2024-06-01)
 
 ### Features
