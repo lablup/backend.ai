@@ -1034,7 +1034,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, _image_id)
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:
