@@ -527,6 +527,9 @@ class Image(graphene.ObjectType):
     # legacy field
     hash = graphene.String()
 
+    # internal attributes
+    raw_labels: dict[str, Any]
+
     @classmethod
     def populate_row(
         cls,
@@ -536,7 +539,7 @@ class Image(graphene.ObjectType):
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
-        return cls(
+        ret = cls(
             id=row.id,
             name=row.image,
             humanized_name=row.image,
@@ -562,6 +565,8 @@ class Image(graphene.ObjectType):
             # legacy
             hash=row.config_digest,
         )
+        ret.raw_labels = row.labels
+        return ret
 
     @classmethod
     async def from_row(
