@@ -16,6 +16,44 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.4 (2024-06-04)
+
+### Features
+* Allow user to explicitly set filename of model definition YAML ([#2063](https://github.com/lablup/backend.ai/issues/2063))
+* Revamp images GQL query by changing image filtering from flag-based to feature set-based and add `aliases` field to customized image GQL schema ([#2136](https://github.com/lablup/backend.ai/issues/2136))
+* Added missing fields for `keypair_resource_policy` in client-py, models, etc. ([#2146](https://github.com/lablup/backend.ai/issues/2146))
+* Add parameters to `check-presets` SDK function ([#2153](https://github.com/lablup/backend.ai/issues/2153))
+* Add relay-aware `VirtualFolderNode` GQL Query ([#2165](https://github.com/lablup/backend.ai/issues/2165))
+* Also perform basic model service validation process when updating model service via `ModifyEndpoint` ([#2167](https://github.com/lablup/backend.ai/issues/2167))
+* Add support for mounting arbitrary VFolders on model service session ([#2168](https://github.com/lablup/backend.ai/issues/2168))
+* Clear zombie routes automatically ([#2229](https://github.com/lablup/backend.ai/issues/2229))
+
+### Fixes
+* Let the `backend.ai mgr clear-history` command clears session records as well as kernel records ([#2077](https://github.com/lablup/backend.ai/issues/2077))
+* Fix orphan model service routes being created ([#2096](https://github.com/lablup/backend.ai/issues/2096))
+* Fix initialization of the resource usage API's kernel-level usage aggregation ([#2102](https://github.com/lablup/backend.ai/issues/2102))
+* Fix model server starting on every kernels (including sub role kernels) on multi container infernce session ([#2124](https://github.com/lablup/backend.ai/issues/2124))
+* Handle fileset-already-exists response of `create-filset` API request and make sure to wait between all GPFS job polling iterations ([#2144](https://github.com/lablup/backend.ai/issues/2144))
+* * Fix error when calling `check_presets` Client SDK API with an invalid `group` parameter 
+  * Rewrite Client SDK to access all APIConfig fields ([#2152](https://github.com/lablup/backend.ai/issues/2152))
+* Ensure that all pending sessions are picked by schedulers ([#2155](https://github.com/lablup/backend.ai/issues/2155))
+* Fix security vulnerability for `sudo_session_enabled` ([#2162](https://github.com/lablup/backend.ai/issues/2162))
+* Rename `endpoints.model_mount_destiation` to `model_mount_destination` ([#2163](https://github.com/lablup/backend.ai/issues/2163))
+* Wait for real quota scope directory creation after Netapp `create_qtree()` call ([#2170](https://github.com/lablup/backend.ai/issues/2170))
+* Fix wrong per-user concurrency calculation logic ([#2175](https://github.com/lablup/backend.ai/issues/2175))
+* Fix model service persisting on `degraded` status forever in rare chance when trying to delete the service ([#2191](https://github.com/lablup/backend.ai/issues/2191))
+* Fix error when query or mutate GraphQL using `BigInt` field type ([#2203](https://github.com/lablup/backend.ai/issues/2203))
+* Fix `backend.ai ssh` command execution when packaged as SCIE/PEX ([#2226](https://github.com/lablup/backend.ai/issues/2226))
+* * fix `endpoints` query not working when trying to load `image_row.aliases`
+  * fix `endpoints.status` reporting `PROVISIONING` when its status is in `DESTROYING` state ([#2233](https://github.com/lablup/backend.ai/issues/2233))
+* Fix GQL raising error when trying to resolve `endpoints.errors` field occasionally ([#2236](https://github.com/lablup/backend.ai/issues/2236))
+
+### Miscellaneous
+* Fix incorrect version notation of GQL Field. ([#1993](https://github.com/lablup/backend.ai/issues/1993))
+* Add max_pending_session_count field to Keypair resource policy GQL schema ([#2013](https://github.com/lablup/backend.ai/issues/2013))
+
+
+
 ## 24.03.4rc1 (2024-06-03)
 No significant changes.
 
