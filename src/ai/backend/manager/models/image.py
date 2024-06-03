@@ -718,8 +718,8 @@ class Image(graphene.ObjectType):
         if not filters:
             return True
 
-        # If the image filtered out by any of its labels, return False early.
-        # If the image is not filtered and is determiend to be balid by any of its labels, `is_valid = True`.
+        # If the image filtered by any of its labels, return False early.
+        # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
         is_valid = False
         for label in self.labels:
             match label.key:
