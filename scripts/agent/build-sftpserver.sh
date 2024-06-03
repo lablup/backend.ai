@@ -74,9 +74,9 @@ centos8_builder_dockerfile=$(cat <<'EOF'
 FROM centos:centos8
 RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
 
-RUN yum install -y make gcc
-RUN yum install -y autoconf
-RUN yum install -y wget
+RUN dnf install -y make gcc
+RUN dnf install -y autoconf
+RUN dnf install -y wget
 EOF
 )
 
