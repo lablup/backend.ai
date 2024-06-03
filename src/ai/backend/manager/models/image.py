@@ -729,6 +729,11 @@ class Image(graphene.ObjectType):
                     else:
                         return False
                 case "ai.backend.customized-image.owner":
+                    if (
+                        ImageLoadFilter.CUSTOMIZED not in filters
+                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                    ):
+                        return False
                     if ImageLoadFilter.CUSTOMIZED in filters:
                         if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
