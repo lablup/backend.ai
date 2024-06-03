@@ -722,25 +722,23 @@ class Image(graphene.ObjectType):
         # If the image is not filtered and is determiend to be balid by any of its labels, `is_valid = True`.
         is_valid = False
         for label in self.labels:
-            if ImageLoadFilter.OPERATIONAL in filters:
-                if label.key == "ai.backend.features" and "operation" in label.value:
-                    is_valid = True
-            else:
-                if label.key == "ai.backend.features" and "operation" in label.value:
-                    return False
-
-            if ImageLoadFilter.CUSTOMIZED in filters:
-                if label.key == "ai.backend.customized-image.owner":
-                    if label.value == f"user:{ctx.user['uuid']}":
+            match label.key:
+                case "ai.backend.features" if "operation" in label.value:
+                    if ImageLoadFilter.OPERATIONAL in filters:
                         is_valid = True
                     else:
                         return False
-            if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
-                if label.key == "ai.backend.customized-image.owner":
-                    if user_role == UserRole.SUPERADMIN:
-                        is_valid = True
-                    else:
-                        return False
+                case "ai.backend.customized-image.owner":
+                    if ImageLoadFilter.CUSTOMIZED in filters:
+                        if label.value == f"user:{ctx.user['uuid']}":
+                            is_valid = True
+                        else:
+                            return False
+                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
+                        if user_role == UserRole.SUPERADMIN:
+                            is_valid = True
+                        else:
+                            return False
         return is_valid
 
 
