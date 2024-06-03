@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "centos8.0" "alpine3.8")
+distros=("alpine3.8" "centos7.6" "centos8.0" "ubuntu16.04" "ubuntu18.04" "ubuntu20.04")
 
 static_libs_dockerfile_part=$(cat <<'EOF'
 ENV ZLIB_VER=1.3.1 \

@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine" "centos" "centos8.0")
+distros=("alpine" "centos" "centos8.0" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04")
 
 SCRIPT_DIR=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 temp_dir=$(mktemp -d -t bai-libbaihook.XXXXX)

@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8" "centos8.0")
+distros=("alpine3.8" "centos8.0" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04")
 
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
