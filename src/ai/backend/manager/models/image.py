@@ -710,16 +710,21 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         filters: set[ImageLoadFilter],
     ) -> bool:
+        """
+        Determine if the image is filtered according to the `filters` parameter.
+        """
         user_role = ctx.user["role"]
 
         if not filters:
             return True
 
-        result = False
+        # If the image filtered out by any of its labels, return False early.
+        # If the image is not filtered and is determiend to be balid by any of its labels, `is_valid = True`.
+        is_valid = False
         for label in self.labels:
             if ImageLoadFilter.OPERATIONAL in filters:
                 if label.key == "ai.backend.features" and "operation" in label.value:
-                    result = True
+                    is_valid = True
             else:
                 if label.key == "ai.backend.features" and "operation" in label.value:
                     return False
@@ -727,36 +732,16 @@ class Image(graphene.ObjectType):
             if ImageLoadFilter.CUSTOMIZED in filters:
                 if label.key == "ai.backend.customized-image.owner":
                     if label.value == f"user:{ctx.user['uuid']}":
-                        result = True
+                        is_valid = True
                     else:
                         return False
             if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
                 if label.key == "ai.backend.customized-image.owner":
                     if user_role == UserRole.SUPERADMIN:
-                        result = True
+                        is_valid = True
                     else:
                         return False
-        return result
-        #     match label.key:
-        #         case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
-        #             return False
-        #         case "ai.backend.customized-image.owner":
-        #             if (
-        #                 (
-        #                     ImageLoadFilter.CUSTOMIZED not in filters
-        #                     and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
-        #                 )
-        #                 or (
-        #                     ImageLoadFilter.CUSTOMIZED_GLOBAL in filters
-        #                     and user_role != UserRole.SUPERADMIN
-        #                 )
-        #                 or (
-        #                     ImageLoadFilter.CUSTOMIZED in filters
-        #                     and label.value != f"user:{ctx.user['uuid']}"
-        #                 )
-        #             ):
-        #                 return False
-        # return True
+        return is_valid
 
 
 class ImageNode(graphene.ObjectType):
