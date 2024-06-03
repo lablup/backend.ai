@@ -712,27 +712,50 @@ class Image(graphene.ObjectType):
     ) -> bool:
         user_role = ctx.user["role"]
 
+        if not filters:
+            return True
+
         for label in self.labels:
-            match label.key:
-                case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
+            if ImageLoadFilter.OPERATIONAL in filters:
+                if label.key == "ai.backend.features" and "operation" in label.value:
+                    return True
+            else:
+                if label.key == "ai.backend.features" and "operation" in label.value:
                     return False
-                case "ai.backend.customized-image.owner":
-                    if (
-                        (
-                            ImageLoadFilter.CUSTOMIZED not in filters
-                            and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
-                        )
-                        or (
-                            ImageLoadFilter.CUSTOMIZED_GLOBAL in filters
-                            and user_role != UserRole.SUPERADMIN
-                        )
-                        or (
-                            ImageLoadFilter.CUSTOMIZED in filters
-                            and label.value != f"user:{ctx.user['uuid']}"
-                        )
-                    ):
+
+            if ImageLoadFilter.CUSTOMIZED in filters:
+                if label.key == "ai.backend.customized-image.owner":
+                    if label.value == f"user:{ctx.user['uuid']}":
+                        return True
+                    else:
                         return False
-        return True
+            if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
+                if label.key == "ai.backend.customized-image.owner":
+                    if user_role == UserRole.SUPERADMIN:
+                        return True
+                    else:
+                        return False
+        return False
+        #     match label.key:
+        #         case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
+        #             return False
+        #         case "ai.backend.customized-image.owner":
+        #             if (
+        #                 (
+        #                     ImageLoadFilter.CUSTOMIZED not in filters
+        #                     and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+        #                 )
+        #                 or (
+        #                     ImageLoadFilter.CUSTOMIZED_GLOBAL in filters
+        #                     and user_role != UserRole.SUPERADMIN
+        #                 )
+        #                 or (
+        #                     ImageLoadFilter.CUSTOMIZED in filters
+        #                     and label.value != f"user:{ctx.user['uuid']}"
+        #                 )
+        #             ):
+        #                 return False
+        # return True
 
 
 class ImageNode(graphene.ObjectType):
