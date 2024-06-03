@@ -722,18 +722,22 @@ async def fetch_exposed_volume_fields(
                 },
             ) as (_, storage_resp):
                 storage_reply = await storage_resp.json()
+                storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
+                storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
                 if show_used:
-                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+                    volume_usage["used"] = storage_used_bytes
 
                 if show_total:
-                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    volume_usage["total"] = storage_capacity_bytes
 
                 if show_percentage:
-                    volume_usage["percentage"] = (
-                        storage_reply[ExposedVolumeInfoField.used_bytes]
-                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
-                    ) * 100
+                    try:
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0
 
             await redis_helper.execute(
                 redis_connection,
