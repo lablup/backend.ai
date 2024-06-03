@@ -715,10 +715,11 @@ class Image(graphene.ObjectType):
         if not filters:
             return True
 
+        result = False
         for label in self.labels:
             if ImageLoadFilter.OPERATIONAL in filters:
                 if label.key == "ai.backend.features" and "operation" in label.value:
-                    return True
+                    result = True
             else:
                 if label.key == "ai.backend.features" and "operation" in label.value:
                     return False
@@ -726,16 +727,16 @@ class Image(graphene.ObjectType):
             if ImageLoadFilter.CUSTOMIZED in filters:
                 if label.key == "ai.backend.customized-image.owner":
                     if label.value == f"user:{ctx.user['uuid']}":
-                        return True
+                        result = True
                     else:
                         return False
             if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
                 if label.key == "ai.backend.customized-image.owner":
                     if user_role == UserRole.SUPERADMIN:
-                        return True
+                        result = True
                     else:
                         return False
-        return False
+        return result
         #     match label.key:
         #         case "ai.backend.features" if "operation" in label.value and ImageLoadFilter.OPERATIONAL not in filters:
         #             return False
