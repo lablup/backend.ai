@@ -1283,11 +1283,11 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
 
 @dataclass
 class AgentKernelRegistryByStatus(JSONSerializableMixin):
-    from .events import KernelLifecycleEventReason
+    KernelTerminationInfo = tuple[KernelId, str]
 
-    all_running_kernels: list[KernelId]
-    actual_terminating_kernels: list[tuple[KernelId, KernelLifecycleEventReason]]
-    actual_terminated_kernels: list[tuple[KernelId, KernelLifecycleEventReason]]
+    actual_existing_kernels: list[KernelId]
+    actual_terminating_kernels: list[KernelTerminationInfo]
+    actual_terminated_kernels: list[KernelTerminationInfo]
 
     def to_json(self) -> dict[str, list[KernelId]]:
         return dataclasses.asdict(self)
@@ -1301,7 +1301,7 @@ class AgentKernelRegistryByStatus(JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict({
-            t.Key("all_running_kernels"): tx.ToList(t.String),
+            t.Key("actual_existing_kernels"): tx.ToList(t.String),
             t.Key("actual_terminating_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
             t.Key("actual_terminated_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
         })
