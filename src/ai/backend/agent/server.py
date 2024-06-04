@@ -483,8 +483,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def sync_and_get_kernels(
         self,
-        running_kernels_from_truth: Collection[str],
-        terminating_kernels_from_truth: Collection[str],
+        running_kernels: Collection[str],
+        terminating_kernels: Collection[str],
     ) -> dict[str, Any]:
         """
         Sync kernel_registry and containers to truth data
@@ -495,13 +495,13 @@ class AgentRPCServer(aobject):
         actual_terminated_kernels: list[tuple[KernelId, KernelLifecycleEventReason]] = []
 
         async with self.agent.registry_lock:
-            all_running_kernels = [
+            actual_existing_kernels = [
                 kid
                 for kid in self.agent.kernel_registry
                 if kid not in self.agent.terminating_kernels
             ]
 
-            for raw_kernel_id in running_kernels_from_truth:
+            for raw_kernel_id in running_kernels:
                 kernel_id = KernelId(UUID(raw_kernel_id))
                 if (kernel_obj := self.agent.kernel_registry.get(kernel_id)) is not None:
                     if kernel_id in self.agent.terminating_kernels:
@@ -516,7 +516,7 @@ class AgentRPCServer(aobject):
                         KernelLifecycleEventReason.ALREADY_TERMINATED,
                     ))
 
-            for raw_kernel_id in terminating_kernels_from_truth:
+            for raw_kernel_id in terminating_kernels:
                 kernel_id = KernelId(UUID(raw_kernel_id))
                 if (kernel_obj := self.agent.kernel_registry.get(kernel_id)) is not None:
                     if kernel_id not in self.agent.terminating_kernels:
@@ -535,7 +535,7 @@ class AgentRPCServer(aobject):
                     ))
 
             for kernel_id, kernel_obj in self.agent.kernel_registry.items():
-                if kernel_id in terminating_kernels_from_truth:
+                if kernel_id in terminating_kernels:
                     if kernel_id not in self.agent.terminating_kernels:
                         await self.agent.inject_container_lifecycle_event(
                             kernel_id,
@@ -545,7 +545,7 @@ class AgentRPCServer(aobject):
                             or KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                             suppress_events=False,
                         )
-                elif kernel_id not in running_kernels_from_truth:
+                elif kernel_id not in running_kernels:
                     # The kernel status is not 'running' or 'terminating' in truth.
                     # It should be terminated.
                     if kernel_id not in self.agent.terminating_kernels:
@@ -559,7 +559,7 @@ class AgentRPCServer(aobject):
                         )
 
         result = AgentKernelRegistryByStatus(
-            all_running_kernels,
+            actual_existing_kernels,
             actual_terminating_kernels,
             actual_terminated_kernels,
         )
