@@ -1033,22 +1033,17 @@ class AbstractAgent(
                         ev.done_future.set_exception(e)
                     raise
                 finally:
-                    if ev.container_id is not None:
-                        await self.container_lifecycle_queue.put(
-                            ContainerLifecycleEvent(
-                                ev.kernel_id,
-                                ev.session_id,
-                                ev.container_id,
-                                LifecycleEvent.CLEAN,
-                                ev.reason,
-                                suppress_events=ev.suppress_events,
-                                done_future=ev.done_future,
-                            ),
-                        )
-                    else:
-                        # Items in `terminating_kernels` are deleted only in _handle_clean_event()
-                        # Should delete the kernel_id that will not be cleaned
-                        self.terminating_kernels.discard(ev.kernel_id)
+                    await self.container_lifecycle_queue.put(
+                        ContainerLifecycleEvent(
+                            ev.kernel_id,
+                            ev.session_id,
+                            ev.container_id,
+                            LifecycleEvent.CLEAN,
+                            ev.reason,
+                            suppress_events=ev.suppress_events,
+                            done_future=ev.done_future,
+                        ),
+                    )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -2002,44 +1997,47 @@ class AbstractAgent(
                     service_ports,
                 )
                 async with self.registry_lock:
-                    self.kernel_registry[ctx.kernel_id] = kernel_obj
-                try:
-                    container_data = await ctx.start_container(
-                        kernel_obj,
-                        cmdargs,
-                        resource_opts,
-                        preopen_ports,
-                    )
-                except ContainerCreationError as e:
-                    msg = e.message or "unknown"
-                    log.error(
-                        "Kernel failed to create container. Kernel is going to be destroyed."
-                        f" (k:{ctx.kernel_id}, detail:{msg})",
-                    )
-                    cid = e.container_id
-                    async with self.registry_lock:
+                    self.kernel_registry[kernel_id] = kernel_obj
+                    try:
+                        container_data = await ctx.start_container(
+                            kernel_obj,
+                            cmdargs,
+                            resource_opts,
+                            preopen_ports,
+                        )
+                    except ContainerCreationError as e:
+                        msg = e.message or "unknown"
+                        log.error(
+                            "Kernel failed to create container. Kernel is going to be destroyed."
+                            f" (k:{kernel_id}, detail:{msg})",
+                        )
+                        cid = e.container_id
                         self.kernel_registry[ctx.kernel_id]["container_id"] = cid
-                    await self.inject_container_lifecycle_event(
-                        kernel_id,
-                        session_id,
-                        LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.FAILED_TO_CREATE,
-                        container_id=ContainerId(cid),
-                    )
-                    raise AgentError(
-                        f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
-                    )
-                except Exception:
-                    log.warning(
-                        "Kernel failed to create container (k:{}). Kernel is going to be"
-                        " unregistered.",
-                        kernel_id,
-                    )
-                    async with self.registry_lock:
-                        del self.kernel_registry[kernel_id]
-                    raise
-                async with self.registry_lock:
-                    self.kernel_registry[ctx.kernel_id].data.update(container_data)
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_CREATE,
+                            container_id=ContainerId(cid),
+                        )
+                        raise AgentError(
+                            f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
+                        )
+                    except Exception as e:
+                        log.warning(
+                            "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
+                            kernel_id,
+                        )
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_CREATE,
+                        )
+                        raise AgentError(
+                            f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
+                        )
+                    self.kernel_registry[kernel_id].data.update(container_data)
                 await kernel_obj.init(self.event_producer)
 
                 current_task = asyncio.current_task()
