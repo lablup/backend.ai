@@ -56,6 +56,7 @@ from ai.backend.common.events import (
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
+    AgentKernelRegistryByStatus,
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
@@ -75,7 +76,7 @@ from ..api.exceptions import (
     SessionNotFound,
 )
 from ..defs import SERVICE_MAX_RETRIES, LockID
-from ..exceptions import convert_to_status_data
+from ..exceptions import MultiAgentError, convert_to_status_data
 from ..models import (
     AgentRow,
     AgentStatus,
@@ -315,10 +316,13 @@ class SchedulerDispatcher(aobject):
                                 sgroup_name,
                             )
                         except Exception as e:
-                            log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
+                            log.exception(
+                                "schedule({}): scheduling error!\n{}", sgroup_name, repr(e)
+                            )
                         else:
                             if (
-                                AgentResourceSyncTrigger.AFTER_SCHEDULING in agent_resource_sync_trigger
+                                AgentResourceSyncTrigger.AFTER_SCHEDULING
+                                in agent_resource_sync_trigger
                                 and kernel_agent_bindings
                             ):
                                 selected_agent_ids = [
