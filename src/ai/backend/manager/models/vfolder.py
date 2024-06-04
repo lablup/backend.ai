@@ -786,16 +786,22 @@ class ACLPermissionContext(
         ) -> WhereClauseType:
             return base_cond | or_cond if base_cond is not None else or_cond
 
-        if self.user:
-            cond = _coalesce(cond, VFolderRow.user.in_(self.user.keys()))
-        if self.project:
-            cond = _coalesce(cond, VFolderRow.group.in_(self.project.keys()))
-        if self.domain:
-            cond = _coalesce(cond, VFolderRow.domain_name.in_(self.domain.keys()))
-        if self.additional:
-            cond = _coalesce(cond, VFolderRow.id.in_(self.additional.keys()))
-        if self.overridden:
-            cond = _coalesce(cond, VFolderRow.id.in_(self.overridden.keys()))
+        if self.user_id_to_permission_map:
+            cond = _coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
+        if self.project_id_to_permission_map:
+            cond = _coalesce(cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys()))
+        if self.domain_name_to_permission_map:
+            cond = _coalesce(
+                cond, VFolderRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
         return cond
 
     async def _build_query(self) -> sa.sql.Select | None:
@@ -809,13 +815,15 @@ class ACLPermissionContext(
     ) -> frozenset[VFolderACLPermission]:
         vfolder_row = acl_obj
         vfolder_id = cast(uuid.UUID, acl_obj.id)
-        if (overriden_perm := self.overridden.get(vfolder_id)) is not None:
+        if (
+            overriden_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
+        ) is not None:
             return overriden_perm
         permissions: set[VFolderACLPermission] = set()
-        permissions |= self.additional.get(vfolder_id, set())
-        permissions |= self.user.get(vfolder_row.user, set())
-        permissions |= self.project.get(vfolder_row.group, set())
-        permissions |= self.domain.get(vfolder_row.domain_name, set())
+        permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
+        permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
+        permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
+        permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
         return frozenset(permissions)
 
 
@@ -829,11 +837,15 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         *,
         extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
-        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
-        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain_name_to_permission_map: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        object_id_to_additional_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
+        object_id_to_overriding_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 if ctx.user_id == user_id:
@@ -847,12 +859,12 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             )  # filter out project vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(additional_stmt)
                     }
 
-                    user = {user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
                 else:
                     additional_stmt = (
                         sa.select(VFolderPermissionRow)
@@ -864,11 +876,13 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             )  # filter out project vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: DEFAULT_ADMIN_PERMISSIONS_ON_USER_INVITED_VFOLDERS
                         for row in await db_session.scalars(additional_stmt)
                     }
-                    user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
+                    user_id_to_permission_map = {
+                        user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS
+                    }
             case UserRole.ADMIN:
                 if ctx.user_id == user_id:
                     additional_stmt = (
@@ -881,12 +895,12 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             )  # filter out project vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(additional_stmt)
                     }
 
-                    user = {user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
                 else:
                     # domain admins cannot access to users in another domain
                     user_domain_stmt = (
@@ -897,11 +911,11 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                     user_row = cast(UserRow, await db_session.scalar(user_domain_stmt))
                     if user_row.domain_name != ctx.domain_name:
                         return ACLPermissionContext(
-                            user=user,
-                            project=project,
-                            domain=domain,
-                            additional=additional,
-                            overridden=overridden,
+                            user_id_to_permission_map,
+                            project_id_to_permission_map,
+                            domain_name_to_permission_map,
+                            object_id_to_additional_permission_map,
+                            object_id_to_overriding_permission_map,
                         )
                     additional_stmt = (
                         sa.select(VFolderPermissionRow)
@@ -913,11 +927,13 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             )  # filter out project vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: DEFAULT_ADMIN_PERMISSIONS_ON_USER_INVITED_VFOLDERS
                         for row in await db_session.scalars(additional_stmt)
                     }
-                    user = {user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS}
+                    user_id_to_permission_map = {
+                        user_id: DEFAULT_ADMIN_PERMISSIONS_ON_USER_VFOLDERS
+                    }
             case UserRole.USER | UserRole.MONITOR:
                 if ctx.user_id == user_id:
                     overridden_stmt = (
@@ -930,20 +946,20 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             )  # filter out project vfolders
                         )
                     )
-                    overridden = {
+                    object_id_to_overriding_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(overridden_stmt)
                     }
 
-                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
             case _:
                 raise RuntimeError("should not reach here")
         return ACLPermissionContext(
-            user=user,
-            project=project,
-            domain=domain,
-            additional=additional,
-            overridden=overridden,
+            user_id_to_permission_map,
+            project_id_to_permission_map,
+            domain_name_to_permission_map,
+            object_id_to_additional_permission_map,
+            object_id_to_overriding_permission_map,
         )
 
     @classmethod
@@ -955,18 +971,22 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         *,
         extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
-        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
-        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain_name_to_permission_map: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        object_id_to_additional_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
+        object_id_to_overriding_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
 
         project_ctx = await ctx.get_or_init_project_ctx()
         role_in_project = project_ctx.get(project_id)
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 # superadmins have an owner permissions to any project folders in any domain
-                project = {project_id: OWNER_PERMISSIONS}
+                project_id_to_permission_map = {project_id: OWNER_PERMISSIONS}
                 if role_in_project is not None:
                     # Admin/user is associated with the project, fetch owned/invited vfolders
                     additional_stmt = (
@@ -981,16 +1001,16 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             # project vfolders or invited user vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(additional_stmt)
                     }
 
-                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
             case UserRole.ADMIN:
                 if role_in_project is not None:
                     # domain admins have an owner permissions to any project folders in the same domain
-                    project = {
+                    project_id_to_permission_map = {
                         project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
                     }
 
@@ -1007,20 +1027,20 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             # project vfolders or invited user vfolders
                         )
                     )
-                    additional = {
+                    object_id_to_additional_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(additional_stmt)
                     }
 
-                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
                 else:
                     # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
-                    project = {
+                    project_id_to_permission_map = {
                         project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
                     }
             case UserRole.USER | UserRole.MONITOR:
                 if role_in_project is not None:
-                    project = {
+                    project_id_to_permission_map = {
                         project_id: OWNER_PERMISSIONS
                         if role_in_project == UserRoleInProject.ADMIN
                         else DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
@@ -1039,23 +1059,23 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                             # project vfolders or invited user vfolders
                         )
                     )
-                    overridden = {
+                    object_id_to_overriding_permission_map = {
                         row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                         for row in await db_session.scalars(overridden_stmt)
                     }
 
-                    user = {ctx.user_id: OWNER_PERMISSIONS}
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
                 else:
                     # Admin/user is NOT associated with the project, do not fetch owned/invited vfolders
                     pass
             case _:
                 raise RuntimeError("should not reach here")
         return ACLPermissionContext(
-            user=user,
-            project=project,
-            domain=domain,
-            additional=additional,
-            overridden=overridden,
+            user_id_to_permission_map,
+            project_id_to_permission_map,
+            domain_name_to_permission_map,
+            object_id_to_additional_permission_map,
+            object_id_to_overriding_permission_map,
         )
 
     @classmethod
@@ -1067,15 +1087,19 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         *,
         extra_target_scopes: ExtraACLScopeType | None,
     ) -> ACLPermissionContext:
-        user: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        project: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        domain: Mapping[str, frozenset[VFolderACLPermission]] = {}
-        additional: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        overridden: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
+        domain_name_to_permission_map: Mapping[str, frozenset[VFolderACLPermission]] = {}
+        object_id_to_additional_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
+        object_id_to_overriding_permission_map: Mapping[
+            uuid.UUID, frozenset[VFolderACLPermission]
+        ] = {}
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 # superadmins have these permissions to any folders in any domain by default
-                domain = {
+                domain_name_to_permission_map = {
                     domain_name: frozenset([
                         VFolderACLPermission.READ_ATTRIBUTE,
                         VFolderACLPermission.UPDATE_ATTRIBUTE,
@@ -1084,15 +1108,17 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                 }
                 if ctx.domain_name != domain_name:
                     return ACLPermissionContext(
-                        user=user,
-                        project=project,
-                        domain=domain,
-                        additional=additional,
-                        overridden=overridden,
+                        user_id_to_permission_map,
+                        project_id_to_permission_map,
+                        domain_name_to_permission_map,
+                        object_id_to_additional_permission_map,
+                        object_id_to_overriding_permission_map,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
                 # superadmins have an owner permissions to any project folders in the same domain
-                project = {project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()}
+                project_id_to_permission_map = {
+                    project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
+                }
                 additional_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1101,26 +1127,28 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                         & (VFolderRow.domain_name == domain_name)
                     )
                 )
-                additional = {
+                object_id_to_additional_permission_map = {
                     row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                     for row in await db_session.scalars(additional_stmt)
                 }
 
-                user = {ctx.user_id: OWNER_PERMISSIONS}
+                user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
             case UserRole.ADMIN:
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
                     return ACLPermissionContext(
-                        user=user,
-                        project=project,
-                        domain=domain,
-                        additional=additional,
-                        overridden=overridden,
+                        user_id_to_permission_map,
+                        project_id_to_permission_map,
+                        domain_name_to_permission_map,
+                        object_id_to_additional_permission_map,
+                        object_id_to_overriding_permission_map,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
 
                 # domain admins have an owner permissions to any project folders in the same domain
-                project = {project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()}
+                project_id_to_permission_map = {
+                    project_id: OWNER_PERMISSIONS for project_id, _ in project_ctx.items()
+                }
                 additional_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1129,15 +1157,15 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                         & (VFolderRow.domain_name == domain_name)
                     )
                 )
-                additional = {
+                object_id_to_additional_permission_map = {
                     row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                     for row in await db_session.scalars(additional_stmt)
                 }
 
-                user = {ctx.user_id: OWNER_PERMISSIONS}
+                user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
 
                 # domain admins default permissions for folders in the same domain
-                domain = {
+                domain_name_to_permission_map = {
                     domain_name: frozenset([
                         VFolderACLPermission.READ_ATTRIBUTE,
                         VFolderACLPermission.UPDATE_ATTRIBUTE,
@@ -1148,14 +1176,14 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                 if ctx.domain_name != domain_name:
                     # Only superadmin can access to another domains
                     return ACLPermissionContext(
-                        user=user,
-                        project=project,
-                        domain=domain,
-                        additional=additional,
-                        overridden=overridden,
+                        user_id_to_permission_map,
+                        project_id_to_permission_map,
+                        domain_name_to_permission_map,
+                        object_id_to_additional_permission_map,
+                        object_id_to_overriding_permission_map,
                     )
                 project_ctx = await ctx.get_or_init_project_ctx()
-                project = {
+                project_id_to_permission_map = {
                     project_id: DEFAULT_USER_PERMISSIONS_ON_ASSOCIATED_PROJECT_VFOLDERS
                     if role == UserRoleInProject.USER
                     else OWNER_PERMISSIONS
@@ -1169,21 +1197,21 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
                         & (VFolderRow.domain_name == domain_name)
                     )
                 )
-                overridden = {
+                object_id_to_overriding_permission_map = {
                     row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
                     for row in await db_session.scalars(overridden_stmt)
                 }
 
-                user = {ctx.user_id: OWNER_PERMISSIONS}
+                user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
 
             case _:
                 raise RuntimeError("should not reach here")
         return ACLPermissionContext(
-            user=user,
-            project=project,
-            domain=domain,
-            additional=additional,
-            overridden=overridden,
+            user_id_to_permission_map,
+            project_id_to_permission_map,
+            domain_name_to_permission_map,
+            object_id_to_additional_permission_map,
+            object_id_to_overriding_permission_map,
         )
 
 
