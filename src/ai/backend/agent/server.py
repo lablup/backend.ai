@@ -491,8 +491,8 @@ class AgentRPCServer(aobject):
         and return kernel infos whose status is irreversible.
         """
 
-        actual_terminating_kernels: list[tuple[KernelId, KernelLifecycleEventReason]] = []
-        actual_terminated_kernels: list[tuple[KernelId, KernelLifecycleEventReason]] = []
+        actual_terminating_kernels: list[tuple[KernelId, str]] = []
+        actual_terminated_kernels: list[tuple[KernelId, str]] = []
 
         async with self.agent.registry_lock:
             actual_existing_kernels = [
@@ -507,13 +507,15 @@ class AgentRPCServer(aobject):
                     if kernel_id in self.agent.terminating_kernels:
                         actual_terminating_kernels.append((
                             kernel_id,
-                            kernel_obj.termination_reason
-                            or KernelLifecycleEventReason.ALREADY_TERMINATED,
+                            str(
+                                kernel_obj.termination_reason
+                                or KernelLifecycleEventReason.ALREADY_TERMINATED
+                            ),
                         ))
                 else:
                     actual_terminated_kernels.append((
                         kernel_id,
-                        KernelLifecycleEventReason.ALREADY_TERMINATED,
+                        str(KernelLifecycleEventReason.ALREADY_TERMINATED),
                     ))
 
             for raw_kernel_id in terminating_kernels:
@@ -531,7 +533,7 @@ class AgentRPCServer(aobject):
                 else:
                     actual_terminated_kernels.append((
                         kernel_id,
-                        KernelLifecycleEventReason.ALREADY_TERMINATED,
+                        str(KernelLifecycleEventReason.ALREADY_TERMINATED),
                     ))
 
             for kernel_id, kernel_obj in self.agent.kernel_registry.items():
