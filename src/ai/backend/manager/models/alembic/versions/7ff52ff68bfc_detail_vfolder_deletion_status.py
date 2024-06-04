@@ -7,6 +7,7 @@ Create Date: 2024-02-06 15:27:34.975504
 """
 
 import enum
+from typing import cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -64,7 +65,24 @@ def upgrade() -> None:
     """
         )
     )
-    conn.execute(text("DROP TYPE vfolderoperationstatus;"))
+    result = conn.execute(
+        text(
+            "SELECT t.typname as enum_name FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid GROUP BY enum_name;"
+        )
+    )
+    enum_name = "vfolderoperationstatus"
+    for row in result:
+        try:
+            candidate_enum = cast(str, row[0])
+        except IndexError:
+            continue
+        if candidate_enum == "vfolderoperationstatus":
+            break
+        elif candidate_enum == "vfolderstatus":
+            enum_name = candidate_enum
+            break
+
+    conn.execute(text(f"DROP TYPE {enum_name};"))
     op.add_column(
         "vfolders",
         sa.Column(
