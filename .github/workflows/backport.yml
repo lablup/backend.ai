@@ -59,8 +59,8 @@ jobs:
           done
           echo "${milestones[@]}"
 
-          for i in "${milestones[@]}"; do
-            if ! git branch -r | grep -q "^origin/$i\$"; then
+          for i in "${!milestones[@]}"; do
+            if ! git branch -r | grep -q "origin/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
