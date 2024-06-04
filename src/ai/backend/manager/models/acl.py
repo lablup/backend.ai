@@ -126,37 +126,37 @@ class AbstractACLPermissionContext(
     `overridden` field is used to address exceptional cases such as permission overriding or cover other scopes(scaling groups or storage hosts etc).
     """
 
-    user: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
-    project: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
-    domain: Mapping[str, frozenset[ACLPermissionType]]
+    user_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
+    project_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
+    domain_name_to_permission_map: Mapping[str, frozenset[ACLPermissionType]]
 
-    additional: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
-    overridden: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
+    object_id_to_additional_permission_map: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
+    object_id_to_overriding_permission_map: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
 
     def filter_by_permission(self, permission_to_include: ACLPermissionType) -> None:
-        self.user = {
+        self.user_id_to_permission_map = {
             uid: permissions
-            for uid, permissions in self.user.items()
+            for uid, permissions in self.user_id_to_permission_map.items()
             if permission_to_include in permissions
         }
-        self.project = {
+        self.project_id_to_permission_map = {
             pid: permissions
-            for pid, permissions in self.project.items()
+            for pid, permissions in self.project_id_to_permission_map.items()
             if permission_to_include in permissions
         }
-        self.domain = {
+        self.domain_name_to_permission_map = {
             dname: permissions
-            for dname, permissions in self.domain.items()
+            for dname, permissions in self.domain_name_to_permission_map.items()
             if permission_to_include in permissions
         }
-        self.additional = {
+        self.object_id_to_additional_permission_map = {
             obj_id: permissions
-            for obj_id, permissions in self.additional.items()
+            for obj_id, permissions in self.object_id_to_additional_permission_map.items()
             if permission_to_include in permissions
         }
-        self.overridden = {
+        self.object_id_to_overriding_permission_map = {
             obj_id: permissions
-            for obj_id, permissions in self.overridden.items()
+            for obj_id, permissions in self.object_id_to_overriding_permission_map.items()
             if permission_to_include in permissions
         }
 
