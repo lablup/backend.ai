@@ -483,6 +483,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def sync_and_get_kernels(
         self,
+        preparing_kernels: Collection[str],
+        pulling_kernels: Collection[str],
         running_kernels: Collection[str],
         terminating_kernels: Collection[str],
     ) -> dict[str, Any]:
@@ -547,10 +549,30 @@ class AgentRPCServer(aobject):
                             or KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                             suppress_events=False,
                         )
-                elif kernel_id not in running_kernels:
-                    # The kernel status is not 'running' or 'terminating' in truth.
-                    # It should be terminated.
-                    if kernel_id not in self.agent.terminating_kernels:
+                elif kernel_id in running_kernels:
+                    pass
+                elif kernel_id in preparing_kernels:
+                    # kernel_registry may not have `preparing` state kernels.
+                    pass
+                elif kernel_id in pulling_kernels:
+                    # kernel_registry does not have `pulling` state kernels.
+                    # Let's just skip it.
+                    pass
+                else:
+                    # This kernel is not alive according to the truth data.
+                    # The kernel should be destroyed or cleaned
+                    if kernel_id in self.agent.terminating_kernels:
+                        await self.agent.inject_container_lifecycle_event(
+                            kernel_id,
+                            kernel_obj.session_id,
+                            LifecycleEvent.CLEAN,
+                            kernel_obj.termination_reason
+                            or KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                            suppress_events=True,
+                        )
+                    elif kernel_id in self.agent.restarting_kernels:
+                        pass
+                    else:
                         await self.agent.inject_container_lifecycle_event(
                             kernel_id,
                             kernel_obj.session_id,

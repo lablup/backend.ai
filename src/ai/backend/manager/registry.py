@@ -3089,11 +3089,15 @@ class AgentRegistry:
     async def _sync_agent_resource_and_get_kerenels(
         self,
         agent_id: AgentId,
+        preparing_kernels: Collection[KernelId],
+        pulling_kernels: Collection[KernelId],
         running_kernels: Collection[KernelId],
         terminating_kernels: Collection[KernelId],
     ) -> AgentKernelRegistryByStatus:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             resp: dict[str, Any] = await rpc.call.sync_and_get_kernels(
+                preparing_kernels,
+                pulling_kernels,
                 running_kernels,
                 terminating_kernels,
             )
@@ -3112,7 +3116,12 @@ class AgentRegistry:
             .options(
                 selectinload(
                     AgentRow.kernels.and_(
-                        KernelRow.status.in_([KernelStatus.RUNNING, KernelStatus.TERMINATING])
+                        KernelRow.status.in_([
+                            KernelStatus.PREPARING,
+                            KernelStatus.PULLING,
+                            KernelStatus.RUNNING,
+                            KernelStatus.TERMINATING,
+                        ])
                     ),
                 ).options(load_only(KernelRow.id, KernelRow.status))
             )
@@ -3120,23 +3129,36 @@ class AgentRegistry:
         async with SASession(bind=db_connection) as db_session:
             for _agent_row in await db_session.scalars(stmt):
                 agent_row = cast(AgentRow, _agent_row)
+                preparing_kernels: list[KernelId] = []
+                pulling_kernels: list[KernelId] = []
+                running_kernels: list[KernelId] = []
+                terminating_kernels: list[KernelId] = []
+                for kernel in agent_row.kernels:
+                    kernel_status = cast(KernelStatus, kernel.status)
+                    match kernel_status:
+                        case KernelStatus.PREPARING:
+                            preparing_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.PULLING:
+                            pulling_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.RUNNING:
+                            running_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.TERMINATING:
+                            terminating_kernels.append(KernelId(kernel.id))
+                        case _:
+                            continue
                 agent_kernel_by_status[AgentId(agent_row.id)] = {
-                    "running_kernels": [
-                        KernelId(kern.id)
-                        for kern in agent_row.kernels
-                        if kern.status == KernelStatus.RUNNING
-                    ],
-                    "terminating_kernels": [
-                        KernelId(kern.id)
-                        for kern in agent_row.kernels
-                        if kern.status == KernelStatus.TERMINATING
-                    ],
+                    "preparing_kernels": preparing_kernels,
+                    "pulling_kernels": pulling_kernels,
+                    "running_kernels": running_kernels,
+                    "terminating_kernels": terminating_kernels,
                 }
         tasks = []
         for agent_id in agent_ids:
             tasks.append(
                 self._sync_agent_resource_and_get_kerenels(
                     agent_id,
+                    agent_kernel_by_status[agent_id]["preparing_kernels"],
+                    agent_kernel_by_status[agent_id]["pulling_kernels"],
                     agent_kernel_by_status[agent_id]["running_kernels"],
                     agent_kernel_by_status[agent_id]["terminating_kernels"],
                 )
@@ -3154,7 +3176,9 @@ class AgentRegistry:
                     agent_errors,
                 )
             else:
-                assert isinstance(resp, AgentKernelRegistryByStatus)
+                assert isinstance(
+                    resp, AgentKernelRegistryByStatus
+                ), f"response should be `AgentKernelRegistryByStatus`, not {type(resp)}"
                 result[aid] = resp
         return result
 
