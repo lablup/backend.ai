@@ -693,8 +693,6 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
-
-  """Added in ..."""
   agent_count: Int
 }
 
