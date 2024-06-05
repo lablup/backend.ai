@@ -150,7 +150,14 @@ from .resources import (
     known_slot_types,
 )
 from .stats import StatContext, StatModes
-from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
+from .types import (
+    Container,
+    ContainerLifecycleEvent,
+    ContainerStatus,
+    KernelStatus,
+    LifecycleEvent,
+    MountInfo,
+)
 from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
@@ -551,7 +558,6 @@ class AbstractAgent(
     redis: Redis
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    terminating_kernels: Set[KernelId]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -591,7 +597,6 @@ class AbstractAgent(
         self.computers = {}
         self.images = {}  # repoTag -> digest
         self.restarting_kernels = {}
-        self.terminating_kernels = set()
         self.stat_ctx = StatContext(
             self,
             mode=StatModes(local_config["container"]["stats-type"]),
@@ -947,7 +952,7 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled:
+                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
                         continue
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
@@ -965,7 +970,7 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled:
+                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
                         continue
                     updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
@@ -990,6 +995,7 @@ class AbstractAgent(
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.stats_enabled = True
+                kernel_obj.status = KernelStatus.RUNNING
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
@@ -997,7 +1003,6 @@ class AbstractAgent(
             assert current_task is not None
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
-            self.terminating_kernels.add(ev.kernel_id)
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
@@ -1018,10 +1023,10 @@ class AbstractAgent(
                             )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
-                        self.terminating_kernels.discard(ev.kernel_id)
                         return
                 else:
                     kernel_obj.stats_enabled = False
+                    kernel_obj.status = KernelStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
@@ -1094,7 +1099,6 @@ class AbstractAgent(
                             self.port_pool.update(restored_ports)
                         await kernel_obj.close()
                 finally:
-                    self.terminating_kernels.discard(ev.kernel_id)
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
@@ -1265,10 +1269,7 @@ class AbstractAgent(
             try:
                 # Check if: there are dead containers
                 for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
-                    if (
-                        kernel_id in self.restarting_kernels
-                        or kernel_id in self.terminating_kernels
-                    ):
+                    if kernel_id in self.restarting_kernels:
                         continue
                     log.info(
                         "detected dead container during lifeycle sync (k:{}, c:{})",
@@ -1296,7 +1297,7 @@ class AbstractAgent(
                 for kernel_id in known_kernels.keys() - alive_kernels.keys():
                     if (
                         kernel_id in self.restarting_kernels
-                        or kernel_id in self.terminating_kernels
+                        or self.kernel_registry[kernel_id].status == KernelStatus.PREPARING
                     ):
                         continue
                     terminated_kernels[kernel_id] = ContainerLifecycleEvent(
@@ -2118,6 +2119,7 @@ class AbstractAgent(
                         },
                     ),
                 )
+                kernel_obj.status = KernelStatus.RUNNING
 
                 if (
                     kernel_config["session_type"] == "batch"
