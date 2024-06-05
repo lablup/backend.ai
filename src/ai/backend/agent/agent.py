@@ -2509,9 +2509,14 @@ class AbstractAgent(
             return  # don't save too frequently
         var_base_path = self.local_config["agent"]["var-base-path"]
         last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        running_kernel_registry = {
+            kid: kernel_obj
+            for kid, kernel_obj in self.kernel_registry.items()
+            if kernel_obj.status == KernelStatus.RUNNING
+        }
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(self.kernel_registry, f)
+                pickle.dump(running_kernel_registry, f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
