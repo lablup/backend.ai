@@ -316,7 +316,7 @@ class ScalingGroup(graphene.ObjectType):
     use_host_network = graphene.Boolean()
 
     # Dynamic fields.
-    agent_count = graphene.Int()
+    agent_count = graphene.Int(description="Added in 24.03.0.")
 
     async def resolve_agent_count(self, info: graphene.ResolveInfo) -> int:
         from .agent import Agent
