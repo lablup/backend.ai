@@ -64,6 +64,16 @@ class Container:
     backend_obj: Any  # used to keep the backend-specific data
 
 
+class KernelStatus(enum.StrEnum):
+    """
+    A type to track the status of `AbstractKernel` objects.
+    """
+
+    PREPARING = enum.auto()
+    RUNNING = enum.auto()
+    TERMINATING = enum.auto()
+
+
 class LifecycleEvent(enum.IntEnum):
     DESTROY = 0
     CLEAN = 1
