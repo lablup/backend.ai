@@ -477,6 +477,12 @@ class Queries(graphene.ObjectType):
     )
 
     # super-admin only
+    agent_count_in_scaling_group = graphene.Field(
+        graphene.Int(),
+        scaling_group=graphene.String(required=True),
+    )
+
+    # super-admin only
     scaling_groups = graphene.List(
         ScalingGroup,
         name=graphene.String(),
@@ -1597,6 +1603,18 @@ class Queries(graphene.ObjectType):
             info.context,
             access_key,
             is_active=is_active,
+        )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_agent_count_in_scaling_group(
+        root: Any,
+        info: graphene.ResolveInfo,
+        scaling_group: str,
+    ) -> int:
+        return await Agent.load_count(
+            info.context,
+            scaling_group=scaling_group,
         )
 
     @staticmethod
