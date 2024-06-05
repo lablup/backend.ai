@@ -696,6 +696,9 @@ type ScalingGroup {
 
   """Added in 24.03.0."""
   agent_count: Int
+
+  """Added in 24.03.0."""
+  agent_total_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {

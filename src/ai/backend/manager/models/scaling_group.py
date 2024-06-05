@@ -26,7 +26,12 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    JSONSerializableMixin,
+    ResourceSlot,
+    SessionTypes,
+)
 
 from .base import (
     Base,
@@ -317,6 +322,7 @@ class ScalingGroup(graphene.ObjectType):
 
     # Dynamic fields.
     agent_count = graphene.Int(description="Added in 24.03.0.")
+    agent_total_resource_slots = graphene.JSONString(description="Added in 24.03.0.")
 
     async def resolve_agent_count(self, info: graphene.ResolveInfo) -> int:
         from .agent import Agent
@@ -325,6 +331,33 @@ class ScalingGroup(graphene.ObjectType):
             info.context,
             scaling_group=self.name,
         )
+
+    async def resolve_agent_total_resource_slots(
+        self, info: graphene.ResolveInfo
+    ) -> Mapping[str, Any]:
+        from .agent import agents
+
+        graph_ctx = info.context
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = (
+                await conn.execute(
+                    sa.select([agents.c.occupied_slots, agents.c.available_slots]).where(
+                        agents.c.scaling_group == self.name
+                    )
+                )
+            ).fetchall()
+
+            total_occupied_slots = ResourceSlot()
+            total_available_slots = ResourceSlot()
+
+            for occupied, available in result:
+                total_occupied_slots += occupied
+                total_available_slots += available
+
+            return {
+                "occupied_slots": total_occupied_slots.to_json(),
+                "available_slots": total_available_slots.to_json(),
+            }
 
     @classmethod
     def from_row(
