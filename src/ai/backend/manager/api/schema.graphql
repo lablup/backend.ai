@@ -80,7 +80,6 @@ type Queries {
   resource_preset(name: String): ResourcePreset
   resource_presets: [ResourcePreset]
   scaling_group(name: String): ScalingGroup
-  agent_count_in_scaling_group(scaling_group: String!): Int
   scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
@@ -694,6 +693,9 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
+
+  """Added in ..."""
+  agent_count: Int
 }
 
 type StorageVolume implements Item {

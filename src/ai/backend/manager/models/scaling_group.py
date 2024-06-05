@@ -315,6 +315,17 @@ class ScalingGroup(graphene.ObjectType):
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
 
+    # Dynamic fields.
+    agent_count = graphene.Int()
+
+    async def resolve_agent_count(self, info: graphene.ResolveInfo) -> int:
+        from .agent import Agent
+
+        return await Agent.load_count(
+            info.context,
+            scaling_group=self.name,
+        )
+
     @classmethod
     def from_row(
         cls,
