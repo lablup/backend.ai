@@ -234,6 +234,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         return props
 
     def __setstate__(self, props) -> None:
+        if "status" not in props:
+            # We pickle "running" kernels, not "preparing" or "terminating" ones
+            props["status"] = KernelStatus.RUNNING
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
