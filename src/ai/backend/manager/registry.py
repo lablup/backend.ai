@@ -977,6 +977,11 @@ class AgentRegistry:
         # Prepare internal data.
         internal_data = {} if internal_data is None else internal_data
         internal_data.update(dotfile_data)
+        if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
+            internal_data["model_definition_path"] = _fname
+
+        if sudo_session_enabled:
+            internal_data["sudo_session_enabled"] = True
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
@@ -1444,16 +1449,25 @@ class AgentRegistry:
             size=scheduled_session.cluster_size,
             replicas=replicas,
             network_name=network_name,
-            ssh_keypair=(
-                await self.create_cluster_ssh_keypair()
-                if scheduled_session.cluster_size > 1
-                else None
-            ),
+            ssh_keypair=await self.create_cluster_ssh_keypair(),
             cluster_ssh_port_mapping=cast(
                 Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),
         )
+
+        async with self.db.begin_readonly_session() as db_sess:
+            uuid, email, username = (
+                await db_sess.execute(
+                    sa.select([UserRow.uuid, UserRow.email, UserRow.username]).where(
+                        UserRow.uuid == scheduled_session.user_uuid
+                    )
+                )
+            ).fetchone()
+
         scheduled_session.environ.update({
+            "BACKENDAI_USER_UUID": str(uuid),
+            "BACKENDAI_USER_EMAIL": email,
+            "BACKENDAI_USER_NAME": username,
             "BACKENDAI_SESSION_ID": str(scheduled_session.id),
             "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
             "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),
@@ -1958,12 +1972,14 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
+                    session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
-                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                        session_status = cast(SessionStatus, session_row.status)
+                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
                                 kernel.occupied_slots
                             )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                        if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             if kernel.role in PRIVATE_KERNEL_ROLES:
                                 sftp_concurrency_used_per_key[session_row.access_key].add(
                                     session_row.id
@@ -2042,7 +2058,12 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan or not concurrency_used_per_key:
+        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
+        # to set all concurrency_used to 0
+        _do_fullscan = do_fullscan or (
+            not concurrency_used_per_key and not sftp_concurrency_used_per_key
+        )
+        if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
@@ -3157,17 +3178,19 @@ class AgentRegistry:
 
     async def get_commit_status(
         self,
-        session: SessionRow,
-    ) -> Mapping[str, str]:
-        kern_id = str(session.main_kernel.id)
-        key = f"kernel.{kern_id}.commit"
-        result: Optional[bytes] = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(key),
-        )
+        kernel_ids: Sequence[KernelId],
+    ) -> Mapping[KernelId, str]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for kernel_id in kernel_ids:
+                await pipe.get(f"kernel.{kernel_id}.commit")
+            return pipe
+
+        commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
+
         return {
-            "kernel": kern_id,
-            "status": str(result, "utf-8") if result is not None else CommitStatus.READY.value,
+            kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
+            for kernel_id, result in zip(kernel_ids, commit_statuses)
         }
 
     async def commit_session(
@@ -3562,13 +3585,12 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_readonly_session() as db_sess:
-                route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
             async def _update() -> None:
                 new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
                     if isinstance(event, SessionCancelledEvent):
                         update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
@@ -3649,6 +3671,9 @@ async def invoke_session_callback(
 
             async def _clear_error() -> None:
                 async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+
                     query = sa.select([sa.func.count("*")]).where(
                         (RoutingRow.endpoint == endpoint.id)
                         & (RoutingRow.status == RouteStatus.HEALTHY)
@@ -3799,15 +3824,26 @@ async def handle_route_creation(
                 UserScope(
                     domain_name=endpoint.domain,
                     group_id=group_id,
-                    user_uuid=created_user.uuid,
-                    user_role=created_user.role,
+                    user_uuid=session_owner["uuid"],
+                    user_role=session_owner["role"],
                 ),
                 session_owner["access_key"],
                 resource_policy,
                 SessionTypes.INFERENCE,
                 {
-                    "mounts": [endpoint.model],
-                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "mounts": [endpoint.model, *[m.vfid.folder_id for m in endpoint.extra_mounts]],
+                    "mount_map": {
+                        endpoint.model: endpoint.model_mount_destination,
+                        **{
+                            m.vfid.folder_id: m.kernel_path.as_posix()
+                            for m in endpoint.extra_mounts
+                        },
+                    },
+                    "mount_options": {
+                        m.vfid.folder_id: {"permission": m.mount_perm}
+                        for m in endpoint.extra_mounts
+                    },
+                    "model_definition_path": endpoint.model_definition_path,
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,

@@ -71,10 +71,13 @@ from .image import (
     ForgetImageById,
     Image,
     ImageLoadFilter,
+    ImageNode,
     ModifyImage,
     PreloadImage,
+    PublicImageLoadFilter,
     RescanImages,
     UnloadImage,
+    UntagImageFromRegistry,
 )
 from .kernel import (
     ComputeContainer,
@@ -139,7 +142,9 @@ from .vfolder import (
     SetQuotaScope,
     UnsetQuotaScope,
     VirtualFolder,
+    VirtualFolderConnection,
     VirtualFolderList,
+    VirtualFolderNode,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
@@ -203,8 +208,9 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
-    forget_image_by_id = ForgetImageById.Field(description="Added since 24.03.0")
+    forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field()
+    untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
@@ -320,6 +326,11 @@ class Queries(graphene.ObjectType):
         Group,
         id=graphene.UUID(required=True),
         domain_name=graphene.String(),
+        type=graphene.List(
+            graphene.String,
+            default_value=[ProjectType.GENERAL.name],
+            description=("Added in 24.03.0."),
+        ),
     )
 
     # Within a single domain, this will always return nothing or a single item,
@@ -339,24 +350,34 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
             ),
         ),
     )
 
     image = graphene.Field(
         Image,
-        reference=graphene.String(required=True),
+        id=graphene.String(description="Added in 24.03.1"),
+        reference=graphene.String(),
         architecture=graphene.String(default_value=DEFAULT_IMAGE_ARCH),
     )
 
     images = graphene.List(
         Image,
-        is_installed=graphene.Boolean(),
-        is_operation=graphene.Boolean(),
+        is_installed=graphene.Boolean(
+            description="Added in 19.09.0. If it is specified, fetch images installed on at least one agent."
+        ),
+        is_operation=graphene.Boolean(
+            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
+        ),
+        image_filters=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+        ),
     )
 
-    customized_images = graphene.List(Image, description="Added since 24.03.0")
+    customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
 
     user = graphene.Field(
         User,
@@ -501,6 +522,13 @@ class Queries(graphene.ObjectType):
     vfolder = graphene.Field(
         VirtualFolder,
         id=graphene.String(),
+    )
+
+    vfolder_node = graphene.Field(
+        VirtualFolderNode, id=graphene.String(required=True), description="Added in 24.03.4."
+    )
+    vfolder_nodes = PaginatedConnectionField(
+        VirtualFolderConnection, description="Added in 24.03.4."
     )
 
     vfolder_list = graphene.Field(  # legacy non-paginated list
@@ -837,6 +865,7 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    @staticmethod
     async def resolve_group_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -844,6 +873,7 @@ class Queries(graphene.ObjectType):
     ):
         return await GroupNode.get_node(info, id)
 
+    @staticmethod
     async def resolve_group_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -868,12 +898,44 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
+    async def resolve_vfolder_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await VirtualFolderNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_vfolder_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await VirtualFolderNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
     async def resolve_group(
         root: Any,
         info: graphene.ResolveInfo,
         id: uuid.UUID,
         *,
-        domain_name: str = None,
+        domain_name: str | None = None,
         type: list[str] = [ProjectType.GENERAL.name],
     ) -> Group:
         ctx: GraphQueryContext = info.context
@@ -909,7 +971,9 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Group.by_user",
             )
-            client_groups = await loader.load(client_user_id, type=[ProjectType[t] for t in type])
+            client_groups = [
+                group for group in await loader.load(client_user_id) if group.type in type
+            ]
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
         else:
@@ -1003,13 +1067,23 @@ class Queries(graphene.ObjectType):
     async def resolve_image(
         root: Any,
         info: graphene.ResolveInfo,
-        reference: str,
-        architecture: str,
+        *,
+        id: str | None = None,
+        reference: str | None = None,
+        architecture: str | None = None,
     ) -> Image:
+        """Loads image information by its ID or reference information. Either ID or reference/architecture pair must be provided."""
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        item = await Image.load_item(info.context, reference, architecture)
+        if id:
+            item = await Image.load_item_by_id(info.context, uuid.UUID(id))
+        else:
+            if not (reference and architecture):
+                raise InvalidAPIParameters(
+                    "reference/architecture and id can't be omitted at the same time!"
+                )
+            item = await Image.load_item(info.context, reference, architecture)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1025,11 +1099,14 @@ class Queries(graphene.ObjectType):
     async def resolve_customized_images(
         root: Any,
         info: graphene.ResolveInfo,
-    ) -> Sequence[Image]:
+    ) -> Sequence[ImageNode]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        items = await Image.load_all(
+            ctx,
+            filters=set((ImageLoadFilter.CUSTOMIZED,)),
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1040,7 +1117,13 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return items
+        return [
+            ImageNode.from_legacy_image(i)
+            for i in items
+            # access scope to each customized image has already been
+            # evaluated at Image.load_all()
+            if "ai.backend.customized-image.owner" in i.raw_labels
+        ]
 
     @staticmethod
     async def resolve_images(
@@ -1049,15 +1132,34 @@ class Queries(graphene.ObjectType):
         *,
         is_installed=None,
         is_operation=False,
+        image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         image_load_filters: set[ImageLoadFilter] = set()
-        if is_installed is not None:
-            image_load_filters.add(ImageLoadFilter.INSTALLED)
-        if is_operation is not None:
-            image_load_filters.add(ImageLoadFilter.EXCLUDE_OPERATIONAL)
+        if image_filters is not None:
+            try:
+                _filters: list[PublicImageLoadFilter] = [
+                    PublicImageLoadFilter(f) for f in image_filters
+                ]
+            except ValueError as e:
+                allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
+                raise InvalidAPIParameters(
+                    f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
+                )
+            image_load_filters.update([ImageLoadFilter(f) for f in _filters])
+            if (
+                client_role == UserRole.SUPERADMIN
+                and ImageLoadFilter.CUSTOMIZED in image_load_filters
+            ):
+                image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
+                image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
+        else:
+            if is_operation is None:
+                # I know this logic is quite contradicts to the parameter name,
+                # but to conform with previous implementation...
+                image_load_filters.add(ImageLoadFilter.OPERATIONAL)
 
         items = await Image.load_all(ctx, filters=image_load_filters)
         if client_role == UserRole.SUPERADMIN:
@@ -1070,6 +1172,8 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
+        if is_installed is not None:
+            items = [item for item in items if item.installed]
         return items
 
     @staticmethod

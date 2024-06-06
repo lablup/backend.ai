@@ -186,6 +186,8 @@ class UserRow(Base):
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
+    vfolder_row = relationship("VFolderRow", back_populates="user_row")
+
 
 class UserGroup(graphene.ObjectType):
     id = graphene.UUID()

@@ -733,10 +733,13 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
         case "redlock":
             from ai.backend.common.lock import RedisLock
 
+            redlock_config = root_ctx.local_config["manager"]["redlock-config"]
+
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
                 root_ctx.redis_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+                lock_retry_interval=redlock_config["lock_retry_interval"],
             )
         case "etcd":
             from ai.backend.common.lock import EtcdLock
@@ -744,6 +747,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             return lambda lock_id, lifetime_hint: EtcdLock(
                 str(lock_id),
                 root_ctx.shared_config.etcd,
+                lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+            )
+        case "etcetra":
+            from ai.backend.common.lock import EtcetraLock
+
+            return lambda lock_id, lifetime_hint: EtcetraLock(
+                str(lock_id),
+                root_ctx.shared_config.etcetra_etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case other:

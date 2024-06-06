@@ -676,6 +676,7 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
+        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
     )
 
     @property
@@ -1193,7 +1194,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
-    requested_slots = graphene.JSONString(description="Added in 24.03.0")
+    requested_slots = graphene.JSONString(description="Added in 24.03.0.")
 
     # statistics
     num_queries = BigInt()
@@ -1332,14 +1333,10 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_readonly_session() as db_sess:
-            session: SessionRow = await SessionRow.get_session(
-                db_sess,
-                self.id,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        commit_status = await graph_ctx.registry.get_commit_status(session)
-        return commit_status["status"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "ComputeSession.commit_statuses"
+        )
+        return await loader.load(self.main_kernel_id)
 
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         containers = self.containers
@@ -1583,6 +1580,15 @@ class ComputeSession(graphene.ObjectType):
                 session_ids,
                 lambda row: row.SessionRow.id,
             )
+
+    @classmethod
+    async def batch_load_commit_statuses(
+        cls,
+        ctx: GraphQueryContext,
+        kernel_ids: Sequence[KernelId],
+    ) -> Sequence[str]:
+        commit_statuses = await ctx.registry.get_commit_status(kernel_ids)
+        return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
 
 
 class ComputeSessionList(graphene.ObjectType):
