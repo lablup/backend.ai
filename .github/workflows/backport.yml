@@ -50,9 +50,17 @@ jobs:
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
           echo $milestones
 
+          # Remove Backlog from the backport target branch
           milestones=($milestones)
           for i in "${!milestones[@]}"; do
             if [[ "${milestones[$i]}" == "Backlog" ]]; then
+              unset 'milestones[$i]'
+            fi
+          done
+          echo "${milestones[@]}"
+
+          for i in "${!milestones[@]}"; do
+            if ! git branch -r | grep -q "origin/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
@@ -87,7 +95,7 @@ jobs:
           git fetch origin main --depth=2
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
-            --amend -m "${{ needs.backport-target-branch.outputs.commit_message }}" \
+            --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \
             --trailer "Backported-from=main (${{ needs.backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
@@ -99,13 +107,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - id: commit_message
         run: |
-          commit_header=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | head -n 1)
+          commit_header=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | head -n 1)
           echo "commit_header=$commit_header" >> $GITHUB_OUTPUT
-          commit_body=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==1')
+          commit_body=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | awk '/^$/{p++;next} p==1')
           echo "commit_body<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_body" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          commit_footer=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==2')
+          commit_footer=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | awk '/^$/{p++;next} p==2')
           echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_footer" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -121,6 +129,8 @@ jobs:
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ needs.backport-target-branch.outputs.author }}
+      - run: |
+          gh pr view ${{ needs.backport-target-branch.outputs.pr_number }} --json labels | jq -r '.labels[].name' | xargs -I {} gh pr edit ${{ steps.pr.outputs.pull-request-number }} --add-label {}
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='
