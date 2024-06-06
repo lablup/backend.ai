@@ -183,7 +183,7 @@ class Domain(BaseFunction):
     @classmethod
     async def delete(cls, name: str):
         """
-        Inactivates an existing domain.
+        Deletes an existing domain. This action only deletes the primary record and might leave behind some associated data or metadata that can be manually cleaned up or ignored. Ideal for removing items that may be re-created or restored.
         """
         query = textwrap.dedent(
             """\
@@ -202,7 +202,7 @@ class Domain(BaseFunction):
     @classmethod
     async def purge(cls, name: str):
         """
-        Deletes an existing domain.
+        Purges an existing domain. This action is irreversible and should be used when you need to ensure that no trace of the resource remains.
         """
         query = textwrap.dedent(
             """\

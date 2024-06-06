@@ -9,7 +9,7 @@ from decimal import Decimal
 from functools import partial
 from multiprocessing import Event, Process, Queue
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Tuple
+from typing import Any, Callable, Iterable, List, Literal, Tuple
 
 import aiotools
 import attrs
@@ -19,9 +19,16 @@ from redis.asyncio import Redis
 from ai.backend.common import config
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.lock import AbstractDistributedLock, EtcdLock, FileLock, RedisLock
+from ai.backend.common.lock import (
+    AbstractDistributedLock,
+    EtcdLock,
+    EtcetraLock,
+    FileLock,
+    RedisLock,
+)
 from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair, RedisConnectionInfo
 
 
@@ -120,6 +127,7 @@ def etcd_timer_node_process(
     etcd_ctx: EtcdLockContext,
     timer_ctx: TimerNodeContext,
     dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
+    etcd_client: Literal["etcetra"] | Literal["etcd-client-py"],
 ) -> None:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -143,17 +151,33 @@ def etcd_timer_node_process(
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
-        etcd = AsyncEtcd(
-            addr=etcd_ctx.addr,
-            namespace=etcd_ctx.namespace,
-            scope_prefix_map={
-                ConfigScopes.GLOBAL: "global",
-                ConfigScopes.SGROUP: "sgroup/testing",
-                ConfigScopes.NODE: "node/i-test",
-            },
-        )
+        etcd_lock: AbstractDistributedLock
+        match etcd_client:
+            case "etcd-client-py":
+                etcd = AsyncEtcd(
+                    addr=etcd_ctx.addr,
+                    namespace=etcd_ctx.namespace,
+                    scope_prefix_map={
+                        ConfigScopes.GLOBAL: "global",
+                        ConfigScopes.SGROUP: "sgroup/testing",
+                        ConfigScopes.NODE: "node/i-test",
+                    },
+                )
+                etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
+            case "etcetra":
+                etcetra_etcd = EtcetraAsyncEtcd(
+                    addr=etcd_ctx.addr,
+                    namespace=etcd_ctx.namespace,
+                    scope_prefix_map={
+                        ConfigScopes.GLOBAL: "global",
+                        ConfigScopes.SGROUP: "sgroup/testing",
+                        ConfigScopes.NODE: "node/i-test",
+                    },
+                )
+                etcd_lock = EtcetraLock(etcd_ctx.lock_name, etcetra_etcd, timeout=None, debug=True)
+
         timer = GlobalTimer(
-            EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True),
+            etcd_lock,
             event_producer,
             lambda: NoopEvent(timer_ctx.test_case_ns),
             timer_ctx.interval,
@@ -336,11 +360,13 @@ async def test_gloal_timer_redlock(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+@pytest.mark.parametrize("etcd_client", ["etcetra", "etcd-client-py"])
 async def test_global_timer_etcdlock(
     dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
     test_case_ns,
     etcd_container,
     redis_container,
+    etcd_client,
 ) -> None:
     lock_name = f"{test_case_ns}lock"
     event_records_queue: Queue = Queue()
@@ -369,6 +395,7 @@ async def test_global_timer_etcdlock(
                     interval=interval,
                 ),
                 dispatcher_cls,
+                etcd_client,
             ),
         )
         process.start()

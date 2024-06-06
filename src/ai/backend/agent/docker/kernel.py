@@ -193,11 +193,23 @@ class DockerKernel(AbstractKernel):
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 log.info("Container (k: {}) is being committed", kernel_id)
                 docker = Docker()
-                container = docker.containers.container(container_id)
-                changes: list[str] = []
-                for label_name, label_value in extra_labels.items():
-                    changes.append(f"LABEL {label_name}={label_value}")
                 try:
+                    # There is a known issue at certain versions of Docker Engine
+                    # which prevents container from being committed when request config body is empty
+                    # https://github.com/moby/moby/issues/45543
+                    docker_info = await docker.system.info()
+                    docker_version = docker_info["ServerVersion"]
+                    major, _, patch = docker_version.split(".", maxsplit=2)
+                    config = None
+                    if (int(major) == 23 and int(patch) < 8) or (
+                        int(major) == 24 and int(patch) < 1
+                    ):
+                        config = {"ContainerSpec": {}}
+
+                    container = docker.containers.container(container_id)
+                    changes: list[str] = []
+                    for label_name, label_value in extra_labels.items():
+                        changes.append(f"LABEL {label_name}={label_value}")
                     if canonical:
                         if ":" in canonical:
                             repo, tag = canonical.rsplit(":", maxsplit=1)
@@ -210,6 +222,7 @@ class DockerKernel(AbstractKernel):
                         changes=changes,
                         repository=repo,
                         tag=tag,
+                        config=config,
                     )
                     image_id = response["Id"]
                     if filename:
