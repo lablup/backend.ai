@@ -338,7 +338,7 @@ class ScalingGroup(graphene.ObjectType):
         from .agent import AgentRow
 
         graph_ctx = info.context
-        async with graph_ctx.db.begin_readonly() as db_session:
+        async with graph_ctx.db.begin_readonly_session() as db_session:
             query_stmt = sa.select([AgentRow.occupied_slots, AgentRow.available_slots]).where(
                 AgentRow.scaling_group == self.name
             )
