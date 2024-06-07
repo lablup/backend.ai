@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth

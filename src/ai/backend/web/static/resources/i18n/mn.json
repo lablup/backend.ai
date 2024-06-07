@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Нууц үгээ оруулна уу",
       "InvalidBlankEmail": "Имэйлээ оруулна уу",
       "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна",
-      "MyEnvironments": "Миний орчин"
+      "MyEnvironments": "Миний орчин",
+      "ResourcePolicy": "Нөөцийн бодлого"
     },
     "YouAreOffline": "Та одоо офлайн байна",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө.",
       "StartTimeMustBeInTheFuture": "Эхлэх цаг нь одоогийн цагаас хойш байх ёстой.",
       "PreOpenPortMaxCountLimit": "Та {{count}} хүртэл урьдчилан нээлттэй порт тохируулж болно.",
-      "EnqueueComputeSessionWarning": "Хэрэв та үүнийг одоо байгаа нөөцөөс том болговол сесс үүсгэх нь боломжтой болох хүртэл дараалалд саатах болно.",
+      "EnqueueComputeSessionWarning": "Хангалтгүй нөөц. \nХурал хүлээгдэж магадгүй.",
       "SessionName": "Сеанс нэр",
       "ResetFormConfirm": "Та бүх оруулгуудаа дахин тохируулахыг хүсэж байна уу?",
       "TemplateAndHistory": "Загварууд",
@@ -258,11 +259,23 @@
       "EnvironmentVariableDuplicateName": "Энэ хувьсагчийн нэр аль хэдийн байна.",
       "Template": "Сеанс загвар",
       "EnableAutomaticShmem": "Автомат хуваалцсан санах ой",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Кластерын хэмжээ 2-оос багагүй тохиолдолд зөвхөн бүхэл тоог зөвшөөрнө.",
       "StartAfter": "Дараа нь эхлэх:",
       "StartTimeDoesNotApply": "Хэрэв эхлэх цагийг тохируулаагүй бол энэ нь хамаарахгүй.",
-      "FailedToStartNewSession": "Сеанс үүсгэж чадсангүй. \nСеанс хуудасны 'Дууссан' табыг шалгана уу."
+      "FailedToStartNewSession": "Сеанс үүсгэж чадсангүй. \nСеанс хуудасны 'Дууссан' табыг шалгана уу.",
+      "EnvironmentVariableValueRequired": "Утга оруулна уу.",
+      "AddEnvironmentVariable": "Орчны хувьсагчдыг нэмнэ үү",
+      "NeoSwitchDescription": "Та \"{{launcher}}\" сесс эхлүүлэгч ашиглаж байна.",
+      "PreviousLauncher": "Сонгодог",
+      "NeoLauncher": "NEO",
+      "EnableAutomaticMiniumShmem": "Хамгийн бага хуваалцсан санах ойг тохируулах",
+      "MiniumAllocation": "Хамгийн бага шаардлага",
+      "MiniumAllocationTooltip": "Сонгосон ажиллах орчны хамгийн бага шаардлагыг сонгоно уу",
+      "InteractiveModeDesc": "jupyter notebook, visual studio код гэх мэтээр интерактив код үүсгэх, турших, ажиллуулах боломжийг танд олгоно.",
+      "BatchModeDesc": "Кодоо олон зангилаатай кластераар ажиллуул.",
+      "PleaseCompleteForm": "Маягт дутуу эсвэл алдаатай байна. \nОруулсан мэдээллээ шалгана уу.",
+      "SkipToConfirmAndLaunch": "Шүүмж рүү алгасах",
+      "ProxyDirectTCPNotSupported": "Прокси шууд TCP холболт хараахан дэмжигдээгүй байна"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -334,7 +347,8 @@
       "PleaseFollowSessionNameRule": "Дор хаяж 4 үсэг, тоо, '.', '_', '-' гэсэн хослолыг оруулна уу.",
       "SessionNameShouldStartWith": "Энэ нь цагаан толгойн үсэг, тоо эсвэл \"_\" -ээр эхлэх ёстой.",
       "SessionNameShouldEndWith": "Энэ нь цагаан толгойн үсэг, тоо эсвэл '_'-ээр төгссөн байх ёстой.",
-      "SessionNameInvalidCharacter": "Нэрийн дунд хэсэгт зөвхөн цагаан толгойн үсэг, тоо, '_' байж болно."
+      "SessionNameInvalidCharacter": "Нэрийн дунд хэсэгт зөвхөн цагаан толгойн үсэг, тоо, '_' байж болно.",
+      "SessionNameTooShort": "Дор хаяж 4 тэмдэгт оруулна уу."
     },
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "NoSessionToDisplay": "Харуулах сесс алга",
@@ -392,7 +406,8 @@
     "SessionName": "Сеанс нэр",
     "SessionId": "Сешн Id",
     "EnvironmentAndVersion": "Хүрээлэн буй орчин ба хувилбар",
-    "Tags": "Шошго"
+    "Tags": "Шошго",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -426,7 +441,10 @@
     "OK": "БОЛЖ БАЙНА УУ",
     "Download": "Татаж авах",
     "Clone": "Клон",
-    "Config": "Тохиргоо"
+    "Config": "Тохиргоо",
+    "Previous": "Өмнөх",
+    "Next": "Дараачийн",
+    "PushToImage": "Тохируулсан зураг руу түлхэх сесс"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -451,7 +469,9 @@
     "Utilization": "Ашиглалт",
     "NoAvailableLiveStat": "Боломжтой шууд статистик байхгүй",
     "Allocation": "Хуваарилалт",
-    "DiskPerc": "Диск %"
+    "DiskPerc": "Диск %",
+    "AutoRefreshEvery5s": "5 секунд тутамд автоматаар сэргээнэ",
+    "Agent": "Агент"
   },
   "general": {
     "cores": "цөм",
@@ -473,7 +493,8 @@
     "Image": "Зураг",
     "All": "бүхэлд нь",
     "InProgress": "Ажиллаж байна",
-    "Session": "Сессия"
+    "Session": "Сессия",
+    "General": "Генерал"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -638,7 +659,8 @@
       "DeleteForever": "Бүрмөсөн устгах",
       "FolderRestored": "{{ folderName }} хавтас сэргээгдсэн.",
       "FolderDeletedForever": "{{ folderName }} хавтас бүрмөсөн устгагдсан.",
-      "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв."
+      "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв.",
+      "MoveToTrashBin": "Хогийн сав руу шилжүүлнэ үү"
     },
     "explorer": {
       "Delete": "Устгах ...",
@@ -741,7 +763,8 @@
       "DeleteForeverDesc": "АНХААРУУЛГА: сонгосон зүйлс үүрд устах бөгөөд та тэдгээрийг сэргээх боломжгүй болно."
     },
     "ask": {
-      "DoYouWantToProceed": "Та үргэлжлүүлэхийг хүсч байна уу?"
+      "DoYouWantToProceed": "Та үргэлжлүүлэхийг хүсч байна уу?",
+      "DoYouWantToDeleteSomething": "Та \"{{ name }}\"-г устгахдаа итгэлтэй байна уу?"
     },
     "title": {
       "LetsDouble-Check": "Давхар шалгуулъя",
@@ -802,7 +825,10 @@
     "NoChangeMade": "Өөрчлөлт ороогүй",
     "Architecture": "Архитектур",
     "NoImageToDisplay": "Үзүүлэх зураг байхгүй",
-    "CustomizedImageSuccessfullyDeleted": "Тохируулсан зургийг амжилттай устгалаа."
+    "CustomizedImageSuccessfullyDeleted": "Тохируулсан зургийг амжилттай устгалаа.",
+    "DescImageResourceModified": "Нөөцийн хязгаарыг амжилттай өөрчилсөн",
+    "DescImagePortsModified": "Зургийн портуудыг амжилттай өөрчилсөн",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Хэрэв та аль хэдийн суулгасан зургийг өөрчилбөл зургийг дахин суулгах шаардлагатай болно.</p><p>Зургийг дахин суулгах хүртэл өөрчлөлтийг хийхгүй.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Нөөцийн урьдчилсан тохируулга",
@@ -934,8 +960,22 @@
     "SuccessfullyDeleted": "Нөөцийн бодлогыг амжилттай устгасан.",
     "PolicyNameEmpty": "Бодлогын нэр хоосон байж болохгүй.",
     "AboutToDeleteResourcePolicy": "Та энэ нөөцийн бодлогыг устгах гэж байна:",
-    "MaxSessionLifeTime": "Сеанс үргэлжлэх хугацаа (сек.)",
-    "NoResourcePolicyToDisplay": "Харуулах нөөцийн бодлого байхгүй"
+    "MaxSessionLifetime": "Сеанс үргэлжлэх хугацаа (сек.)",
+    "NoResourcePolicyToDisplay": "Харуулах нөөцийн бодлого байхгүй",
+    "Keypair": "Товчлуур",
+    "User": "Хэрэглэгч",
+    "Project": "Төсөл",
+    "KeypairResourcePolicy": "Түлхүүрийн нөөцийн бодлого",
+    "IdleTimeout": "Сул зогсолтын хугацаа",
+    "CreateResourcePolicy": "Нөөцийн бодлогыг бий болгох",
+    "ResourcePolicyNameAlreadyExists": "Нөөцийн бодлогын нэр аль хэдийн байна. \nНэмэх нэрээ өөрчилнө үү.",
+    "UserResourcePolicy": "Хэрэглэгчийн нөөцийн бодлого",
+    "MaxVFolderCount": "Хамгийн их хавтасны тоо",
+    "MaxSessionCountPerModelSession": "Загвар бүрийн хамгийн их сеанс тоо",
+    "MaxQuotaScopeSize": "Хамгийн их квот хамрах хүрээний хэмжээ (ГБ)",
+    "MaxCustomizedImageCount": "Хамгийн их тохируулсан зургийн тоо",
+    "CreatedAt": "Үүсгэсэн",
+    "MaxFolderCount": "Хамгийн их хавтасны тоо"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1164,7 +1204,11 @@
     "RequireWarboyPlugin": "Backend.AI Warboy Plugin шаардлагатай.",
     "Plugins": "Plugins",
     "OpenSourceCUDAGPUsupport": "Нээлттэй эхийн CUDA GPU дэмжлэг",
-    "ShowOnlyChanged": "Зөвхөн өөрчлөлтүүдийг харуулах"
+    "ShowOnlyChanged": "Зөвхөн өөрчлөлтүүдийг харуулах",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Hyperaccel LPU хурдасгуурыг ашигла.",
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Plugin шаардлагатай.",
+    "SearchPlaceholder": "Хайх"
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
@@ -1414,7 +1458,8 @@
     "RequireOTP": "OTP бичнэ үү."
   },
   "inputLimit": {
-    "4to64chars": "(4~64 тэмдэгт)"
+    "4to64chars": "(4~64 тэмдэгт)",
+    "4to32chars": "(4~32 тэмдэгт)"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1477,7 +1522,6 @@
     "RoutingsCount": "Чиглүүлэлтийн тоо",
     "Active/Total": "Идэвхтэй/Нийт",
     "Public": "Олон нийтийн",
-    "YouAreAboutToTerminate": "Та дуусгавар болгох гэж байна",
     "FailedToStartService": "Үйлчилгээг үүсгэж чадсангүй.",
     "ServingRouteErrorModalTitle": "Үйлчилгээний маршрутын алдаа",
     "ClearErrors": "Алдааг арилгаад дахин оролдоно уу",
@@ -1498,12 +1542,28 @@
     "resources": "Нөөц",
     "Image": "Зураг",
     "Owner": "Эзэмшигч",
+    "Validate": "Баталгаажуулах",
+    "Cancel": "Цуцлах",
+    "ValidationInfo": "Баталгаажуулалтын мэдээлэл",
+    "Processing": "Боловсруулж байна...",
+    "Success": "Амжилт",
+    "Error": "Алдаа",
+    "SeeContainerLogs": "Контейнерийн бүртгэлийг үзнэ үү",
+    "TimeStamp": "Цагийн тэмдэг",
+    "Result": "Үр дүн",
+    "Finished": "Дууслаа",
     "ServiceDelegatedFrom": "Загвар үйлчилгээг {{ createdUser }} үүсгэсэн боловч сессийн эрхийг {{ sessionOwner }}-д шилжүүлнэ.",
     "FailedToTerminateService": "Үйлчилгээг цуцлах хүсэлт амжилтгүй боллоо.",
     "FailedToUpdateService": "Үйлчилгээг шинэчилж чадсангүй.",
     "ServiceCreated": "Загвар үйлчилгээ {{ name }} амжилттай үүсгэгдсэн.",
     "ServiceUpdated": "Загвар үйлчилгээ {{ name }} амжилттай шинэчлэгдсэн.",
-    "ServiceTerminated": "Загварын үйлчилгээ {{ name }} амжилттай хаагдсан."
+    "CannotValidateNow": "Одоо үйлчилгээг баталгаажуулах боломжгүй байна. \nНөөцийн хуваарилалт эсвэл бусад тохиргоог шалгана уу.",
+    "Ready": "Бэлэн",
+    "ServiceTerminated": "'{{ name }}' загварын үйлчилгээнд хаах хүсэлт илгээсэн.",
+    "ModelMountDestination": "Загварын хавтасыг холбох газар",
+    "AdditionalMounts": "Нэмэлт бэхэлгээ",
+    "ModelDefinitionPath": "Загварын тодорхойлолтын файлын зам",
+    "NoExtraMounts": "Нэмэлт бэхэлгээ байхгүй"
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",
@@ -1544,10 +1604,20 @@
     "SelectColumnToDisplay": "Харуулах багануудыг сонгоно уу",
     "SearchTableColumn": "Хүснэгтийн багануудыг хайх"
   },
-  "setting": {
-    "SearchPlaceholder": "Хайлтын нэр томъёог оруулна уу",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Hyperaccel LPU хурдасгуурыг ашигла.",
-    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Plugin шаардлагатай."
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Оролтын талбарын баталгаажуулалтын алдаа",
+      "ValidationErrorText": "Хэрэв та шаардлагатай талбарт утга оруулахгүй эсвэл буруу утга оруулбал тухайн талбарт алдааны мэдэгдэл гарч ирнэ.",
+      "FixErrorAndTryAgainText": "Хэрэв алдааны талбар байгаа бол \"Эхлүүлэх сесс\" товчлуур идэвхгүй болно. \nАлдааг засаад дахин оролдоно уу.",
+      "FixErrorFieldbyModifyButton": "Энэ алдааны талбарын хувьд та баруун дээд буланд байрлах Засварлах товчлуур руу шууд очиж засварлаж болно."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Хуулбарлах",
+    "Copied": "Хуулсан"
+  },
+  "propertyFilter": {
+    "placeHolder": "Хайх",
+    "ResetFilter": "Reset Filter"
   }
 }
