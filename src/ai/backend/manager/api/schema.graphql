@@ -694,10 +694,10 @@ type ScalingGroup {
   scheduler_opts: JSONString
   use_host_network: Boolean
 
-  """Added in 24.03.0."""
+  """Added in 24.03.5."""
   agent_count: Int
 
-  """Added in 24.03.0."""
+  """Added in 24.03.5."""
   agent_total_resource_slots: JSONString
 }
 
