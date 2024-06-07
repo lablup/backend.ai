@@ -1265,10 +1265,17 @@ class AbstractAgent(
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
+        _containers = await self.enumerate_containers(DEAD_STATUS_SET | ACTIVE_STATUS_SET)
+
         async with self.registry_lock:
             try:
                 # Check if: there are dead containers
-                for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
+                dead_containers = [
+                    (kid, container)
+                    for kid, container in _containers
+                    if container.status in DEAD_STATUS_SET
+                ]
+                for kernel_id, container in dead_containers:
                     if kernel_id in self.restarting_kernels:
                         continue
                     log.info(
@@ -1284,7 +1291,12 @@ class AbstractAgent(
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
-                for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
+                alive_containers = [
+                    (kid, container)
+                    for kid, container in _containers
+                    if container.status in ACTIVE_STATUS_SET
+                ]
+                for kernel_id, container in alive_containers:
                     alive_kernels[kernel_id] = container.id
                     session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                     kernel_session_map[kernel_id] = session_id
