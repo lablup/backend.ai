@@ -4,7 +4,7 @@ import enum
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar, final
 
 import graphene
@@ -45,30 +45,35 @@ class ClientContext:
 
     async def get_or_init_project_ctx(self) -> Mapping[uuid.UUID, UserRoleInProject]:
         if self._project_ctx is None:
-            if self.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
-                role_in_project = UserRoleInProject.ADMIN
-            else:
-                role_in_project = UserRoleInProject.USER
-
-            if self.user_role == UserRole.SUPERADMIN:
-                stmt = (
-                    sa.select(AssocGroupUserRow)
-                    .select_from(AssocGroupUserRow)
-                    .where(AssocGroupUserRow.user_id == self.user_id)
-                )
-            else:
-                stmt = (
-                    sa.select(AssocGroupUserRow)
-                    .select_from(sa.join(AssocGroupUserRow, GroupRow))
-                    .where(
-                        (AssocGroupUserRow.user_id == self.user_id)
-                        & (GroupRow.domain_name == self.domain_name)
+            match self.user_role:
+                case UserRole.SUPERADMIN | UserRole.MONITOR:
+                    stmt = sa.select(GroupRow)
+                    async with AsyncSession(self.db_conn) as db_session:
+                        self._project_ctx = {
+                            row.id: UserRoleInProject.ADMIN
+                            for row in await db_session.scalars(stmt)
+                        }
+                case UserRole.ADMIN:
+                    stmt = sa.select(GroupRow).where(GroupRow.domain_name == self.domain_name)
+                    async with AsyncSession(self.db_conn) as db_session:
+                        self._project_ctx = {
+                            row.id: UserRoleInProject.ADMIN
+                            for row in await db_session.scalars(stmt)
+                        }
+                case UserRole.USER:
+                    stmt = (
+                        sa.select(AssocGroupUserRow)
+                        .select_from(sa.join(AssocGroupUserRow, GroupRow))
+                        .where(
+                            (AssocGroupUserRow.user_id == self.user_id)
+                            & (GroupRow.domain_name == self.domain_name)
+                        )
                     )
-                )
-            async with AsyncSession(self.db_conn) as db_session:
-                self._project_ctx = {
-                    row.group_id: role_in_project for row in await db_session.scalars(stmt)
-                }
+                    async with AsyncSession(self.db_conn) as db_session:
+                        self._project_ctx = {
+                            row.group_id: UserRoleInProject.USER
+                            for row in await db_session.scalars(stmt)
+                        }
         return self._project_ctx
 
 
@@ -126,12 +131,22 @@ class AbstractACLPermissionContext(
     `overridden` field is used to address exceptional cases such as permission overriding or cover other scopes(scaling groups or storage hosts etc).
     """
 
-    user_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
-    project_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]]
-    domain_name_to_permission_map: Mapping[str, frozenset[ACLPermissionType]]
+    user_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]] = field(
+        default_factory=dict
+    )
+    project_id_to_permission_map: Mapping[uuid.UUID, frozenset[ACLPermissionType]] = field(
+        default_factory=dict
+    )
+    domain_name_to_permission_map: Mapping[str, frozenset[ACLPermissionType]] = field(
+        default_factory=dict
+    )
 
-    object_id_to_additional_permission_map: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
-    object_id_to_overriding_permission_map: Mapping[ACLObjectIDType, frozenset[ACLPermissionType]]
+    object_id_to_additional_permission_map: Mapping[
+        ACLObjectIDType, frozenset[ACLPermissionType]
+    ] = field(default_factory=dict)
+    object_id_to_overriding_permission_map: Mapping[
+        ACLObjectIDType, frozenset[ACLPermissionType]
+    ] = field(default_factory=dict)
 
     def filter_by_permission(self, permission_to_include: ACLPermissionType) -> None:
         self.user_id_to_permission_map = {
