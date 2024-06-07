@@ -41,10 +41,10 @@ class ClientContext:
     user_id: uuid.UUID
     user_role: UserRole
 
-    project_ctx: Mapping[uuid.UUID, UserRoleInProject] | None = None
+    _project_ctx: Mapping[uuid.UUID, UserRoleInProject] | None = None
 
     async def get_or_init_project_ctx(self) -> Mapping[uuid.UUID, UserRoleInProject]:
-        if self.project_ctx is None:
+        if self._project_ctx is None:
             if self.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
                 role_in_project = UserRoleInProject.ADMIN
             else:
@@ -66,10 +66,10 @@ class ClientContext:
                     )
                 )
             async with AsyncSession(self.db_conn) as db_session:
-                self.project_ctx = {
+                self._project_ctx = {
                     row.group_id: role_in_project for row in await db_session.scalars(stmt)
                 }
-        return self.project_ctx
+        return self._project_ctx
 
 
 class BaseACLScope:
@@ -91,17 +91,17 @@ class UserScope(BaseACLScope):
     user_id: uuid.UUID
 
 
-# Extra ACL scope is used to address ACL object specific scopes
+# Extra ACL scope is to address some scopes that contain specific object types
 # such as registries for images, scaling groups for agents, storage hosts for vfolders etc.
-ExtraACLScopeName = str
-ExtraACLScopeID = Any
-ExtraACLScopeType = Mapping[ExtraACLScopeName, ExtraACLScopeID]
+_ExtraACLScopeTypeName = str
+_ExtraACLScopeID = Any
+ExtraACLScope = Mapping[_ExtraACLScopeTypeName, _ExtraACLScopeID]
 
 
 @dataclass(frozen=True)
 class ACLObjectScope:
     base_scope: BaseACLScope
-    extra_scopes: ExtraACLScopeType | None = None
+    extra_scopes: ExtraACLScope | None = None
 
 
 ACLObjectType = TypeVar("ACLObjectType")
@@ -218,7 +218,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContextType:
         pass
 
@@ -230,7 +230,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContextType:
         pass
 
@@ -242,7 +242,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContextType:
         pass
 
