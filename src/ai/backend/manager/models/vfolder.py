@@ -809,21 +809,19 @@ class ACLPermissionContext(
                     continue
         return cond
 
-    async def _build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(VFolderRow).where(cond)
 
-    async def determine_permission_on_obj(
-        self, acl_obj: VFolderRow
-    ) -> frozenset[VFolderACLPermission]:
+    async def determine_permission(self, acl_obj: VFolderRow) -> frozenset[VFolderACLPermission]:
         vfolder_row = acl_obj
         vfolder_id = cast(uuid.UUID, acl_obj.id)
         if (
-            overriden_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
+            overriding_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
         ) is not None:
-            return overriden_perm
+            return overriding_perm
         permissions: set[VFolderACLPermission] = set()
         permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
         permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
@@ -832,7 +830,9 @@ class ACLPermissionContext(
         return frozenset(permissions)
 
 
-class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermissionContext]):
+class ACLPermissionContextBuilder(
+    AbstractACLPermissionContextBuilder[VFolderACLPermission, ACLPermissionContext]
+):
     @classmethod
     async def _build_in_user_scope(
         cls,
@@ -1145,8 +1145,10 @@ async def get_vfolders(
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
     async with SASession(ctx.db_conn) as db_session:
-        permission_ctx = await ACLPermissionContextBuilder.build(db_session, ctx, target_scope)
-        query_stmt = await permission_ctx.build_query(requested_permission)
+        permission_ctx = await ACLPermissionContextBuilder.build(
+            db_session, ctx, target_scope, permission=requested_permission
+        )
+        query_stmt = await permission_ctx.build_query()
         if query_stmt is None:
             return []
         if vfolder_id is not None:
@@ -1163,7 +1165,7 @@ async def get_vfolders(
         result: list[VFolderACLObject] = []
         for row in await db_session.scalars(query_stmt):
             row = cast(VFolderRow, row)
-            permissions = await permission_ctx.determine_permission_on_obj(row)
+            permissions = await permission_ctx.determine_permission(row)
             result.append(VFolderACLObject(row, permissions))
         return result
 
