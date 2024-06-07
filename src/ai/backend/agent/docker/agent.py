@@ -10,6 +10,7 @@ import shutil
 import signal
 import struct
 import sys
+from collections.abc import Mapping
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -22,7 +23,6 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    Mapping,
     MutableMapping,
     Optional,
     Sequence,
@@ -119,6 +119,30 @@ def container_from_docker_container(src: DockerContainer) -> Container:
         ports=ports,
         backend_obj=src,
     )
+
+
+async def _clean_scratch(
+    loop: asyncio.AbstractEventLoop,
+    scratch_type: str,
+    scratch_root: Path,
+    kernel_id: KernelId,
+) -> None:
+    scratch_dir = scratch_root / str(kernel_id)
+    tmp_dir = scratch_root / f"{kernel_id}_tmp"
+    try:
+        if sys.platform.startswith("linux") and scratch_type == "memory":
+            await destroy_scratch_filesystem(scratch_dir)
+            await destroy_scratch_filesystem(tmp_dir)
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+            await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
+        elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+            await destroy_loop_filesystem(scratch_root, kernel_id)
+        else:
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+    except CalledProcessError:
+        pass
+    except FileNotFoundError:
+        pass
 
 
 def _DockerError_reduce(self):
@@ -853,17 +877,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             log.debug("full container config: {!r}", pretty(container_config))
 
         async def _rollback_container_creation() -> None:
-            scratch_type = self.local_config["container"]["scratch-type"]
-            scratch_root = self.local_config["container"]["scratch-root"]
-            if sys.platform.startswith("linux") and scratch_type == "memory":
-                await destroy_scratch_filesystem(self.scratch_dir)
-                await destroy_scratch_filesystem(self.tmp_dir)
-                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-            elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                await destroy_loop_filesystem(scratch_root, self.kernel_id)
-            else:
-                await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
+            await _clean_scratch(
+                loop,
+                self.local_config["container"]["scratch-type"],
+                self.local_config["container"]["scratch-root"],
+                self.kernel_id,
+            )
             self.port_pool.update(host_ports)
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
@@ -1513,24 +1532,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                scratch_dir = scratch_root / str(kernel_id)
-                tmp_dir = scratch_root / f"{kernel_id}_tmp"
-                try:
-                    if sys.platform.startswith("linux") and scratch_type == "memory":
-                        await destroy_scratch_filesystem(scratch_dir)
-                        await destroy_scratch_filesystem(tmp_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
-                    elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                        await destroy_loop_filesystem(scratch_root, kernel_id)
-                    else:
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                except CalledProcessError:
-                    pass
-                except FileNotFoundError:
-                    pass
+                await _clean_scratch(
+                    loop,
+                    self.local_config["container"]["scratch-type"],
+                    self.local_config["container"]["scratch-root"],
+                    kernel_id,
+                )
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
