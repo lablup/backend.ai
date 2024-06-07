@@ -98,15 +98,29 @@ class UserScope(BaseACLScope):
 
 # Extra ACL scope is to address some scopes that contain specific object types
 # such as registries for images, scaling groups for agents, storage hosts for vfolders etc.
-_ExtraACLScopeTypeName = str
-_ExtraACLScopeID = Any
-ExtraACLScope = Mapping[_ExtraACLScopeTypeName, _ExtraACLScopeID]
+class ExtraACLScope:
+    pass
+
+
+@dataclass(frozen=True)
+class StorageHost(ExtraACLScope):
+    name: str
+
+
+@dataclass(frozen=True)
+class ImageRegistry(ExtraACLScope):
+    name: str
+
+
+@dataclass(frozen=True)
+class ScalingGroup(ExtraACLScope):
+    name: str
 
 
 @dataclass(frozen=True)
 class ACLObjectScope:
     base_scope: BaseACLScope
-    extra_scopes: ExtraACLScope | None = None
+    extra_scopes: list[ExtraACLScope] | None = None
 
 
 ACLObjectType = TypeVar("ACLObjectType")
@@ -233,7 +247,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContextType:
         pass
 
@@ -245,7 +259,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContextType:
         pass
 
@@ -257,7 +271,7 @@ class AbstractACLPermissionContextBuilder(Generic[ACLPermissionContextType], met
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContextType:
         pass
 

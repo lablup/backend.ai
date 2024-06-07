@@ -5,7 +5,7 @@ import logging
 import os.path
 import uuid
 from collections.abc import Container, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import (
@@ -73,6 +73,7 @@ from .acl import (
     BaseACLPermission,
     ClientContext,
     ExtraACLScope,
+    StorageHost,
 )
 from .base import (
     GUID,
@@ -728,6 +729,7 @@ ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderACLPermission] = (
     ADMIN_PERMISSIONS | USER_PERMISSIONS_ON_PROJECT_FOLDERS
 )
 
+# TODO: Change type of `vfolder_permissions.permission` to VFolderACLPermission
 PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderACLPermission]] = {
     VFolderPermission.READ_ONLY: frozenset([
         VFolderACLPermission.READ_ATTRIBUTE,
@@ -762,32 +764,49 @@ PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderAC
 class ACLPermissionContext(
     AbstractACLPermissionContext[VFolderACLPermission, VFolderRow, uuid.UUID]
 ):
+    extra_scopes: list[ExtraACLScope] = field(default_factory=list)
+
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
 
-        def _coalesce(
+        def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            or_cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression,
         ) -> WhereClauseType:
-            return base_cond | or_cond if base_cond is not None else or_cond
+            return base_cond | _cond if base_cond is not None else _cond
+
+        def _AND_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond & _cond if base_cond is not None else _cond
 
         if self.user_id_to_permission_map:
-            cond = _coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
+            cond = _OR_coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
         if self.project_id_to_permission_map:
-            cond = _coalesce(cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys()))
+            cond = _OR_coalesce(
+                cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys())
+            )
         if self.domain_name_to_permission_map:
-            cond = _coalesce(
+            cond = _OR_coalesce(
                 cond, VFolderRow.domain_name.in_(self.domain_name_to_permission_map.keys())
             )
         if self.object_id_to_additional_permission_map:
-            cond = _coalesce(
+            cond = _OR_coalesce(
                 cond, VFolderRow.id.in_(self.object_id_to_additional_permission_map.keys())
             )
         if self.object_id_to_overriding_permission_map:
-            cond = _coalesce(
+            cond = _OR_coalesce(
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
+
+        for scope in self.extra_scopes:
+            match scope:
+                case StorageHost(name):
+                    cond = _AND_coalesce(cond, (VFolderRow.host == name))
+                case _:
+                    continue
         return cond
 
     async def _build_query(self) -> sa.sql.Select | None:
@@ -821,7 +840,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -934,6 +953,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
+            extra_scopes=extra_target_scopes or [],
         )
 
     @classmethod
@@ -943,7 +963,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1001,6 +1021,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
+            extra_scopes=extra_target_scopes or [],
         )
 
     @classmethod
@@ -1010,7 +1031,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: ExtraACLScope | None,
+        extra_target_scopes: list[ExtraACLScope] | None = None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1103,6 +1124,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
+            extra_scopes=extra_target_scopes or [],
         )
 
 
