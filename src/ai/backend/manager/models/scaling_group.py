@@ -335,17 +335,14 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_agent_total_resource_slots(
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
-        from .agent import agents
+        from .agent import AgentRow
 
         graph_ctx = info.context
-        async with graph_ctx.db.begin_readonly() as conn:
-            result = (
-                await conn.execute(
-                    sa.select([agents.c.occupied_slots, agents.c.available_slots]).where(
-                        agents.c.scaling_group == self.name
-                    )
-                )
-            ).fetchall()
+        async with graph_ctx.db.begin_readonly() as db_session:
+            query_stmt = sa.select([AgentRow.occupied_slots, AgentRow.available_slots]).where(
+                AgentRow.scaling_group == self.name
+            )
+            result = (await db_session.execute(query_stmt)).fetchall()
 
             total_occupied_slots = ResourceSlot()
             total_available_slots = ResourceSlot()
