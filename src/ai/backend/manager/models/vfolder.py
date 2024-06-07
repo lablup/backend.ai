@@ -72,7 +72,7 @@ from .acl import (
     ACLObjectScope,
     BaseACLPermission,
     ClientContext,
-    ExtraACLScopeType,
+    ExtraACLScope,
 )
 from .base import (
     GUID,
@@ -835,7 +835,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -969,7 +969,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1085,7 +1085,7 @@ class ACLPermissionContextBuilder(AbstractACLPermissionContextBuilder[ACLPermiss
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: ExtraACLScopeType | None,
+        extra_target_scopes: ExtraACLScope | None,
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
