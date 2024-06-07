@@ -676,6 +676,7 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
+        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
     )
 
     @property
@@ -1193,7 +1194,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
-    requested_slots = graphene.JSONString(description="Added in 24.03.0")
+    requested_slots = graphene.JSONString(description="Added in 24.03.0.")
 
     # statistics
     num_queries = BigInt()

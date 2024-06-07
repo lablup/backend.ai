@@ -1835,15 +1835,25 @@ class AbstractAgent(
                     and kernel_config["session_type"] == SessionTypes.INFERENCE
                 ):
                     model_folder = model_folders[0]
-                    model_definition_path = Path(model_folder.host_path / "model-definition.yml")
-                    if not model_definition_path.is_file():
-                        model_definition_path = Path(
-                            model_folder.host_path / "model-definition.yaml"
-                        )
-                    if not model_definition_path.is_file():
+                    if _fname := (kernel_config.get("internal_data") or {}).get(
+                        "model_definition_path"
+                    ):
+                        model_definition_candidates = [_fname]
+                    else:
+                        model_definition_candidates = [
+                            "model-definition.yaml",
+                            "model-definition.yml",
+                        ]
+
+                    model_definition_path = None
+                    for filename in model_definition_candidates:
+                        if (Path(model_folder.host_path) / filename).is_file():
+                            model_definition_path = Path(model_folder.host_path) / filename
+                            break
+
+                    if not model_definition_path:
                         raise AgentError(
-                            "Model definition file (model-definition.yml or"
-                            " model-definition.yaml) does not exist under vFolder"
+                            f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
                             f" {model_folder.name} (ID {model_folder.vfid})",
                         )
                     try:
@@ -2084,7 +2094,7 @@ class AbstractAgent(
                     "attached_devices": attached_devices,
                 }
 
-                if model_definition:
+                if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                     for model in model_definition["models"]:
                         asyncio.create_task(
                             self.start_and_monitor_model_service_health(kernel_obj, model)

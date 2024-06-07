@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "输入您的密码",
       "InvalidBlankEmail": "输入你的电子邮箱",
       "DisMatchUserEmail": "用户电子邮件不匹配",
-      "MyEnvironments": "我的环境"
+      "MyEnvironments": "我的环境",
+      "ResourcePolicy": "资源政策"
     },
     "YouAreOffline": "您现在离线",
     "YouAreOnline": "您现在在线",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "机械制造商",
       "GPUSlot": "投币口",
       "Architecture": "建筑学",
-      "ModelStorageToMount": "型号存储安装",
+      "ModelStorageToMount": "要安装的模型存储",
       "MinMemory": "当前所选运行环境的最小内存容量为 {{size}}iB。",
       "AIAccelerator": "人工智能加速器",
       "FailedToConnectCoordinator": "连接应用程序管理失败。请检查网络连接和防火墙设置。",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
-      "EnqueueComputeSessionWarning": "如果将其设置为大于当前可用资源，则会话创建将在队列中延迟，直到可用。",
+      "EnqueueComputeSessionWarning": "资源不足。\n会话可能处于待处理状态。",
       "SessionName": "会话名称",
       "ResetFormConfirm": "您想重置所有条目吗？",
       "TemplateAndHistory": "模板",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "已经存在的变量名。",
       "Template": "会议模板",
       "EnableAutomaticMiniumShmem": "设置最小共享内存",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "当簇大小不小于 2 时，只允许使用整数。",
       "StartAfter": "之后开始：",
       "StartTimeDoesNotApply": "如果未设置开始时间，则不适用。",
@@ -273,7 +273,8 @@
       "AddEnvironmentVariable": "添加环境变量",
       "EnvironmentVariableValueRequired": "请输入数值。",
       "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。",
-      "FailedToStartNewSession": "会话创建失败。\n请检查会话页面上的“已完成”选项卡。"
+      "FailedToStartNewSession": "会话创建失败。\n请检查会话页面上的“已完成”选项卡。",
+      "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -400,11 +401,11 @@
     "Agents": "代理商",
     "IPU": "IPU",
     "IPU(MEM)": "IPU（内存）",
-    "ConvertSessionToImage": "将会话转换为图像",
     "SessionName": "会话名称",
     "SessionId": "会话 ID",
     "EnvironmentAndVersion": "环境及版本",
-    "Tags": "标签"
+    "Tags": "标签",
+    "fGPU": "GPU"
   },
   "button": {
     "Cancel": "取消",
@@ -466,7 +467,9 @@
     "Allocation": "分配",
     "Utilization": "利用率",
     "DiskPerc": "磁盘 %",
-    "NoAgentToDisplay": "无代理显示"
+    "NoAgentToDisplay": "无代理显示",
+    "AutoRefreshEvery5s": "每5秒自动刷新一次",
+    "Agent": "代理"
   },
   "general": {
     "cores": "核心",
@@ -488,7 +491,8 @@
     "Image": "图像",
     "All": "全部",
     "InProgress": "进行中",
-    "Session": "会话"
+    "Session": "会话",
+    "General": "一般情况"
   },
   "credential": {
     "Permission": "允许",
@@ -757,7 +761,8 @@
       "DeleteForeverDesc": "警告：所选项目将被永久删除，并且您将无法恢复它们。"
     },
     "ask": {
-      "DoYouWantToProceed": "您要继续吗？"
+      "DoYouWantToProceed": "您要继续吗？",
+      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？"
     },
     "title": {
       "LetsDouble-Check": "让我们仔细检查",
@@ -818,7 +823,10 @@
     "NoChangeMade": "未作改动",
     "Architecture": "建筑学",
     "NoImageToDisplay": "无图像显示",
-    "CustomizedImageSuccessfullyDeleted": "自定义图片已成功删除。"
+    "CustomizedImageSuccessfullyDeleted": "自定义图片已成功删除。",
+    "DescImageResourceModified": "资源限制成功修改",
+    "DescImagePortsModified": "图像端口修改成功",
+    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "资源预设",
@@ -950,8 +958,23 @@
     "SuccessfullyDeleted": "已成功删除资源策略。",
     "PolicyNameEmpty": "策略名称不应为空。",
     "AboutToDeleteResourcePolicy": "您即将删除此资源策略：",
-    "MaxSessionLifeTime": "会话寿命（秒）",
-    "NoResourcePolicyToDisplay": "无资源政策显示"
+    "MaxSessionLifetime": "会话寿命（秒）",
+    "NoResourcePolicyToDisplay": "无资源政策显示",
+    "Keypair": "密钥对",
+    "User": "用户",
+    "Project": "项目",
+    "KeypairResourcePolicy": "密钥对资源策略",
+    "IdleTimeout": "空闲超时",
+    "CreateResourcePolicy": "创建资源策略",
+    "ResourcePolicyNameAlreadyExists": "资源策略名称已存在。\n请更改名称以添加。",
+    "UserResourcePolicy": "用户资源策略",
+    "MaxVFolderCount": "最大文件夹数",
+    "MaxSessionCountPerModelSession": "每个模型会话的最大会话计数",
+    "MaxQuotaScopeSize": "最大配额范围大小 (GB)",
+    "MaxCustomizedImageCount": "最大自定义图像数量",
+    "CreatedAt": "创建于",
+    "MaxFolderCount": "最大文件夹数",
+    "ProjectResourcePolicy": "项目资源政策"
   },
   "registry": {
     "Hostname": "主机名",
@@ -1183,7 +1206,8 @@
     "ShowOnlyChanged": "仅显示更改",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
-    "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。"
+    "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。",
+    "SearchPlaceholder": "搜索"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1503,15 +1527,30 @@
     "RoutingsCount": "路由计数",
     "Active/Total": "活动/总数",
     "Public": "公众",
-    "YouAreAboutToTerminate": "您即将终止",
     "Image": "图片",
     "Owner": "所有者",
+    "Validate": "证实",
+    "Cancel": "取消",
+    "ValidationInfo": "验证信息",
+    "Processing": "加工...",
+    "Success": "成功",
+    "Error": "错误",
+    "SeeContainerLogs": "查看容器日志",
+    "TimeStamp": "时间戳",
+    "Result": "结果",
+    "Finished": "完成的",
     "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}",
     "FailedToTerminateService": "终止服务的请求失败。",
     "FailedToUpdateService": "更新服务失败。",
     "ServiceCreated": "模型服务 {{ name }} 已成功创建。",
     "ServiceUpdated": "模型服务 {{ name }} 已成功更新。",
-    "ServiceTerminated": "模型服务 {{ name }} 已成功终止。"
+    "CannotValidateNow": "现在无法验证服务。\n请检查资源分配或其他配置。",
+    "Ready": "准备好",
+    "ServiceTerminated": "已为模型服务“{{ name }}”发送关闭请求。",
+    "ModelMountDestination": "模型文件夹的安装目标",
+    "AdditionalMounts": "附加安装座",
+    "ModelDefinitionPath": "模型定义文件路径",
+    "NoExtraMounts": "没有额外的安装座"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1564,7 +1603,20 @@
     "SelectColumnToDisplay": "选择要显示的列",
     "SearchTableColumn": "搜索表格列"
   },
-  "setting": {
-    "SearchPlaceholder": "输入搜索词"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "输入字段验证错误",
+      "ValidationErrorText": "如果您未在必填字段中输入值或输入无效值，则该字段中会显示一条错误消息。",
+      "FixErrorAndTryAgainText": "如果存在错误字段，则“启动会话”按钮将被禁用。\n请更正错误并重试。",
+      "FixErrorFieldbyModifyButton": "对于该错误字段，您可以直接进入右上角的编辑按钮进行编辑。"
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "复制",
+    "Copied": "已复制"
+  },
+  "propertyFilter": {
+    "placeHolder": "搜索",
+    "ResetFilter": "重置过滤器"
   }
 }

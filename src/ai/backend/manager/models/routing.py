@@ -30,7 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class RouteStatus(Enum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
-    TERMINATING = "unhealthy"
+    TERMINATING = "terminating"
     PROVISIONING = "provisioning"
     FAILED_TO_START = "failed_to_start"
 
