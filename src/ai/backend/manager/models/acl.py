@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar
 
@@ -120,7 +120,7 @@ class ScalingGroup(ExtraACLScope):
 @dataclass(frozen=True)
 class ACLObjectScope:
     base_scope: BaseACLScope
-    extra_scopes: list[ExtraACLScope] | None = None
+    extra_scopes: list[ExtraACLScope] = field(default_factory=list)
 
 
 ACLObjectType = TypeVar("ACLObjectType")
@@ -243,7 +243,7 @@ class AbstractACLPermissionContextBuilder(
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 
@@ -255,7 +255,7 @@ class AbstractACLPermissionContextBuilder(
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 
@@ -267,7 +267,7 @@ class AbstractACLPermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 

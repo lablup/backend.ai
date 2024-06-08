@@ -4,7 +4,7 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Mapping
+from collections.abc import Container, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import PurePosixPath
@@ -840,7 +840,7 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         user_id: uuid.UUID,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -953,7 +953,7 @@ class ACLPermissionContextBuilder(
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
-            extra_scopes=extra_target_scopes or [],
+            extra_scopes=list(extra_target_scopes),
         )
 
     @classmethod
@@ -963,7 +963,7 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         project_id: uuid.UUID,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1021,7 +1021,7 @@ class ACLPermissionContextBuilder(
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
-            extra_scopes=extra_target_scopes or [],
+            extra_scopes=list(extra_target_scopes),
         )
 
     @classmethod
@@ -1031,7 +1031,7 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
         *,
-        extra_target_scopes: list[ExtraACLScope] | None = None,
+        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1124,7 +1124,7 @@ class ACLPermissionContextBuilder(
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
-            extra_scopes=extra_target_scopes or [],
+            extra_scopes=list(extra_target_scopes),
         )
 
 
