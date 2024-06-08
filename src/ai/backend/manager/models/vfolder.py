@@ -843,8 +843,6 @@ class ACLPermissionContextBuilder(
         extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        domain_name_to_permission_map: Mapping[str, frozenset[VFolderACLPermission]] = {}
         object_id_to_additional_permission_map: Mapping[
             uuid.UUID, frozenset[VFolderACLPermission]
         ] = {}
@@ -949,10 +947,8 @@ class ACLPermissionContextBuilder(
                 raise RuntimeError("should not reach here")
         return ACLPermissionContext(
             user_id_to_permission_map,
-            project_id_to_permission_map,
-            domain_name_to_permission_map,
-            object_id_to_additional_permission_map,
-            object_id_to_overriding_permission_map,
+            object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+            object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
             extra_scopes=list(extra_target_scopes),
         )
 
@@ -965,12 +961,7 @@ class ACLPermissionContextBuilder(
         *,
         extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
-        user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
-        domain_name_to_permission_map: Mapping[str, frozenset[VFolderACLPermission]] = {}
-        object_id_to_additional_permission_map: Mapping[
-            uuid.UUID, frozenset[VFolderACLPermission]
-        ] = {}
         object_id_to_overriding_permission_map: Mapping[
             uuid.UUID, frozenset[VFolderACLPermission]
         ] = {}
@@ -1016,11 +1007,8 @@ class ACLPermissionContextBuilder(
             case _:
                 raise RuntimeError("should not reach here")
         return ACLPermissionContext(
-            user_id_to_permission_map,
-            project_id_to_permission_map,
-            domain_name_to_permission_map,
-            object_id_to_additional_permission_map,
-            object_id_to_overriding_permission_map,
+            project_id_to_permission_map=project_id_to_permission_map,
+            object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
             extra_scopes=list(extra_target_scopes),
         )
 
