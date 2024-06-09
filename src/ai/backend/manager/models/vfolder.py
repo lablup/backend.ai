@@ -683,21 +683,21 @@ async def query_accessible_vfolders(
 
 class VFolderACLPermission(BaseACLPermission):
     # Only owners can do
-    CLONE = "clone"
-    OVERRIDE_PERMISSION_TO_OTHERS = "override-permission"  # Invite, share
+    CLONE = enum.auto()
+    OVERRIDE_PERMISSION_TO_OTHERS = enum.auto()  # Invite, share
 
     # `create_vfolder` action should be in {Domain, Project, or User} permissions, not here
-    READ_ATTRIBUTE = "read-attribute"
-    UPDATE_ATTRIBUTE = "update-attribute"
-    DELETE_VFOLDER = "delete-vfolder"
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_VFOLDER = enum.auto()
 
-    READ_CONTENT = "read-content"
-    WRITE_CONTENT = "write-content"
-    DELETE_CONTENT = "delete-content"
+    READ_CONTENT = enum.auto()
+    WRITE_CONTENT = enum.auto()
+    DELETE_CONTENT = enum.auto()
 
-    MOUNT_RO = "mount-ro"
-    MOUNT_RW = "mount-rw"
-    MOUNT_WD = "mount-wd"
+    MOUNT_RO = enum.auto()
+    MOUNT_RW = enum.auto()
+    MOUNT_WD = enum.auto()
 
 
 WhereClauseType: TypeAlias = (
