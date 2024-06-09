@@ -901,23 +901,24 @@ class ACLPermissionContextBuilder(
                         .where(UserRow.uuid == user_id)
                         .options(load_only(UserRow.domain_name))
                     )
-                    user_row = cast(UserRow, await db_session.scalar(user_domain_stmt))
-                    if user_row.domain_name == ctx.domain_name:
-                        additional_stmt = (
-                            sa.select(VFolderPermissionRow)
-                            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                            .where(
-                                (VFolderPermissionRow.user == ctx.user_id)
-                                & (
-                                    VFolderRow.ownership_type == VFolderOwnershipType.USER
-                                )  # filter out project vfolders
+                    user_row = cast(UserRow | None, await db_session.scalar(user_domain_stmt))
+                    if user_row is not None:
+                        if user_row.domain_name == ctx.domain_name:
+                            additional_stmt = (
+                                sa.select(VFolderPermissionRow)
+                                .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                                .where(
+                                    (VFolderPermissionRow.user == ctx.user_id)
+                                    & (
+                                        VFolderRow.ownership_type == VFolderOwnershipType.USER
+                                    )  # filter out project vfolders
+                                )
                             )
-                        )
-                        object_id_to_additional_permission_map = {
-                            row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
-                            for row in await db_session.scalars(additional_stmt)
-                        }
-                        user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
+                            object_id_to_additional_permission_map = {
+                                row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
+                                for row in await db_session.scalars(additional_stmt)
+                            }
+                            user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
             case UserRole.USER:
                 if ctx.user_id == user_id:
                     overriding_stmt = (
