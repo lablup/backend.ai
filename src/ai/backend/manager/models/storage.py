@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import itertools
 import logging
+import uuid
+from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -17,19 +21,39 @@ from typing import (
     Sequence,
     Tuple,
     TypedDict,
+    cast,
 )
 
 import aiohttp
 import attrs
 import graphene
+import sqlalchemy as sa
 import yarl
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata, VFolderID
+from ai.backend.common.types import (
+    HardwareMetadata,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
+from .acl import (
+    AbstractACLPermissionContext,
+    AbstractACLPermissionContextBuilder,
+    BaseACLPermission,
+    ClientContext,
+)
 from .base import Item, PaginatedList
+from .domain import DomainRow
+from .group import GroupRow
+from .keypair import KeyPairRow
+from .resource_policy import KeyPairResourcePolicyRow
+from .user import UserRole, UserRow
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -56,6 +80,251 @@ class StorageProxyInfo:
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 
 _ctx_volumes_cache: ContextVar[List[Tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
+
+
+class StorageHostACLPermission(BaseACLPermission):
+    from .vfolder import VFolderACLPermission
+
+    CREATE_FOLDER = enum.auto()
+
+    CLONE = VFolderACLPermission.CLONE
+    OVERRIDE_PERMISSION_TO_OTHERS = VFolderACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+
+    READ_ATTRIBUTE = VFolderACLPermission.READ_ATTRIBUTE
+    UPDATE_ATTRIBUTE = VFolderACLPermission.UPDATE_ATTRIBUTE
+    DELETE_VFOLDER = VFolderACLPermission.DELETE_VFOLDER
+
+    READ_CONTENT = VFolderACLPermission.READ_CONTENT
+    WRITE_CONTENT = VFolderACLPermission.WRITE_CONTENT
+    DELETE_CONTENT = VFolderACLPermission.DELETE_CONTENT
+
+    MOUNT_RO = VFolderACLPermission.MOUNT_RO
+    MOUNT_RW = VFolderACLPermission.MOUNT_RW
+    MOUNT_WD = VFolderACLPermission.MOUNT_WD
+
+
+ALL_STORAGE_HOST_PERMISSIONS = frozenset([perm for perm in StorageHostACLPermission])
+
+
+LEGACY_VFHOST_PERMISSION_TO_HOST_ACL_PERMISSION_MAP: Mapping[
+    VFolderHostPermission, frozenset[StorageHostACLPermission]
+] = {
+    VFolderHostPermission.CREATE: frozenset([StorageHostACLPermission.CREATE_FOLDER]),
+    VFolderHostPermission.MODIFY: frozenset([StorageHostACLPermission.UPDATE_ATTRIBUTE]),
+    VFolderHostPermission.DELETE: frozenset([
+        StorageHostACLPermission.DELETE_VFOLDER,
+        StorageHostACLPermission.DELETE_CONTENT,
+    ]),
+    VFolderHostPermission.MOUNT_IN_SESSION: frozenset([
+        StorageHostACLPermission.MOUNT_RO,
+        StorageHostACLPermission.MOUNT_RW,
+        StorageHostACLPermission.MOUNT_WD,
+    ]),
+    VFolderHostPermission.UPLOAD_FILE: frozenset([
+        StorageHostACLPermission.READ_ATTRIBUTE,
+        StorageHostACLPermission.WRITE_CONTENT,
+        StorageHostACLPermission.DELETE_CONTENT,
+    ]),
+    VFolderHostPermission.DOWNLOAD_FILE: frozenset([
+        StorageHostACLPermission.READ_ATTRIBUTE,
+        StorageHostACLPermission.WRITE_CONTENT,
+        StorageHostACLPermission.DELETE_CONTENT,
+    ]),
+    VFolderHostPermission.INVITE_OTHERS: frozenset([
+        StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+    ]),
+    VFolderHostPermission.SET_USER_PERM: frozenset([
+        StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+    ]),
+}
+
+ALL_LEGACY_VFHOST_PERMISSIONS = {perm for perm in VFolderHostPermission}
+
+
+def _legacy_vf_perms_to_host_acl_perms(
+    perms: list[VFolderHostPermission],
+) -> frozenset[StorageHostACLPermission]:
+    if set(perms) == ALL_LEGACY_VFHOST_PERMISSIONS:
+        return ALL_STORAGE_HOST_PERMISSIONS
+    result: frozenset[StorageHostACLPermission] = frozenset()
+    for perm in perms:
+        result |= LEGACY_VFHOST_PERMISSION_TO_HOST_ACL_PERMISSION_MAP[perm]
+    return result
+
+
+@dataclass
+class ACLPermissionContext(AbstractACLPermissionContext[StorageHostACLPermission, str, str]):
+    @property
+    def host_names(self) -> set[str]:
+        return {*self.object_id_to_additional_permission_map.keys()}
+
+    async def build_query(self) -> sa.sql.Select | None:
+        return None
+
+    async def determine_permission(self, acl_obj: str) -> frozenset[StorageHostACLPermission]:
+        host_name = acl_obj
+        return self.object_id_to_additional_permission_map.get(host_name, frozenset())
+
+
+class ACLPermissionContextBuilder(
+    AbstractACLPermissionContextBuilder[StorageHostACLPermission, ACLPermissionContext]
+):
+    @classmethod
+    async def _build_in_user_scope(
+        cls,
+        db_session: SASession,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+    ) -> ACLPermissionContext:
+        from ..api.exceptions import UserNotFound
+
+        match ctx.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                stmt = (
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_id)
+                    .options(
+                        selectinload(UserRow.keypairs).options(
+                            joinedload(KeyPairRow.resource_policy)
+                        ),
+                        joinedload(UserRow.domain),
+                    )
+                )
+                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                if user_row is None:
+                    raise UserNotFound
+            case UserRole.ADMIN:
+                stmt = (
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_id)
+                    .options(
+                        selectinload(UserRow.keypairs).options(
+                            joinedload(KeyPairRow.resource_policy)
+                        ),
+                        joinedload(UserRow.domain),
+                    )
+                )
+                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                if user_row is None:
+                    raise UserNotFound
+                if ctx.domain_name != user_row.domain_name:
+                    return ACLPermissionContext()
+            case UserRole.USER:
+                if ctx.user_id != user_id:
+                    return ACLPermissionContext()
+                stmt = (
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_id)
+                    .options(
+                        selectinload(UserRow.keypairs).options(
+                            joinedload(KeyPairRow.resource_policy)
+                        ),
+                        joinedload(UserRow.domain),
+                    )
+                )
+                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                if user_row is None:
+                    raise UserNotFound
+        domain_vfolder_host_permission = cast(
+            VFolderHostPermissionMap, user_row.domain.allowed_vfolder_hosts
+        )
+
+        object_id_to_additional_permission_map: defaultdict[
+            str, frozenset[StorageHostACLPermission]
+        ] = defaultdict(frozenset)
+        for host, perms in domain_vfolder_host_permission.items():
+            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
+                perms
+            )
+
+        for keypair in user_row.keypairs:
+            resource_policy = cast(KeyPairResourcePolicyRow | None, keypair.resource_policy)
+            if resource_policy is None:
+                continue
+            vfolder_host_permission = cast(
+                VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts
+            )
+            for host, perms in vfolder_host_permission.items():
+                object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
+                    perms
+                )
+
+        return ACLPermissionContext(
+            object_id_to_additional_permission_map=object_id_to_additional_permission_map
+        )
+
+    @classmethod
+    async def _build_in_project_scope(
+        cls,
+        db_session: SASession,
+        ctx: ClientContext,
+        project_id: uuid.UUID,
+    ) -> ACLPermissionContext:
+        from ..api.exceptions import GroupNotFound
+
+        project_ctx = await ctx.get_or_init_project_ctx()
+        if project_id not in project_ctx:
+            raise GroupNotFound
+        stmt = (
+            sa.select(GroupRow)
+            .where(GroupRow.id == project_id)
+            .options(joinedload(GroupRow.domain))
+        )
+        project_row = cast(GroupRow, await db_session.scalar(stmt))
+        project_vfolder_host_permission = cast(
+            VFolderHostPermissionMap, project_row.allowed_vfolder_hosts
+        )
+        domain_vfolder_host_permission = cast(
+            VFolderHostPermissionMap, project_row.domain.allowed_vfolder_hosts
+        )
+
+        object_id_to_additional_permission_map: defaultdict[
+            str, frozenset[StorageHostACLPermission]
+        ] = defaultdict(frozenset)
+        for host, perms in project_vfolder_host_permission.items():
+            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
+                perms
+            )
+
+        for host, perms in domain_vfolder_host_permission.items():
+            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
+                perms
+            )
+
+        return ACLPermissionContext(
+            object_id_to_additional_permission_map=object_id_to_additional_permission_map
+        )
+
+    @classmethod
+    async def _build_in_domain_scope(
+        cls,
+        db_session: SASession,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ACLPermissionContext:
+        from ..api.exceptions import DomainNotFound
+
+        match ctx.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                pass
+            case UserRole.ADMIN:
+                if ctx.domain_name != domain_name:
+                    return ACLPermissionContext()
+            case UserRole.USER:
+                if ctx.domain_name != domain_name:
+                    return ACLPermissionContext()
+
+        stmt = sa.select(DomainRow).where(DomainRow.name == domain_name)
+        domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
+        if domain_row is None:
+            raise DomainNotFound
+        vfolder_host_permission = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
+        return ACLPermissionContext(
+            object_id_to_additional_permission_map={
+                host: _legacy_vf_perms_to_host_acl_perms(perms)
+                for host, perms in vfolder_host_permission.items()
+            }
+        )
 
 
 class VolumeInfo(TypedDict):

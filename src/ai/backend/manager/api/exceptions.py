@@ -197,6 +197,10 @@ class ImageNotFound(ObjectNotFound):
     object_name = "environment image"
 
 
+class UserNotFound(ObjectNotFound):
+    object_name = "user"
+
+
 class DomainNotFound(ObjectNotFound):
     object_name = "domain"
 
