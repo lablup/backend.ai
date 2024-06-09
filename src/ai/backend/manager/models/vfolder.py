@@ -96,9 +96,7 @@ from .rbac import (
 )
 from .rbac.exceptions import NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import ACLPermissionContext as StorageHostPermissionContext
-from .storage import ACLPermissionContextBuilder as StorageHostPermissionContextBuilder
-from .storage import StorageHostACLPermission
+from .storage import StorageHostACLPermission, StorageHostPermissionMap, get_storage_hosts
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -817,8 +815,8 @@ PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderR
 class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]):
     host_permission_context: StorageHostPermissionContext | None = None
 
-    def apply_host_perm_ctx(self, host_perm_ctx: StorageHostPermissionContext) -> None:
-        self.host_permission_context = host_perm_ctx
+    def apply_host_perms(self, host_perm: StorageHostPermissionMap) -> None:
+        self.host_permission_map = host_perm
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -855,8 +853,9 @@ class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolder
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
 
-        if self.host_permission_context is not None:
-            if host_names := self.host_permission_context.host_names:
+        if self.host_permission_map is not None:
+            host_names = {*self.host_permission_map.keys()}
+            if host_names:
                 cond = _AND_coalesce(cond, VFolderRow.host.in_(host_names))
             else:
                 return None
@@ -884,9 +883,9 @@ class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolder
         permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
         permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
-        if self.host_permission_context is not None:
-            host_permissions = await self.host_permission_context.determine_permission(
-                vfolder_row.host
+        if self.host_permission_map is not None:
+            host_permissions: frozenset[StorageHostACLPermission] = self.host_permission_map.get(
+                vfolder_row.host, frozenset()
             )
             permissions &= {
                 _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP[perm]
