@@ -4,8 +4,8 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Iterable, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Container, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import (
@@ -72,7 +72,6 @@ from .acl import (
     ACLObjectScope,
     BaseACLPermission,
     ClientContext,
-    ExtraACLScope,
     StorageHost,
 )
 from .base import (
@@ -764,8 +763,6 @@ PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderAC
 class ACLPermissionContext(
     AbstractACLPermissionContext[VFolderACLPermission, VFolderRow, uuid.UUID]
 ):
-    extra_scopes: list[ExtraACLScope] = field(default_factory=list)
-
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -801,12 +798,6 @@ class ACLPermissionContext(
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
 
-        for scope in self.extra_scopes:
-            match scope:
-                case StorageHost(name):
-                    cond = _AND_coalesce(cond, (VFolderRow.host == name))
-                case _:
-                    continue
         return cond
 
     async def build_query(self) -> sa.sql.Select | None:
@@ -839,8 +830,6 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         user_id: uuid.UUID,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         object_id_to_additional_permission_map: Mapping[
@@ -949,7 +938,6 @@ class ACLPermissionContextBuilder(
             user_id_to_permission_map,
             object_id_to_additional_permission_map=object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
-            extra_scopes=list(extra_target_scopes),
         )
 
     @classmethod
@@ -958,8 +946,6 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         project_id: uuid.UUID,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         object_id_to_overriding_permission_map: Mapping[
@@ -1009,7 +995,6 @@ class ACLPermissionContextBuilder(
         return ACLPermissionContext(
             project_id_to_permission_map=project_id_to_permission_map,
             object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
-            extra_scopes=list(extra_target_scopes),
         )
 
     @classmethod
@@ -1018,8 +1003,6 @@ class ACLPermissionContextBuilder(
         db_session: SASession,
         ctx: ClientContext,
         domain_name: str,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContext:
         user_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
         project_id_to_permission_map: Mapping[uuid.UUID, frozenset[VFolderACLPermission]] = {}
@@ -1112,7 +1095,6 @@ class ACLPermissionContextBuilder(
             domain_name_to_permission_map,
             object_id_to_additional_permission_map,
             object_id_to_overriding_permission_map,
-            extra_scopes=list(extra_target_scopes),
         )
 
 
@@ -1124,6 +1106,7 @@ class VFolderACLObject(NamedTuple):
 async def get_vfolders(
     ctx: ClientContext,
     target_scope: ACLObjectScope,
+    extra_scope: StorageHost | None = None,
     requested_permission: VFolderACLPermission | None = None,
     *,
     vfolder_id: uuid.UUID | None = None,
