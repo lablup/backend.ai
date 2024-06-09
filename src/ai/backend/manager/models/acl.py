@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar
 
@@ -120,7 +120,6 @@ class ScalingGroup(ExtraACLScope):
 @dataclass(frozen=True)
 class ACLObjectScope:
     base_scope: BaseACLScope
-    extra_scopes: list[ExtraACLScope] = field(default_factory=list)
 
 
 ACLObjectType = TypeVar("ACLObjectType")
@@ -218,17 +217,11 @@ class AbstractACLPermissionContextBuilder(
     ) -> ACLPermissionContextType:
         match target_scope.base_scope:
             case UserScope(user_id=user_id):
-                result = await cls._build_in_user_scope(
-                    db_session, ctx, user_id, extra_target_scopes=target_scope.extra_scopes
-                )
+                result = await cls._build_in_user_scope(db_session, ctx, user_id)
             case ProjectScope(project_id=project_id):
-                result = await cls._build_in_project_scope(
-                    db_session, ctx, project_id, extra_target_scopes=target_scope.extra_scopes
-                )
+                result = await cls._build_in_project_scope(db_session, ctx, project_id)
             case DomainScope(domain_name=domain_name):
-                result = await cls._build_in_domain_scope(
-                    db_session, ctx, domain_name, extra_target_scopes=target_scope.extra_scopes
-                )
+                result = await cls._build_in_domain_scope(db_session, ctx, domain_name)
             case _:
                 raise RuntimeError(f"invalid ACL scope `{target_scope}`")
         if permission is not None:
@@ -242,8 +235,6 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         user_id: uuid.UUID,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 
@@ -254,8 +245,6 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         project_id: uuid.UUID,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 
@@ -266,8 +255,6 @@ class AbstractACLPermissionContextBuilder(
         db_session: AsyncSession,
         ctx: ClientContext,
         domain_name: str,
-        *,
-        extra_target_scopes: Iterable[ExtraACLScope],
     ) -> ACLPermissionContextType:
         pass
 
