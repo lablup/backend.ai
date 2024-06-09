@@ -69,8 +69,8 @@ from ..types import UserScope
 from .acl import (
     AbstractACLPermissionContext,
     AbstractACLPermissionContextBuilder,
-    ACLObjectScope,
     BaseACLPermission,
+    BaseACLScope,
     ClientContext,
     StorageHost,
 )
@@ -1109,7 +1109,7 @@ class VFolderACLObject(NamedTuple):
 
 async def get_vfolders(
     ctx: ClientContext,
-    target_scope: ACLObjectScope,
+    target_scope: BaseACLScope,
     extra_scope: StorageHost | None = None,
     requested_permission: VFolderACLPermission | None = None,
     *,

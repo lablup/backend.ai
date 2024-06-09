@@ -117,11 +117,6 @@ class ScalingGroup(ExtraACLScope):
     name: str
 
 
-@dataclass(frozen=True)
-class ACLObjectScope:
-    base_scope: BaseACLScope
-
-
 ACLObjectType = TypeVar("ACLObjectType")
 ACLObjectIDType = TypeVar("ACLObjectIDType")
 
@@ -211,11 +206,11 @@ class AbstractACLPermissionContextBuilder(
         cls,
         db_session: AsyncSession,
         ctx: ClientContext,
-        target_scope: ACLObjectScope,
+        target_scope: BaseACLScope,
         *,
         permission: ACLPermissionType | None = None,
     ) -> ACLPermissionContextType:
-        match target_scope.base_scope:
+        match target_scope:
             case UserScope(user_id=user_id):
                 result = await cls._build_in_user_scope(db_session, ctx, user_id)
             case ProjectScope(project_id=project_id):
