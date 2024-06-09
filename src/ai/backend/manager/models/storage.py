@@ -46,6 +46,7 @@ from .acl import (
     AbstractACLPermissionContext,
     AbstractACLPermissionContextBuilder,
     BaseACLPermission,
+    BaseACLScope,
     ClientContext,
 )
 from .base import Item, PaginatedList
@@ -155,8 +156,8 @@ def _legacy_vf_perms_to_host_acl_perms(
 @dataclass
 class ACLPermissionContext(AbstractACLPermissionContext[StorageHostACLPermission, str, str]):
     @property
-    def host_names(self) -> set[str]:
-        return {*self.object_id_to_additional_permission_map.keys()}
+    def host_to_permissions_map(self) -> Mapping[str, frozenset[StorageHostACLPermission]]:
+        return self.object_id_to_additional_permission_map
 
     async def build_query(self) -> sa.sql.Select | None:
         return None
@@ -333,6 +334,21 @@ class VolumeInfo(TypedDict):
     path: str
     fsprefix: str
     capabilities: List[str]
+
+
+StorageHostPermissionMap = Mapping[str, frozenset[StorageHostACLPermission]]
+
+
+async def get_storage_hosts(
+    ctx: ClientContext,
+    target_scope: BaseACLScope,
+    requested_permission: StorageHostACLPermission | None = None,
+) -> StorageHostPermissionMap:
+    async with SASession(ctx.db_conn) as db_session:
+        permission_ctx = await ACLPermissionContextBuilder.build(
+            db_session, ctx, target_scope, permission=requested_permission
+        )
+        return {**permission_ctx.host_to_permissions_map}
 
 
 class StorageSessionManager:

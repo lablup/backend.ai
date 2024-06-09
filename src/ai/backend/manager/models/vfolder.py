@@ -95,9 +95,7 @@ from .group import GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import ACLPermissionContext as StorageHostPermissionContext
-from .storage import ACLPermissionContextBuilder as StorageHostPermissionContextBuilder
-from .storage import StorageHostACLPermission
+from .storage import StorageHostACLPermission, StorageHostPermissionMap, get_storage_hosts
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -803,10 +801,10 @@ PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderAC
 class ACLPermissionContext(
     AbstractACLPermissionContext[VFolderACLPermission, VFolderRow, uuid.UUID]
 ):
-    host_permission_context: StorageHostPermissionContext | None = None
+    host_permission_map: StorageHostPermissionMap | None = None
 
-    def apply_host_perm_ctx(self, host_perm_ctx: StorageHostPermissionContext) -> None:
-        self.host_permission_context = host_perm_ctx
+    def apply_host_perms(self, host_perm: StorageHostPermissionMap) -> None:
+        self.host_permission_map = host_perm
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -843,8 +841,9 @@ class ACLPermissionContext(
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
 
-        if self.host_permission_context is not None:
-            if host_names := self.host_permission_context.host_names:
+        if self.host_permission_map is not None:
+            host_names = {*self.host_permission_map.keys()}
+            if host_names:
                 cond = _AND_coalesce(cond, VFolderRow.host.in_(host_names))
             else:
                 return None
@@ -870,9 +869,9 @@ class ACLPermissionContext(
         permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
         permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
-        if self.host_permission_context is not None:
-            host_permissions = await self.host_permission_context.determine_permission(
-                vfolder_row.host
+        if self.host_permission_map is not None:
+            host_permissions: frozenset[StorageHostACLPermission] = self.host_permission_map.get(
+                vfolder_row.host, frozenset()
             )
             permissions &= {
                 _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP[perm]
@@ -1160,24 +1159,26 @@ async def get_vfolders(
     allowed_status: Container[VFolderOperationStatus] | None = None,
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
-    async with SASession(ctx.db_conn) as db_session:
-        host_permission = (
-            _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
-            if requested_permission is not None
-            else None
-        )
-        host_permission_ctx = await StorageHostPermissionContextBuilder.build(
-            db_session, ctx, target_scope, permission=host_permission
-        )
-        if extra_scope is not None and host_permission is not None:
-            perms = await host_permission_ctx.determine_permission(extra_scope.name)
-            if host_permission not in perms:
-                return []
+    requested_host_permission = (
+        _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        if requested_permission is not None
+        else None
+    )
+    host_permissions = await get_storage_hosts(ctx, target_scope, requested_host_permission)
+    if extra_scope is not None:
+        host_permissions = {
+            host_name: perms
+            for host_name, perms in host_permissions.items()
+            if host_name == extra_scope.name
+        }
+    if not host_permissions:
+        return []
 
+    async with SASession(ctx.db_conn) as db_session:
         permission_ctx = await ACLPermissionContextBuilder.build(
             db_session, ctx, target_scope, permission=requested_permission
         )
-        permission_ctx.apply_host_perm_ctx(host_permission_ctx)
+        permission_ctx.apply_host_perms(host_permissions)
 
         query_stmt = await permission_ctx.build_query()
         if query_stmt is None:
