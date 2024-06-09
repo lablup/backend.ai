@@ -724,8 +724,12 @@ USER_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderACLPermission] = frozenset
     VFolderACLPermission.MOUNT_RW,
     VFolderACLPermission.MOUNT_WD,
 ])
+# The element of admin permission set on project folders is the same with owner's permission set
+# but it doesn't mean that admins are the owner of the project folders.
 ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderACLPermission] = (
-    ADMIN_PERMISSIONS | USER_PERMISSIONS_ON_PROJECT_FOLDERS
+    ADMIN_PERMISSIONS
+    | USER_PERMISSIONS_ON_PROJECT_FOLDERS
+    | {VFolderACLPermission.CLONE, VFolderACLPermission.OVERRIDE_PERMISSION_TO_OTHERS}
 )
 
 # TODO: Change type of `vfolder_permissions.permission` to VFolderACLPermission
