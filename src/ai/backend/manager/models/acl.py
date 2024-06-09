@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, List, Sequence, TypeVar
 import graphene
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.types import VFolderHostPermission
 
@@ -47,14 +48,18 @@ class ClientContext:
         if self._project_ctx is None:
             match self.user_role:
                 case UserRole.SUPERADMIN | UserRole.MONITOR:
-                    stmt = sa.select(GroupRow)
+                    stmt = sa.select(GroupRow).options(load_only(GroupRow.id))
                     async with AsyncSession(self.db_conn) as db_session:
                         self._project_ctx = {
                             row.id: UserRoleInProject.ADMIN
                             for row in await db_session.scalars(stmt)
                         }
                 case UserRole.ADMIN:
-                    stmt = sa.select(GroupRow).where(GroupRow.domain_name == self.domain_name)
+                    stmt = (
+                        sa.select(GroupRow)
+                        .where(GroupRow.domain_name == self.domain_name)
+                        .options(load_only(GroupRow.id))
+                    )
                     async with AsyncSession(self.db_conn) as db_session:
                         self._project_ctx = {
                             row.id: UserRoleInProject.ADMIN
