@@ -957,46 +957,26 @@ class ACLPermissionContextBuilder(
             uuid.UUID, frozenset[VFolderACLPermission]
         ] = {}
 
-        match ctx.user_role:
-            case UserRole.SUPERADMIN | UserRole.MONITOR:
-                # superadmins have an admin-permissions to any project folders in any domain
+        role_in_project = await ctx.get_user_role_in_project(project_id)
+        match role_in_project:
+            case UserRoleInProject.ADMIN:
                 project_id_to_permission_map = {project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS}
-
-            case UserRole.ADMIN:
-                project_ctx = await ctx.get_or_init_project_ctx()
-                role_in_project = project_ctx.get(project_id)
-                if role_in_project == UserRoleInProject.ADMIN:
-                    project_id_to_permission_map = {
-                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                    }
-            case UserRole.USER:
-                project_ctx = await ctx.get_or_init_project_ctx()
-                role_in_project = project_ctx.get(project_id)
-                if role_in_project is not None:
-                    project_id_to_permission_map = {
-                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                        if role_in_project == UserRoleInProject.ADMIN
-                        else USER_PERMISSIONS_ON_PROJECT_FOLDERS
-                    }
-
-                    overriding_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (VFolderRow.group == project_id)
-                        )
+            case UserRoleInProject.USER:
+                project_id_to_permission_map = {project_id: USER_PERMISSIONS_ON_PROJECT_FOLDERS}
+                overriding_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.group == project_id)
                     )
-                    object_id_to_overriding_permission_map = {
-                        row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
-                        for row in await db_session.scalars(overriding_stmt)
-                    }
-
-                else:
-                    # User is NOT associated with the project
-                    pass
+                )
+                object_id_to_overriding_permission_map = {
+                    row.vfolder: PERMISSION_TO_ACL_PERMISSION_MAP[row.permission]
+                    for row in await db_session.scalars(overriding_stmt)
+                }
             case _:
-                raise RuntimeError("should not reach here")
+                pass
         return ACLPermissionContext(
             project_id_to_permission_map=project_id_to_permission_map,
             object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
@@ -1021,11 +1001,13 @@ class ACLPermissionContextBuilder(
         match ctx.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
-                project_ctx = await ctx.get_or_init_project_ctx()
-                project_id_to_permission_map = {
-                    project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                    for project_id, _ in project_ctx.items()
-                }
+
+                project_ctx = await ctx.get_or_init_project_ctx_in_domain(domain_name)
+                if project_ctx is not None:
+                    project_id_to_permission_map = {
+                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                        for project_id, _ in project_ctx.items()
+                    }
                 additional_stmt = (
                     sa.select(VFolderPermissionRow)
                     .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1043,11 +1025,12 @@ class ACLPermissionContextBuilder(
             case UserRole.ADMIN:
                 if ctx.domain_name == domain_name:
                     domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
-                    project_ctx = await ctx.get_or_init_project_ctx()
-                    project_id_to_permission_map = {
-                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                        for project_id, _ in project_ctx.items()
-                    }
+                    project_ctx = await ctx.get_or_init_project_ctx_in_domain(domain_name)
+                    if project_ctx is not None:
+                        project_id_to_permission_map = {
+                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                            for project_id, _ in project_ctx.items()
+                        }
                     additional_stmt = (
                         sa.select(VFolderPermissionRow)
                         .select_from(sa.join(VFolderPermissionRow, VFolderRow))
@@ -1067,13 +1050,14 @@ class ACLPermissionContextBuilder(
                     pass
             case UserRole.USER:
                 if ctx.domain_name == domain_name:
-                    project_ctx = await ctx.get_or_init_project_ctx()
-                    project_id_to_permission_map = {
-                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                        if role == UserRoleInProject.ADMIN
-                        else USER_PERMISSIONS_ON_PROJECT_FOLDERS
-                        for project_id, role in project_ctx.items()
-                    }
+                    project_ctx = await ctx.get_or_init_project_ctx_in_domain(domain_name)
+                    if project_ctx is not None:
+                        project_id_to_permission_map = {
+                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                            if role == UserRoleInProject.ADMIN
+                            else USER_PERMISSIONS_ON_PROJECT_FOLDERS
+                            for project_id, role in project_ctx.items()
+                        }
                     overriding_stmt = (
                         sa.select(VFolderPermissionRow)
                         .select_from(sa.join(VFolderPermissionRow, VFolderRow))
