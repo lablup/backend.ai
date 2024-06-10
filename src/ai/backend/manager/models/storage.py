@@ -48,6 +48,9 @@ from .acl import (
     BaseACLPermission,
     BaseACLScope,
     ClientContext,
+    DomainScope,
+    ProjectScope,
+    UserScope,
 )
 from .base import Item, PaginatedList
 from .domain import DomainRow
@@ -177,8 +180,6 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         user_id: uuid.UUID,
     ) -> ACLPermissionContext:
-        from ..api.exceptions import UserNotFound
-
         match ctx.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 stmt = (
@@ -187,13 +188,12 @@ class ACLPermissionContextBuilder(
                     .options(
                         selectinload(UserRow.keypairs).options(
                             joinedload(KeyPairRow.resource_policy)
-                        ),
-                        joinedload(UserRow.domain),
+                        )
                     )
                 )
                 user_row = cast(UserRow | None, await db_session.scalar(stmt))
                 if user_row is None:
-                    raise UserNotFound
+                    return ACLPermissionContext()
             case UserRole.ADMIN:
                 stmt = (
                     sa.select(UserRow)
@@ -201,13 +201,12 @@ class ACLPermissionContextBuilder(
                     .options(
                         selectinload(UserRow.keypairs).options(
                             joinedload(KeyPairRow.resource_policy)
-                        ),
-                        joinedload(UserRow.domain),
+                        )
                     )
                 )
                 user_row = cast(UserRow | None, await db_session.scalar(stmt))
                 if user_row is None:
-                    raise UserNotFound
+                    return ACLPermissionContext()
                 if ctx.domain_name != user_row.domain_name:
                     return ACLPermissionContext()
             case UserRole.USER:
@@ -225,27 +224,18 @@ class ACLPermissionContextBuilder(
                 )
                 user_row = cast(UserRow | None, await db_session.scalar(stmt))
                 if user_row is None:
-                    raise UserNotFound
-        domain_vfolder_host_permission = cast(
-            VFolderHostPermissionMap, user_row.domain.allowed_vfolder_hosts
-        )
+                    return ACLPermissionContext()
 
         object_id_to_additional_permission_map: defaultdict[
             str, frozenset[StorageHostACLPermission]
         ] = defaultdict(frozenset)
-        for host, perms in domain_vfolder_host_permission.items():
-            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
-                perms
-            )
 
         for keypair in user_row.keypairs:
             resource_policy = cast(KeyPairResourcePolicyRow | None, keypair.resource_policy)
             if resource_policy is None:
                 continue
-            vfolder_host_permission = cast(
-                VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts
-            )
-            for host, perms in vfolder_host_permission.items():
+            host_permissions = cast(VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts)
+            for host, perms in host_permissions.items():
                 object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
                     perms
                 )
@@ -261,33 +251,17 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         project_id: uuid.UUID,
     ) -> ACLPermissionContext:
-        from ..api.exceptions import GroupNotFound
-
-        project_ctx = await ctx.get_or_init_project_ctx()
-        if project_id not in project_ctx:
-            raise GroupNotFound
-        stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
-            .options(joinedload(GroupRow.domain))
-        )
+        role_in_project = await ctx.get_user_role_in_project(project_id)
+        if role_in_project is None:
+            return ACLPermissionContext()
+        stmt = sa.select(GroupRow).where(GroupRow.id == project_id)
         project_row = cast(GroupRow, await db_session.scalar(stmt))
-        project_vfolder_host_permission = cast(
-            VFolderHostPermissionMap, project_row.allowed_vfolder_hosts
-        )
-        domain_vfolder_host_permission = cast(
-            VFolderHostPermissionMap, project_row.domain.allowed_vfolder_hosts
-        )
+        host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
 
         object_id_to_additional_permission_map: defaultdict[
             str, frozenset[StorageHostACLPermission]
         ] = defaultdict(frozenset)
-        for host, perms in project_vfolder_host_permission.items():
-            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
-                perms
-            )
-
-        for host, perms in domain_vfolder_host_permission.items():
+        for host, perms in host_permissions.items():
             object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
                 perms
             )
@@ -303,8 +277,6 @@ class ACLPermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
     ) -> ACLPermissionContext:
-        from ..api.exceptions import DomainNotFound
-
         match ctx.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 pass
@@ -318,7 +290,7 @@ class ACLPermissionContextBuilder(
         stmt = sa.select(DomainRow).where(DomainRow.name == domain_name)
         domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
         if domain_row is None:
-            raise DomainNotFound
+            return ACLPermissionContext()
         vfolder_host_permission = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
         return ACLPermissionContext(
             object_id_to_additional_permission_map={
@@ -349,6 +321,40 @@ async def get_storage_hosts(
             db_session, ctx, target_scope, permission=requested_permission
         )
         return {**permission_ctx.host_to_permissions_map}
+
+
+def merge_host_permissions(
+    left: StorageHostPermissionMap, right: StorageHostPermissionMap
+) -> StorageHostPermissionMap:
+    result: dict[str, frozenset[StorageHostACLPermission]] = {}
+    for host_name in {*left.keys(), *right.keys()}:
+        result[host_name] = left.get(host_name, frozenset()) | right.get(host_name, frozenset())
+    return result
+
+
+async def get_client_accessible_storage_hosts(
+    ctx: ClientContext,
+    requested_permission: StorageHostACLPermission | None = None,
+) -> StorageHostPermissionMap:
+    kp_scoped_host_permissions = await get_storage_hosts(
+        ctx, UserScope(ctx.user_id), requested_permission
+    )
+    domain_scoped_host_permissions = await get_storage_hosts(
+        ctx, DomainScope(ctx.domain_name), requested_permission
+    )
+    host_permissions = merge_host_permissions(
+        kp_scoped_host_permissions, domain_scoped_host_permissions
+    )
+    project_ctx = await ctx.get_or_init_project_ctx_in_domain(ctx.domain_name)
+    if project_ctx is not None:
+        for project_id in project_ctx.keys():
+            project_scoped_host_permissions = await get_storage_hosts(
+                ctx, ProjectScope(project_id), requested_permission
+            )
+            host_permissions = merge_host_permissions(
+                host_permissions, project_scoped_host_permissions
+            )
+    return host_permissions
 
 
 class StorageSessionManager:

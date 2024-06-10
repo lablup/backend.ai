@@ -96,7 +96,11 @@ from .rbac import (
 )
 from .rbac.exceptions import NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import StorageHostACLPermission, StorageHostPermissionMap, get_storage_hosts
+from .storage import (
+    StorageHostACLPermission,
+    StorageHostPermissionMap,
+    get_client_accessible_storage_hosts,
+)
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
