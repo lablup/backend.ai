@@ -54,9 +54,7 @@ class ClientContext:
     _project_ctx: ProjectContext | None = field(init=False, default=None)
     _domain_project_ctx: Mapping[str, ProjectContext] | None = field(init=False, default=None)
 
-    async def get_or_init_project_ctx_in_domain(
-        self, domain_name: str
-    ) -> Mapping[uuid.UUID, UserRoleInProject] | None:
+    async def get_or_init_project_ctx_in_domain(self, domain_name: str) -> ProjectContext | None:
         match self.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 if self._domain_project_ctx is None:
@@ -94,7 +92,7 @@ class ClientContext:
         else:
             return _project_ctx.get(project_id)
 
-    async def _get_or_init_project_ctx(self) -> Mapping[uuid.UUID, UserRoleInProject] | Bypass:
+    async def _get_or_init_project_ctx(self) -> ProjectContext | Bypass:
         match self.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 # Superadmins and monitors can access to ALL projects in the system.
