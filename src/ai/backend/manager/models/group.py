@@ -96,7 +96,6 @@ _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 
 class UserRoleInProject(enum.StrEnum):
-    OWNER = enum.auto()
     ADMIN = enum.auto()  # TODO: impl project admin
     USER = enum.auto()  # User is associated as user
 

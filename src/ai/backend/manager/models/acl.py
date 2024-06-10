@@ -34,6 +34,15 @@ class BaseACLPermission(enum.StrEnum):
 ACLPermissionType = TypeVar("ACLPermissionType", bound=BaseACLPermission)
 
 
+class Bypass(enum.Enum):
+    TOKEN = enum.auto()
+
+
+bypass = Bypass.TOKEN
+
+ProjectContext = Mapping[uuid.UUID, UserRoleInProject]
+
+
 @dataclass
 class ClientContext:
     db_conn: AsyncConnection
@@ -42,19 +51,57 @@ class ClientContext:
     user_id: uuid.UUID
     user_role: UserRole
 
-    _project_ctx: Mapping[uuid.UUID, UserRoleInProject] | None = None
+    _project_ctx: ProjectContext | None = field(init=False, default=None)
+    _domain_project_ctx: Mapping[str, ProjectContext] | None = field(init=False, default=None)
 
-    async def get_or_init_project_ctx(self) -> Mapping[uuid.UUID, UserRoleInProject]:
-        if self._project_ctx is None:
-            match self.user_role:
-                case UserRole.SUPERADMIN | UserRole.MONITOR:
-                    stmt = sa.select(GroupRow).options(load_only(GroupRow.id))
+    async def get_or_init_project_ctx_in_domain(
+        self, domain_name: str
+    ) -> Mapping[uuid.UUID, UserRoleInProject] | None:
+        match self.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                if self._domain_project_ctx is None:
+                    self._domain_project_ctx = {}
+                if domain_name not in self._domain_project_ctx:
+                    stmt = (
+                        sa.select(GroupRow)
+                        .where(GroupRow.domain_name == domain_name)
+                        .options(load_only(GroupRow.id))
+                    )
                     async with AsyncSession(self.db_conn) as db_session:
-                        self._project_ctx = {
-                            row.id: UserRoleInProject.ADMIN
-                            for row in await db_session.scalars(stmt)
+                        self._domain_project_ctx = {
+                            **self._domain_project_ctx,
+                            domain_name: {
+                                row.id: UserRoleInProject.ADMIN
+                                for row in await db_session.scalars(stmt)
+                            },
                         }
-                case UserRole.ADMIN:
+            case UserRole.ADMIN:
+                if self._domain_project_ctx is None:
+                    _project_ctx = await self._get_or_init_project_ctx()
+                    assert _project_ctx is not bypass
+                    self._domain_project_ctx = {self.domain_name: _project_ctx}
+            case UserRole.USER:
+                if self._domain_project_ctx is None:
+                    _project_ctx = await self._get_or_init_project_ctx()
+                    assert _project_ctx is not bypass
+                    self._domain_project_ctx = {self.domain_name: _project_ctx}
+        return self._domain_project_ctx.get(domain_name)
+
+    async def get_user_role_in_project(self, project_id: uuid.UUID) -> UserRoleInProject | None:
+        _project_ctx = await self._get_or_init_project_ctx()
+        if _project_ctx is bypass:
+            return UserRoleInProject.ADMIN
+        else:
+            return _project_ctx.get(project_id)
+
+    async def _get_or_init_project_ctx(self) -> Mapping[uuid.UUID, UserRoleInProject] | Bypass:
+        match self.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                # Superadmins and monitors can access to ALL projects in the system.
+                # Let's not fetch all project data from DB.
+                return bypass
+            case UserRole.ADMIN:
+                if self._project_ctx is None:
                     stmt = (
                         sa.select(GroupRow)
                         .where(GroupRow.domain_name == self.domain_name)
@@ -65,7 +112,9 @@ class ClientContext:
                             row.id: UserRoleInProject.ADMIN
                             for row in await db_session.scalars(stmt)
                         }
-                case UserRole.USER:
+                return self._project_ctx
+            case UserRole.USER:
+                if self._project_ctx is None:
                     stmt = (
                         sa.select(AssocGroupUserRow)
                         .select_from(sa.join(AssocGroupUserRow, GroupRow))
@@ -79,7 +128,7 @@ class ClientContext:
                             row.group_id: UserRoleInProject.USER
                             for row in await db_session.scalars(stmt)
                         }
-        return self._project_ctx
+                return self._project_ctx
 
 
 class BaseACLScope:
