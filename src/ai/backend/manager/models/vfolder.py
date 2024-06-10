@@ -95,7 +95,11 @@ from .group import GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import StorageHostACLPermission, StorageHostPermissionMap, get_storage_hosts
+from .storage import (
+    StorageHostACLPermission,
+    StorageHostPermissionMap,
+    get_client_accessible_storage_hosts,
+)
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -1164,7 +1168,8 @@ async def get_vfolders(
         if requested_permission is not None
         else None
     )
-    host_permissions = await get_storage_hosts(ctx, target_scope, requested_host_permission)
+    host_permissions = await get_client_accessible_storage_hosts(ctx, requested_host_permission)
+
     if extra_scope is not None:
         host_permissions = {
             host_name: perms
