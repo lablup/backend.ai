@@ -64,7 +64,9 @@
       "Data&Model": "Data",
       "InvalidBlankPassword": "Masukkan kata sandi Anda",
       "InvalidBlankEmail": "Masukkan email Anda",
-      "DisMatchUserEmail": "Email Pengguna tidak cocok"
+      "DisMatchUserEmail": "Email Pengguna tidak cocok",
+      "MyEnvironments": "Lingkungan Saya",
+      "ResourcePolicy": "Kebijakan Sumber Daya"
     },
     "YouAreOffline": "Anda sekarang offline",
     "YouAreOnline": "Anda sekarang online",
@@ -113,10 +115,17 @@
     "IPUEnabled": "IPU NPU Diaktifkan",
     "ATOMEnabled": "ATOM NPU Diaktifkan",
     "WarboyEnabled": "Warboy NPU Diaktifkan",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan"
   },
   "session": {
     "launcher": {
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Anda menggunakan peluncur sesi \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Loncat ke ulasan",
+      "InteractiveModeDesc": "memungkinkan Anda untuk membuat, menguji, dan menjalankan kode secara interaktif melalui jupyter notebook, kode visual studio, dll.",
+      "BatchModeDesc": "Anda dapat menjalankan kode Anda dengan beberapa node & cluster untuk menskalakan ide Anda",
+      "AddEnvironmentVariable": "Menambahkan variabel lingkungan",
       "Sessions": "Sesi",
       "Project": "Proyek",
       "UserResourceLimit": "Batas Sumber Daya Pengguna",
@@ -221,7 +230,7 @@
       "StartModelServing": "Memulai Penyajian Model",
       "InferenceMode": "Kesimpulan",
       "ImageDoesNotProvideModelPath": "Gambar kontainer tidak menyediakan jalur model. Ini harus dimodifikasi.",
-      "ModelStorageToMount": "Penyimpanan model untuk dipasang",
+      "ModelStorageToMount": "Penyimpanan Model Untuk Dipasang",
       "AIAccelerator": "Akselerator AI",
       "DescAIAccelerator": "</p> <p>Akselerator AI (GPU atau NPU) sangat cocok untuk komputasi matriks / vektor yang terlibat dalam pembelajaran mesin. Akselerator AI mempercepat algoritme pelatihan / inferensi dengan urutan besarnya, mengurangi waktu berjalan dari berminggu-minggu menjadi beberapa hari.",
       "SessionAlreadyExists": "Nama sesi sudah ada",
@@ -243,7 +252,7 @@
       "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
       "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
       "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
-      "EnqueueComputeSessionWarning": "Jika Anda mengaturnya lebih besar dari sumber daya yang tersedia saat ini, pembuatan sesi akan tertunda dalam antrean hingga tersedia.",
+      "EnqueueComputeSessionWarning": "Sumber daya tidak mencukupi. \nSesi mungkin tertunda.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
       "TemplateAndHistory": "Templat",
@@ -256,10 +265,17 @@
       "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
       "Template": "Templat Sesi",
       "EnableAutomaticShmem": "Memori bersama otomatis",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Hanya bilangan bulat yang diperbolehkan jika ukuran cluster tidak kurang dari 2.",
       "StartAfter": "Mulai setelah:",
-      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku."
+      "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku.",
+      "PreviousLauncher": "Classic",
+      "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda.",
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSilakan periksa tab 'SELESAI' di halaman sesi.",
+      "EnvironmentVariableValueRequired": "Silakan masukkan nilai.",
+      "EnableAutomaticMiniumShmem": "Mengatur memori bersama minimum",
+      "MiniumAllocation": "Persyaratan minimum",
+      "MiniumAllocationTooltip": "Pilih sebagai persyaratan minimum untuk lingkungan berjalan yang dipilih",
+      "ProxyDirectTCPNotSupported": "Koneksi TCP langsung proxy belum didukung"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -293,7 +309,8 @@
       "Prepared": "Siap",
       "App": "Aplikasi",
       "NoExistingConnectionExample": "Tidak Ada Koneksi Contoh untuk disalin.",
-      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard."
+      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard.",
+      "ConnectUrlIsNotValid": "URL koneksi tidak valid."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
@@ -322,8 +339,12 @@
     "Batch": "Batch",
     "Architecture": "Arsitektur",
     "Validation": {
+      "SessionNameTooShort": "Masukkan setidaknya 4 karakter.",
+      "SessionNameShouldStartWith": "Nama tersebut harus dimulai dengan huruf alfabet, angka, atau '_'.",
+      "SessionNameShouldEndWith": "Nama tersebut harus diakhiri dengan huruf alfabet, angka, atau '_'.",
+      "SessionNameInvalidCharacter": "Bagian tengah nama hanya boleh berisi huruf alfabet, angka, dan '_'.",
       "SessionNameRequired": "Nama sesi harus diisi",
-      "EnterValidSessionName": "Masukkan nama sesi yang valid",
+      "EnterValidSessionName": "Silakan masukkan kombinasi minimal 4 huruf alfabet, atau angka, atau tanda hubung, atau garis bawah.",
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
       "SluggedStrings": "String yang disumbat (>3 karakter)",
       "SessionNameTooLong64": "Silakan masukkan 64 karakter atau kurang.",
@@ -377,7 +398,15 @@
     "CPU": "CPU",
     "MEM": "Memori",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memori)"
+    "GPU(MEM)": "GPU (memori)",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memori)",
+    "SessionName": "Nama Sesi",
+    "SessionId": "Id Sesi",
+    "EnvironmentAndVersion": "Lingkungan dan Versi",
+    "Tags": "Tag",
+    "Agents": "Agen",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -411,7 +440,10 @@
     "OK": "BAIKLAH.",
     "Download": "Unduh",
     "Clone": "Clone",
-    "Config": "Konfigurasi"
+    "Config": "Konfigurasi",
+    "Next": "Berikutnya",
+    "Previous": "Sebelumnya",
+    "PushToImage": "Sesi dorong ke gambar yang disesuaikan"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -436,7 +468,9 @@
     "Utilization": "Pemanfaatan",
     "NoAvailableLiveStat": "Tidak ada statistik langsung yang tersedia",
     "Allocation": "Alokasi",
-    "DiskPerc": "Disk %"
+    "DiskPerc": "Disk %",
+    "AutoRefreshEvery5s": "Penyegaran otomatis setiap 5 detik",
+    "Agent": "Agen"
   },
   "general": {
     "cores": "core",
@@ -458,7 +492,8 @@
     "Image": "Gambar",
     "All": "Semua",
     "InProgress": "Sedang Berlangsung",
-    "Session": "Sesi"
+    "Session": "Sesi",
+    "General": "Umum"
   },
   "credential": {
     "Permission": "Izin",
@@ -537,7 +572,8 @@
     "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
     "EnableSudoSession": "Aktifkan sesi sudo",
-    "MainAccessKey": "Kunci Akses Utama"
+    "MainAccessKey": "Kunci Akses Utama",
+    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut."
   },
   "data": {
     "Folders": "Folder",
@@ -590,7 +626,7 @@
       "FolderRenamed": "Folder telah diganti nama",
       "FolderNameMismatched": "Nama folder tidak cocok. Silakan periksa apakah ada karakter spasi di bidang input atau tidak.",
       "SameFileName": "Nilai input sama dengan nama file yang akan diperbarui. Silakan ganti dengan nama lain.",
-      "FolderDeleted": "Folder dihapus",
+      "FolderDeleted": "Folder {{ folderName }} telah dihapus.",
       "FolderUpdated": "Opsi folder diperbarui",
       "FolderDisconnected": "Koneksi folder telah terputus.",
       "FileRenamed": "File sudah diganti nama",
@@ -617,7 +653,13 @@
       "CloneFolder": "Folder klon",
       "LeaveFolder": "Tinggalkan folder",
       "ShareFolder": "Folder berbagi",
-      "ModifyPermissions": "Memodifikasi izin"
+      "ModifyPermissions": "Memodifikasi izin",
+      "Restore": "Memulihkan",
+      "DeleteForever": "Hapus selamanya",
+      "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
+      "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
+      "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah.",
+      "MoveToTrashBin": "Pindah ke tempat sampah"
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -668,7 +710,8 @@
       "EmptyFilesAndFoldersAreNotUploaded": "File kosong dan folder kosong tidak diunggah",
       "FolderAlreadyExists": "Folder yang akan diunggah sudah ada.",
       "NumberOfSFTPSessionsExceededTitle": "Mencapai batas jumlah sesi unggahan yang sedang berjalan",
-      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru."
+      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru.",
+      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini."
     },
     "invitation": {
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -707,21 +750,25 @@
     "ModelStore": "Toko Model",
     "New": "Baru",
     "Add": "Menambahkan",
-    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama."
+    "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "PERINGATAN: ini tidak dapat dibatalkan!",
       "LogDeletion": "Anda yakin ingin menghapus semua pesan log?",
       "WillBeAppliedToNewSessions": "Pembaruan ini akan diterapkan ke sesi baru.",
-      "Required": "Diperlukan"
+      "Required": "Diperlukan",
+      "DeleteForeverDesc": "PERINGATAN: item yang dipilih akan dihapus selamanya dan Anda tidak dapat memulihkannya."
     },
     "ask": {
-      "DoYouWantToProceed": "Apakah Anda ingin lanjut?"
+      "DoYouWantToProceed": "Apakah Anda ingin lanjut?",
+      "DoYouWantToDeleteSomething": "Apakah Anda yakin ingin menghapus \"{{ nama }}\"?"
     },
     "title": {
       "LetsDouble-Check": "Mari Periksa Kembali",
-      "Notice": "Pemberitahuan"
+      "Notice": "Pemberitahuan",
+      "DeleteForever": "Hapus selamanya?"
     },
     "ErrorOccurred": "Terjadi Galat",
     "error": {
@@ -776,7 +823,11 @@
     "PasswordsDoNotMatch": "Password dan Konfirmasi tidak cocok.",
     "NoChangeMade": "Tidak ada perubahan yang dibuat",
     "Architecture": "Arsitektur",
-    "NoImageToDisplay": "Tidak ada gambar yang akan ditampilkan"
+    "NoImageToDisplay": "Tidak ada gambar yang akan ditampilkan",
+    "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus.",
+    "DescImageResourceModified": "Batas sumber daya berhasil diubah",
+    "DescImagePortsModified": "Port Gambar berhasil dimodifikasi",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -908,8 +959,23 @@
     "SuccessfullyDeleted": "Kebijakan sumber daya berhasil dihapus.",
     "PolicyNameEmpty": "Nama kebijakan wajib diisi.",
     "AboutToDeleteResourcePolicy": "Anda akan menghapus kebijakan sumber daya ini:",
-    "MaxSessionLifeTime": "Sesi Seumur Hidup (detik)",
-    "NoResourcePolicyToDisplay": "Tidak ada Kebijakan Sumber Daya yang ditampilkan"
+    "MaxSessionLifetime": "Sesi Seumur Hidup (detik)",
+    "NoResourcePolicyToDisplay": "Tidak ada Kebijakan Sumber Daya yang ditampilkan",
+    "Keypair": "pasangan kunci",
+    "User": "Pengguna",
+    "Project": "Proyek",
+    "KeypairResourcePolicy": "Kebijakan Sumber Daya Pasangan Kunci",
+    "IdleTimeout": "Batas Waktu Diam",
+    "CreateResourcePolicy": "Buat Kebijakan Sumber Daya",
+    "ResourcePolicyNameAlreadyExists": "Nama kebijakan sumber daya sudah ada. \nSilakan ubah nama untuk ditambahkan.",
+    "UserResourcePolicy": "Kebijakan Sumber Daya Pengguna",
+    "MaxVFolderCount": "Jumlah Folder Maks",
+    "MaxSessionCountPerModelSession": "Jumlah Sesi Maks Per Sesi Model",
+    "MaxQuotaScopeSize": "Ukuran Cakupan Kuota Maks (GB)",
+    "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
+    "CreatedAt": "Dibuat di",
+    "MaxFolderCount": "Jumlah Folder Maks",
+    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1138,7 +1204,11 @@
     "RequireWarboyPlugin": "Membutuhkan Plugin Backend.AI Warboy.",
     "Plugins": "Plugin",
     "OpenSourceCUDAGPUsupport": "Dukungan GPU CUDA Sumber Terbuka",
-    "ShowOnlyChanged": "Hanya Tampilan yang Berubah"
+    "ShowOnlyChanged": "Hanya Tampilan yang Berubah",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel.",
+    "SearchPlaceholder": "Pencarian"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1191,14 +1261,12 @@
     "LeaveService": "Tinggalkan Layanan",
     "DescConfirmLeave": "Untuk konfirmasi, silakan ketik kembali e-mail dan password Anda.",
     "Password": "Kata sandi",
-    "E-mail": "E-mail",
     "APIKey": "Kunci API",
     "SecretKey": "Kunci rahasia",
     "Endpoint": "Titik akhir",
     "NotAUser": "Bukan pengguna?",
     "LoginAnotherway": "Ingin login dengan cara lain?",
     "SignUp": "Daftar",
-    "LoginWithE-mail": "Masuk dengan E-mail",
     "LoginWithIAM": "Masuk dengan IAM",
     "ClickToUseIAM": "Klik untuk Menggunakan IAM",
     "ClickToUseID": "Klik untuk Menggunakan ID",
@@ -1226,7 +1294,9 @@
     },
     "EndpointInfo": "Tentang Endpoint",
     "DescEndpoint": "<p>Dalam API ENDPOINT, URL server Web Backend.AI, yang meneruskan permintaan ke Manajer, harus dimasukkan.</p> <p>misalnya, http://127.0.0.1:8090/</p> <p>",
-    "EndpointStartWith": "Titik akhir harus dimulai dengan http:// atau https://."
+    "EndpointStartWith": "Titik akhir harus dimulai dengan http:// atau https://.",
+    "LoginWithE-mailorUsername": "Masuk Dengan Email atau Nama Pengguna",
+    "E-mailorUsername": "Email atau nama pengguna"
   },
   "signup": {
     "SignupBETA": "Pendaftaran (khusus undangan Beta)",
@@ -1358,7 +1428,8 @@
     "ResourcePolicyStillReferenced": "Ada pasangan kunci yang merujuk pada kebijakan sumber daya ini.",
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
-    "WrongAPIServerAddress": "Alamat server API salah."
+    "WrongAPIServerAddress": "Alamat server API salah.",
+    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1387,7 +1458,8 @@
     "RequireOTP": "Tulis OTP."
   },
   "inputLimit": {
-    "4to64chars": "(4 ~ 64 karakter)"
+    "4to64chars": "(4 ~ 64 karakter)",
+    "4to32chars": "(4~32 karakter)"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1421,7 +1493,8 @@
     "ForUser": "Untuk Pengguna",
     "ForProject": "Untuk Proyek",
     "QuotaDoesNotSupported": "Backend penyimpanan ini tidak mendukung kuota.",
-    "BeCarefulToSetUserResourcePolicy": "Mengubah kebijakan sumber daya dapat memengaruhi semua pengguna yang menggunakan kebijakan sumber daya pengguna tersebut, jadi gunakanlah dengan hati-hati."
+    "BeCarefulToSetUserResourcePolicy": "Mengubah kebijakan sumber daya dapat memengaruhi semua pengguna yang menggunakan kebijakan sumber daya pengguna tersebut, jadi gunakanlah dengan hati-hati.",
+    "StorageSetting": "Pengaturan Penyimpanan"
   },
   "modelService": {
     "EditModelService": "Layanan Edit Model",
@@ -1449,7 +1522,6 @@
     "RoutingsCount": "Jumlah Rute",
     "Active/Total": "Aktif/Total",
     "Public": "Publik",
-    "YouAreAboutToTerminate": "Anda akan mengakhiri",
     "FailedToStartService": "Gagal membuat layanan.",
     "ServingRouteErrorModalTitle": "Kesalahan Rute Penyajian",
     "ClearErrors": "Hapus kesalahan dan coba lagi",
@@ -1470,12 +1542,27 @@
     "resources": "Sumber daya",
     "Image": "Gambar",
     "Owner": "Pemilik",
+    "Processing": "Pengolahan...",
+    "Success": "Kesuksesan",
+    "Error": "Kesalahan",
+    "SeeContainerLogs": "Lihat Log Kontainer",
+    "TimeStamp": "Stempel waktu",
+    "Result": "Hasil",
+    "Finished": "Selesai",
     "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
     "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
     "FailedToUpdateService": "Gagal memperbarui layanan.",
     "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
     "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
-    "ServiceTerminated": "Layanan model {{ name }} telah berhasil dihentikan."
+    "CannotValidateNow": "Tidak dapat memvalidasi layanan sekarang. \nSilakan periksa alokasi sumber daya atau konfigurasi lainnya.",
+    "Ready": "Siap",
+    "Validate": "Mengesahkan",
+    "ValidationInfo": "Info Validasi",
+    "ServiceTerminated": "Permintaan penutupan dikirim untuk layanan model '{{ nama }}'.",
+    "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
+    "AdditionalMounts": "Pemasangan Tambahan",
+    "ModelDefinitionPath": "Jalur File Definisi Model",
+    "NoExtraMounts": "Tidak ada tunggangan tambahan"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1516,7 +1603,20 @@
     "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
     "SearchTableColumn": "Cari kolom tabel"
   },
-  "setting": {
-    "SearchPlaceholder": "Masukkan Istilah Pencarian"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Kesalahan validasi kolom masukan",
+      "ValidationErrorText": "Jika Anda tidak memasukkan nilai di bidang yang wajib diisi atau memasukkan nilai yang tidak valid, pesan kesalahan akan ditampilkan di bidang tersebut.",
+      "FixErrorAndTryAgainText": "Jika ada bidang kesalahan, tombol Sesi peluncuran dinonaktifkan. \nHarap perbaiki kesalahannya dan coba lagi.",
+      "FixErrorFieldbyModifyButton": "Untuk kolom error tersebut, Anda bisa langsung menuju tombol Edit di pojok kanan atas untuk mengeditnya."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Menyalin",
+    "Copied": "Disalin"
+  },
+  "propertyFilter": {
+    "placeHolder": "Pencarian",
+    "ResetFilter": "Filter Ulang"
   }
 }

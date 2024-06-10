@@ -3,7 +3,7 @@ from __future__ import annotations
 from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
-    CustomizedImageNameOutputFormatter,
+    CustomizedImageOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
     InlineRoutingFormatter,
@@ -99,9 +99,9 @@ image_fields = FieldSet([
     FieldSpec("labels { key value }", "labels"),
     FieldSpec(
         "labels { key value }",
-        "Customized Image Name",
-        alt_name="customized_image_name",
-        formatter=CustomizedImageNameOutputFormatter(),
+        "Customized Image Info",
+        alt_name="customized_image",
+        formatter=CustomizedImageOutputFormatter(),
     ),
 ])
 
@@ -136,10 +136,14 @@ keypair_resource_policy_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("created_at"),
     FieldSpec("total_resource_slots"),
+    FieldSpec("max_session_lifetime"),
     FieldSpec("max_concurrent_sessions"),  # formerly concurrency_limit
     FieldSpec("idle_timeout"),
     FieldSpec("max_containers_per_session"),
     FieldSpec("allowed_vfolder_hosts"),
+    FieldSpec("max_pending_session_count"),
+    FieldSpec("max_pending_session_resource_slots"),
+    FieldSpec("max_concurrent_sftp_sessions"),
 ])
 
 
@@ -301,7 +305,7 @@ service_fields = FieldSet([
     FieldSpec("resource_slots", formatter=nested_dict_formatter),
     FieldSpec("url"),
     FieldSpec("model"),
-    FieldSpec("model_mount_destiation"),
+    FieldSpec("model_mount_destination"),
     FieldSpec("created_user"),
     FieldSpec("session_owner"),
     FieldSpec("tag"),

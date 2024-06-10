@@ -64,7 +64,9 @@
       "Data&Model": "Данные",
       "InvalidBlankPassword": "Введите ваш пароль",
       "InvalidBlankEmail": "Введите адрес электронной почты",
-      "DisMatchUserEmail": "Электронная почта пользователя не совпадает"
+      "DisMatchUserEmail": "Электронная почта пользователя не совпадает",
+      "MyEnvironments": "Моя среда",
+      "ResourcePolicy": "Ресурсная политика"
     },
     "YouAreOffline": "Вы сейчас не в сети",
     "YouAreOnline": "Вы сейчас в сети",
@@ -113,7 +115,8 @@
     "IPUEnabled": "IPU NPU Включено",
     "ATOMEnabled": "ATOM NPU Включено",
     "WarboyEnabled": "Warboy NPU Enabled",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "Hyperaccel LPU включен"
   },
   "session": {
     "launcher": {
@@ -221,7 +224,7 @@
       "StartModelServing": "Начало обслуживания модели",
       "InferenceMode": "Вывод",
       "ImageDoesNotProvideModelPath": "В образе контейнера не указан путь к модели. Его необходимо изменить.",
-      "ModelStorageToMount": "Модельное хранилище для монтажа",
+      "ModelStorageToMount": "Хранение модели для установки",
       "AIAccelerator": "Ускоритель искусственного интеллекта",
       "DescAIAccelerator": "<p>АИ-ускорители (GPU или NPU) хорошо подходят для матричных/векторных вычислений, связанных с машинным обучением. ИИ-ускорители на порядки ускоряют алгоритмы обучения/вывода, сокращая время работы от нескольких недель до нескольких дней.</p>",
       "SessionAlreadyExists": "Имя сессии уже существует",
@@ -243,7 +246,7 @@
       "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
       "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
       "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
-      "EnqueueComputeSessionWarning": "Если вы установите его больше, чем доступные на данный момент ресурсы, создание сеанса будет отложено в очереди до тех пор, пока он не станет доступным.",
+      "EnqueueComputeSessionWarning": "Недостаточно ресурсов. \nВозможно, сессия еще не завершена.",
       "SessionName": "Имя сеанса",
       "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
       "TemplateAndHistory": "Шаблоны",
@@ -255,13 +258,23 @@
       "EnvironmentVariableNamePatternError": "Имя переменной должно начинаться с буквы или символа подчеркивания и может содержать только буквы, цифры и символы подчеркивания.",
       "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует.",
       "Template": "Шаблон сессии",
-      "EnableAutomaticShmem": "Автоматическая разделяемая память",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
+      "EnableAutomaticMiniumShmem": "Установите минимальный объем общей памяти",
       "OnlyAllowsDiscreteNumberByClusterSize": "Допускается только целое число, если размер кластера не меньше 2.",
       "StartAfter": "Начать после:",
-      "StartTimeDoesNotApply": "Если время начала не установлено, оно не применяется."
+      "StartTimeDoesNotApply": "Если время начала не установлено, оно не применяется.",
+      "MiniumAllocation": "Минимальные требования",
+      "MiniumAllocationTooltip": "Выберите минимальное требование для выбранной среды выполнения",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Вы используете программу запуска сессии \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Перейти к обзору",
+      "InteractiveModeDesc": "позволяет создавать, тестировать и запускать код в интерактивном режиме через jupyter notebook, visual studio code и т.д.",
+      "BatchModeDesc": "Вы можете запускать свой код на нескольких узлах и кластерах, чтобы масштабировать свою идею.",
+      "AddEnvironmentVariable": "Добавьте переменные окружения",
+      "EnvironmentVariableValueRequired": "Пожалуйста, введите значение.",
+      "PleaseCompleteForm": "Форма не заполнена или содержит ошибки. Пожалуйста, проверьте введенные данные.",
+      "FailedToStartNewSession": "Создание сеанса не удалось. \nПожалуйста, проверьте вкладку «Законченный» на странице сеанса.",
+      "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -295,7 +308,8 @@
       "Prepared": "Готовый",
       "App": "Приложение",
       "NoExistingConnectionExample": "Нет примера подключения для копирования.",
-      "SSHConnectionExampleClipboardCopy": "Пример подключения SSH скопирован в буфер обмена."
+      "SSHConnectionExampleClipboardCopy": "Пример подключения SSH скопирован в буфер обмена.",
+      "ConnectUrlIsNotValid": "URL-адрес подключения недействителен."
     },
     "TensorboardPath": "Каталог журналов для TensorBoard",
     "InputTensorboardPath": "Введите каталог журнала, на который будет ссылаться TensorBoard. Обратите внимание, что каталог журналов не будет создан автоматически.",
@@ -325,11 +339,15 @@
     "Architecture": "Архитектура",
     "Validation": {
       "SessionNameRequired": "Имя сессии является обязательным",
-      "EnterValidSessionName": "Введите действительное имя сессии",
+      "EnterValidSessionName": "Введите комбинацию как минимум из 4 букв алфавита, цифр, дефиса или подчеркивания.",
       "SessionNameAlreadyExist": "Имя сессии уже существует",
       "SluggedStrings": "Строки с засечками (>3 символов)",
       "SessionNameTooLong64": "Введите не более 64 символов.",
-      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 4 букв, цифр, «.», «_» и «-»."
+      "PleaseFollowSessionNameRule": "Введите комбинацию как минимум из 4 букв, цифр, «.», «_» и «-».",
+      "SessionNameTooShort": "Пожалуйста, введите не менее 4 символов.",
+      "SessionNameShouldStartWith": "Он должен начинаться с буквы алфавита, цифры или '_'.",
+      "SessionNameShouldEndWith": "Он должен заканчиваться буквой алфавита, цифрой или '_'.",
+      "SessionNameInvalidCharacter": "В середине имени могут быть только буквы алфавита, цифры и '_'."
     },
     "AlreadyTerminatingSession": "Уже завершаю сессию.",
     "NoSessionToDisplay": "Нет сеансов для отображения",
@@ -379,7 +397,15 @@
     "CPU": "CPU",
     "MEM": "Память",
     "GPU": "GPU",
-    "GPU(MEM)": "Графический процессор (память)"
+    "GPU(MEM)": "GPU (память)",
+    "Agents": "Агенты",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (память)",
+    "SessionName": "Имя сеанса",
+    "SessionId": "Идентификатор сессии",
+    "EnvironmentAndVersion": "Окружающая среда и версия",
+    "Tags": "Теги",
+    "fGPU": "фГПУ"
   },
   "button": {
     "Cancel": "Отмена",
@@ -413,7 +439,10 @@
     "OK": "OK",
     "Download": "Скачать",
     "Clone": "Клон",
-    "Config": "Конфигурация"
+    "Config": "Конфигурация",
+    "Next": "Следующий",
+    "Previous": "Предыдущий",
+    "PushToImage": "Отправить сеанс на настроенное изображение"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -438,7 +467,9 @@
     "Utilization": "Утилизация",
     "NoAvailableLiveStat": "Нет доступной оперативной статистики",
     "Allocation": "Распределение",
-    "DiskPerc": "Диск %"
+    "DiskPerc": "Диск %",
+    "AutoRefreshEvery5s": "Автоматическое обновление каждые 5 секунд",
+    "Agent": "Агент"
   },
   "general": {
     "cores": "ядра",
@@ -460,7 +491,8 @@
     "Image": "Изображение",
     "All": "Все",
     "InProgress": "В процессе",
-    "Session": "Сессия"
+    "Session": "Сессия",
+    "General": "Общие сведения"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -539,7 +571,8 @@
     "SignoutSeccessfullyFinished": "Выход из системы завершен",
     "ModifyUserDetail": "Изменение сведений о пользователе",
     "EnableSudoSession": "Включить сеанс sudo",
-    "MainAccessKey": "Главный ключ доступа"
+    "MainAccessKey": "Главный ключ доступа",
+    "InactivateTheFollowingUsers": "Деактивируйте следующих пользователей."
   },
   "data": {
     "Folders": "Папки",
@@ -592,7 +625,7 @@
       "FolderRenamed": "Папка переименована",
       "FolderNameMismatched": "Несоответствующее имя папки. Пожалуйста, проверьте, есть ли пробел в поле ввода или нет.",
       "SameFileName": "Входное значение совпадает с именем файла для обновления. Пожалуйста, измените его на другое имя.",
-      "FolderDeleted": "Папка удалена",
+      "FolderDeleted": "Папка {{ folderName }} удалена.",
       "FolderUpdated": "Параметры папки обновлены",
       "FolderDisconnected": "Папка отключена.",
       "FileRenamed": "Файл переименован",
@@ -619,7 +652,13 @@
       "CloneFolder": "Клонировать папку",
       "LeaveFolder": "Папка-скоросшиватель",
       "ShareFolder": "Папка общего доступа",
-      "ModifyPermissions": "Изменение прав доступа"
+      "ModifyPermissions": "Изменение прав доступа",
+      "Restore": "Восстановить",
+      "DeleteForever": "Удалить навсегда",
+      "FolderRestored": "Папка {{ folderName }} восстановлена.",
+      "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
+      "MoveToTrashBin": "Переместить в мусорное ведро",
+      "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину."
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -670,7 +709,8 @@
       "EmptyFilesAndFoldersAreNotUploaded": "Пустые файлы и пустые папки не загружаются",
       "FolderAlreadyExists": "Папка, которую планируется загрузить, уже существует.",
       "NumberOfSFTPSessionsExceededTitle": "Достигнут предел количества запущенных сеансов выгрузки",
-      "NumberOfSFTPSessionsExceededBody": "У вас запущены все доступные сессии выгрузки, которые вы можете создать. Перед началом нового сеанса завершите неиспользованные сеансы выгрузки."
+      "NumberOfSFTPSessionsExceededBody": "У вас запущены все доступные сессии выгрузки, которые вы можете создать. Перед началом нового сеанса завершите неиспользованные сеансы выгрузки.",
+      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена."
     },
     "invitation": {
       "NoValidEmails": "Не введены действительные адреса электронной почты",
@@ -709,21 +749,25 @@
     "ModelStore": "Модельный магазин",
     "New": "Новый",
     "Add": "Добавить",
-    "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте."
+    "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ВНИМАНИЕ: это нельзя отменить!",
       "LogDeletion": "Вы уверены, что хотите удалить все сообщения журнала?",
       "WillBeAppliedToNewSessions": "Это обновление будет применено к новым сеансам.",
-      "Required": "Требуется"
+      "Required": "Требуется",
+      "DeleteForeverDesc": "ВНИМАНИЕ: выбранные элементы будут удалены навсегда, и вы не сможете их восстановить."
     },
     "ask": {
-      "DoYouWantToProceed": "Вы хотите продолжить?"
+      "DoYouWantToProceed": "Вы хотите продолжить?",
+      "DoYouWantToDeleteSomething": "Вы уверены, что хотите удалить \"{{ имя }}\"?"
     },
     "title": {
       "LetsDouble-Check": "Давайте дважды проверим",
-      "Notice": "Уведомление"
+      "Notice": "Уведомление",
+      "DeleteForever": "Удалить навсегда?"
     },
     "ErrorOccurred": "Возникла ошибка",
     "error": {
@@ -778,7 +822,11 @@
     "PasswordsDoNotMatch": "Пароль и подтверждение не совпадают.",
     "NoChangeMade": "Изменения не вносились",
     "Architecture": "Архитектура",
-    "NoImageToDisplay": "Нет изображений для отображения"
+    "NoImageToDisplay": "Нет изображений для отображения",
+    "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено.",
+    "DescImageResourceModified": "Лимит ресурсов успешно изменен",
+    "DescImagePortsModified": "Порты изображений успешно изменены",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -910,8 +958,23 @@
     "SuccessfullyDeleted": "Политика ресурсов успешно удалена.",
     "PolicyNameEmpty": "Имя политики не должно быть пустым.",
     "AboutToDeleteResourcePolicy": "Вы собираетесь удалить эту политику ресурсов:",
-    "MaxSessionLifeTime": "Время жизни сеанса (сек.)",
-    "NoResourcePolicyToDisplay": "Отсутствие отображения политик ресурсов"
+    "MaxSessionLifetime": "Время жизни сеанса (сек.)",
+    "NoResourcePolicyToDisplay": "Отсутствие отображения политик ресурсов",
+    "Keypair": "Ключевая пара",
+    "User": "Пользователь",
+    "Project": "Проект",
+    "KeypairResourcePolicy": "Политика ресурсов пары ключей",
+    "IdleTimeout": "Тайм-аут простоя",
+    "CreateResourcePolicy": "Создать политику ресурсов",
+    "ResourcePolicyNameAlreadyExists": "Название политики ресурсов уже существует. \nПожалуйста, измените имя, чтобы добавить.",
+    "UserResourcePolicy": "Политика пользовательских ресурсов",
+    "MaxVFolderCount": "Максимальное количество папок",
+    "MaxSessionCountPerModelSession": "Максимальное количество сеансов на модельный сеанс",
+    "MaxQuotaScopeSize": "Максимальный размер квоты (ГБ)",
+    "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
+    "CreatedAt": "Создан в",
+    "MaxFolderCount": "Максимальное количество папок",
+    "ProjectResourcePolicy": "Ресурсная политика проекта"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1140,7 +1203,11 @@
     "RequireWarboyPlugin": "Требуется плагин Backend.AI Warboy Plugin.",
     "Plugins": "Плагины",
     "OpenSourceCUDAGPUsupport": "Поддержка графического процессора CUDA с открытым исходным кодом",
-    "ShowOnlyChanged": "Отображать только изменения"
+    "ShowOnlyChanged": "Отображать только изменения",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Используйте ускоритель Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Поиск"
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1193,14 +1260,12 @@
     "LeaveService": "Оставить службу",
     "DescConfirmLeave": "Для подтверждения, пожалуйста, введите свой E-mail и пароль еще раз.",
     "Password": "Пароль",
-    "E-mail": "Электронная почта",
     "APIKey": "Ключ API",
     "SecretKey": "Секретный ключ",
     "Endpoint": "Конечная точка",
     "NotAUser": "Не пользователь?",
     "LoginAnotherway": "Хотите войти другим способом?",
     "SignUp": "Зарегистрироваться",
-    "LoginWithE-mail": "Войти по электронной почте",
     "LoginWithIAM": "Войти через IAM",
     "ClickToUseIAM": "Нажмите, чтобы использовать IAM",
     "ClickToUseID": "Нажмите, чтобы использовать идентификатор",
@@ -1228,7 +1293,9 @@
     },
     "EndpointInfo": "О компании Endpoint",
     "DescEndpoint": "<p>В API ENDPOINT необходимо ввести URL веб-сервера Backend.AI, который передает запрос Менеджеру.</p><p>например, http://127.0.0.1:8090/</p>.",
-    "EndpointStartWith": "Конечная точка должна начинаться с http:// или https://."
+    "EndpointStartWith": "Конечная точка должна начинаться с http:// или https://.",
+    "LoginWithE-mailorUsername": "Войти по электронной почте или имени пользователя",
+    "E-mailorUsername": "Электронная почта или имя пользователя"
   },
   "signup": {
     "SignupBETA": "Регистрация (только приглашение в бета-версию)",
@@ -1360,7 +1427,8 @@
     "ResourcePolicyStillReferenced": "Существуют пары ключей, которые ссылаются на данную ресурсную политику.",
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
-    "WrongAPIServerAddress": "Неверный адрес сервера API."
+    "WrongAPIServerAddress": "Неверный адрес сервера API.",
+    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1389,7 +1457,8 @@
     "RequireOTP": "Напишите ОТП."
   },
   "inputLimit": {
-    "4to64chars": "(4~64 символа)"
+    "4to64chars": "(4~64 символа)",
+    "4to32chars": "(4~32 символа)"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1423,7 +1492,8 @@
     "ForUser": "Для пользователя",
     "ForProject": "Для проекта",
     "QuotaDoesNotSupported": "Данный бэкэнд хранилища не поддерживает квотирование.",
-    "BeCarefulToSetUserResourcePolicy": "Изменение политики ресурсов может повлиять на всех пользователей, использующих данную политику ресурсов, поэтому использовать ее следует с осторожностью."
+    "BeCarefulToSetUserResourcePolicy": "Изменение политики ресурсов может повлиять на всех пользователей, использующих данную политику ресурсов, поэтому использовать ее следует с осторожностью.",
+    "StorageSetting": "Настройки хранения"
   },
   "modelService": {
     "EditModelService": "Редактирование модели сервиса",
@@ -1451,7 +1521,6 @@
     "RoutingsCount": "Количество маршрутов",
     "Active/Total": "Активный/Всего",
     "Public": "Публичный",
-    "YouAreAboutToTerminate": "Вы собираетесь прекратить работу",
     "FailedToStartService": "Не удалось создать службу.",
     "ServingRouteErrorModalTitle": "Ошибка обслуживающего маршрута",
     "ClearErrors": "Очистить ошибку и повторить попытку",
@@ -1472,12 +1541,28 @@
     "resources": "Ресурсы",
     "Image": "Изображение",
     "Owner": "Владелец",
+    "Validate": "Подтвердить",
+    "Cancel": "Отмена",
+    "ValidationInfo": "Информация о проверке",
+    "Processing": "Обработка...",
+    "Success": "Успех",
+    "Error": "Ошибка",
+    "SeeContainerLogs": "См. журналы контейнеров",
+    "TimeStamp": "Временная метка",
+    "Result": "Результат",
+    "Finished": "Законченный",
     "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}.",
     "FailedToTerminateService": "Запрос на завершение службы завершился неудачно.",
     "FailedToUpdateService": "Не удалось обновить службу.",
     "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
     "ServiceUpdated": "Сервис модели {{ name }} успешно обновлен.",
-    "ServiceTerminated": "Служба модели {{ name }} успешно прекращена."
+    "CannotValidateNow": "Невозможно проверить услугу сейчас. \nПожалуйста, проверьте распределение ресурсов или другие конфигурации.",
+    "Ready": "Готовый",
+    "ServiceTerminated": "Для службы модели «{{ name }}» отправлен запрос на завершение работы.",
+    "ModelMountDestination": "Место установки папки модели",
+    "AdditionalMounts": "Дополнительные крепления",
+    "ModelDefinitionPath": "Путь к файлу определения модели",
+    "NoExtraMounts": "Никаких дополнительных креплений"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1518,7 +1603,20 @@
     "SelectColumnToDisplay": "Выберите столбцы для отображения",
     "SearchTableColumn": "Поиск по столбцам таблицы"
   },
-  "setting": {
-    "SearchPlaceholder": "Введите поисковый запрос"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Ошибки проверки поля ввода",
+      "ValidationErrorText": "Если вы не введете значение в обязательное поле или введете неверное значение, в этом поле отобразится сообщение об ошибке.",
+      "FixErrorAndTryAgainText": "Если есть поле с ошибкой, кнопка «Запустить сеанс» неактивна. \nПожалуйста, исправьте ошибку и повторите попытку.",
+      "FixErrorFieldbyModifyButton": "Для этого поля ошибки вы можете перейти непосредственно к кнопке «Редактировать» в правом верхнем углу, чтобы отредактировать его."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Копировать",
+    "Copied": "Скопировано"
+  },
+  "propertyFilter": {
+    "placeHolder": "Поиск",
+    "ResetFilter": "СброситьФильтр"
   }
 }

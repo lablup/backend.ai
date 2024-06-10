@@ -19,6 +19,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.head_ref }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -58,7 +59,7 @@ jobs:
         echo "name=$author_name" >> $GITHUB_OUTPUT
         echo "email=$author_email" >> $GITHUB_OUTPUT
     - name: Make commit message for changing change log file
-      uses: stefanzweifel/git-auto-commit-action@v4
+      uses: stefanzweifel/git-auto-commit-action@v5
       with:
         commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
         commit_message: 'chore: update GraphQL schema dump'
@@ -73,4 +74,4 @@ jobs:
         with:
           schema: 'main:src/ai/backend/manager/api/schema.graphql'
           rules: |
-            custom-rule.js
+            gql-inspector-checker.js
