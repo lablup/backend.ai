@@ -664,6 +664,14 @@ class SessionRow(Base):
     num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
     last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
 
+    plugin_data = sa.Column(
+        "plugin_data",
+        pgsql.JSONB,
+        nullable=False,
+        default="{}",
+        server_default="{}",
+    )
+
     routing = relationship("RoutingRow", back_populates="session_row")
 
     __table_args__ = (

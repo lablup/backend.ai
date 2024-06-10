@@ -163,6 +163,13 @@ users = sa.Table(
         sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
         nullable=True,  # keypairs.user is non-nullable
     ),
+    sa.Column(
+        "plugin_data",
+        pgsql.JSONB,
+        nullable=False,
+        default="{}",
+        server_default="{}",
+    ),
 )
 
 

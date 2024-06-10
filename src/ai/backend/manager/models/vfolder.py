@@ -335,6 +335,13 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
+    sa.Column(
+        "plugin_data",
+        pgsql.JSONB,
+        nullable=False,
+        default="{}",
+        server_default="{}",
+    ),
     # status_history records the most recent status changes for each status
     # e.g)
     # {

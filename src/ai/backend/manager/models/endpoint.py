@@ -192,6 +192,14 @@ class EndpointRow(Base):
         nullable=True,
     )
 
+    plugin_data = sa.Column(
+        "plugin_data",
+        pgsql.JSONB,
+        nullable=False,
+        default="{}",
+        server_default="{}",
+    )
+
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
