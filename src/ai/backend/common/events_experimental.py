@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import socket
+import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
 from typing import Any
@@ -74,8 +75,6 @@ async def read_stream(
                     last_id = msg_id
         except asyncio.CancelledError:
             raise
-        except Exception:
-            log.exception("")
 
 
 async def read_stream_by_group(
@@ -168,8 +167,6 @@ async def read_stream_by_group(
                         raise
                 continue
             raise
-        except Exception:
-            log.exception("")
 
 
 class EventDispatcher(_EventDispatcher):
@@ -213,64 +210,135 @@ class EventDispatcher(_EventDispatcher):
         )
 
         self._log_events = log_events
+        self.reconnect_poll_interval = 0.3
+
+    def show_retry_warning(
+        self,
+        e: Exception,
+        first_trial: float,
+        retry_log_count: int,
+        last_log_time: float,
+        warn_on_first_attempt: bool = True,
+    ) -> None:
+        now = time.perf_counter()
+        if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
+            log.warning(
+                "Retrying due to interruption of Redis connection " "({}, retrying-for: {:.3f}s)",
+                repr(e),
+                now - first_trial,
+            )
+            retry_log_count += 1
+            last_log_time = now
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        try:
-            async with RedisConnection(self.redis_config, db=self.db) as client:
-                async for msg_id, msg_data in read_stream(
-                    client,
-                    self._stream_key,
-                ):
-                    if self._closed:
-                        return
-                    if msg_data is None:
-                        continue
-                    try:
-                        await self.dispatch_subscribers(
-                            msg_data[b"name"].decode(),
-                            AgentId(msg_data[b"source"].decode()),
-                            msgpack.unpackb(msg_data[b"args"]),
-                        )
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        log.exception("EventDispatcher.subscribe(): unexpected-error")
-        except asyncio.CancelledError:
-            raise
-        except:
-            log.exception("")
-            raise
+        first_trial = time.perf_counter()
+        retry_log_count = 0
+        last_log_time = first_trial
+
+        while True:
+            try:
+                async with RedisConnection(self.redis_config, db=self.db) as client:
+                    async for msg_id, msg_data in read_stream(
+                        client,
+                        self._stream_key,
+                    ):
+                        if self._closed:
+                            return
+                        if msg_data is None:
+                            continue
+                        try:
+                            await self.dispatch_subscribers(
+                                msg_data[b"name"].decode(),
+                                AgentId(msg_data[b"source"].decode()),
+                                msgpack.unpackb(msg_data[b"args"]),
+                            )
+                        except asyncio.CancelledError:
+                            raise
+            except hiredis.HiredisError as e:
+                if "READONLY" in e.args[0]:
+                    self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                    if self.reconnect_poll_interval:
+                        await asyncio.sleep(self.reconnect_poll_interval)
+                    continue
+                elif "NOREPLICAS" in e.args[0]:
+                    self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                    if self.reconnect_poll_interval:
+                        await asyncio.sleep(self.reconnect_poll_interval)
+                    continue
+                else:
+                    raise
+            except asyncio.TimeoutError as e:
+                self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                if self.reconnect_poll_interval:
+                    await asyncio.sleep(self.reconnect_poll_interval)
+                continue
+            except (ConnectionError, EOFError) as e:
+                self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                if self.reconnect_poll_interval:
+                    await asyncio.sleep(self.reconnect_poll_interval)
+                continue
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("EventDispatcher.subscribe(): unexpected-error")
+                raise
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        try:
-            async with RedisConnection(self.redis_config, db=self.db) as client:
-                async for msg_id, msg_data in read_stream_by_group(
-                    client,
-                    self._stream_key,
-                    self._consumer_group,
-                    self._consumer_name,
-                ):
-                    if self._closed:
-                        return
-                    if msg_data is None:
-                        continue
-                    try:
-                        await self.dispatch_consumers(
-                            msg_data[b"name"].decode(),
-                            AgentId(msg_data[b"source"].decode()),
-                            msgpack.unpackb(msg_data[b"args"]),
-                        )
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        log.exception("EventDispatcher.consume(): unexpected-error")
-        except asyncio.CancelledError:
-            raise
-        except:
-            log.exception("")
-            raise
+        first_trial = time.perf_counter()
+        retry_log_count = 0
+        last_log_time = first_trial
+
+        while True:
+            try:
+                async with RedisConnection(self.redis_config, db=self.db) as client:
+                    async for msg_id, msg_data in read_stream_by_group(
+                        client,
+                        self._stream_key,
+                        self._consumer_group,
+                        self._consumer_name,
+                    ):
+                        if self._closed:
+                            return
+                        if msg_data is None:
+                            continue
+                        try:
+                            await self.dispatch_consumers(
+                                msg_data[b"name"].decode(),
+                                AgentId(msg_data[b"source"].decode()),
+                                msgpack.unpackb(msg_data[b"args"]),
+                            )
+                        except asyncio.CancelledError:
+                            raise
+            except hiredis.HiredisError as e:
+                if "READONLY" in e.args[0]:
+                    self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                    if self.reconnect_poll_interval:
+                        await asyncio.sleep(self.reconnect_poll_interval)
+                    continue
+                elif "NOREPLICAS" in e.args[0]:
+                    self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                    if self.reconnect_poll_interval:
+                        await asyncio.sleep(self.reconnect_poll_interval)
+                    continue
+                else:
+                    raise
+            except asyncio.TimeoutError as e:
+                self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                if self.reconnect_poll_interval:
+                    await asyncio.sleep(self.reconnect_poll_interval)
+                continue
+            except (ConnectionError, EOFError) as e:
+                self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
+                if self.reconnect_poll_interval:
+                    await asyncio.sleep(self.reconnect_poll_interval)
+                continue
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("EventDispatcher.consume(): unexpected-error")
+                raise
 
     async def close(self) -> None:
         self._closed = True

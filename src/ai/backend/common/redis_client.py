@@ -1,9 +1,7 @@
 import asyncio
 import logging
-import time
 from typing import Any, AsyncContextManager, Final, Sequence
 
-import async_timeout
 import hiredis
 
 from .logging import BraceStyleAdapter
@@ -52,13 +50,11 @@ class RedisClient(aobject):
         self,
         command: Sequence[str | int | float | bytes | memoryview],
         *,
-        reconnect_poll_interval: float | None = None,
         command_timeout: float | None = None,
     ) -> Any:
         return (
             await self._send(
                 [command],
-                reconnect_poll_interval=reconnect_poll_interval,
                 command_timeout=command_timeout,
             )
         )[0]
@@ -67,13 +63,11 @@ class RedisClient(aobject):
         self,
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
-        reconnect_poll_interval: float | None = None,
         command_timeout: float | None = None,
         return_exception=False,
     ) -> Any:
         return await self._send(
             commands,
-            reconnect_poll_interval=reconnect_poll_interval,
             command_timeout=command_timeout,
             return_exception=return_exception,
         )
@@ -82,7 +76,6 @@ class RedisClient(aobject):
         self,
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
-        reconnect_poll_interval: float | None = None,
         command_timeout: float | None = None,
         return_exception=False,
     ) -> list[Any]:
@@ -94,22 +87,10 @@ class RedisClient(aobject):
         should take care of side-effects of it.
         """
 
-        first_trial = time.perf_counter()
-        retry_log_count = 0
-        last_log_time = first_trial
-
-        def show_retry_warning(e: Exception, warn_on_first_attempt: bool = True) -> None:
-            nonlocal retry_log_count, last_log_time
-            now = time.perf_counter()
-            if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
-                log.warning(
-                    "Retrying due to interruption of Redis connection "
-                    "({}, retrying-for: {:.3f}s)",
-                    repr(e),
-                    now - first_trial,
-                )
-                retry_log_count += 1
-                last_log_time = now
+        if command_timeout:
+            _timeout_secs = command_timeout
+        else:
+            _timeout_secs = 10.0
 
         while True:
             try:
@@ -119,7 +100,8 @@ class RedisClient(aobject):
                     request_blob = hiredis.pack_command(tuple(command))  # type: ignore[arg-type]
                     self.writer.write(request_blob)
                     _blobs += request_blob
-                await self.writer.drain()
+                async with asyncio.timeout(_timeout_secs):
+                    await self.writer.drain()
 
                 if self.verbose:
                     log.debug("requests: {}", commands)
@@ -129,14 +111,25 @@ class RedisClient(aobject):
                 first_result = ellipsis
 
                 _buf = bytes()
+
+                met_unexpected_eof = False
+
                 try:
                     while first_result == ellipsis:
-                        buf = await self.reader.read(n=BUF_SIZE)
+                        async with asyncio.timeout(_timeout_secs):
+                            buf = await self.reader.read(n=BUF_SIZE)
                         _buf += buf
                         hiredis_reader.feed(buf)
                         first_result = hiredis_reader.gets()
+                        if first_result == ellipsis and self.reader.at_eof():
+                            met_unexpected_eof = True
+                            break
                 except hiredis.ProtocolError:
                     raise
+
+                if met_unexpected_eof:
+                    log.warning("Met unexpected EOF")
+                    raise EOFError
 
                 if self.verbose:
                     log.debug("raw response: {}", _buf)
@@ -174,30 +167,6 @@ class RedisClient(aobject):
                         log.debug("{} -> {}", request, response)
 
                 return results
-            except hiredis.HiredisError as e:
-                if "READONLY" in e.args[0]:
-                    show_retry_warning(e)
-                    if reconnect_poll_interval:
-                        await asyncio.sleep(reconnect_poll_interval)
-                    continue
-                elif "NOREPLICAS" in e.args[0]:
-                    show_retry_warning(e)
-                    if reconnect_poll_interval:
-                        await asyncio.sleep(reconnect_poll_interval)
-                    continue
-                else:
-                    raise
-            except asyncio.TimeoutError as e:
-                if command_timeout is not None:
-                    now = time.perf_counter()
-                    if now - first_trial >= command_timeout + 1.0:
-                        show_retry_warning(e)
-                continue
-            except ConnectionResetError as e:
-                show_retry_warning(e)
-                if reconnect_poll_interval:
-                    await asyncio.sleep(reconnect_poll_interval)
-                continue
             except asyncio.CancelledError:
                 raise
             finally:
@@ -208,23 +177,23 @@ class RedisConnection(AsyncContextManager[RedisClient]):
     redis_config: EtcdRedisConfig
     db: int
 
+    socket_timeout: float | None
     socket_connect_timeout: float | None
-    reconnect_poll_timeout: float | None
 
     def __init__(
         self,
         redis_config: EtcdRedisConfig,
         *,
         db: int = 0,
+        socket_timeout: float | None = 5.0,
         socket_connect_timeout: float | None = 2.0,
-        reconnect_poll_timeout: float | None = 0.3,
     ) -> None:
         self.redis_config = redis_config
         self.db = db
         self.hiredis_reader = hiredis.Reader()
 
+        self.socket_timeout = socket_timeout
         self.socket_connect_timeout = socket_connect_timeout
-        self.reconnect_poll_timeout = reconnect_poll_timeout
 
     async def connect(self) -> RedisClient:
         if self.redis_config.get("sentinel"):
@@ -237,7 +206,7 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         port = redis_url[1]
         password = self.redis_config.get("password")
 
-        async with async_timeout.timeout(self.socket_connect_timeout):
+        async with asyncio.timeout(self.socket_connect_timeout):
             reader, writer = await asyncio.open_connection(host, port)
 
         self.writer = writer
@@ -247,12 +216,17 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
         if password:
             await client.execute(
-                ["AUTH", password], reconnect_poll_interval=self.reconnect_poll_timeout
+                ["AUTH", password],
+                command_timeout=self.socket_timeout,
             )
 
-        await client.execute(["HELLO", "3"], reconnect_poll_interval=self.reconnect_poll_timeout)
         await client.execute(
-            ["SELECT", self.db], reconnect_poll_interval=self.reconnect_poll_timeout
+            ["HELLO", "3"],
+            command_timeout=self.socket_timeout,
+        )
+        await client.execute(
+            ["SELECT", self.db],
+            command_timeout=self.socket_timeout,
         )
 
         return client
@@ -261,7 +235,8 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         return await self.connect()
 
     async def disconnect(self) -> None:
-        self.writer.close()
+        if self.writer:
+            self.writer.close()
 
     async def __aexit__(self, *exc_info) -> None:
         return await self.disconnect()
