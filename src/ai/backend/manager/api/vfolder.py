@@ -103,7 +103,6 @@ from ..models import (
     vfolders,
 )
 from ..models.acl import (
-    ACLObjectScope,
     BaseACLScope,
     ClientContext,
     DomainScope,
@@ -243,8 +242,8 @@ async def resolve_vfolder_rows(
     async with root_ctx.db.begin_readonly() as db_conn:
         entries = await get_vfolders(
             ClientContext(db_conn, domain_name, user_uuid, user_role),
-            ACLObjectScope(DomainScope(domain_name)),
-            perm,
+            DomainScope(domain_name),
+            requested_permission=perm,
             vfolder_name=vfolder_name,
             vfolder_id=vfolder_id,
         )
@@ -467,8 +466,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         entries = await get_vfolders(
             ClientContext(conn, domain_name, user_uuid, user_role),
-            ACLObjectScope(DomainScope(domain_name)),
-            VFolderACLPermission.READ_ATTRIBUTE,
+            DomainScope(domain_name),
+            requested_permission=VFolderACLPermission.READ_ATTRIBUTE,
             vfolder_name=params["name"],
             blocked_status=HARD_DELETED_VFOLDER_STATUSES,
         )
@@ -608,7 +607,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     owner_user_uuid,
                     owner_user_role,
                 ),
-                ACLObjectScope(requested_scope),
+                requested_scope,
             )
             if scope_ctx.query_condition is not None:
                 owned = []
@@ -624,7 +623,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 )
                 for _entry in await db_session.scalars(query_stmt):
                     entry = cast(VFolderRow, _entry)
-                    perm = await scope_ctx.determine_permission_on_obj(entry)
+                    perm = await scope_ctx.determine_permission(entry)
                     resp_data = {
                         "name": entry.name,
                         "id": entry.id.hex,
@@ -2155,8 +2154,8 @@ async def _delete(
                 user_uuid,
                 user_role,
             ),
-            ACLObjectScope(DomainScope(domain_name)),
-            VFolderACLPermission.DELETE_VFOLDER,
+            DomainScope(domain_name),
+            requested_permission=VFolderACLPermission.DELETE_VFOLDER,
             vfolder_id=vfolder_id,
             blocked_status=DEAD_VFOLDER_STATUSES,
         )
@@ -2328,8 +2327,8 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
                 user_uuid,
                 user_role,
             ),
-            ACLObjectScope(DomainScope(domain_name)),
-            VFolderACLPermission.READ_ATTRIBUTE,
+            DomainScope(domain_name),
+            requested_permission=VFolderACLPermission.READ_ATTRIBUTE,
             vfolder_name=folder_name,
         )
         if len(entries) > 1:
