@@ -57,7 +57,6 @@ class ExtendedAsyncSAEngine(SAEngine):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        self.conn_timeout: float | None = kwargs.pop("_conn_timeout") or None  # Convert 0 to `None`
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
@@ -103,10 +102,7 @@ class ExtendedAsyncSAEngine(SAEngine):
             self._generic_txn_count += 1
             self._check_generic_txn_cnt()
             try:
-                async with asyncio.timeout(self.conn_timeout):
-                    yield connection
-            except asyncio.TimeoutError:
-                log.exception("DB Connection timeout")
+                yield connection
             finally:
                 self._generic_txn_count -= 1
 
@@ -125,11 +121,7 @@ class ExtendedAsyncSAEngine(SAEngine):
             self._readonly_txn_count += 1
             self._check_readonly_txn_cnt()
             try:
-                async with asyncio.timeout(self.conn_timeout):
-                    yield conn_with_exec_opts
-            except asyncio.TimeoutError:
-                log.exception("DB Connection timeout")
-                raise
+                yield conn_with_exec_opts
             finally:
                 self._readonly_txn_count -= 1
 
@@ -297,7 +289,6 @@ async def execute_with_txn_retry(
 def create_async_engine(
     *args,
     _txn_concurrency_threshold: int = 0,
-    _conn_timeout: float = 0,
     _lock_conn_timeout: int = 0,
     **kwargs,
 ) -> ExtendedAsyncSAEngine:
@@ -306,7 +297,6 @@ def create_async_engine(
     return ExtendedAsyncSAEngine(
         sync_engine,
         _txn_concurrency_threshold=_txn_concurrency_threshold,
-        _conn_timeout=_conn_timeout,
         _lock_conn_timeout=_lock_conn_timeout,
     )
 
@@ -347,7 +337,6 @@ async def connect_database(
             int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
             2,
         ),
-        _conn_timeout=local_config["db"]["conn-timeout"],
         _lock_conn_timeout=local_config["db"]["lock-conn-timeout"],
     )
     yield db
