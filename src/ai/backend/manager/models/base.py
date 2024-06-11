@@ -1358,29 +1358,25 @@ def _build_sql_stmt_from_connection_args(
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
         _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
 
-                def subq_to_condition(
-                    column_to_be_compared: InstrumentedAttribute,
-                    subquery: ScalarSelect,
-                    direction: OrderDirection,
-                ) -> WhereClauseType:
+        def subq_to_condition(
+            column_to_be_compared: InstrumentedAttribute,
+            subquery: ScalarSelect,
+            direction: OrderDirection,
+        ) -> WhereClauseType:
+            match pagination_order:
+                case ConnectionPaginationOrder.FORWARD | None:
                     if direction == OrderDirection.ASC:
                         cond = column_to_be_compared > subquery
                     else:
                         cond = column_to_be_compared < subquery
+
+                    # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
+                    # because the ordering direction of ID field is determined by only `ConnectionPaginationOrder`.
                     condition_when_same_with_subq = (column_to_be_compared == subquery) & (
                         id_column > cursor_row_id
                     )
-                    return cond | condition_when_same_with_subq
-            case ConnectionPaginationOrder.BACKWARD:
-
-                def subq_to_condition(
-                    column_to_be_compared: InstrumentedAttribute,
-                    subquery: ScalarSelect,
-                    direction: OrderDirection,
-                ) -> WhereClauseType:
+                case ConnectionPaginationOrder.BACKWARD:
                     if direction == OrderDirection.ASC:
                         cond = column_to_be_compared < subquery
                     else:
@@ -1388,12 +1384,12 @@ def _build_sql_stmt_from_connection_args(
                     condition_when_same_with_subq = (column_to_be_compared == subquery) & (
                         id_column < cursor_row_id
                     )
-                    return cond | condition_when_same_with_subq
+
+            return cond | condition_when_same_with_subq
 
         for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
-            cond = subq_to_condition(col, subq, direction)
-            conditions.append(cond)
+            conditions.append(subq_to_condition(col, subq, direction))
 
     if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
