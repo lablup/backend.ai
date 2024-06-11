@@ -4,7 +4,7 @@ import asyncio
 import functools
 import json
 import logging
-from contextlib import _AsyncGeneratorContextManager as AbstractAsyncCtxMgr
+from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
@@ -297,7 +297,7 @@ async def execute_with_txn_retry(
 def create_async_engine(
     *args,
     _txn_concurrency_threshold: int = 0,
-    _conn_timeout: int = 0,
+    _conn_timeout: float = 0,
     _lock_conn_timeout: int = 0,
     **kwargs,
 ) -> ExtendedAsyncSAEngine:
