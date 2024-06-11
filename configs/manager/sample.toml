@@ -27,7 +27,7 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # pool-size = 8
 
 # The connection's lifetime
-# Any connection made from ExtendedAsyncEngine will close after `conn-timeout` seconds
+# Any connection made in `ai.backend.manager.models.utils.ExtendedAsyncEngine` will close after `conn-timeout` seconds
 # Default is 0, which means infinite
 # conn-timeout = 30
 

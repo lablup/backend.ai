@@ -245,8 +245,8 @@ async def execute_with_txn_retry(
 ) -> TQueryResult: ...
 
 
-# Setting "type ignore" here becuase Mypy does not recognize any types from `sqlalchemy`
-# it just assume all sqlalchemy's types are `Any` including `SASession` and `SAConnection`.
+# Setting "type ignore" here becuase Mypy deduces all fields and attributes in `sqlalchemy` module to `Any` type
+# including `SASession` and `SAConnection`.
 @overload
 async def execute_with_txn_retry(  # type: ignore[misc]
     txn_func: Callable[[SAConnection], Awaitable[TQueryResult]],
@@ -255,7 +255,7 @@ async def execute_with_txn_retry(  # type: ignore[misc]
 ) -> TQueryResult: ...
 
 
-# TODO: Allow only `SASession` parameter, remove type overloading and remove `begin_trx` after migrate Core APIs to ORM.
+# TODO: Allow `SASession` parameter only, remove type overloading and remove `begin_trx` after migrating Core APIs to ORM APIs.
 async def execute_with_txn_retry(
     txn_func: Callable[[SASession], Awaitable[TQueryResult]]
     | Callable[[SAConnection], Awaitable[TQueryResult]],
@@ -266,7 +266,7 @@ async def execute_with_txn_retry(
     """
     Execute DB related function by retrying transaction in a given connection.
 
-    Used to resolve Postgres Serialization error that require transaction retry.
+    The transaction retry resolves Postgres's Serialization error.
     Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
     """
 
