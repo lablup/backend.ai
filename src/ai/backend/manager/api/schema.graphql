@@ -695,10 +695,16 @@ type ScalingGroup {
   use_host_network: Boolean
 
   """Added in 24.03.5."""
-  agent_count_by_status(status: String = "ALIVE"): Int
+  agent_count_by_status(
+    """Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']"""
+    status: String = "ALIVE"
+  ): Int
 
   """Added in 24.03.5."""
-  agent_total_resource_slots_by_status(status: String = "ALIVE"): JSONString
+  agent_total_resource_slots_by_status(
+    """Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']"""
+    status: String = "ALIVE"
+  ): JSONString
 }
 
 type StorageVolume implements Item {

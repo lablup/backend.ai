@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 
+from .agent import AgentStatus
 from .base import (
     Base,
     IDColumn,
@@ -324,17 +325,21 @@ class ScalingGroup(graphene.ObjectType):
     agent_count_by_status = graphene.Field(
         graphene.Int,
         description="Added in 24.03.5.",
-        status=graphene.String(default_value="ALIVE"),
+        status=graphene.String(
+            default_value="ALIVE", description=f"Should be one of {[s.name for s in AgentStatus]}"
+        ),
     )
 
     agent_total_resource_slots_by_status = graphene.Field(
         graphene.JSONString,
         description="Added in 24.03.5.",
-        status=graphene.String(default_value="ALIVE"),
+        status=graphene.String(
+            default_value="ALIVE", description=f"Should be one of {[s.name for s in AgentStatus]}"
+        ),
     )
 
     async def resolve_agent_count_by_status(
-        self, info: graphene.ResolveInfo, status: str = "ALIVE"
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> int:
         from .agent import Agent
 
@@ -345,7 +350,7 @@ class ScalingGroup(graphene.ObjectType):
         )
 
     async def resolve_agent_total_resource_slots_by_status(
-        self, info: graphene.ResolveInfo, status: str = "ALIVE"
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> Mapping[str, Any]:
         from .agent import AgentRow, AgentStatus
 
