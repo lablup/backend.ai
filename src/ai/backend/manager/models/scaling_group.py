@@ -22,7 +22,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
@@ -351,17 +351,23 @@ class ScalingGroup(graphene.ObjectType):
 
         graph_ctx = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            query_stmt = sa.select([AgentRow.occupied_slots, AgentRow.available_slots]).where(
-                (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[raw_status])
+            query_stmt = (
+                sa.select(AgentRow)
+                .where(
+                    (AgentRow.scaling_group == self.name)
+                    & (AgentRow.status == AgentStatus[raw_status])
+                )
+                .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
             )
-            result = (await db_session.execute(query_stmt)).fetchall()
+            result = (await db_session.scalars(query_stmt)).all()
+            agent_rows = cast(list[AgentRow], result)
 
             total_occupied_slots = ResourceSlot()
             total_available_slots = ResourceSlot()
 
-            for occupied, available in result:
-                total_occupied_slots += occupied
-                total_available_slots += available
+            for agent_row in agent_rows:
+                total_occupied_slots += agent_row.occupied_slots
+                total_available_slots += agent_row.available_slots
 
             return {
                 "occupied_slots": total_occupied_slots.to_json(),
