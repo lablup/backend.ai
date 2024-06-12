@@ -326,7 +326,8 @@ class ScalingGroup(graphene.ObjectType):
         graphene.Int,
         description="Added in 24.03.5.",
         status=graphene.String(
-            default_value="ALIVE", description=f"Should be one of {[s.name for s in AgentStatus]}"
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Should be one of {[s.name for s in AgentStatus]}",
         ),
     )
 
@@ -334,7 +335,8 @@ class ScalingGroup(graphene.ObjectType):
         graphene.JSONString,
         description="Added in 24.03.5.",
         status=graphene.String(
-            default_value="ALIVE", description=f"Should be one of {[s.name for s in AgentStatus]}"
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Should be one of {[s.name for s in AgentStatus]}",
         ),
     )
 
