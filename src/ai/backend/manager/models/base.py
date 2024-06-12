@@ -1372,7 +1372,7 @@ def _build_sql_stmt_from_connection_args(
                         cond = column_to_be_compared < subquery
 
                     # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
-                    # because the ordering direction of ID field is determined by only `ConnectionPaginationOrder`.
+                    # because the ordering direction of ID field is always determined by `pagination_order` only.
                     condition_when_same_with_subq = (column_to_be_compared == subquery) & (
                         id_column > cursor_row_id
                     )
