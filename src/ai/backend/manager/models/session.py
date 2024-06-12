@@ -76,7 +76,12 @@ from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    agg_to_array,
+    execute_with_txn_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -743,47 +748,47 @@ class SessionRow(Base):
         """
         now = datetime.now(tzutc())
 
-        async def _check_and_update() -> SessionStatus | None:
-            async with db.begin_session() as db_session:
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == session_id)
-                    .with_for_update()
-                    .options(
-                        noload("*"),
-                        load_only(SessionRow.status),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
-                        ),
-                    )
-                )
-                session_row: SessionRow = (await db_session.scalars(session_query)).first()
-                determined_status = determine_session_status(session_row.kernels)
-                if determined_status not in SESSION_STATUS_TRANSITION_MAP[session_row.status]:
-                    # TODO: log or raise error
-                    return None
-
-                update_values = {
-                    "status": determined_status,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            determined_status.name: now.isoformat(),
-                        },
+        async def _check_and_update(db_session: SASession) -> SessionStatus | None:
+            session_query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .with_for_update()
+                .options(
+                    noload("*"),
+                    load_only(SessionRow.status),
+                    selectinload(SessionRow.kernels).options(
+                        noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
                     ),
-                }
-                if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
-                    update_values["terminated_at"] = now
-                if status_info is not None:
-                    update_values["status_info"] = status_info
-                update_query = (
-                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
                 )
-                await db_session.execute(update_query)
+            )
+            session_row: SessionRow = (await db_session.scalars(session_query)).first()
+            determined_status = determine_session_status(session_row.kernels)
+            if determined_status not in SESSION_STATUS_TRANSITION_MAP[session_row.status]:
+                # TODO: log or raise error
+                return None
+
+            update_values = {
+                "status": determined_status,
+                "status_history": sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {
+                        determined_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+                update_values["terminated_at"] = now
+            if status_info is not None:
+                update_values["status_info"] = status_info
+            update_query = (
+                sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
+            )
+            await db_session.execute(update_query)
             return determined_status
 
-        return await execute_with_retry(_check_and_update)
+        async with db.connect() as conn:
+            return await execute_with_txn_retry(_check_and_update, db.begin_session, conn)
 
     @staticmethod
     async def set_session_status(
@@ -816,12 +821,12 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
+        async def _update(db_sess: SASession) -> None:
+            query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
+            await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        async with db.connect() as conn:
+            await execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def set_session_result(
@@ -836,12 +841,12 @@ class SessionRow(Base):
             "result": SessionResult.SUCCESS if success else SessionResult.FAILURE,
         }
 
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
+        async def _update(db_sess: SASession) -> None:
+            query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
+            await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        async with db.connect() as conn:
+            await execute_with_txn_retry(_update, db.begin_session, conn)
 
     @classmethod
     async def match_sessions(

@@ -66,7 +66,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
@@ -77,6 +76,7 @@ from .gql_relay import (
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
@@ -1031,10 +1031,13 @@ ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
 
 
 async def gql_mutation_wrapper(
-    result_cls: Type[ResultType], _do_mutate: Callable[[], Coroutine[Any, Any, ResultType]]
+    graph_ctx: GraphQueryContext,
+    result_cls: Type[ResultType],
+    _do_mutate: Callable[[SAConnection | SASession], Coroutine[Any, Any, ResultType]],
 ) -> ResultType:
     try:
-        return await execute_with_retry(_do_mutate)
+        async with graph_ctx.db.connect() as conn:
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin, conn)
     except sa.exc.IntegrityError as e:
         log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
@@ -1069,20 +1072,19 @@ async def simple_db_mutate(
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
 
-    async def _do_mutate() -> ResultType:
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            result = await conn.execute(_query)
-            if post_func:
-                await post_func(conn, result)
+    async def _do_mutate(_conn: SAConnection) -> ResultType:
+        if pre_func:
+            await pre_func(_conn)
+        _query = mutation_query() if callable(mutation_query) else mutation_query
+        result = await _conn.execute(_query)
+        if post_func:
+            await post_func(_conn, result)
         if result.rowcount > 0:
             return result_cls(True, "success")
         else:
             return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
-    return await gql_mutation_wrapper(result_cls, _do_mutate)
+    return await gql_mutation_wrapper(graph_ctx, result_cls, _do_mutate)
 
 
 async def simple_db_mutate_returning_item(
@@ -1118,23 +1120,22 @@ async def simple_db_mutate_returning_item(
         time due to its cursor-like nature.
     """
 
-    async def _do_mutate() -> ResultType:
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            _query = _query.returning(_query.table)
-            result = await conn.execute(_query)
-            if post_func:
-                row = await post_func(conn, result)
-            else:
-                row = result.first()
-            if result.rowcount > 0:
-                return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            else:
-                return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+    async def _do_mutate(_conn: SAConnection) -> ResultType:
+        if pre_func:
+            await pre_func(_conn)
+        _query = mutation_query() if callable(mutation_query) else mutation_query
+        _query = _query.returning(_query.table)
+        result = await _conn.execute(_query)
+        if post_func:
+            row = await post_func(_conn, result)
+        else:
+            row = result.first()
+        if result.rowcount > 0:
+            return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
+        else:
+            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
-    return await gql_mutation_wrapper(result_cls, _do_mutate)
+    return await gql_mutation_wrapper(graph_ctx, result_cls, _do_mutate)
 
 
 def set_if_set(

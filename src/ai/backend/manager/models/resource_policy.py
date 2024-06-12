@@ -12,7 +12,6 @@ from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (
     Base,
@@ -28,8 +27,11 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
+from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
@@ -603,25 +605,25 @@ class CreateUserResourcePolicy(graphene.Mutation):
     ) -> CreateUserResourcePolicy:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> UserResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(
-                    name,
-                    props.max_vfolder_count,
-                    props.max_quota_scope_size,
-                    props.max_session_count_per_model_session,
-                    props.max_customized_image_count,
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-                return cls(
-                    True,
-                    "success",
-                    UserResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
+        async def _do_mutate(db_sess: SASession) -> UserResourcePolicy:
+            row = UserResourcePolicyRow(
+                name,
+                props.max_vfolder_count,
+                props.max_quota_scope_size,
+                props.max_session_count_per_model_session,
+                props.max_customized_image_count,
+            )
+            db_sess.add(row)
+            await db_sess.flush()
+            query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+            return cls(
+                True,
+                "success",
+                UserResourcePolicy.from_row(graph_ctx, await db_sess.scalar(query)),
+            )
 
-        return await execute_with_retry(_do_mutate)
+        async with graph_ctx.db.connect() as conn:
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin_session, conn)
 
 
 class ModifyUserResourcePolicy(graphene.Mutation):
@@ -801,23 +803,21 @@ class CreateProjectResourcePolicy(graphene.Mutation):
     ) -> CreateProjectResourcePolicy:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> ProjectResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(
-                    name, props.max_vfolder_count, props.max_quota_scope_size
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == name
-                )
-                return cls(
-                    True,
-                    "success",
-                    ProjectResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
+        async def _do_mutate(db_session: SASession) -> ProjectResourcePolicy:
+            row = ProjectResourcePolicyRow(
+                name, props.max_vfolder_count, props.max_quota_scope_size
+            )
+            db_session.add(row)
+            await db_session.flush()
+            query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
+            return cls(
+                True,
+                "success",
+                ProjectResourcePolicy.from_row(graph_ctx, await db_session.scalar(query)),
+            )
 
-        return await execute_with_retry(_do_mutate)
+        async with graph_ctx.db.connect() as conn:
+            return await execute_with_txn_retry(_do_mutate, graph_ctx.db.begin_session, conn)
 
 
 class ModifyProjectResourcePolicy(graphene.Mutation):
