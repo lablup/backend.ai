@@ -324,28 +324,28 @@ class ScalingGroup(graphene.ObjectType):
     agent_count_by_status = graphene.Field(
         graphene.Int,
         description="Added in 24.03.5.",
-        raw_status=graphene.String(default_value="ALIVE"),
+        status=graphene.String(default_value="ALIVE"),
     )
 
     agent_total_resource_slots_by_status = graphene.Field(
         graphene.JSONString,
         description="Added in 24.03.5.",
-        raw_status=graphene.String(default_value="ALIVE"),
+        status=graphene.String(default_value="ALIVE"),
     )
 
     async def resolve_agent_count_by_status(
-        self, info: graphene.ResolveInfo, raw_status: str = "ALIVE"
+        self, info: graphene.ResolveInfo, status: str = "ALIVE"
     ) -> int:
         from .agent import Agent
 
         return await Agent.load_count(
             info.context,
-            raw_status=raw_status,
+            raw_status=status,
             scaling_group=self.name,
         )
 
     async def resolve_agent_total_resource_slots_by_status(
-        self, info: graphene.ResolveInfo, raw_status: str = "ALIVE"
+        self, info: graphene.ResolveInfo, status: str = "ALIVE"
     ) -> Mapping[str, Any]:
         from .agent import AgentRow, AgentStatus
 
@@ -354,8 +354,7 @@ class ScalingGroup(graphene.ObjectType):
             query_stmt = (
                 sa.select(AgentRow)
                 .where(
-                    (AgentRow.scaling_group == self.name)
-                    & (AgentRow.status == AgentStatus[raw_status])
+                    (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
                 )
                 .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
             )
