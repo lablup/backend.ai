@@ -13,6 +13,7 @@ from callosum.exceptions import AuthenticationError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
@@ -21,7 +22,7 @@ from ai.backend.common.types import AgentId
 
 from .exceptions import AgentError, RPCError
 from .models.agent import agents
-from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from .models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -96,19 +97,19 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row:
-            async with self.db.begin_readonly() as conn:
-                query = (
-                    sa.select([agents.c.addr, agents.c.public_key])
-                    .select_from(agents)
-                    .where(
-                        agents.c.id == agent_id,
-                    )
+        async def _fetch_agent(conn: SAConnection) -> Row:
+            query = (
+                sa.select([agents.c.addr, agents.c.public_key])
+                .select_from(agents)
+                .where(
+                    agents.c.id == agent_id,
                 )
-                result = await conn.execute(query)
-                return result.first()
+            )
+            result = await conn.execute(query)
+            return result.first()
 
-        agent = await execute_with_retry(_fetch_agent)
+        async with self.db.connect() as conn:
+            agent = await execute_with_txn_retry(_fetch_agent, self.db.begin_readonly, conn)
         return agent["addr"], agent["public_key"]
 
     @actxmgr
