@@ -321,27 +321,38 @@ class ScalingGroup(graphene.ObjectType):
     use_host_network = graphene.Boolean()
 
     # Dynamic fields.
-    alive_agent_count = graphene.Int(description="Added in 24.03.5.")
-    alive_agent_total_resource_slots = graphene.JSONString(description="Added in 24.03.5.")
+    agent_count_by_status = graphene.Field(
+        graphene.Int,
+        description="Added in 24.03.5.",
+        raw_status=graphene.String(default_value="ALIVE"),
+    )
 
-    async def resolve_alive_agent_count(self, info: graphene.ResolveInfo) -> int:
+    agent_total_resource_slots_by_status = graphene.Field(
+        graphene.JSONString,
+        description="Added in 24.03.5.",
+        raw_status=graphene.String(default_value="ALIVE"),
+    )
+
+    async def resolve_agent_count_by_status(
+        self, info: graphene.ResolveInfo, raw_status: str = "ALIVE"
+    ) -> int:
         from .agent import Agent
 
         return await Agent.load_count(
             info.context,
-            raw_status="ALIVE",
+            raw_status=raw_status,
             scaling_group=self.name,
         )
 
-    async def resolve_alive_agent_total_resource_slots(
-        self, info: graphene.ResolveInfo
+    async def resolve_agent_total_resource_slots_by_status(
+        self, info: graphene.ResolveInfo, raw_status: str = "ALIVE"
     ) -> Mapping[str, Any]:
         from .agent import AgentRow, AgentStatus
 
         graph_ctx = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
             query_stmt = sa.select([AgentRow.occupied_slots, AgentRow.available_slots]).where(
-                AgentRow.scaling_group == self.name and AgentRow.status == AgentStatus.ALIVE
+                (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[raw_status])
             )
             result = (await db_session.execute(query_stmt)).fetchall()
 
