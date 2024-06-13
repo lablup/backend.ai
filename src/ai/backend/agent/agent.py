@@ -703,7 +703,7 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
-        self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
+        self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 13.0))
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
