@@ -435,6 +435,12 @@ class AgentRegistry:
                 HardwareMetadata,
             )
 
+    async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            result = await rpc.call.scan_gpu_alloc_map()
+            return result
+
     async def create_session(
         self,
         session_name: str,
