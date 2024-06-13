@@ -25,6 +25,7 @@ from ..exception import (
     ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    LockTimeout,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
@@ -228,12 +229,15 @@ class BaseFSOpModel(AbstractFSOpModel):
     ) -> None:
         async with self.delete_sema:
             lock_path = path.parent / f"{path.name}.lock"
-            async with FileLock(lock_path, remove_when_unlock=True):
-                loop = asyncio.get_running_loop()
-                try:
-                    await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
-                except FileNotFoundError:
-                    pass
+            try:
+                async with FileLock(lock_path, remove_when_unlock=True):
+                    loop = asyncio.get_running_loop()
+                    try:
+                        await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
+                    except FileNotFoundError:
+                        pass
+            except asyncio.TimeoutError:
+                raise LockTimeout
 
     def scan_tree(
         self,

@@ -46,6 +46,7 @@ from ..exception import (
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
+    LockTimeout,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
@@ -386,11 +387,11 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         async with ctx.get_volume(params["volume"]) as volume:
             try:
                 await volume.delete_vfolder(params["vfid"])
-            except asyncio.TimeoutError:
+            except LockTimeout:
                 raise web.HTTPBadRequest(
                     body=json.dumps(
                         {
-                            "msg": "Task already ongoing",
+                            "msg": "VFolder is already being deleted",
                             "vfid": str(params["vfid"]),
                         },
                     ),
