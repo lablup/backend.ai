@@ -146,7 +146,7 @@ class Agent(graphene.ObjectType):
     container_count = graphene.Int()
 
     # Dynamic fields.
-    fgpu_slots = graphene.JSONString()
+    gpu_alloc_map = graphene.JSONString()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -234,7 +234,7 @@ class Agent(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader(ctx, "Agent.container_count")
         return await loader.load(self.id)
 
-    async def resolve_fgpu_slots(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
         ctx: GraphQueryContext = info.context
         result = await ctx.registry.scan_gpu_alloc_map(self.id)
         return result
