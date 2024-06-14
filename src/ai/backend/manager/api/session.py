@@ -1423,6 +1423,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         last_stat = await root_ctx.registry.destroy_session(
             session,
             forced=params["forced"],
+            user_role=user_role,
         )
         resp = {
             "stats": last_stat,
