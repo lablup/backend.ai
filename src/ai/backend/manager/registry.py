@@ -20,6 +20,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -165,6 +166,7 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
+from .models.session import SESSION_KERNEL_STATUS_MAPPING
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -2147,6 +2149,26 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
+        async def _force_destroy_for_suadmin(
+            target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
+        ) -> None:
+            async def _destroy(db_session: AsyncSession) -> None:
+                _stmt = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                if session_row is None:
+                    raise SessionNotFound(f"Session not found (id: {session_id})")
+                kernels = cast(list[KernelRow], session_row.kernels)
+                for kern in kernels:
+                    kern.status = SESSION_KERNEL_STATUS_MAPPING[target_status]
+                session_row.status = target_status
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
+
         async with handle_session_exception(
             self.db,
             "destroy_session",
@@ -2191,25 +2213,8 @@ class AgentRegistry:
                             session_id,
                             target_session.status,
                         )
-
-                        async def _force_destroy_for_suadmin(db_session: AsyncSession) -> None:
-                            _stmt = (
-                                sa.select(SessionRow)
-                                .where(SessionRow.id == session_id)
-                                .options(selectinload(SessionRow.kernels))
-                            )
-                            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
-                            if session_row is None:
-                                raise SessionNotFound(f"Session not found (id: {session_id})")
-                            kernels = cast(list[KernelRow], session_row.kernels)
-                            for kern in kernels:
-                                kern.status = KernelStatus.CANCELLED
-                            session_row.status = SessionStatus.CANCELLED
-
-                        async with self.db.connect() as db_conn:
-                            await execute_with_txn_retry(
-                                _force_destroy_for_suadmin, self.db.begin_session, db_conn
-                            )
+                        await _force_destroy_for_suadmin(SessionStatus.CANCELLED)
+                        return {}
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
@@ -2228,25 +2233,8 @@ class AgentRegistry:
                         target_session.status,
                     )
                     if user_role is UserRole.SUPERADMIN:
-
-                        async def _force_destroy_for_suadmin(db_session: AsyncSession) -> None:
-                            _stmt = (
-                                sa.select(SessionRow)
-                                .where(SessionRow.id == session_id)
-                                .options(selectinload(SessionRow.kernels))
-                            )
-                            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
-                            if session_row is None:
-                                raise SessionNotFound(f"Session not found (id: {session_id})")
-                            kernels = cast(list[KernelRow], session_row.kernels)
-                            for kern in kernels:
-                                kern.status = KernelStatus.TERMINATED
-                            session_row.status = SessionStatus.TERMINATED
-
-                        async with self.db.connect() as db_conn:
-                            await execute_with_txn_retry(
-                                _force_destroy_for_suadmin, self.db.begin_session, db_conn
-                            )
+                        await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
+                        return {}
                     else:
                         await SessionRow.set_session_status(
                             self.db, session_id, SessionStatus.TERMINATING
