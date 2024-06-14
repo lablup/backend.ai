@@ -43,7 +43,7 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
@@ -87,8 +87,6 @@ from ..models import (
     ImageRow,
     KernelLoadingStrategy,
     KernelRole,
-    KernelRow,
-    KernelStatus,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -101,7 +99,6 @@ from ..models import (
     session_templates,
     vfolders,
 )
-from ..models.utils import execute_with_txn_retry
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -2221,53 +2218,6 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return response
 
 
-class ForceDestroyModel(BaseModel):
-    session_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("id", "session_id", "sessionId"),
-        description="Session ID to force-destroy",
-    )
-
-
-@auth_required
-@pydantic_params_api_handler(ForceDestroyModel)
-async def force_destroy(request: web.Request, params: ForceDestroyModel) -> web.StreamResponse:
-    session_id = params.session_id
-    log.info("FORCE_DESTROY (ak:{}, s:{})", request["keypair"]["access_key"], session_id)
-    if request["user"]["role"] != UserRole.SUPERADMIN:
-        raise InsufficientPrivilege("You are not allowed")
-
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.connect() as db_conn:
-
-        async def _update(db_session: SASession):
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == session_id)
-                .options(selectinload(SessionRow.kernels))
-            )
-            session_row = cast(SessionRow | None, await db_session.scalar(query))
-            if session_row is None:
-                raise SessionNotFound(f"Session not found (id:{session_id})")
-            status = cast(SessionStatus, session_row.status)
-            kernels = cast(list[KernelRow], session_row.kernels)
-            match status:
-                case SessionStatus.PREPARING | SessionStatus.PULLING:
-                    for kern in kernels:
-                        kern.status = KernelStatus.CANCELLED
-                    session_row.status = SessionStatus.CANCELLED
-                case SessionStatus.TERMINATING:
-                    for kern in kernels:
-                        kern.status = KernelStatus.TERMINATED
-                    session_row.status = SessionStatus.TERMINATED
-                case _:
-                    raise InvalidAPIParameters(
-                        f"Not allowed to force-destroy sessions whose status is {status.name}"
-                    )
-
-        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
-    return web.Response(status=204)
-
-
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     agent_lost_checker: asyncio.Task[None]
@@ -2324,7 +2274,6 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
-    cors.add(app.router.add_route("DELETE", "/_/force-destroy", force_destroy))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
