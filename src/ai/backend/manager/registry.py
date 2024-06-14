@@ -2186,6 +2186,11 @@ class AgentRegistry:
                     )
                 case SessionStatus.PULLING:
                     if forced and user_role is UserRole.SUPERADMIN:
+                        log.warning(
+                            "force-terminating session (s:{}, status:{})",
+                            session_id,
+                            target_session.status,
+                        )
 
                         async def _force_destroy_for_suadmin(db_session: AsyncSession) -> None:
                             _stmt = (
