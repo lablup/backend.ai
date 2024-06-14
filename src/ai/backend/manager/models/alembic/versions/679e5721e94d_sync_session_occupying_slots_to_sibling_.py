@@ -12,7 +12,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Session, registry, relationship, selectinload
+from sqlalchemy.orm import Session, load_only, registry, relationship, selectinload
 from sqlalchemy.sql import text
 
 from ai.backend.common.types import ResourceSlot
@@ -84,10 +84,9 @@ def _sync_multi_kernel_cluster_session():
                 (SessionRow.cluster_size != 1)
                 & (SessionRow.occupying_slots == {})
                 & (SessionRow.status_history.op("?")("RUNNING"))
-                & (sa.not_(SessionRow.status_history.op("?")("ERROR")))
             )
             .limit(PAGE_SIZE)
-            .options(selectinload(SessionRow.kernels))
+            .options(selectinload(SessionRow.kernels).options(load_only(KernelRow.occupied_slots)))
         )
         session_list = cast(list[SessionRow], db_sess.scalars(select_stmt).all())
         if not session_list:
