@@ -150,6 +150,7 @@ from .models import (
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
+    UserRole,
     UserRow,
     agents,
     domains,
@@ -167,6 +168,7 @@ from .models import (
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
+    execute_with_txn_retry,
     is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
@@ -2120,6 +2122,7 @@ class AgentRegistry:
         *,
         forced: bool = False,
         reason: Optional[KernelLifecycleEventReason] = None,
+        user_role: UserRole | None = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -2182,6 +2185,26 @@ class AgentRegistry:
                         self.db, session_id, SessionStatus.CANCELLED
                     )
                 case SessionStatus.PULLING:
+                    if forced and user_role is UserRole.SUPERADMIN:
+
+                        async def _force_destroy_for_suadmin(db_session: AsyncSession) -> None:
+                            _stmt = (
+                                sa.select(SessionRow)
+                                .where(SessionRow.id == session_id)
+                                .options(selectinload(SessionRow.kernels))
+                            )
+                            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                            if session_row is None:
+                                raise SessionNotFound(f"Session not found (id: {session_id})")
+                            kernels = cast(list[KernelRow], session_row.kernels)
+                            for kern in kernels:
+                                kern.status = KernelStatus.CANCELLED
+                            session_row.status = SessionStatus.CANCELLED
+
+                        async with self.db.connect() as db_conn:
+                            await execute_with_txn_retry(
+                                _force_destroy_for_suadmin, self.db.begin_session, db_conn
+                            )
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
@@ -2199,12 +2222,33 @@ class AgentRegistry:
                         session_id,
                         target_session.status,
                     )
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
-                    await self.event_producer.produce_event(
-                        SessionTerminatingEvent(session_id, reason),
-                    )
+                    if user_role is UserRole.SUPERADMIN:
+
+                        async def _force_destroy_for_suadmin(db_session: AsyncSession) -> None:
+                            _stmt = (
+                                sa.select(SessionRow)
+                                .where(SessionRow.id == session_id)
+                                .options(selectinload(SessionRow.kernels))
+                            )
+                            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                            if session_row is None:
+                                raise SessionNotFound(f"Session not found (id: {session_id})")
+                            kernels = cast(list[KernelRow], session_row.kernels)
+                            for kern in kernels:
+                                kern.status = KernelStatus.TERMINATED
+                            session_row.status = SessionStatus.TERMINATED
+
+                        async with self.db.connect() as db_conn:
+                            await execute_with_txn_retry(
+                                _force_destroy_for_suadmin, self.db.begin_session, db_conn
+                            )
+                    else:
+                        await SessionRow.set_session_status(
+                            self.db, session_id, SessionStatus.TERMINATING
+                        )
+                        await self.event_producer.produce_event(
+                            SessionTerminatingEvent(session_id, reason),
+                        )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
                         "Cannot destroy sessions that has already been already terminated"
