@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 from typing import Any, AsyncContextManager, Final, Sequence
 
 import hiredis
@@ -11,6 +12,21 @@ __all__ = (
     "RedisClient",
     "RedisConnection",
 )
+
+
+_keepalive_options: dict[int, int] = {}
+
+
+# macOS does not support several TCP_ options
+# so check if socket package includes TCP options before adding it
+if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
+    _keepalive_options[_TCP_KEEPIDLE] = 20
+
+if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
+    _keepalive_options[_TCP_KEEPINTVL] = 5
+
+if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
+    _keepalive_options[_TCP_KEEPCNT] = 3
 
 
 class Ellipsis(object):
@@ -187,6 +203,7 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         db: int = 0,
         socket_timeout: float | None = 5.0,
         socket_connect_timeout: float | None = 2.0,
+        keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
         self.redis_config = redis_config
         self.db = db
@@ -194,6 +211,7 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
         self.socket_timeout = socket_timeout
         self.socket_connect_timeout = socket_connect_timeout
+        self.keepalive_options = keepalive_options
 
     async def connect(self) -> RedisClient:
         if self.redis_config.get("sentinel"):
@@ -208,6 +226,11 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
         async with asyncio.timeout(self.socket_connect_timeout):
             reader, writer = await asyncio.open_connection(host, port)
+            sock: socket.socket = writer.get_extra_info("socket")
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+
+            for opt, val in self.keepalive_options.items():
+                sock.setsockopt(socket.IPPROTO_TCP, opt, val)
 
         self.writer = writer
         self.reader = reader
