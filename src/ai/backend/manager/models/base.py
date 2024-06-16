@@ -80,6 +80,8 @@ from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql.selectable import ScalarSelect
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -417,6 +419,9 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
+
+    def coerce_compared_value(self, op, value):
+        return JSONB()
 
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
@@ -1320,14 +1325,13 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     cursor_id, pagination_order, requested_page_size = connection_args
 
-    # Default ordering by id column
-    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
         parser = order_expr.parser
@@ -1336,10 +1340,14 @@ def _build_sql_stmt_from_connection_args(
     # Apply SQL order_by
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
             set_ordering = lambda col, direction: (
                 col.asc() if direction == OrderDirection.ASC else col.desc()
             )
         case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
             set_ordering = lambda col, direction: (
                 col.desc() if direction == OrderDirection.ASC else col.asc()
             )
@@ -1349,21 +1357,39 @@ def _build_sql_stmt_from_connection_args(
 
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
-        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
-                conditions.append(id_column > _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
-                )
-            case ConnectionPaginationOrder.BACKWARD:
-                conditions.append(id_column < _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
-                )
+        _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
+
+        def subq_to_condition(
+            column_to_be_compared: InstrumentedAttribute,
+            subquery: ScalarSelect,
+            direction: OrderDirection,
+        ) -> WhereClauseType:
+            match pagination_order:
+                case ConnectionPaginationOrder.FORWARD | None:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared > subquery
+                    else:
+                        cond = column_to_be_compared < subquery
+
+                    # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
+                    # because the ordering direction of ID field is always determined by `pagination_order` only.
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column > cursor_row_id
+                    )
+                case ConnectionPaginationOrder.BACKWARD:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared < subquery
+                    else:
+                        cond = column_to_be_compared > subquery
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column < cursor_row_id
+                    )
+
+            return cond | condition_when_same_with_subq
+
         for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            stmt = stmt.where(set_subquery(col, subq, direction))
+            subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
+            conditions.append(subq_to_condition(col, subq, direction))
 
     if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
@@ -1375,7 +1401,8 @@ def _build_sql_stmt_from_connection_args(
 
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 def _build_sql_stmt_from_sql_arg(
@@ -1387,8 +1414,9 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int | None = None,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
@@ -1409,11 +1437,13 @@ def _build_sql_stmt_from_sql_arg(
         stmt = stmt.offset(offset)
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
     sql_stmt: sa.sql.Select
+    sql_count_stmt: sa.sql.Select
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
@@ -1452,7 +1482,7 @@ def generate_sql_info_for_gql_connection(
         connection_args = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt, conditions = _build_sql_stmt_from_connection_args(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
             orm_class,
             id_column,
@@ -1462,6 +1492,7 @@ def generate_sql_info_for_gql_connection(
         )
         return GraphQLConnectionSQLInfo(
             stmt,
+            count_stmt,
             conditions,
             connection_args.cursor,
             connection_args.pagination_order,
@@ -1469,7 +1500,7 @@ def generate_sql_info_for_gql_connection(
         )
     else:
         page_size = first
-        stmt, conditions = _build_sql_stmt_from_sql_arg(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
             id_column,
@@ -1478,4 +1509,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
+        return GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)

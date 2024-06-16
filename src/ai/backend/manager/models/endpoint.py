@@ -22,6 +22,7 @@ from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
     MountPermission,
@@ -693,6 +694,17 @@ class ModelServicePredicateChecker:
         return yaml_name
 
 
+class RuntimeVariantInfo(graphene.ObjectType):
+    """Added in 24.03.5."""
+
+    name = graphene.String()
+    human_readable_name = graphene.String()
+
+    @classmethod
+    def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
+        return cls(name=enum.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -734,7 +746,7 @@ class Endpoint(graphene.ObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
-    runtime_variant = graphene.String(description="Added in 24.03.5.")
+    runtime_variant = graphene.Field(RuntimeVariantInfo, description="Added in 24.03.5.")
 
     created_at = GQLDateTime(required=True)
     destroyed_at = GQLDateTime()
@@ -788,7 +800,7 @@ class Endpoint(graphene.ObjectType):
             retries=row.retries,
             routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
-            runtime_variant=row.runtime_variant.name,
+            runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
@@ -1020,7 +1032,9 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
-    model_definition_path = graphene.String(description="Added in 24.03.4.")
+    model_definition_path = graphene.String(
+        description="Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
+    )
     open_to_public = graphene.Boolean()
     extra_mounts = graphene.List(
         ExtraMountInput,
@@ -1189,7 +1203,13 @@ class ModifyEndpoint(graphene.Mutation):
                         endpoint_row.model_row,
                         endpoint_row.model_definition_path,
                     )
-
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
                 # from AgentRegistry.handle_route_creation()
                 await graph_ctx.registry.create_session(
                     "",

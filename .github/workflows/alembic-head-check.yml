@@ -7,7 +7,7 @@ on:
 
 jobs:
   check-multiple-heads:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration') && github.event.pull_request.merged == false }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
