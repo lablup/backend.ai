@@ -938,6 +938,9 @@ class KubernetesAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_command(self, image_ref: str) -> str | None:
+        return None
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
