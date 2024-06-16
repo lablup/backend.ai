@@ -632,6 +632,11 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
+    """
+    key: `str` type slot name.
+    value: `str` or `Decimal` type value. Do not convert this to `float` or `int`.
+    """
+
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
