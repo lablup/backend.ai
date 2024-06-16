@@ -209,6 +209,7 @@ from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
+from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
@@ -223,6 +224,7 @@ from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
+from .pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -246,6 +248,7 @@ manager_local_config_iv = (
             t.Key("password"): t.String,
             t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
+            t.Key("pool-pre-ping", default=False): t.ToBool,
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
             t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
@@ -275,6 +278,12 @@ manager_local_config_iv = (
                 "etcd",
                 "etcetra",
             ),
+            t.Key(
+                "pg-advisory-config", default=PgAdvisoryLock.default_config
+            ): PgAdvisoryLock.config_iv,
+            t.Key("filelock-config", default=FileLock.default_config): FileLock.config_iv,
+            t.Key("redlock-config", default=RedisLock.default_config): RedisLock.config_iv,
+            t.Key("etcdlock-config", default=EtcdLock.default_config): EtcdLock.config_iv,
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
                 allow_nonexisting=True,

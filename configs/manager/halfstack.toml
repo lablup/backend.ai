@@ -12,6 +12,7 @@ name = "backend"
 user = "postgres"
 password = "develove"
 pool-recycle = 50
+pool-pre-ping = false
 
 
 [manager]
