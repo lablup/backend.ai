@@ -1509,7 +1509,10 @@
     "ModelMountDestination": "Miejsce docelowe montażu dla folderu modelu",
     "AdditionalMounts": "Dodatkowe mocowania",
     "ModelDefinitionPath": "Ścieżka pliku definicji modelu",
-    "NoExtraMounts": "Żadnych dodatkowych mocowań"
+    "NoExtraMounts": "Żadnych dodatkowych mocowań",
+    "SyncRoutes": "Synchronizacja tras",
+    "SyncRoutesFailed": "Żądanie synchronizacji trasy nie powiodło się.",
+    "SyncRoutesRequested": "Zażądano synchronizacji tras."
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
