@@ -1802,6 +1802,9 @@ input ModifyEndpointInput {
   Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.
   """
   extra_mounts: [ExtraMountInput]
+
+  """Added in 24.03.5."""
+  environ: JSONString
 }
 
 input ImageRefType {
