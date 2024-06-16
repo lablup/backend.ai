@@ -4,10 +4,12 @@ on:
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
   merge_group:
+permissions:
+  contents: write
 
 jobs:
   pr-number-assign:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null && github.event.pull_request.merged == false }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.number != null && github.event.pull_request.merged == false }}
     uses: ./.github/workflows/pr-number-assign.yml
     secrets:
       WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT }}
