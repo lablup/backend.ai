@@ -160,10 +160,11 @@ class HarborRegistry_v2(BaseContainerRegistry):
             async with sess.delete(base_url, allow_redirects=False, **rqst_args) as resp:
                 try:
                     resp.raise_for_status()
-                except aiohttp.client_exceptions.ClientError:
-                    content = await resp.json()
-                    log.warn("response body: {}", content)
-                    raise
+                except aiohttp.ClientResponseError as e:
+                    if (
+                        e.status != 404
+                    ):  #  404 means image is already removed from harbor so we can just safely ignore the exception
+                        raise RuntimeError(f"Failed to untag {image}: {e.message}") from e
 
     async def fetch_repositories(
         self,
