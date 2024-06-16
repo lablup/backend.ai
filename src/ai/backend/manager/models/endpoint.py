@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    RuntimeVariant,
     SessionTypes,
     VFolderID,
     VFolderMount,
@@ -55,6 +56,7 @@ from .base import (
     Item,
     PaginatedList,
     ResourceSlotColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     gql_mutation_wrapper,
@@ -154,6 +156,12 @@ class EndpointRow(Base):
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
+    runtime_variant = sa.Column(
+        "runtime_variant",
+        StrEnumType(RuntimeVariant),
+        nullable=False,
+        default=RuntimeVariant.CUSTOM,
+    )
 
     model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
 
@@ -219,6 +227,7 @@ class EndpointRow(Base):
         cluster_mode: ClusterMode,
         cluster_size: int,
         extra_mounts: Sequence[VFolderMount],
+        runtime_variant: RuntimeVariant,
         *,
         model_mount_destination: Optional[str] = None,
         tag: Optional[str] = None,
@@ -252,6 +261,7 @@ class EndpointRow(Base):
         self.environ = environ
         self.resource_opts = resource_opts
         self.open_to_public = open_to_public
+        self.runtime_variant = runtime_variant
 
     @classmethod
     async def get(
@@ -724,6 +734,7 @@ class Endpoint(graphene.ObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
+    runtime_variant = graphene.String(description="Added in 24.03.5.")
 
     created_at = GQLDateTime(required=True)
     destroyed_at = GQLDateTime()
@@ -777,6 +788,7 @@ class Endpoint(graphene.ObjectType):
             retries=row.retries,
             routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
+            runtime_variant=row.runtime_variant.name,
         )
 
     @classmethod
@@ -1015,6 +1027,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
     )
     environ = graphene.JSONString(description="Added in 24.03.5.")
+    runtime_variant = graphene.String(description="Added in 24.03.5.")
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -1077,6 +1090,12 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (_newval := props.environ) and _newval is not Undefined:
                     endpoint_row.environ = _newval
+
+                if (_newval := props.runtime_variant) and _newval is not Undefined:
+                    try:
+                        endpoint_row.runtime_variant = RuntimeVariant[_newval]
+                    except KeyError:
+                        raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
                 if (
                     _newval := props.desired_session_count
@@ -1164,11 +1183,12 @@ class ModifyEndpoint(graphene.Mutation):
                     )
                     endpoint_row.extra_mounts = vfolder_mounts
 
-                await ModelServicePredicateChecker.validate_model_definition(
-                    graph_ctx.storage_manager,
-                    endpoint_row.model_row,
-                    endpoint_row.model_definition_path,
-                )
+                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    await ModelServicePredicateChecker.validate_model_definition(
+                        graph_ctx.storage_manager,
+                        endpoint_row.model_row,
+                        endpoint_row.model_definition_path,
+                    )
 
                 # from AgentRegistry.handle_route_creation()
                 await graph_ctx.registry.create_session(
