@@ -469,11 +469,22 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             resource_policy,
         )
 
-    yaml_path = await ModelServicePredicateChecker.validate_model_definition(
-        root_ctx.storage_manager,
-        folder_row,
-        params.config.model_definition_path,
-    )
+    if params.runtime_variant == RuntimeVariant.CUSTOM:
+        yaml_path = await ModelServicePredicateChecker.validate_model_definition(
+            root_ctx.storage_manager,
+            folder_row,
+            params.config.model_definition_path,
+        )
+    else:
+        if (
+            params.runtime_variant != RuntimeVariant.CMD
+            and params.config.model_mount_destination != "/models"
+        ):
+            raise InvalidAPIParameters(
+                "Model mount destination must be /models for non-custom runtimes"
+            )
+        # this path won't be used on actual session but just to keep the convention
+        yaml_path = "model-definition.yaml"
 
     return ValidationResult(
         model_id,
