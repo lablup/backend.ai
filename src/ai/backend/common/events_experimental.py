@@ -1,17 +1,16 @@
 import asyncio
 import logging
-import socket
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
 from typing import Any
 
 import hiredis
-import msgpack
 from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
+from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .logging import BraceStyleAdapter
@@ -21,21 +20,6 @@ from .types import AgentId, EtcdRedisConfig
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = ("EventDispatcher",)
-
-
-_keepalive_options: dict[int, int] = {}
-
-
-# macOS does not support several TCP_ options
-# so check if socket package includes TCP options before adding it
-if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
-    _keepalive_options[_TCP_KEEPIDLE] = 20
-
-if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
-    _keepalive_options[_TCP_KEEPINTVL] = 5
-
-if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
-    _keepalive_options[_TCP_KEEPCNT] = 3
 
 
 async def read_stream(
@@ -52,7 +36,7 @@ async def read_stream(
         try:
             reply = await client.execute(
                 ["XREAD", "BLOCK", block_timeout, "STREAMS", stream_key, last_id],
-                command_timeout=block_timeout / 1000,
+                command_timeout=(block_timeout + 5_000) / 1000,
             )
             if not reply:
                 continue
@@ -104,7 +88,7 @@ async def read_stream_by_group(
                         str(autoclaim_idle_timeout),
                         autoclaim_start_id,
                     ],
-                    command_timeout=autoclaim_idle_timeout / 1000,
+                    command_timeout=(autoclaim_idle_timeout + 5_000) / 1000,
                 )
                 if not reply:
                     continue
@@ -129,7 +113,7 @@ async def read_stream_by_group(
                     stream_key,
                     ">",  # fetch messages not seen by other consumers
                 ],
-                command_timeout=block_timeout / 1000,
+                command_timeout=(block_timeout + 5_000) / 1000,
             )
             if not reply:
                 continue
