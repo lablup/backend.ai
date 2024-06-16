@@ -73,7 +73,7 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
-from .image import ImageNode
+from .image import ImageNode, ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -988,7 +988,7 @@ class ComputeContainer(graphene.ObjectType):
             .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(KernelRow.image_row))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         if cluster_role is not None:
             query = query.where(KernelRow.cluster_role == cluster_role)
@@ -1019,7 +1019,7 @@ class ComputeContainer(graphene.ObjectType):
             sa.select(KernelRow)
             # TODO: use "owner session ID" when we implement multi-container session
             .where(KernelRow.session_id.in_(session_ids))
-            .options(selectinload(KernelRow.image_row))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         async with ctx.db.begin_readonly_session() as conn:
             return await batch_multiresult(

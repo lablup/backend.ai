@@ -65,7 +65,8 @@
       "InvalidBlankEmail": "E-mail을 입력하세요.",
       "InvalidBlankPassword": "패스워드를 입력하세요.",
       "DisMatchUserEmail": "사용자 E-mail이 일치하지 않습니다.",
-      "MyEnvironments": "나의 실행 환경"
+      "MyEnvironments": "나의 실행 환경",
+      "ResourcePolicy": "자원 정책"
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -251,7 +252,7 @@
       "Enable": "활성화",
       "Network": "네트워크",
       "preopen": "사전 개방 포트",
-      "EnqueueComputeSessionWarning": "현재 사용 가능한 자원({{amount}})보다 크게 설정하면 세션 생성이 가능해질 때까지 큐에서 실행 지연됩니다.",
+      "EnqueueComputeSessionWarning": "자원이 부족하여 세션이 즉시 실행되지 않을 수 있습니다.",
       "ErrorCanNotExceedRemaining": "남아있는 자원({{amount}})보다 크게 설정할 수 없습니다.",
       "Template": "세션 템플릿",
       "TemplateAndHistory": "템플릿 및 최근기록",
@@ -262,7 +263,6 @@
       "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
       "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다.",
       "EnableAutomaticMiniumShmem": "최소 공유메모리 설정",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "클러스터 크기가 2 이상인 경우 정수만 허용됩니다.",
       "StartAfter": "다음 이후에 시작:",
       "StartTimeDoesNotApply": "시작 시간을 설정하지 않으면 적용되지 않습니다.",
@@ -274,7 +274,8 @@
       "EnvironmentVariableValueRequired": "값을 입력해주세요.",
       "PleaseCompleteForm": "양식이 완성되지 않았거나 오류가 포함되어 있습니다. 입력 내용을 확인해주세요.",
       "NeedToCorrectForm": "수정 버튼을 눌러 입력하신 내용을 확인해주세요.",
-      "FailedToStartNewSession": "세션 생성에 실패했습니다. 세션 페이지의 '종료' 탭을 확인해 주세요."
+      "FailedToStartNewSession": "세션 생성에 실패했습니다. 세션 페이지의 '종료' 탭을 확인해 주세요.",
+      "ProxyDirectTCPNotSupported": "프록시 직접 TCP 연결은 아직 지원되지 않습니다."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -401,11 +402,11 @@
     "Agents": "실행노드",
     "IPU": "IPU",
     "IPU(MEM)": "IPU(메모리)",
-    "ConvertSessionToImage": "세션을 이미지로 변환",
     "SessionName": "세션 이름",
     "SessionId": "세션 ID",
     "EnvironmentAndVersion": "환경 및 버전",
-    "Tags": "태그"
+    "Tags": "태그",
+    "fGPU": "fGPU"
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -433,7 +434,6 @@
     "RouteId": "라우트 ID",
     "SessionId": "세션 ID",
     "TrafficRatio": "트래픽 비율",
-    "YouAreAboutToTerminate": "아래의 서비스를 삭제하려고 합니다: ",
     "ClearErrors": "오류 지우고 재시도",
     "ServingRouteErrorModalTitle": "서빙 라우트 에러",
     "FailedToStartService": "서비스를 생성하지 못했습니다.",
@@ -454,12 +454,28 @@
     "resources": "자원",
     "Image": "이미지",
     "Owner": "소유자",
+    "Validate": "유효성 검사",
+    "Cancel": "취소",
+    "ValidationInfo": "유효성 검사 결과",
+    "Processing": "확인 중...",
+    "Success": "성공",
+    "Error": "오류",
+    "SeeContainerLogs": "컨테이너 로그 보기",
+    "TimeStamp": "타임스탬프",
+    "Result": "실행 결과",
+    "Finished": "완료됨",
     "ServiceDelegatedFrom": "모델 서비스는 {{ createdUser }}에 의해 생성되지만 세션 소유권은 {{ sessionOwner }}에 위임됩니다.",
     "FailedToTerminateService": "서비스 삭제 요청이 실패하였습니다.",
     "FailedToUpdateService": "서비스를 업데이트하지 못했습니다.",
     "ServiceCreated": "모델 서비스 {{ name }}이(가) 성공적으로 생성되었습니다.",
     "ServiceUpdated": "모델 서비스 {{ name }}이(가) 성공적으로 업데이트되었습니다.",
-    "ServiceTerminated": "모델 서비스 {{ name }}이(가) 성공적으로 종료되었습니다."
+    "CannotValidateNow": "지금은 서비스를 확인할 수 없습니다. \n리소스 할당이나 기타 구성을 확인하세요.",
+    "Ready": "준비",
+    "ServiceTerminated": "모델 서비스 '{{ name }}'에 대한 종료 요청이 전송되었습니다.",
+    "ModelMountDestination": "모델 폴더 마운트 할 경로",
+    "AdditionalMounts": "추가 마운트",
+    "ModelDefinitionPath": "모델 정의 파일 경로",
+    "NoExtraMounts": "추가 마운트 없음"
   },
   "button": {
     "Cancel": "취소",
@@ -521,7 +537,9 @@
     "Utilization": "사용량",
     "NoAvailableLiveStat": "표시할 사용량 없음",
     "Allocation": "할당 정보",
-    "DiskPerc": "디스크 %"
+    "DiskPerc": "디스크 %",
+    "AutoRefreshEvery5s": "5초마다 자동 새로고침",
+    "Agent": "에이전트"
   },
   "storageHost": {
     "StorageSetting": "스토리지 설정",
@@ -578,7 +596,8 @@
     "Image": "이미지",
     "All": "전체",
     "InProgress": "진행중",
-    "Session": "세션"
+    "Session": "세션",
+    "General": "일반"
   },
   "credential": {
     "Permission": "권한",
@@ -847,7 +866,8 @@
       "DeleteForeverDesc": "경고: 선택한 항목은 완전히 삭제되며 복원할 수 없습니다."
     },
     "ask": {
-      "DoYouWantToProceed": "계속 진행하시겠습니까?"
+      "DoYouWantToProceed": "계속 진행하시겠습니까?",
+      "DoYouWantToDeleteSomething": "\"{{ name }}\"을(를) 삭제하시겠습니까?"
     },
     "title": {
       "LetsDouble-Check": "한 번 더 확인합시다",
@@ -908,7 +928,10 @@
     "PasswordsDoNotMatch": "변경할 비밀번호와 비밀번호 확인란의 값이 일치해야 합니다.",
     "NoChangeMade": "변경된 부분이 없습니다.",
     "Architecture": "아키텍쳐",
-    "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다."
+    "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다.",
+    "DescImageResourceModified": "리소스 제한이 수정되었습니다.",
+    "DescImagePortsModified": "이미지 포트가 수정되었습니다.",
+    "ModifyImageResourceLimitReinstallRequired": "<p>이미 설치된 이미지를 수정하는 경우, 이미지 재설치가 필요합니다.</p><<p>수정내용은 이미지가 재설치되기 전까지 적용되지 않습니다. </p>"
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -1041,7 +1064,22 @@
     "PolicyNameEmpty": "자원 정책명은 필수 입력입니다.",
     "NoResourcePolicyToDisplay": "자원 정책 정보가 없습니다.",
     "AboutToDeleteResourcePolicy": "아래의 자원 정책을 삭제하려고 합니다: ",
-    "MaxSessionLifeTime": "세션 최대 실행시간"
+    "MaxSessionLifetime": "세션 최대 실행시간",
+    "Keypair": "키페어",
+    "User": "사용자",
+    "Project": "프로젝트",
+    "KeypairResourcePolicy": "키페어 자원 정책",
+    "IdleTimeout": "유휴 대기 시간",
+    "CreateResourcePolicy": "자원 정책 만들기",
+    "ResourcePolicyNameAlreadyExists": "리소스 정책 이름이 이미 존재합니다. \n추가하려면 이름을 변경하세요.",
+    "UserResourcePolicy": "사용자 자원 정책",
+    "MaxVFolderCount": "최대 폴더 수",
+    "MaxSessionCountPerModelSession": "모델 세션당 최대 세션 수",
+    "MaxQuotaScopeSize": "최대 할당량 범위 크기(GB)",
+    "MaxCustomizedImageCount": "최대 사용자 정의 이미지 수",
+    "CreatedAt": "생성 날짜",
+    "MaxFolderCount": "최대 폴더 수",
+    "ProjectResourcePolicy": "프로젝트 자원 정책"
   },
   "registry": {
     "Hostname": "호스트명",
@@ -1273,7 +1311,8 @@
     "ShowOnlyChanged": "수정 사항만 표시",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU 가속기를 사용합니다.",
-    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU 플러그인이 필요합니다."
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU 플러그인이 필요합니다.",
+    "SearchPlaceholder": "검색"
   },
   "notification": {
     "SuccessfullyUpdated": "성공적으로 수정되었습니다.",
@@ -1565,7 +1604,20 @@
     "SearchTableColumn": "테이블 열 검색",
     "SelectColumnToDisplay": "표시할 열 선택"
   },
-  "setting": {
-    "SearchPlaceholder": "검색어를 입력해 주세요"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "입력 필드 검증 오류",
+      "ValidationErrorText": "필수 입력 필드에 값을 입력하지 않거나 잘못된 값을 입력한 경우, 해당 필드에 오류 메시지가 표시됩니다.",
+      "FixErrorAndTryAgainText": "오류 필드가 있는 경우, 세션 실행 버튼이 비활성화 됩니다. 오류 수정 후 다시 시도해 주세요.",
+      "FixErrorFieldbyModifyButton": "해당 오류 필드에 대해, 우측 상단의 수정 버튼으로 바로 이동하여 수정할 수 있습니다."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "복사",
+    "Copied": "복사됨"
+  },
+  "propertyFilter": {
+    "ResetFilter": "필터 초기화",
+    "placeHolder": "검색"
   }
 }

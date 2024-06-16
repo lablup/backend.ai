@@ -3,7 +3,7 @@ import logging
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
 
 import graphene
 import jwt
@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_relay import AsyncNode
@@ -276,7 +277,9 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_row))
+            query = query.options(
+                selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases)
+            )
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -572,6 +575,10 @@ class ModelServicePredicateChecker:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
+            if vfolder.usage_mode == VFolderUsageMode.MODEL:
+                raise InvalidAPIParameters(
+                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
+                )
 
         return vfolder_mounts
 
@@ -818,7 +825,7 @@ class Endpoint(graphene.ObjectType):
             sa.select(EndpointRow)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_row))
+            .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -902,7 +909,7 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
             return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
@@ -950,6 +957,8 @@ class Endpoint(graphene.ObjectType):
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
         for route in error_routes:
+            if not route.error_data:
+                continue
             match route.error_data["type"]:
                 case "session_cancelled":
                     session_id = route.error_data["session_id"]
@@ -982,8 +991,12 @@ class ExtraMountInput(graphene.InputObjectType):
 
     vfolder_id = graphene.String()
     mount_destination = graphene.String()
-    type = graphene.Enum.from_enum(MountTypes)
-    permission = graphene.Enum.from_enum(MountPermission)
+    type = graphene.String(
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+    )
+    permission = graphene.String(
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
+    )
 
 
 class ModifyEndpointInput(graphene.InputObjectType):
@@ -997,7 +1010,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     resource_group = graphene.String()
     model_definition_path = graphene.String(description="Added in 24.03.4.")
     open_to_public = graphene.Boolean()
-    extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
+    extra_mounts = graphene.List(
+        ExtraMountInput,
+        description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
+    )
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -1114,14 +1130,21 @@ class ModifyEndpoint(graphene.Mutation):
                 result = await conn.execute(query)
 
                 resource_policy = result.first()
-                if (
-                    extra_mounts_input := props.extra_mounts
-                ) and extra_mounts_input is not Undefined:
+                if (extra_mounts_input := props.extra_mounts) is not Undefined:
+                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
                     extra_mounts = {
-                        _get_vfolder_id(m.id): MountOptionModel(
-                            mount_destination=m.mount_destination,
-                            type=m.type,
-                            permission=m.permission,
+                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
+                            mount_destination=(
+                                m.mount_destination
+                                if m.mount_destination is not Undefined
+                                else None
+                            ),
+                            type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
+                            permission=(
+                                MountPermission(m.permission)
+                                if m.permission is not Undefined
+                                else None
+                            ),
                         )
                         for m in extra_mounts_input
                     }

@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Masukkan kata laluan anda",
       "InvalidBlankEmail": "Masukkan emel anda",
       "DisMatchUserEmail": "E-mel Pengguna tidak sepadan",
-      "MyEnvironments": "Persekitaran Saya"
+      "MyEnvironments": "Persekitaran Saya",
+      "ResourcePolicy": "Dasar Sumber"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "Slot",
       "Architecture": "Seni bina",
-      "ModelStorageToMount": "Storan model untuk dipasang",
+      "ModelStorageToMount": "Penyimpanan Model Untuk Dilekapkan",
       "MinMemory": "Kapasiti memori minimum untuk persekitaran masa jalan yang dipilih pada masa ini ialah {{saiz}}iB.",
       "AIAccelerator": "Pemecut AI",
       "ModelStorage": "Storan Model",
@@ -244,7 +245,7 @@
       "Enable": "Dayakan",
       "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
       "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
-      "EnqueueComputeSessionWarning": "Jika anda menetapkannya lebih besar daripada sumber yang tersedia pada masa ini, penciptaan sesi akan ditangguhkan dalam baris gilir sehingga ia tersedia.",
+      "EnqueueComputeSessionWarning": "Sumber yang tidak mencukupi. \nSesi mungkin belum selesai.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Adakah anda mahu menetapkan semula semua entri anda?",
       "TemplateAndHistory": "templat",
@@ -258,7 +259,6 @@
       "Template": "Templat Sesi",
       "EnableAutomaticMiniumShmem": "Tetapkan memori kongsi minimum",
       "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Hanya integer dibenarkan apabila saiz kelompok tidak kurang daripada 2.",
       "StartAfter": "Mulakan selepas:",
       "StartTimeDoesNotApply": "Jika masa mula tidak ditetapkan, ia tidak terpakai.",
@@ -273,7 +273,8 @@
       "AddEnvironmentVariable": "Tambah pembolehubah persekitaran",
       "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
       "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
-      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi."
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi.",
+      "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -400,11 +401,11 @@
     "Agents": "ejen",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (memori)",
-    "ConvertSessionToImage": "Tukar Sesi kepada Imej",
     "SessionName": "Nama Sesi",
     "SessionId": "Id Sesi",
     "EnvironmentAndVersion": "Persekitaran dan Versi",
-    "Tags": "Tag"
+    "Tags": "Tag",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Batal",
@@ -466,7 +467,9 @@
     "Allocation": "Peruntukan",
     "Utilization": "Penggunaan",
     "DiskPerc": "Cakera %",
-    "NoAgentToDisplay": "Tiada Ejen untuk dipaparkan"
+    "NoAgentToDisplay": "Tiada Ejen untuk dipaparkan",
+    "AutoRefreshEvery5s": "Muat semula automatik setiap 5s",
+    "Agent": "Ejen"
   },
   "general": {
     "cores": "teras",
@@ -488,7 +491,8 @@
     "Image": "Gambar",
     "All": "keseluruhan",
     "InProgress": "Prosiding",
-    "Session": "Sesi"
+    "Session": "Sesi",
+    "General": "Umum"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -750,7 +754,27 @@
   },
   "dialog": {
     "warning": {
-      "DeleteForeverDesc": "AMARAN: item yang dipilih akan dipadamkan selama-lamanya dan anda tidak akan dapat memulihkannya."
+      "DeleteForeverDesc": "AMARAN: item yang dipilih akan dipadamkan selama-lamanya dan anda tidak akan dapat memulihkannya.",
+      "CannotBeUndone": "AMARAN: ini tidak boleh dibuat asal!",
+      "LogDeletion": "Adakah anda pasti mahu memadamkan semua mesej log?",
+      "Required": "Diperlukan",
+      "WillBeAppliedToNewSessions": "Kemas kini ini akan digunakan pada sesi baharu."
+    },
+    "ErrorOccurred": "Ralat Berlaku",
+    "error": {
+      "Error": "ralat"
+    },
+    "ask": {
+      "DoYouWantToProceed": "Adakah anda mahu meneruskan?",
+      "DoYouWantToDeleteSomething": "Adakah anda pasti mahu memadamkan \"{{ name }}\"?"
+    },
+    "title": {
+      "LetsDouble-Check": "Mari semak semula",
+      "Notice": "Notis",
+      "DeleteForever": "Padam Selamanya?"
+    },
+    "hide": {
+      "DonotShowThisAgain": "Jangan tunjukkan ini lagi."
     }
   },
   "environment": {
@@ -799,7 +823,10 @@
     "NoChangeMade": "Tiada perubahan dibuat",
     "Architecture": "Seni bina",
     "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
-    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan."
+    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan.",
+    "DescImageResourceModified": "Had sumber berjaya diubah suai",
+    "DescImagePortsModified": "Port Imej berjaya diubah suai",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -931,8 +958,23 @@
     "SuccessfullyDeleted": "Dasar sumber berjaya dipadamkan.",
     "PolicyNameEmpty": "Nama polisi tidak boleh kosong.",
     "AboutToDeleteResourcePolicy": "Anda akan memadamkan dasar sumber ini:",
-    "MaxSessionLifeTime": "Sepanjang Hayat Sesi (saat)",
-    "NoResourcePolicyToDisplay": "Tiada Dasar Sumber untuk dipaparkan"
+    "MaxSessionLifetime": "Sepanjang Hayat Sesi (saat)",
+    "NoResourcePolicyToDisplay": "Tiada Dasar Sumber untuk dipaparkan",
+    "Keypair": "Pasangan kekunci",
+    "User": "pengguna",
+    "Project": "Projek",
+    "KeypairResourcePolicy": "Dasar Sumber Pasangan Kunci",
+    "IdleTimeout": "Tamat Masa Terbiar",
+    "CreateResourcePolicy": "Buat Dasar Sumber",
+    "ResourcePolicyNameAlreadyExists": "Nama dasar sumber sudah wujud. \nSila tukar nama untuk ditambah.",
+    "UserResourcePolicy": "Dasar Sumber Pengguna",
+    "MaxVFolderCount": "Kiraan Folder Maks",
+    "MaxSessionCountPerModelSession": "Kiraan Sesi Maks Setiap Sesi Model",
+    "MaxQuotaScopeSize": "Saiz Skop Kuota Maks (GB)",
+    "MaxCustomizedImageCount": "Kiraan Imej Tersuai Maks",
+    "CreatedAt": "Dicipta Pada",
+    "MaxFolderCount": "Kiraan Folder Maks",
+    "ProjectResourcePolicy": "Dasar Sumber Projek"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1164,7 +1206,8 @@
     "ShowOnlyChanged": "Paparkan Perubahan Sahaja",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
-    "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin."
+    "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin.",
+    "SearchPlaceholder": "Cari"
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1485,14 +1528,29 @@
     "RoutingsCount": "Kiraan Laluan",
     "Active/Total": "Aktif/Jumlah",
     "Public": "Awam",
-    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
     "Owner": "Pemilik",
+    "Validate": "Sahkan",
+    "Cancel": "Batal",
+    "ValidationInfo": "Maklumat Pengesahan",
+    "Processing": "Memproses...",
+    "Success": "Kejayaan",
+    "Error": "ralat",
+    "SeeContainerLogs": "Lihat Log Bekas",
+    "TimeStamp": "Cap masa",
+    "Result": "Hasilnya",
+    "Finished": "Selesai",
     "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
     "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal.",
     "FailedToUpdateService": "Gagal mengemas kini perkhidmatan.",
     "ServiceCreated": "Perkhidmatan model {{ name }} telah berjaya dibuat.",
     "ServiceUpdated": "Perkhidmatan model {{ name }} telah berjaya dikemas kini.",
-    "ServiceTerminated": "Perkhidmatan model {{ name }} telah berjaya ditamatkan."
+    "CannotValidateNow": "Tidak dapat mengesahkan perkhidmatan sekarang. \nSila semak peruntukan sumber atau konfigurasi lain.",
+    "Ready": "sedia",
+    "ServiceTerminated": "Permintaan penutupan telah dihantar untuk perkhidmatan model '{{ name }}'.",
+    "ModelMountDestination": "Lekapkan Destinasi Untuk Folder Model",
+    "AdditionalMounts": "Lekapan Tambahan",
+    "ModelDefinitionPath": "Laluan Fail Definisi Model",
+    "NoExtraMounts": "Tiada pelekap tambahan"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1545,7 +1603,20 @@
     "SettingTable": "Tetapan Meja",
     "SearchTableColumn": "Cari lajur jadual"
   },
-  "setting": {
-    "SearchPlaceholder": "Masukkan Istilah Carian"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Ralat pengesahan medan input",
+      "ValidationErrorText": "Jika anda tidak memasukkan nilai dalam medan yang diperlukan atau memasukkan nilai yang tidak sah, mesej ralat dipaparkan dalam medan tersebut.",
+      "FixErrorAndTryAgainText": "Jika terdapat medan ralat, butang Sesi Pelancaran dinyahdayakan. \nSila betulkan ralat dan cuba lagi.",
+      "FixErrorFieldbyModifyButton": "Untuk medan ralat itu, anda boleh pergi terus ke butang Edit di penjuru kanan sebelah atas untuk mengeditnya."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Salinan",
+    "Copied": "disalin"
+  },
+  "propertyFilter": {
+    "placeHolder": "Cari",
+    "ResetFilter": "ResetFilter"
   }
 }

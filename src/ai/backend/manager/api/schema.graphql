@@ -43,7 +43,18 @@ type Queries {
     reference: String
     architecture: String = "x86_64"
   ): Image
-  images(is_installed: Boolean, is_operation: Boolean): [Image]
+  images(
+    """
+    Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
+    """
+    is_installed: Boolean
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+
+    """
+    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    """
+    image_filters: [String] = null
+  ): [Image]
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
@@ -222,6 +233,9 @@ scalar UUID
 type ImageNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   humanized_name: String
   tag: String
@@ -233,6 +247,9 @@ type ImageNode implements Node {
   size_bytes: BigInt
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
+
+  """Added in 24.03.4. The array of image aliases."""
+  aliases: [String]
 }
 
 type KVPair {
@@ -700,9 +717,13 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.03.4."""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  row_id: UUID
   host: String
   quota_scope_id: String
   name: String
@@ -1777,7 +1798,9 @@ input ModifyEndpointInput {
   model_definition_path: String
   open_to_public: Boolean
 
-  """Added in 24.03.4."""
+  """
+  Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.
+  """
   extra_mounts: [ExtraMountInput]
 }
 
@@ -1791,4 +1814,14 @@ input ImageRefType {
 input ExtraMountInput {
   vfolder_id: String
   mount_destination: String
+
+  """
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  """
+  type: String
+
+  """
+  Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
+  """
+  permission: String
 }

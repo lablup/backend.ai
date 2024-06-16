@@ -98,7 +98,9 @@
     "Starts": "Alkaa",
     "Status": "Tila",
     "Terminated": "Lopetettu",
-    "Utilization": "Käyttö"
+    "Utilization": "Käyttö",
+    "AutoRefreshEvery5s": "Automaattinen päivitys 5 sekunnin välein",
+    "Agent": "Agentti"
   },
   "button": {
     "Add": "Lisää",
@@ -397,7 +399,27 @@
   },
   "dialog": {
     "warning": {
-      "DeleteForeverDesc": "VAROITUS: valitut kohteet poistetaan pysyvästi, etkä voi palauttaa niitä."
+      "DeleteForeverDesc": "VAROITUS: valitut kohteet poistetaan pysyvästi, etkä voi palauttaa niitä.",
+      "WillBeAppliedToNewSessions": "Tätä päivitystä sovelletaan uusiin istuntoihin.",
+      "CannotBeUndone": "VAROITUS: tätä ei voi perua!",
+      "LogDeletion": "Haluatko varmasti poistaa kaikki lokiviestit?",
+      "Required": "Vaadittu"
+    },
+    "ErrorOccurred": "Tapahtunut virhe",
+    "error": {
+      "Error": "Virhe"
+    },
+    "ask": {
+      "DoYouWantToProceed": "Haluatteko jatkaa?",
+      "DoYouWantToDeleteSomething": "Oletko varma, että haluat poistaa \"{{ name }}\"?\"?"
+    },
+    "title": {
+      "LetsDouble-Check": "Tupla-tarkistetaan",
+      "Notice": "Ilmoitus",
+      "DeleteForever": "Poista ikuisesti?"
+    },
+    "hide": {
+      "DonotShowThisAgain": "Älä näytä tätä enää."
     }
   },
   "eduapi": {
@@ -459,7 +481,10 @@
     "SuccessfullyModified": "Muutettu onnistuneesti",
     "TakesTime": ". Se vie aikaa, joten ota kuppi kahvia!",
     "Version": "Versio",
-    "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti."
+    "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti.",
+    "DescImageResourceModified": "Resurssirajan muokkaus onnistui",
+    "DescImagePortsModified": "Kuvaportteja on muokattu onnistuneesti",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -485,7 +510,8 @@
     "Image": "Kuva",
     "All": "Kaikki",
     "InProgress": "Käynnissä",
-    "Session": "Istunto"
+    "Session": "Istunto",
+    "General": "Yleistä"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -720,15 +746,30 @@
     "TokenGenerated": "Tuotettu merkki",
     "TokenGenerationFailed": "Tokenin luominen epäonnistui. yritä uudelleen.",
     "TrafficRatio": "Liikennesuhde",
-    "YouAreAboutToTerminate": "Olet lopettamassa",
     "resources": "Resurssit",
     "Owner": "Omistaja",
+    "Validate": "Vahvista",
+    "Cancel": "Peruuttaa",
+    "ValidationInfo": "Vahvistustiedot",
+    "Processing": "Käsitellään...",
+    "Success": "Menestys",
+    "Error": "Virhe",
+    "SeeContainerLogs": "Katso Säilön lokit",
+    "TimeStamp": "Aikaleima",
+    "Result": "Tulos",
+    "Finished": "Valmis",
     "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle.",
     "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui.",
     "FailedToUpdateService": "Palvelun päivittäminen epäonnistui.",
     "ServiceCreated": "Mallipalvelun {{ name }} luominen onnistui.",
     "ServiceUpdated": "Mallipalvelun {{ name }} päivitys onnistui.",
-    "ServiceTerminated": "Mallipalvelu {{ name }} on lopetettu onnistuneesti."
+    "CannotValidateNow": "Palvelua ei voi vahvistaa nyt. \nTarkista resurssien allokaatio tai muut asetukset.",
+    "Ready": "Valmis",
+    "ServiceTerminated": "Mallipalvelun '{{ name }}' sammutuspyyntö lähetettiin.",
+    "AdditionalMounts": "Lisäkiinnikkeet",
+    "ModelDefinitionPath": "Mallin määritelmän tiedostopolku",
+    "ModelMountDestination": "Kiinnityskohde mallikansioon",
+    "NoExtraMounts": "Ei ylimääräisiä kiinnikkeitä"
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -858,7 +899,7 @@
     "ContainerPerSession": "Säiliö istuntoa kohti",
     "Folders": "Kansiot",
     "IdleTimeoutSec": "Tyhjäkäynnin aikakatkaisu (sek.)",
-    "MaxSessionLifeTime": "Istunnon kesto (sek.)",
+    "MaxSessionLifetime": "Istunnon kesto (sek.)",
     "Name": "Nimi",
     "NoResourcePolicyToDisplay": "Ei näytettäviä resurssikäytäntöjä",
     "PolicyName": "Politiikan nimi",
@@ -871,7 +912,22 @@
     "SuccessfullyDeleted": "Resurssikäytäntö poistettu onnistuneesti.",
     "SuccessfullyUpdated": "Resurssikäytäntö päivitetty onnistuneesti.",
     "Unlimited": "Rajoittamaton",
-    "UpdateResourcePolicy": "Resurssipolitiikan päivittäminen"
+    "UpdateResourcePolicy": "Resurssipolitiikan päivittäminen",
+    "Keypair": "Avainpari",
+    "User": "Käyttäjä",
+    "Project": "Projekti",
+    "KeypairResourcePolicy": "Avainparin resurssikäytäntö",
+    "IdleTimeout": "Idle Timeout",
+    "CreateResourcePolicy": "Luo resurssikäytäntö",
+    "ResourcePolicyNameAlreadyExists": "Resurssikäytännön nimi on jo olemassa. \nMuuta lisättävä nimi.",
+    "UserResourcePolicy": "Käyttäjäresurssikäytäntö",
+    "MaxVFolderCount": "Kansioiden enimmäismäärä",
+    "MaxSessionCountPerModelSession": "Maksimi istuntojen määrä malliistuntoa kohti",
+    "MaxQuotaScopeSize": "Kiintiön enimmäiskoko (GB)",
+    "MaxCustomizedImageCount": "Suurin mukautettu kuvien määrä",
+    "CreatedAt": "Luotu klo",
+    "MaxFolderCount": "Kansioiden enimmäismäärä",
+    "ProjectResourcePolicy": "Projektin resurssipolitiikka"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -1071,7 +1127,7 @@
       "Memory": "Muisti",
       "MinMemory": "Tällä hetkellä valitun ajoympäristön vähimmäismuistikapasiteetti on {{size}}iB.",
       "ModelStorage": "Malli Varastointi",
-      "ModelStorageToMount": "Mallivarasto asennettavaksi",
+      "ModelStorageToMount": "Mallin säilytystila kiinnitettäväksi",
       "MountedFolders": "Asennetut kansiot",
       "MultiNode": "Multi Node",
       "MustSpecifyVersion": "Ympäristö ja versio on määritettävä.",
@@ -1154,7 +1210,6 @@
       "ErrorCanNotExceedRemaining": "Ei voida asettaa suuremmaksi kuin jäljellä olevat resurssit ({{amount}}).",
       "EnableAutomaticMiniumShmem": "Aseta jaetun muistin vähimmäismäärä",
       "Template": "Istuntomalli",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Vain kokonaisluku on sallittu, kun klusterin koko on vähintään 2.",
       "StartAfter": "Aloita sen jälkeen:",
       "StartTimeDoesNotApply": "Jos aloitusaikaa ei ole asetettu, se ei ole voimassa.",
@@ -1169,7 +1224,8 @@
       "AddEnvironmentVariable": "Lisää ympäristömuuttujia",
       "EnvironmentVariableValueRequired": "Anna arvo.",
       "PleaseCompleteForm": "Lomake on puutteellinen tai sisältää virheitä. Tarkista syöttämäsi tiedot.",
-      "FailedToStartNewSession": "Istunnon luominen epäonnistui. \nTarkista istuntosivun VALMIS-välilehti."
+      "FailedToStartNewSession": "Istunnon luominen epäonnistui. \nTarkista istuntosivun VALMIS-välilehti.",
+      "ProxyDirectTCPNotSupported": "Välityspalvelimen suoraa TCP-yhteyttä ei tueta vielä"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1179,11 +1235,11 @@
     "Agents": "Agentit",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (muisti)",
-    "ConvertSessionToImage": "Muunna istunto kuvaksi",
     "SessionName": "Istunnon nimi",
     "SessionId": "Istunnon tunniste",
     "EnvironmentAndVersion": "Ympäristö ja versio",
-    "Tags": "Tunnisteet"
+    "Tags": "Tunnisteet",
+    "fGPU": "fGPU"
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1251,7 +1307,8 @@
     "ShowOnlyChanged": "Vain näyttö muuttuu",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Käytä Hyperaccel LPU -kiihdytintä.",
-    "RequireHyperaccelLPUPlugin": "Vaatii Backend.AI Hyperaccel LPU -laajennuksen."
+    "RequireHyperaccelLPUPlugin": "Vaatii Backend.AI Hyperaccel LPU -laajennuksen.",
+    "SearchPlaceholder": "Etsi"
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1509,7 +1566,8 @@
       "InvalidBlankPassword": "Syötä salasanasi",
       "InvalidBlankEmail": "Syötä sähköpostiosoitteesi",
       "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
-      "MyEnvironments": "Omat ympäristöt"
+      "MyEnvironments": "Omat ympäristöt",
+      "ResourcePolicy": "Resurssipolitiikka"
     }
   },
   "modelStore": {
@@ -1545,7 +1603,20 @@
     "SelectColumnToDisplay": "Valitse näytettävät sarakkeet",
     "SearchTableColumn": "Hae taulukon sarakkeita"
   },
-  "setting": {
-    "SearchPlaceholder": "Kirjoita hakutermi"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Syöttökentän vahvistusvirheet",
+      "ValidationErrorText": "Jos et syötä arvoa pakolliseen kenttään tai kirjoitat virheellisen arvon, kenttään tulee virheilmoitus.",
+      "FixErrorAndTryAgainText": "Jos virhekenttä on, Launch session -painike ei ole käytössä. \nKorjaa virhe ja yritä uudelleen.",
+      "FixErrorFieldbyModifyButton": "Voit muokata virhekenttää suoraan oikeassa yläkulmassa olevasta Muokkaa-painikkeesta."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopio",
+    "Copied": "Kopioitu"
+  },
+  "propertyFilter": {
+    "placeHolder": "Etsi",
+    "ResetFilter": "ResetFilter"
   }
 }

@@ -1726,7 +1726,9 @@ class VirtualFolderList(graphene.ObjectType):
 class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
+        description = "Added in 24.03.4."
 
+    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
@@ -1822,12 +1824,13 @@ class VirtualFolderNode(graphene.ObjectType):
     def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             host=row.host,
             quota_scope_id=row.quota_scope_id,
             name=row.name,
             user=row.user,
             user_email=row.user_row.email if row.user_row else None,
-            group=row.group_row,
+            group=row.group_row.id if row.group_row else None,
             group_name=row.group_row.name if row.group_row else None,
             creator=row.creator,
             unmanaged_path=row.unmanaged_path,
@@ -1883,7 +1886,8 @@ class VirtualFolderNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -1899,9 +1903,6 @@ class VirtualFolderNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
@@ -2479,7 +2480,8 @@ class ModelCard(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -2495,9 +2497,6 @@ class ModelCard(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             model_store_project_gids = (
                 (

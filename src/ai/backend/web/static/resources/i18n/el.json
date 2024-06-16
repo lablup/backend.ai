@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Εισάγετε τον κωδικό σας",
       "InvalidBlankEmail": "Συμπληρώστε το email σας",
       "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
-      "MyEnvironments": "Τα περιβάλλοντα μου"
+      "MyEnvironments": "Τα περιβάλλοντα μου",
+      "ResourcePolicy": "Πολιτική Πόρων"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-).",
       "PreOpenPortMaxCountLimit": "Μπορείτε να ορίσετε έως και {{count}} προ-ανοικτές θύρες.",
       "StartTimeMustBeInTheFuture": "Η ώρα έναρξης πρέπει να είναι μετά την τρέχουσα ώρα.",
-      "EnqueueComputeSessionWarning": "Εάν το ορίσετε μεγαλύτερο από τους διαθέσιμους πόρους, η δημιουργία συνεδρίας θα καθυστερήσει στην ουρά μέχρι να γίνει διαθέσιμη.",
+      "EnqueueComputeSessionWarning": "Ανεπαρκείς πόροι. \nΗ συνεδρία ενδέχεται να εκκρεμεί.",
       "SessionName": "Όνομα συνεδρίας",
       "ResetFormConfirm": "Θέλετε να επαναφέρετε όλες τις καταχωρήσεις σας;",
       "TemplateAndHistory": "Πρότυπα",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "Ένα όνομα μεταβλητής που υπάρχει ήδη.",
       "Template": "Πρότυπο συνεδρίας",
       "EnableAutomaticMiniumShmem": "Ορισμός ελάχιστης κοινόχρηστης μνήμης",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "StartAfter": "Έναρξη μετά:",
       "StartTimeDoesNotApply": "Εάν δεν έχει οριστεί η ώρα έναρξης, δεν ισχύει.",
       "OnlyAllowsDiscreteNumberByClusterSize": "Μόνο ακέραιος επιτρέπεται όταν το μέγεθος του συμπλέγματος δεν είναι μικρότερο από 2.",
@@ -273,7 +273,8 @@
       "AddEnvironmentVariable": "Προσθήκη μεταβλητών περιβάλλοντος",
       "EnvironmentVariableValueRequired": "Παρακαλώ εισάγετε μια τιμή.",
       "PleaseCompleteForm": "Το έντυπο είναι ελλιπές ή περιέχει σφάλματα. Παρακαλούμε ελέγξτε τα στοιχεία σας.",
-      "FailedToStartNewSession": "Η δημιουργία συνεδρίας απέτυχε. \nΕλέγξτε την καρτέλα \"Πεπερασμένος\" στη σελίδα της συνεδρίας."
+      "FailedToStartNewSession": "Η δημιουργία συνεδρίας απέτυχε. \nΕλέγξτε την καρτέλα \"Πεπερασμένος\" στη σελίδα της συνεδρίας.",
+      "ProxyDirectTCPNotSupported": "Η απευθείας σύνδεση TCP μεσολάβησης δεν υποστηρίζεται ακόμη"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -400,11 +401,11 @@
     "Agents": "Πράκτορες",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (μνήμη)",
-    "ConvertSessionToImage": "Μετατροπή συνεδρίας σε εικόνα",
     "SessionName": "Όνομα συνεδρίας",
     "SessionId": "Αναγνωριστικό συνεδρίας",
     "EnvironmentAndVersion": "Περιβάλλον και Έκδοση",
-    "Tags": "Ετικέτες"
+    "Tags": "Ετικέτες",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -466,7 +467,9 @@
     "Allocation": "Κατανομή",
     "Utilization": "Χρήση",
     "DiskPerc": "Δίσκος %",
-    "NoAgentToDisplay": "Δεν υπάρχουν πράκτορες για εμφάνιση"
+    "NoAgentToDisplay": "Δεν υπάρχουν πράκτορες για εμφάνιση",
+    "AutoRefreshEvery5s": "Αυτόματη ανανέωση κάθε 5 δευτερόλεπτα",
+    "Agent": "Πράκτορας"
   },
   "general": {
     "cores": "πυρήνες",
@@ -488,7 +491,8 @@
     "Image": "Εικόνα",
     "All": "Όλα",
     "InProgress": "Σε εξέλιξη",
-    "Session": "Σύνοδος"
+    "Session": "Σύνοδος",
+    "General": "Γενικά"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -757,7 +761,8 @@
       "DeleteForeverDesc": "ΠΡΟΕΙΔΟΠΟΙΗΣΗ: επιλεγμένα στοιχεία θα διαγραφούν οριστικά και δεν θα μπορείτε να τα επαναφέρετε."
     },
     "ask": {
-      "DoYouWantToProceed": "Θέλετε να συνεχίσετε?"
+      "DoYouWantToProceed": "Θέλετε να συνεχίσετε?",
+      "DoYouWantToDeleteSomething": "Είστε σίγουροι ότι θέλετε να διαγράψετε το \"{{ name }}\";"
     },
     "title": {
       "LetsDouble-Check": "Ας ελέγξουμε ξανά",
@@ -818,7 +823,10 @@
     "NoChangeMade": "Δεν έγιναν αλλαγές",
     "Architecture": "Αρχιτεκτονική",
     "NoImageToDisplay": "Δεν εμφανίζονται εικόνες",
-    "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς."
+    "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς.",
+    "DescImageResourceModified": "Το όριο πόρων τροποποιήθηκε επιτυχώς",
+    "DescImagePortsModified": "Οι θύρες εικόνας τροποποιήθηκαν με επιτυχία",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -950,8 +958,23 @@
     "SuccessfullyDeleted": "Η πολιτική πόρων διαγράφηκε με επιτυχία.",
     "PolicyNameEmpty": "Το όνομα πολιτικής δεν πρέπει να είναι κενό.",
     "AboutToDeleteResourcePolicy": "Πρόκειται να διαγράψετε αυτήν την πολιτική πόρων:",
-    "MaxSessionLifeTime": "Διάρκεια ζωής συνόδου (sec.)",
-    "NoResourcePolicyToDisplay": "Δεν εμφανίζονται πολιτικές πόρων"
+    "MaxSessionLifetime": "Διάρκεια ζωής συνόδου (sec.)",
+    "NoResourcePolicyToDisplay": "Δεν εμφανίζονται πολιτικές πόρων",
+    "Keypair": "Keypair",
+    "User": "Χρήστης",
+    "Project": "Εργο",
+    "KeypairResourcePolicy": "Πολιτική πόρων ζεύγους κλειδιών",
+    "IdleTimeout": "Χρονικό όριο αδράνειας",
+    "CreateResourcePolicy": "Δημιουργία Πολιτικής Πόρων",
+    "ResourcePolicyNameAlreadyExists": "Το όνομα της πολιτικής πόρων υπάρχει ήδη. \nΑλλάξτε το όνομα για προσθήκη.",
+    "UserResourcePolicy": "Πολιτική πόρων χρήστη",
+    "MaxVFolderCount": "Μέγιστος αριθμός φακέλων",
+    "MaxSessionCountPerModelSession": "Μέγιστος αριθμός περιόδων σύνδεσης ανά περίοδο λειτουργίας μοντέλου",
+    "MaxQuotaScopeSize": "Μέγιστο μέγεθος εύρους ορίου (GB)",
+    "MaxCustomizedImageCount": "Μέγιστος προσαρμοσμένος αριθμός εικόνων",
+    "CreatedAt": "Δημιουργήθηκε στο",
+    "MaxFolderCount": "Μέγιστος αριθμός φακέλων",
+    "ProjectResourcePolicy": "Πολιτική πόρων έργου"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1183,7 +1206,8 @@
     "ShowOnlyChanged": "Εμφάνιση μόνο αλλαγών",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Χρησιμοποιήστε τον επιταχυντή Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Απαιτεί το πρόσθετο Backend.AI Hyperaccel LPU."
+    "RequireHyperaccelLPUPlugin": "Απαιτεί το πρόσθετο Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Αναζήτηση"
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1463,14 +1487,29 @@
     "RoutingsCount": "Αριθμός δρομολογίων",
     "Active/Total": "Ενεργό/Σύνολο",
     "Public": "Δημόσιο",
-    "YouAreAboutToTerminate": "Πρόκειται να τερματίσετε",
     "Owner": "Ιδιοκτήτης",
+    "Validate": "Επικυρώνω",
+    "Cancel": "Ματαίωση",
+    "ValidationInfo": "Πληροφορίες επικύρωσης",
+    "Processing": "Επεξεργασία...",
+    "Success": "Επιτυχία",
+    "Error": "Λάθος",
+    "SeeContainerLogs": "Βλέπε αρχεία καταγραφής κοντέινερ",
+    "TimeStamp": "Χρονική σήμανση",
+    "Result": "Αποτέλεσμα",
+    "Finished": "Πεπερασμένος",
     "ServiceDelegatedFrom": "Το μοντέλο υπηρεσίας δημιουργείται από τον {{ createdUser }}, αλλά η ιδιοκτησία της συνεδρίας θα ανατεθεί στον {{ sessionOwner }}",
     "FailedToTerminateService": "Η αίτηση τερματισμού της υπηρεσίας απέτυχε.",
     "ServiceUpdated": "Η υπηρεσία μοντέλου {{ όνομα }} ενημερώθηκε με επιτυχία.",
     "FailedToUpdateService": "Η ενημέρωση της υπηρεσίας απέτυχε.",
     "ServiceCreated": "Η υπηρεσία μοντέλου {{ όνομα }} δημιουργήθηκε με επιτυχία.",
-    "ServiceTerminated": "Η υπηρεσία μοντέλου {{ όνομα }} τερματίστηκε με επιτυχία."
+    "CannotValidateNow": "Δεν είναι δυνατή η επικύρωση της υπηρεσίας τώρα. \nΕλέγξτε την κατανομή πόρων ή άλλες διαμορφώσεις.",
+    "Ready": "Ετοιμος",
+    "ServiceTerminated": "Στάλθηκε ένα αίτημα τερματισμού λειτουργίας για την υπηρεσία μοντέλου \"{{ όνομα }}\".",
+    "ModelMountDestination": "Προσάρτηση προορισμού για φάκελο μοντέλου",
+    "AdditionalMounts": "Πρόσθετες βάσεις",
+    "ModelDefinitionPath": "Διαδρομή αρχείου ορισμού μοντέλου",
+    "NoExtraMounts": "Χωρίς επιπλέον βάσεις"
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
@@ -1564,7 +1603,20 @@
     "SelectColumnToDisplay": "Επιλέξτε για εμφάνιση στηλών",
     "SearchTableColumn": "Αναζήτηση στηλών πίνακα"
   },
-  "setting": {
-    "SearchPlaceholder": "Εισαγάγετε τον όρο αναζήτησης"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Σφάλματα επικύρωσης πεδίου εισαγωγής",
+      "ValidationErrorText": "Εάν δεν εισαγάγετε μια τιμή σε ένα απαιτούμενο πεδίο ή εισαγάγετε μια μη έγκυρη τιμή, εμφανίζεται ένα μήνυμα σφάλματος σε αυτό το πεδίο.",
+      "FixErrorAndTryAgainText": "Εάν υπάρχει πεδίο σφάλματος, το κουμπί Εκκίνηση συνεδρίας είναι απενεργοποιημένο. \nΔιορθώστε το σφάλμα και δοκιμάστε ξανά.",
+      "FixErrorFieldbyModifyButton": "Για αυτό το πεδίο σφάλματος, μπορείτε να μεταβείτε απευθείας στο κουμπί Επεξεργασία στην επάνω δεξιά γωνία για να το επεξεργαστείτε."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "αντίγραφο",
+    "Copied": "Αντιγράφηκε"
+  },
+  "propertyFilter": {
+    "placeHolder": "Αναζήτηση",
+    "ResetFilter": "Επαναφορά φίλτρου"
   }
 }
