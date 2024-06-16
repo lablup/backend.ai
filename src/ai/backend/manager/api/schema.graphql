@@ -905,6 +905,9 @@ type Endpoint implements Item {
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
+
+  """Added in 24.03.5."""
+  runtime_variant: String
   created_at: DateTime!
   destroyed_at: DateTime
   routings: [Routing]
@@ -1807,6 +1810,9 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   environ: JSONString
+
+  """Added in 24.03.5."""
+  runtime_variant: String
 }
 
 input ImageRefType {
