@@ -236,7 +236,12 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
     async def disconnect(self) -> None:
         if self.writer:
-            self.writer.close()
+            try:
+                self.writer.close()
+            except RuntimeError as e:
+                if str(e) == "Event loop is closed":
+                    pass  # there's no more room we can do anything
+                raise e
 
     async def __aexit__(self, *exc_info) -> None:
         return await self.disconnect()

@@ -253,9 +253,7 @@ class TimerNode(threading.Thread):
         asyncio.run(self.timer_node_async())
 
 
-@pytest.mark.asyncio(
-    scope="package"
-)  # session scope required to get rid of `Event loop is closed` error on test cleanup
+@pytest.mark.asyncio
 @pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
 async def test_global_timer_filelock(
     dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
@@ -305,7 +303,7 @@ async def test_global_timer_filelock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio(scope="package")
+@pytest.mark.asyncio
 @pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
 async def test_gloal_timer_redlock(
     dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
@@ -360,7 +358,7 @@ async def test_gloal_timer_redlock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio(scope="package")
+@pytest.mark.asyncio
 @pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
 @pytest.mark.parametrize("etcd_client", ["etcetra", "etcd-client-py"])
 async def test_global_timer_etcdlock(
@@ -421,7 +419,7 @@ async def test_global_timer_etcdlock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio(scope="package")
+@pytest.mark.asyncio
 @pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
 async def test_global_timer_join_leave(
     dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
