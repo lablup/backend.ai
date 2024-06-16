@@ -907,7 +907,7 @@ type Endpoint implements Item {
   open_to_public: Boolean
 
   """Added in 24.03.5."""
-  runtime_variant: String
+  runtime_variant: RuntimeVariantInfo
   created_at: DateTime!
   destroyed_at: DateTime
   routings: [Routing]
@@ -915,6 +915,12 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+}
+
+"""Added in 24.03.5."""
+type RuntimeVariantInfo {
+  name: String
+  human_readable_name: String
 }
 
 type Routing implements Item {
