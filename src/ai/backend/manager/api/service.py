@@ -42,6 +42,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     AgentId,
     ClusterMode,
@@ -1174,6 +1175,29 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class RuntimeInfo(BaseModel):
+    name: Annotated[str, Field(description="Identifier to be passed later inside request body")]
+    human_readable_name: Annotated[
+        str, Field(description="Use this value as displayed label to user")
+    ]
+
+
+class RuntimeInfoModel(BaseModel):
+    runtimes: list[RuntimeInfo]
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
+async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
+    return RuntimeInfoModel(
+        runtimes=[
+            RuntimeInfo(name=v.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
+            for v in RuntimeVariant
+        ]
+    )
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -1204,6 +1228,7 @@ def create_app(
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("POST", "/_/try", try_start))
+    cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))
