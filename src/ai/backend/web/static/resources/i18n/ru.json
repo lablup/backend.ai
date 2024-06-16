@@ -1562,7 +1562,10 @@
     "ModelMountDestination": "Место установки папки модели",
     "AdditionalMounts": "Дополнительные крепления",
     "ModelDefinitionPath": "Путь к файлу определения модели",
-    "NoExtraMounts": "Никаких дополнительных креплений"
+    "NoExtraMounts": "Никаких дополнительных креплений",
+    "SyncRoutes": "Синхронизация маршрутов",
+    "SyncRoutesFailed": "Запрос на синхронизацию маршрута завершился неудачей.",
+    "SyncRoutesRequested": "Запрошена синхронизация маршрутов."
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
