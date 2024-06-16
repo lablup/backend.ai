@@ -600,6 +600,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.cluster_mode,
             params.cluster_size,
             validation_result.extra_mounts,
+            RuntimeVariant.CUSTOM,
             model_mount_destination=params.config.model_mount_destination,
             tag=params.tag,
             startup_command=params.startup_command,
