@@ -36,7 +36,7 @@ async def read_stream(
         try:
             reply = await client.execute(
                 ["XREAD", "BLOCK", block_timeout, "STREAMS", stream_key, last_id],
-                command_timeout=block_timeout / 1000,
+                command_timeout=(block_timeout + 5_000) / 1000,
             )
             if not reply:
                 continue
@@ -88,7 +88,7 @@ async def read_stream_by_group(
                         str(autoclaim_idle_timeout),
                         autoclaim_start_id,
                     ],
-                    command_timeout=autoclaim_idle_timeout / 1000,
+                    command_timeout=(autoclaim_idle_timeout + 5_000) / 1000,
                 )
                 if not reply:
                     continue
@@ -113,7 +113,7 @@ async def read_stream_by_group(
                     stream_key,
                     ">",  # fetch messages not seen by other consumers
                 ],
-                command_timeout=block_timeout / 1000,
+                command_timeout=(block_timeout + 5_000) / 1000,
             )
             if not reply:
                 continue
