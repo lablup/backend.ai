@@ -827,7 +827,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
