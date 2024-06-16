@@ -223,6 +223,10 @@ class ServeInfoModel(BaseResponseModel):
             " will be no authentication required to communicate with this API service."
         )
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(description="Type of the inference runtime the image will try to load."),
+    ]
 
 
 @auth_required
@@ -259,6 +263,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         ],
         service_endpoint=endpoint.url,
         is_public=endpoint.open_to_public,
+        runtime_variant=endpoint.runtime_variant,
     )
 
 
@@ -277,7 +282,7 @@ class ServiceConfigModel(BaseModel):
         validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
         default="/models",
         description=(
-            "Mount destination for the model VFolder will be mounted inside the inference session"
+            "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
         ),
     )
 
@@ -319,6 +324,13 @@ class NewServiceRequestModel(BaseModel):
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(
+            description="Type of the inference runtime the image will try to load.",
+            default=RuntimeVariant.CUSTOM,
+        ),
+    ]
     architecture: str = Field(
         validation_alias=AliasChoices("arch", "architecture"),
         description="Image architecture",
@@ -469,11 +481,19 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             resource_policy,
         )
 
-    yaml_path = await ModelServicePredicateChecker.validate_model_definition(
-        root_ctx.storage_manager,
-        folder_row,
-        params.config.model_definition_path,
-    )
+    if params.runtime_variant == RuntimeVariant.CUSTOM:
+        yaml_path = await ModelServicePredicateChecker.validate_model_definition(
+            root_ctx.storage_manager,
+            folder_row,
+            params.config.model_definition_path,
+        )
+    elif (
+        params.runtime_variant != RuntimeVariant.CMD
+        and params.config.model_mount_destination != "/models"
+    ):
+        raise InvalidAPIParameters(
+            "Model mount destination must be /models for non-custom runtimes"
+        )
 
     return ValidationResult(
         model_id,
@@ -579,7 +599,6 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.cluster_mode,
             params.cluster_size,
             validation_result.extra_mounts,
-            RuntimeVariant.CUSTOM,
             model_mount_destination=params.config.model_mount_destination,
             tag=params.tag,
             startup_command=params.startup_command,
@@ -588,6 +607,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             bootstrap_script=params.bootstrap_script,
             resource_opts=params.config.resource_opts,
             open_to_public=params.open_to_public,
+            runtime_variant=params.runtime_variant,
         )
         db_sess.add(endpoint)
         await db_sess.flush()
@@ -603,6 +623,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         active_routes=[],
         service_endpoint=None,
         is_public=params.open_to_public,
+        runtime_variant=params.runtime_variant,
     )
 
 

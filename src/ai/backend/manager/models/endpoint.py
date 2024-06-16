@@ -1020,7 +1020,9 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
-    model_definition_path = graphene.String(description="Added in 24.03.4.")
+    model_definition_path = graphene.String(
+        description="Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
+    )
     open_to_public = graphene.Boolean()
     extra_mounts = graphene.List(
         ExtraMountInput,
@@ -1189,7 +1191,13 @@ class ModifyEndpoint(graphene.Mutation):
                         endpoint_row.model_row,
                         endpoint_row.model_definition_path,
                     )
-
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
                 # from AgentRegistry.handle_route_creation()
                 await graph_ctx.registry.create_session(
                     "",
