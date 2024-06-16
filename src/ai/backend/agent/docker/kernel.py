@@ -207,7 +207,10 @@ class DockerKernel(AbstractKernel):
                         config = {"ContainerSpec": {}}
 
                     container = docker.containers.container(container_id)
-                    changes: list[str] = []
+                    changes: list[str] = [
+                        "RUN rm -rf /tmp/*",
+                    ]
+
                     for label_name, label_value in extra_labels.items():
                         changes.append(f"LABEL {label_name}={label_value}")
                     if canonical:
