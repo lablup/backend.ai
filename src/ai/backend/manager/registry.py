@@ -164,10 +164,10 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
-from .models.session import finalize_running as finalize_session_running
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
+    execute_with_txn_retry,
     is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
@@ -1582,8 +1582,28 @@ class AgentRegistry:
                 ),
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            await KernelRow.update_kernel(self.db, kernel_id, new_status, update_data=update_data)
-            new_session_status = await finalize_session_running(self.db, session_id, actual_allocs)
+
+            async def _update_session_occupying_slots(db_session: AsyncSession) -> None:
+                _stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                if session_row is None:
+                    raise SessionNotFound(f"Failed to fetch session (id:{session_id})")
+                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                session_occupying_slots.sync_keys(actual_allocs)
+                for key, val in session_occupying_slots.items():
+                    session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
+                session_row.occupying_slots = session_occupying_slots
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(
+                    _update_session_occupying_slots, self.db.begin_session, db_conn
+                )
+            kernel_did_update = await KernelRow.update_kernel(
+                self.db, kernel_id, new_status, update_data=update_data
+            )
+            if not kernel_did_update:
+                return
+            new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
             query = (
