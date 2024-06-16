@@ -1014,6 +1014,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         ExtraMountInput,
         description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
     )
+    environ = graphene.JSONString(description="Added in 24.03.5.")
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -1073,6 +1074,9 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
+
+                if (_newval := props.environ) and _newval is not Undefined:
+                    endpoint_row.environ = _newval
 
                 if (
                     _newval := props.desired_session_count
