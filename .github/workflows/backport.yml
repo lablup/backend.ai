@@ -60,7 +60,7 @@ jobs:
           echo "${milestones[@]}"
 
           for i in "${!milestones[@]}"; do
-            if ! git branch -r | grep -q "origin/${milestones[$i]}\$"; then
+            if ! git ls-remote --heads | grep -q "refs/heads/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
