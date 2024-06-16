@@ -1509,7 +1509,10 @@
     "ModelMountDestination": "Προσάρτηση προορισμού για φάκελο μοντέλου",
     "AdditionalMounts": "Πρόσθετες βάσεις",
     "ModelDefinitionPath": "Διαδρομή αρχείου ορισμού μοντέλου",
-    "NoExtraMounts": "Χωρίς επιπλέον βάσεις"
+    "NoExtraMounts": "Χωρίς επιπλέον βάσεις",
+    "SyncRoutes": "Διαδρομές συγχρονισμού",
+    "SyncRoutesFailed": "Το αίτημα συγχρονισμού διαδρομής απέτυχε.",
+    "SyncRoutesRequested": "Ζητήθηκε συγχρονισμός διαδρομής."
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
