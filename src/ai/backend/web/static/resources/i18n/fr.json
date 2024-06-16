@@ -1562,7 +1562,10 @@
     "ModelMountDestination": "Destination de montage pour le dossier modèle",
     "AdditionalMounts": "Supports supplémentaires",
     "ModelDefinitionPath": "Chemin du fichier de définition du modèle",
-    "NoExtraMounts": "Pas de montures supplémentaires"
+    "NoExtraMounts": "Pas de montures supplémentaires",
+    "SyncRoutes": "Synchroniser les itinéraires",
+    "SyncRoutesFailed": "La demande de synchronisation des routes a échoué.",
+    "SyncRoutesRequested": "La synchronisation de l'itinéraire a été demandée."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",

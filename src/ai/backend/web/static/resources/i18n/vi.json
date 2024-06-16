@@ -1550,7 +1550,10 @@
     "ModelMountDestination": "Mount đích cho thư mục mẫu",
     "AdditionalMounts": "Gắn kết bổ sung",
     "ModelDefinitionPath": "Đường dẫn tệp định nghĩa mô hình",
-    "NoExtraMounts": "Không có gắn kết bổ sung"
+    "NoExtraMounts": "Không có gắn kết bổ sung",
+    "SyncRoutes": "Đồng bộ hóa tuyến đường",
+    "SyncRoutesFailed": "Yêu cầu đồng bộ hóa tuyến đường không thành công.",
+    "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",

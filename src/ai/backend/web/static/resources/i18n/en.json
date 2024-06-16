@@ -488,7 +488,10 @@
     "ModelMountDestination": "Mount Destination For Model Folder",
     "AdditionalMounts": "Additional Mounts",
     "ModelDefinitionPath": "Model Definition File Path",
-    "NoExtraMounts": "No extra mounts"
+    "NoExtraMounts": "No extra mounts",
+    "SyncRoutes": "Sync routes",
+    "SyncRoutesFailed": "The route synchronization request failed.",
+    "SyncRoutesRequested": "The route synchronization requested."
   },
   "button": {
     "Cancel": "Cancel",
