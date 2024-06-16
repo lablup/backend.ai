@@ -2,8 +2,8 @@
 set -e
 
 arch=$(uname -m)
-# distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
-distros=("ubuntu16.04")
+
+distros=("alpine3.8" "centos7.6" "centos8.0" "ubuntu16.04" "ubuntu18.04" "ubuntu20.04")
 
 if [ $arch = "arm64" ]; then
   arch="aarch64"
@@ -36,6 +36,14 @@ RUN yum install -y make gcc
 EOF
 )
 
+centos8_builder_dockerfile=$(cat <<'EOF'
+FROM centos:centos8
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
+RUN dnf install -y make gcc
+EOF
+)
+
 alpine_builder_dockerfile=$(cat <<'EOF'
 FROM alpine:3.8
 RUN apk add --no-cache make gcc musl-dev
@@ -61,6 +69,7 @@ echo "$ubuntu1604_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu16.04.
 echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu18.04.dockerfile"
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu20.04.dockerfile"
 echo "$centos_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.centos7.6.dockerfile"
+echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.centos8.0.dockerfile"
 echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.alpine3.8.dockerfile"
 
 for distro in "${distros[@]}"; do

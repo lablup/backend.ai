@@ -1122,6 +1122,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
