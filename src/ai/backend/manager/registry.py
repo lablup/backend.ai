@@ -980,6 +980,8 @@ class AgentRegistry:
         internal_data.update(dotfile_data)
         if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
             internal_data["model_definition_path"] = _fname
+        if _variant := session_enqueue_configs["creation_config"].get("runtime_variant"):
+            internal_data["runtime_variant"] = _variant
 
         if sudo_session_enabled:
             internal_data["sudo_session_enabled"] = True
@@ -3860,6 +3862,7 @@ async def handle_route_creation(
                         for m in endpoint.extra_mounts
                     },
                     "model_definition_path": endpoint.model_definition_path,
+                    "runtime_variant": endpoint.runtime_variant.value,
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,
