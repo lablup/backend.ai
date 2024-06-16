@@ -99,6 +99,7 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
@@ -618,12 +619,18 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
+        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+            event_dispatcher_cls = ExperimentalEventDispatcher
+        else:
+            event_dispatcher_cls = EventDispatcher
+
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
-        self.event_dispatcher = await EventDispatcher.new(
+        self.event_dispatcher = await event_dispatcher_cls.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
