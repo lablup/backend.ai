@@ -604,6 +604,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                 io_write_bytes += int(nbytes)
                     case "2":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.max", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
@@ -644,6 +645,7 @@ class MemoryPlugin(AbstractComputePlugin):
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
                 mem_cur_bytes,
+                mem_max_bytes,
                 io_read_bytes,
                 io_write_bytes,
                 net_rx_bytes,
@@ -662,6 +664,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 if ret is None:
                     return None
                 mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
+                mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
                 io_read_bytes = 0
                 io_write_bytes = 0
                 for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
@@ -678,6 +681,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
                 return (
                     mem_cur_bytes,
+                    mem_total_bytes,
                     io_read_bytes,
                     io_write_bytes,
                     net_rx_bytes,
@@ -705,12 +709,14 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid, result in zip(container_ids, results):
             if result is None:
                 continue
-            per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
-            per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
-            per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
-            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
+            per_container_mem_used_bytes[cid] = Measurement(
+                Decimal(result[0]), capacity=Decimal(result[1])
+            )
+            per_container_io_read_bytes[cid] = Measurement(Decimal(result[2]))
+            per_container_io_write_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[5]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[6]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
