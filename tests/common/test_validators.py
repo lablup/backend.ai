@@ -1,6 +1,5 @@
 import enum
 import os
-import pickle
 import pwd
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address, ip_address
@@ -14,40 +13,6 @@ from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import VFolderID
-
-
-def test_trafaret_dataerror_pickling():
-    with pytest.raises(t.DataError):
-        iv = t.Int()
-        iv.check("x")
-
-    # Remove the already installed monkey-patch.
-    # (e.g., when running the whole test suite)
-    try:
-        if hasattr(t.DataError, "__reduce__"):
-            delattr(t.DataError, "__reduce__")
-    except AttributeError:
-        pass
-
-    with pytest.raises(RuntimeError):
-        try:
-            iv = t.Int()
-            iv.check("x")
-        except t.DataError as e:
-            bindata = pickle.dumps(e)
-            pickle.loads(bindata)
-
-    tx.fix_trafaret_pickle_support()
-
-    try:
-        iv = t.Int()
-        iv.check("x")
-    except t.DataError as e:
-        bindata = pickle.dumps(e)
-        unpacked = pickle.loads(bindata)
-        assert unpacked.error == e.error
-        assert unpacked.name == e.name
-        assert unpacked.value == e.value
 
 
 def test_aliased_key():

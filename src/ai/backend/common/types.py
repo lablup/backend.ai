@@ -90,6 +90,8 @@ __all__ = (
     "check_typed_dict",
     "EtcdRedisConfig",
     "RedisConnectionInfo",
+    "RuntimeVariant",
+    "MODEL_SERVICE_RUNTIME_PROFILES",
 )
 
 if TYPE_CHECKING:
@@ -632,6 +634,11 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
+    """
+    key: `str` type slot name.
+    value: `str` or `Decimal` type value. Do not convert this to `float` or `int`.
+    """
+
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -1055,7 +1062,7 @@ class ClusterInfo(TypedDict):
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_name: Optional[str]
-    ssh_keypair: Optional[ClusterSSHKeyPair]
+    ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
 
@@ -1246,3 +1253,29 @@ SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 class ModelServiceStatus(enum.Enum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
+
+
+class RuntimeVariant(enum.StrEnum):
+    VLLM = "vllm"
+    NIM = "nim"
+    CMD = "cmd"
+    CUSTOM = "custom"
+
+
+@dataclass
+class ModelServiceProfile:
+    name: str
+    health_check_endpoint: str | None = dataclasses.field(default=None)
+    port: int | None = dataclasses.field(default=None)
+
+
+MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
+    RuntimeVariant.CUSTOM: ModelServiceProfile(name="Custom (Default)"),
+    RuntimeVariant.VLLM: ModelServiceProfile(
+        name="vLLM", health_check_endpoint="/health", port=8000
+    ),
+    RuntimeVariant.NIM: ModelServiceProfile(
+        name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
+    ),
+    RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
+}

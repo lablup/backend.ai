@@ -11,7 +11,6 @@ allowSignout = false                    # Let users signout from service. Signup
 allowAnonymousChangePassword = false    # Enable/disable anonymous user can send change password email. Manager plugin is required.
 allowProjectResourceMonitor = true      # Allow users to look up its group monitor statistics
 allowManualImageNameForSession = false  # If true, user will be able to use the specific environment image by typing the exact name.
-alwaysEnqueueComputeSession = false     # If true, new compute session will always enqueued even if there is no resource.
 allowSignupWithoutConfirmation = false  # If true, token received from confirmation message is ignored.
 autoLogout = false                      # If true, user will be automatically logout when they close all Backend.AI tab / window.
 #loginAttemptLimit = 5                  # The number of allowed login attempt for preventing from brute-force attacks
@@ -31,7 +30,7 @@ isDirectorySizeVisible = true           # If false, directory size in folder exp
 maxCountForPreopenPorts = 10            # The maximum allowed number of preopen ports. If you set this option to 0, the feature of preopen ports is disabled.
 allowCustomResourceAllocation = true    # If true, display the custom allocation on the session launcher.
 eduAppNamePrefix = ""                   # The prefix of edu applauncher's app name. If the app name starts with this prefix, split it by '-' and use the tail as the name of image.
-supportModelStore = false		            # Enable model store feature. (From Backend.AI 24.03)
+supportModelStore = false		        # Enable model store feature. (From Backend.AI 24.03)
 
 [wsproxy]
 proxyURL = "[Proxy URL]"
@@ -55,8 +54,10 @@ maxTPUDevicesPerContainer = 8       # Maximum TPU devices per container.
 maxIPUDevicesPerContainer = 8       # Maximum IPU devices per container.
 maxATOMDevicesPerContainer = 8      # Maximum ATOM devices per container.
 maxWarboyDevicesPerContainer = 8    # Maximum Warboy devices per container.
+maxHyperaccelLPUDevicesPerContainer = 8       # Maximum Hyperaccel LPU devices per container.
 maxShmPerContainer = 16             # Maximum shared memory per container.
 maxFileUploadSize = 4294967296      # Maximum size of single file upload. Set to -1 for unlimited upload.
+allowNonAuthTCP = false             # Expose TCP apps to be executable in web browser when set to true 
 
 [environments]
 #allowlist = "" # Comma-separated image name. Image name should contain the repository (registry path and image name) part of the full image URL, excluding the protocol and tag

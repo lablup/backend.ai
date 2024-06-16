@@ -197,6 +197,7 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    vfolder_row = relationship("VFolderRow", back_populates="group_row")
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -276,8 +277,8 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added since 24.03.0.")
-    container_registry = graphene.JSONString(description="Added since 24.03.0.")
+    type = graphene.String(description="Added in 24.03.0.")
+    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -378,8 +379,13 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        *,
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Sequence[Group | None]]:
+        if type is None:
+            _type = [ProjectType.GENERAL]
+        else:
+            _type = type
         j = sa.join(
             groups,
             association_groups_users,
@@ -388,7 +394,7 @@ class Group(graphene.ObjectType):
         query = (
             sa.select([groups, association_groups_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
+            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -427,7 +433,7 @@ class GroupInput(graphene.InputObjectType):
         required=False,
         default_value="GENERAL",
         description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
         ),
     )
     description = graphene.String(required=False, default_value="")
@@ -438,7 +444,7 @@ class GroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 
@@ -454,7 +460,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
     container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added since 24.03.0"
+        required=False, default_value={}, description="Added in 24.03.0"
     )
 
 
@@ -870,6 +876,7 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
+            _,
             conditions,
             cursor,
             pagination_order,
@@ -930,7 +937,8 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -946,9 +954,6 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(row) for row in group_rows]

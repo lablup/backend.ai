@@ -99,12 +99,14 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AcceleratorMetadata,
     AgentId,
@@ -123,6 +125,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
+    RuntimeVariant,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -618,12 +621,18 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
+        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+            event_dispatcher_cls = ExperimentalEventDispatcher
+        else:
+            event_dispatcher_cls = EventDispatcher
+
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
-        self.event_dispatcher = await EventDispatcher.new(
+        self.event_dispatcher = await event_dispatcher_cls.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
@@ -1830,64 +1839,16 @@ class AbstractAgent(
                     for folder in vfolder_mounts
                     if folder.usage_mode == VFolderUsageMode.MODEL
                 ]
-                if (
-                    len(model_folders) > 0
-                    and kernel_config["session_type"] == SessionTypes.INFERENCE
-                ):
-                    model_folder = model_folders[0]
-                    model_definition_path = Path(model_folder.host_path / "model-definition.yml")
-                    if not model_definition_path.is_file():
-                        model_definition_path = Path(
-                            model_folder.host_path / "model-definition.yaml"
-                        )
-                    if not model_definition_path.is_file():
-                        raise AgentError(
-                            "Model definition file (model-definition.yml or"
-                            " model-definition.yaml) does not exist under vFolder"
-                            f" {model_folder.name} (ID {model_folder.vfid})",
-                        )
-                    try:
-                        model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                            None, model_definition_path.read_text
-                        )
-                    except FileNotFoundError as e:
-                        raise AgentError(
-                            "Model definition file (model-definition.yml) does not exist under"
-                            f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                        ) from e
-                    try:
-                        model_definition = model_definition_iv.check(
-                            yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                        )
-                        assert model_definition is not None
-                        for model in model_definition["models"]:
-                            environ["BACKEND_MODEL_NAME"] = model["name"]
-                            environ["BACKEND_MODEL_PATH"] = model["model_path"]
-                            if service := model.get("service"):
-                                overlapping_services = [
-                                    s
-                                    for s in service_ports
-                                    if s["container_ports"][0] == service["port"]
-                                ]
-                                if len(overlapping_services) > 0:
-                                    raise AgentError(
-                                        f"Port {service['port']} overlaps with built-in service"
-                                        f" {overlapping_services[0]['name']}"
-                                    )
-                                service_ports.append({
-                                    "name": f"{model['name']}-{service['port']}",
-                                    "protocol": ServicePortProtocols.PREOPEN,
-                                    "container_ports": (service["port"],),
-                                    "host_ports": (None,),
-                                    "is_inference": True,
-                                })
-                    except DataError as e:
-                        raise AgentError(
-                            "Failed to validate model definition from vFolder"
-                            f" {model_folder.name} (ID {model_folder.vfid})",
-                        ) from e
-                    except yaml.error.YAMLError as e:
-                        raise AgentError(f"Invalid YAML syntax: {e}") from e
+                if kernel_config["session_type"] == SessionTypes.INFERENCE:
+                    model_definition = await self.load_model_definition(
+                        RuntimeVariant(
+                            (kernel_config["internal_data"] or {}).get("runtime_variant", "CUSTOM")
+                        ),
+                        model_folders,
+                        environ,
+                        service_ports,
+                        kernel_config,
+                    )
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -2084,7 +2045,7 @@ class AbstractAgent(
                     "attached_devices": attached_devices,
                 }
 
-                if model_definition:
+                if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                     for model in model_definition["models"]:
                         asyncio.create_task(
                             self.start_and_monitor_model_service_health(kernel_obj, model)
@@ -2141,8 +2102,136 @@ class AbstractAgent(
                 )
             )
 
+    async def load_model_definition(
+        self,
+        runtime_variant: RuntimeVariant,
+        model_folders: list[VFolderMount],
+        environ: MutableMapping[str, Any],
+        service_ports: list[ServicePort],
+        kernel_config: KernelCreationConfig,
+    ) -> Any:
+        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
+        if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
+            raise AgentError(
+                "image should have its own command when runtime variant is set to values other than CUSTOM!"
+            )
+        assert len(model_folders) > 0
+        model_folder: VFolderMount = model_folders[0]
+
+        match runtime_variant:
+            case RuntimeVariant.VLLM:
+                _model = {
+                    "name": "vllm-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.VLLM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.NIM:
+                _model = {
+                    "name": "nim-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.NIM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CMD:
+                _model = {
+                    "name": "image-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": 8000,
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CUSTOM:
+                if _fname := (kernel_config.get("internal_data") or {}).get(
+                    "model_definition_path"
+                ):
+                    model_definition_candidates = [_fname]
+                else:
+                    model_definition_candidates = [
+                        "model-definition.yaml",
+                        "model-definition.yml",
+                    ]
+
+                model_definition_path = None
+                for filename in model_definition_candidates:
+                    if (Path(model_folder.host_path) / filename).is_file():
+                        model_definition_path = Path(model_folder.host_path) / filename
+                        break
+
+                if not model_definition_path:
+                    raise AgentError(
+                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f" {model_folder.name} (ID {model_folder.vfid})",
+                    )
+                try:
+                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                        None, model_definition_path.read_text
+                    )
+                except FileNotFoundError as e:
+                    raise AgentError(
+                        "Model definition file (model-definition.yml) does not exist under"
+                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+                    ) from e
+                try:
+                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+                except yaml.error.YAMLError as e:
+                    raise AgentError(f"Invalid YAML syntax: {e}") from e
+        try:
+            model_definition = model_definition_iv.check(raw_definition)
+            assert model_definition is not None
+            for model in model_definition["models"]:
+                environ["BACKEND_MODEL_NAME"] = model["name"]
+                environ["BACKEND_MODEL_PATH"] = model["model_path"]
+                if service := model.get("service"):
+                    overlapping_services = [
+                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                    ]
+                    if len(overlapping_services) > 0:
+                        raise AgentError(
+                            f"Port {service['port']} overlaps with built-in service"
+                            f" {overlapping_services[0]['name']}"
+                        )
+                    service_ports.append({
+                        "name": f"{model['name']}-{service['port']}",
+                        "protocol": ServicePortProtocols.PREOPEN,
+                        "container_ports": (service["port"],),
+                        "host_ports": (None,),
+                        "is_inference": True,
+                    })
+            return model_definition
+        except DataError as e:
+            raise AgentError(
+                "Failed to validate model definition from vFolder"
+                f" {model_folder.name} (ID {model_folder.vfid})",
+            ) from e
+
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
+
+    @abstractmethod
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        raise NotImplementedError
 
     @abstractmethod
     async def destroy_kernel(

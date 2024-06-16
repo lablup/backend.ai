@@ -1,59 +1,65 @@
 require:db-migration:
-- any: ['src/ai/backend/manager/models/alembic/versions/*.py']
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/manager/models/alembic/versions/*.py'
 
 area:docs:
-- any: [
-    'docs/**/*',
-    'src/ai/backend/manager/api/**/*.py',
-    'src/ai/backend/manager/models/gql.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'docs/**/*'
+    - 'src/ai/backend/manager/api/**/*.py'
+    - 'src/ai/backend/manager/models/gql.py'
 
 comp:storage-proxy:
-- any: ['src/ai/backend/storage/**/*.py']
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/storage/**/*.py'
 
 comp:agent:
-- any: [
-    'src/ai/backend/agent/**/*.py',
-    'src/ai/backend/kernel/**/*.py',
-    'src/ai/backend/runner/**/*.py',
-    'src/ai/backend/helpers/**/*.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/agent/**/*.py'
+    - 'src/ai/backend/kernel/**/*.py'
+    - 'src/ai/backend/runner/**/*.py'
+    - 'src/ai/backend/helpers/**/*.py'
 
 comp:manager:
-- any: ['src/ai/backend/manager/**/*.py']
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/manager/**/*.py'
 
 comp:common:
-- any: [
-    'src/ai/backend/common/**/*.py',
-    'src/ai/backend/plugin/**/*.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/common/**/*.py'
+    - 'src/ai/backend/plugin/**/*.py'
 
 comp:client:
-- any: [
-    'src/ai/backend/client/**/*.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/client/**/*.py'
 
 comp:cli:
-- any: [
-    'src/ai/backend/cli/**/*.py',
-    'src/ai/backend/client/cli/**/*.py',
-    'src/ai/backend/manager/cli/**/*.py',
-    'src/ai/backend/agent/cli/**/*.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/cli/**/*.py'
+    - 'src/ai/backend/client/cli/**/*.py'
+    - 'src/ai/backend/manager/cli/**/*.py'
+    - 'src/ai/backend/agent/cli/**/*.py'
 
 comp:webserver:
-- any: [
-    'src/ai/backend/web/**/*.py',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/web/**/*.py'
 
 comp:webui:
-- any: [
-    'src/ai/backend/web/static',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/web/static'
 
 comp:installer:
-- any: [
-    'scripts/install-dev.sh',
-    'scripts/delete-dev.sh',
-    'tools/pants-plugins/**/*',
-  ]
+- changed-files:
+  - any-glob-to-any-file:
+    - 'scripts/install-dev.sh'
+    - 'scripts/delete-dev.sh'
+    - 'tools/pants-plugins/**/*'

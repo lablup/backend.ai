@@ -4,13 +4,17 @@ import abc
 import asyncio
 import fcntl
 import logging
+from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
+import trafaret as t
 from etcd_client import Client as EtcdClient
 from etcd_client import Communicator as EtcdCommunicator
 from etcd_client import EtcdLockOption
+from etcetra.client import EtcdCommunicator as EtcetraCommunicator
+from etcetra.client import EtcdConnectionManager as EtcetraConnectionManager
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.exceptions import LockError, LockNotOwnedError
@@ -25,6 +29,7 @@ from tenacity import (
 )
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
@@ -33,6 +38,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
+    default_config: ClassVar[Mapping[str, Any]] = {}
+    config_iv: ClassVar[t.Trafaret] = t.Dict().allow_extra("*")
+
     def __init__(self, *, lifetime: Optional[float] = None) -> None:
         assert lifetime is None or lifetime >= 0.0
         self._lifetime = lifetime
@@ -173,7 +181,7 @@ class EtcdLock(AbstractDistributedLock):
     async def __aenter__(self) -> EtcdCommunicator:
         self._etcd_client = self.etcd.etcd.with_lock(
             EtcdLockOption(
-                lock_name=self.lock_name,
+                lock_name=self.lock_name.encode("utf-8"),
                 timeout=self._timeout,
                 ttl=int(self._lifetime) if self._lifetime is not None else None,
             ),
@@ -204,7 +212,14 @@ class RedisLock(AbstractDistributedLock):
     _lock: Optional[AsyncRedisLock]
 
     default_timeout = 9600
-    default_lock_acquire_pause = 1.0
+    default_lock_retry_interval = 1.0
+
+    default_config: ClassVar[Mapping[str, Any]] = {
+        "lock_retry_interval": default_lock_retry_interval
+    }
+    config_iv: ClassVar[t.Trafaret] = t.Dict({
+        t.Key("lock_retry_interval", default=None): t.Null | t.ToFloat[0:],
+    }).allow_extra("*")
 
     def __init__(
         self,
@@ -214,14 +229,18 @@ class RedisLock(AbstractDistributedLock):
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
         debug: bool = False,
-        lock_acquire_pause: Optional[float] = None,
+        lock_retry_interval: Optional[float] = None,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
         self._redis = redis.client
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
-        self._lock_acquire_pause = lock_acquire_pause or self.default_lock_acquire_pause
+        self._lock_retry_interval = (
+            lock_retry_interval
+            if lock_retry_interval is not None
+            else self.default_lock_retry_interval
+        )
 
     async def __aenter__(self) -> None:
         self._lock = AsyncRedisLock(
@@ -230,7 +249,7 @@ class RedisLock(AbstractDistributedLock):
             blocking_timeout=self._timeout,
             timeout=self._lifetime,
             thread_local=False,
-            sleep=self._lock_acquire_pause,
+            sleep=self._lock_retry_interval,
         )
         try:
             await self._lock.__aenter__()
@@ -253,3 +272,51 @@ class RedisLock(AbstractDistributedLock):
             log.debug("RedisLock.__aexit__(): lock released")
 
         return val
+
+
+class EtcetraLock(AbstractDistributedLock):
+    _con_mgr: Optional[EtcetraConnectionManager]
+    _debug: bool
+
+    lock_name: str
+    etcd: EtcetraAsyncEtcd
+    timeout: float
+
+    default_timeout: float = 9600  # not allow infinite timeout for safety
+
+    def __init__(
+        self,
+        lock_name: str,
+        etcd: EtcetraAsyncEtcd,
+        *,
+        timeout: Optional[float] = None,
+        lifetime: Optional[float] = None,
+        debug: bool = False,
+    ) -> None:
+        super().__init__(lifetime=lifetime)
+        self.lock_name = lock_name
+        self.etcd = etcd
+        self._timeout = timeout if timeout is not None else self.default_timeout
+        self._debug = debug
+
+    async def __aenter__(self) -> EtcetraCommunicator:
+        self._con_mgr = self.etcd.etcd.with_lock(
+            self.lock_name,
+            timeout=self._timeout,
+            ttl=int(self._lifetime) if self._lifetime is not None else None,
+        )
+        assert (
+            self._con_mgr is not None
+        )  # FIXME: not required if with_lock() has an explicit return type.
+        communicator = await self._con_mgr.__aenter__()
+        if self._debug:
+            log.debug("etcd lock acquired")
+        return communicator
+
+    async def __aexit__(self, *exc_info) -> Optional[bool]:
+        assert self._con_mgr is not None
+        await self._con_mgr.__aexit__(*exc_info)
+        if self._debug:
+            log.debug("etcd lock released")
+        self._con_mgr = None
+        return None

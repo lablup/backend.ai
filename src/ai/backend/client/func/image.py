@@ -53,6 +53,50 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
+    async def get(
+        cls,
+        reference: str,
+        architecture: str,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ) -> Sequence[dict]:
+        """
+        Fetches the information about registered image in this cluster.
+        """
+        q = (
+            "query($reference: String!, $architecture: String!) {"
+            "  image(reference: $reference, architecture: $architecture) {"
+            "    $fields"
+            "  }"
+            "}"
+        )
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {
+            "reference": reference,
+            "architecture": architecture,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["image"]
+
+    @api_function
+    @classmethod
+    async def get_by_id(
+        cls,
+        id: str,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ) -> Sequence[dict]:
+        """
+        Fetches the information about registered image in this cluster.
+        """
+        q = "query($id: String!) {" "  image(id: $id) {" "    $fields" "  }" "}"
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {
+            "id": id,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["image"]
+
+    @api_function
+    @classmethod
     async def list_customized(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
@@ -96,6 +140,22 @@ class Image(BaseFunction):
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["forget_image_by_id"]
+
+    @api_function
+    @classmethod
+    async def untag_image_from_registry(cls, id: str):
+        q = (
+            "mutation($id: String!) {"
+            "  untag_image_from_registry(id: $id) {"
+            "   ok msg"
+            "  }"
+            "}"
+        )
+        variables = {
+            "id": id,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["untag_image_from_registry"]
 
     @api_function
     @classmethod

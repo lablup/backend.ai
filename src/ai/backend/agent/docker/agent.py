@@ -873,6 +873,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
+
+                if self.internal_data.get("sudo_session_enabled", False):
+                    exec = await container.exec(
+                        [
+                            # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                            "sh",
+                            "-c",
+                            'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                        ],
+                        user="root",
+                    )
+                    shell_response = await exec.start(detach=True)
+                    if shell_response:
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"sudoers provision failed: {shell_response.decode()}",
+                        )
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
@@ -1104,6 +1121,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return await scan_available_resources(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
+
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,

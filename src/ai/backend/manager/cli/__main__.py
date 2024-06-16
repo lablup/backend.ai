@@ -5,8 +5,10 @@ import logging
 import pathlib
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from functools import partial
+from typing import cast
 
 import click
 from more_itertools import chunked
@@ -19,6 +21,8 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
+from ai.backend.manager.models import error_logs
+from ai.backend.manager.models.utils import vacuum_db
 
 from .context import CLIContext, redis_ctx
 
@@ -221,14 +225,14 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     """
-    Delete old records from the kernels table and
+    Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
     import sqlalchemy as sa
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
-    from ai.backend.manager.models import kernels
+    from ai.backend.manager.models import SessionRow, kernels
     from ai.backend.manager.models.utils import connect_database
 
     today = datetime.now()
@@ -300,30 +304,50 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
-                result = await conn.execute(
-                    sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
-                )
-                deleted_count = result.rowcount
+                result = (
+                    await conn.scalars(
+                        sa.select(SessionRow.id).where(SessionRow.terminated_at < expiration_date)
+                    )
+                ).all()
+                session_ids = cast(list[uuid.UUID], result)
+                if session_ids:
+                    await conn.execute(
+                        sa.delete(kernels).where(kernels.c.session_id.in_(session_ids))
+                    )
+                    await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
 
-                vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-                log.info(f"Perfoming {vacuum_sql} operation...")
-                await conn.exec_driver_sql(vacuum_sql)
-
-                curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                curs = await conn.execute(sa.select([sa.func.count()]).select_from(SessionRow))
                 if ret := curs.fetchone():
                     table_size = ret[0]
                     log.info(
-                        "The number of rows of the `kernels` tables after cleanup: {}",
+                        "The number of rows of the `sessions` tables after cleanup: {}",
                         table_size,
                     )
         log.info(
             "Cleaned up {:,} database records older than {}.",
+            len(session_ids),
+            expiration_date,
+        )
+
+    async def _clear_old_error_logs():
+        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+            async with db.begin() as conn:
+                log.info("Deleting old error logs...")
+                result = await conn.execute(
+                    sa.delete(error_logs).where(error_logs.c.created_at < expiration_date),
+                )
+                deleted_count = result.rowcount
+
+        log.info(
+            "Cleaned up {:,} error log records older than {}.",
             deleted_count,
             expiration_date,
         )
 
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
+    asyncio.run(_clear_old_error_logs())
+    asyncio.run(vacuum_db(cli_ctx.local_config, vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")

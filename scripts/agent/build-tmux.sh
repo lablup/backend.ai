@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("glibc" "musl")
+distros=("glibc" "musl" "centos8.0")
 
 glibc_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:22.04
@@ -19,6 +19,21 @@ RUN apk add --no-cache make gcc g++ musl-dev file bison flex
 RUN apk add --no-cache pkgconfig
 EOF
 )
+
+centos8_builder_dockerfile=$(cat <<'EOF'
+FROM centos:centos8
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
+RUN dnf install -y make gcc gcc-c++ bison flex
+RUN dnf install -y pkg-config
+
+RUN dnf install -y make gcc automake autoconf dnf-plugins-core
+RUN dnf config-manager --set-enabled powertools
+RUN dnf install -y zlib-static glibc-static
+
+EOF
+)
+
 
 build_script=$(cat <<'EOF'
 #! /bin/sh
@@ -61,6 +76,7 @@ echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
 echo "$glibc_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.glibc.dockerfile"
 echo "$musl_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.musl.dockerfile"
+echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.centos8.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t tmux-builder:$distro \
