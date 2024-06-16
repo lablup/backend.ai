@@ -905,6 +905,9 @@ type Endpoint implements Item {
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
+
+  """Added in 24.03.5."""
+  runtime_variant: RuntimeVariantInfo
   created_at: DateTime!
   destroyed_at: DateTime
   routings: [Routing]
@@ -912,6 +915,12 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+}
+
+"""Added in 24.03.5."""
+type RuntimeVariantInfo {
+  name: String
+  human_readable_name: String
 }
 
 type Routing implements Item {
@@ -1794,7 +1803,9 @@ input ModifyEndpointInput {
   name: String
   resource_group: String
 
-  """Added in 24.03.4."""
+  """
+  Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`.
+  """
   model_definition_path: String
   open_to_public: Boolean
 
@@ -1805,6 +1816,9 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   environ: JSONString
+
+  """Added in 24.03.5."""
+  runtime_variant: String
 }
 
 input ImageRefType {
