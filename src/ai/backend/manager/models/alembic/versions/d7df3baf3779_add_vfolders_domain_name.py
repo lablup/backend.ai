@@ -1,7 +1,7 @@
 """add vfolders domain name
 
 Revision ID: d7df3baf3779
-Revises: f56a82d0ac9f
+Revises: 5d92c9cc930c
 Create Date: 2024-06-11 16:39:26.648608
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "d7df3baf3779"
-down_revision = "f56a82d0ac9f"
+down_revision = "5d92c9cc930c"
 branch_labels = None
 depends_on = None
 
