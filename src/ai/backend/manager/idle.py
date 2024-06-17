@@ -55,6 +55,7 @@ from ai.backend.common.types import (
     AccessKey,
     BinarySize,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
@@ -847,7 +848,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         interval = IdleCheckerHost.check_interval
         # time_window: Utilization is calculated within this window.
         time_window: timedelta = self.get_time_window(policy)
-        occupied_slots = kernel["occupied_slots"]
+        occupied_slots = cast(ResourceSlot, kernel["occupied_slots"])
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
