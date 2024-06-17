@@ -771,7 +771,10 @@
     "ModelMountDestination": "Destino de montaje para carpeta de modelo",
     "AdditionalMounts": "Montajes adicionales",
     "ModelDefinitionPath": "Ruta del archivo de definición del modelo",
-    "NoExtraMounts": "Sin soportes adicionales"
+    "NoExtraMounts": "Sin soportes adicionales",
+    "SyncRoutes": "Rutas de sincronización",
+    "SyncRoutesFailed": "La solicitud de sincronización de ruta ha fallado.",
+    "SyncRoutesRequested": "Se ha solicitado sincronización de ruta."
   },
   "notification": {
     "Initializing": "Inicializando...",

@@ -401,6 +401,8 @@ jobs:
     needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
