@@ -159,17 +159,21 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
     # Create directory in the vfolder
     with closing(run_user(["vfolder", "mkdir", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "Directory creation failed."
+        assert "Successfully created" in p.before.decode(), "Directory creation failed."
 
     # Create already existing directory with exist-ok option
     with closing(run_user(["vfolder", "mkdir", "-e", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "Exist-ok option does not work properly."
+        assert (
+            "Successfully created" in p.before.decode()
+        ), "Exist-ok option does not work properly."
 
     # Test whether the parent directory is created automatically
     with closing(run_user(["vfolder", "mkdir", "-p", vfolder_name, dir_paths[1]])) as p:
         p.expect(EOF)
-        assert "Done." in p.before.decode(), "The parent directory is not created automatically."
+        assert (
+            "Successfully created" in p.before.decode()
+        ), "The parent directory is not created automatically."
 
 
 @pytest.mark.dependency(

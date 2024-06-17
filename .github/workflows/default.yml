@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -401,6 +401,8 @@ jobs:
     needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
@@ -448,7 +450,7 @@ jobs:
         name: SBOM report
         path: dist
     - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}

@@ -6,8 +6,8 @@ Backend.AI
 ![Wheels](https://img.shields.io/pypi/wheel/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined, container-based computing cluster platform 
-that hosts popular computing/ML frameworks and diverse programming languages, 
+Backend.AI is a streamlined, container-based computing cluster platform
+that hosts popular computing/ML frameworks and diverse programming languages,
 with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
 
 It allocates and isolates the underlying computing resources for multi-tenant
@@ -175,7 +175,6 @@ and basic administration tasks.
 
 **Synchronizing the static Backend.AI WebUI version:**
 ```console
-$ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
 $ scripts/download-webui-release.sh <target version to download>
 ```
 
