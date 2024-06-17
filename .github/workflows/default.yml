@@ -449,7 +449,7 @@ jobs:
         name: SBOM report
         path: dist
     - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
