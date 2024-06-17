@@ -1274,6 +1274,16 @@ class AbstractAgent(
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
+        def _get_session_id(container: Container) -> SessionId | None:
+            _session_id = container.labels.get("ai.backend.session-id")
+            try:
+                return SessionId(UUID(_session_id))
+            except ValueError:
+                log.warning(
+                    f"sync_container_lifecycles() invalid session-id (cid: {container.id}, sid:{_session_id})"
+                )
+                return None
+
         try:
             _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
             async with self.registry_lock:
@@ -1292,7 +1302,9 @@ class AbstractAgent(
                             kernel_id,
                             container.id,
                         )
-                        session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
+                        session_id = _get_session_id(container)
+                        if session_id is None:
+                            continue
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             session_id,
@@ -1307,7 +1319,9 @@ class AbstractAgent(
                     ]
                     for kernel_id, container in active_containers:
                         alive_kernels[kernel_id] = container.id
-                        session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
+                        session_id = _get_session_id(container)
+                        if session_id is None:
+                            continue
                         kernel_session_map[kernel_id] = session_id
                         own_kernels[kernel_id] = container.id
                     for kernel_id, kernel_obj in self.kernel_registry.items():
