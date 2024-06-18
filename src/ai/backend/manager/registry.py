@@ -7,12 +7,13 @@ import itertools
 import logging
 import re
 import secrets
+import textwrap
 import time
 import typing
 import uuid
 import zlib
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -43,7 +44,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -3276,27 +3276,25 @@ class AgentRegistry:
             lambda r: r.sadd("session_status_update", msgpack.packb(session_id)),
         )
 
-    async def reset_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for sid in session_ids:
-                await pipe.srem("session_status_update", msgpack.packb(sid))
-            return pipe
-
-        await redis_helper.execute(self.redis_stat, _pipe_builder)
-
     async def get_status_updatable_sessions(self) -> list[SessionId]:
-        raw_result = cast(
-            set[bytes],
-            await redis_helper.execute(
-                self.redis_stat,
-                lambda r: r.smembers("session_status_update"),
-            ),
+        pop_all_session_id_script = textwrap.dedent("""
+        local key = KEYS[1]
+        local count = redis.call('SCARD', key)
+        local values = redis.call('SPOP', key, count)
+        return values
+        """)
+        raw_result = await redis_helper.execute_script(
+            self.redis_stat,
+            "pop_all_session_id_to_update_status",
+            pop_all_session_id_script,
+            ["session_status_update"],
+            [],
         )
+        raw_result = cast(list[bytes], raw_result)
+
         result: list[SessionId] = []
         for raw_session_id in raw_result:
             result.append(SessionId(msgpack.unpackb(raw_session_id)))
-        await self.reset_status_updatable_session(result)
         return result
 
     async def _get_user_email(
