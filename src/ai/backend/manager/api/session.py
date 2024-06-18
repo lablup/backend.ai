@@ -45,7 +45,7 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
@@ -977,46 +977,52 @@ class TransitSessionStatusRequestModel(BaseModel):
 
 
 class SessionStatusResponseModel(BaseResponseModel):
-    session_status: str | None
+    session_status: str
 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(TransitSessionStatusRequestModel)
-async def transit_status(
+async def check_and_transit_status(
     request: web.Request, params: TransitSessionStatusRequestModel
 ) -> SessionStatusResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
     session_id = SessionId(params.id)
+    user_role = cast(UserRole, request["user"]["role"])
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_id)
-    if requester_access_key != owner_access_key and request["user"]["role"] not in (
+    if requester_access_key != owner_access_key and user_role not in (
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
     ):
         raise InsufficientPrivilege("You are not allowed to transit others's sessions status")
 
     async with root_ctx.db.connect() as db_conn:
-        async with root_ctx.db.begin_readonly_session(db_conn) as db_session:
+
+        async def _check_and_transit(db_session: SASession) -> SessionStatus:
             session_row = await db_session.scalar(
-                sa.select(SessionRow).where(SessionRow.id == session_id)
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(load_only(SessionRow.access_key))
             )
             session_row = cast(SessionRow | None, session_row)
             if session_row is None:
-                raise SessionNotFound(f"Session (id={session_id}) does not exist.")
-            if requester_access_key != session_row.access_key:
+                raise SessionNotFound(f"Session does not exist (id={session_id})")
+            if requester_access_key != session_row.access_key and user_role not in (
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+            ):
                 raise InvalidAPIParameters(
                     f"Access key does not own the session (ak:{requester_access_key}, s:{session_id})"
                 )
 
-        async def _transit(db_session: SASession) -> SessionStatus | None:
             return await root_ctx.registry.transit_session_status(db_session, session_id)
 
-        new_status = await execute_with_txn_retry(_transit, root_ctx.db.begin_session, db_conn)
+        determined_status = await execute_with_txn_retry(
+            _check_and_transit, root_ctx.db.begin_session, db_conn
+        )
 
-    return SessionStatusResponseModel(
-        session_status=new_status.name if new_status is not None else new_status
-    )
+    return SessionStatusResponseModel(session_status=determined_status.name)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -2326,7 +2332,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
-    cors.add(app.router.add_route("POST", "/transit-status", transit_status))
+    cors.add(app.router.add_route("POST", "/_/transit-status", check_and_transit_status))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
