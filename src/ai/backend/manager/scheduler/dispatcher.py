@@ -41,6 +41,7 @@ from ai.backend.common.events import (
     DoPrepareEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
@@ -162,6 +163,7 @@ class SchedulerDispatcher(aobject):
     schedule_timer: GlobalTimer
     prepare_timer: GlobalTimer
     scale_timer: GlobalTimer
+    update_session_status_timer: GlobalTimer
 
     redis_live: RedisConnectionInfo
 
@@ -204,6 +206,7 @@ class SchedulerDispatcher(aobject):
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
         evd.consume(DoScaleEvent, None, self.scale_services)
+        evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -227,9 +230,18 @@ class SchedulerDispatcher(aobject):
             initial_delay=7.0,
             task_name="scale_timer",
         )
+        self.update_session_status_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_SESSION_STATUS_UPDATE_TIMER, 10.0),
+            self.event_producer,
+            lambda: DoUpdateSessionStatusEvent(),
+            interval=7.0,
+            initial_delay=3.0,
+            task_name="update_session_status_timer",
+        )
         await self.schedule_timer.join()
         await self.prepare_timer.join()
         await self.scale_timer.join()
+        await self.update_session_status_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
@@ -237,6 +249,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.scale_timer.leave())
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
+            tg.create_task(self.update_session_status_timer.leave())
         await self.redis_live.close()
         log.info("Session scheduler stopped")
 
@@ -1571,6 +1584,22 @@ class SchedulerDispatcher(aobject):
                     )
                 except Exception as e:
                     log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+
+    async def update_session_status(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoUpdateSessionStatusEvent,
+    ) -> None:
+        log.debug("update_session_status(): triggered")
+        candidates = await self.registry.get_status_updatable_sessions()
+
+        async with self.db.connect() as db_conn:
+            transit_tasks = [
+                self.registry.transit_session_status(db_conn, session_id)
+                for session_id in candidates
+            ]
+            await asyncio.gather(*transit_tasks, return_exceptions=True)
 
     async def start_session(
         self,

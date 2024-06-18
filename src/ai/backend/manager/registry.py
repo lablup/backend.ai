@@ -12,6 +12,7 @@ import typing
 import uuid
 import zlib
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -20,7 +21,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Mapping,
     MutableMapping,
     Optional,
     Sequence,
@@ -43,6 +43,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -2398,7 +2399,10 @@ class AgentRegistry:
                             )
 
                     if kernel.agent_addr is None:
-                        await self.mark_kernel_terminated(kernel.id, "missing-agent-allocation")
+                        async with self.db.connect() as db_conn:
+                            await self.mark_kernel_terminated(
+                                db_conn, kernel.id, target_session.id, "missing-agent-allocation"
+                            )
                         if kernel.cluster_role == DEFAULT_ROLE:
                             main_stat = {"status": "terminated"}
                     else:
@@ -3056,9 +3060,105 @@ class AgentRegistry:
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
                 ])
 
+    async def mark_kernel_preparing(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        now = datetime.now(tzutc())
+
+        async def _set_status(db_session: AsyncSession) -> None:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            kernel_row.set_status(
+                KernelStatus.PREPARING, reason, status_data={}, status_changed_at=now
+            )
+
+        await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)
+        await self.set_status_updatable_session(session_id)
+
+    async def mark_kernel_pulling(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        now = datetime.now(tzutc())
+
+        async def _transit_status(db_session: AsyncSession) -> bool:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            is_pulling = kernel_row.transit_status(
+                KernelStatus.PULLING, reason, status_changed_at=now
+            )
+            if is_pulling:
+                await db_session.commit()
+            return is_pulling
+
+        update_successful = await execute_with_txn_retry(
+            _transit_status, self.db.begin_session, db_conn
+        )
+        if update_successful:
+            await self.set_status_updatable_session(session_id)
+
+    async def mark_kernel_running(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+        created_info: Mapping[str, Any],
+    ) -> None:
+        now = datetime.now(tzutc())
+        agent_host = URL(created_info["agent_addr"]).host
+        actual_allocs = self.convert_resource_spec_to_resource_slot(
+            created_info["resource_spec"]["allocations"]
+        )
+
+        async def _get_and_transit(db_session: AsyncSession) -> bool:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            is_running = kernel_row.transit_status(
+                KernelStatus.RUNNING,
+                reason,
+                status_changed_at=now,
+            )
+            if is_running:
+                kernel_row.occupied_slots = actual_allocs
+                kernel_row.container_id = created_info["container_id"]
+                kernel_row.attached_devices = created_info.get("attached_devices", {})
+                kernel_row.kernel_host = created_info.get("kernel_host", agent_host)
+                kernel_row.repl_in_port = created_info["repl_in_port"]
+                kernel_row.repl_out_port = created_info["repl_out_port"]
+                kernel_row.service_ports = created_info.get("service_ports", [])
+                await db_session.commit()
+            return is_running
+
+        update_successful = await execute_with_txn_retry(
+            _get_and_transit, self.db.begin_session, db_conn
+        )
+
+        async def _update_session(db_session: AsyncSession) -> None:
+            _stmt = sa.select(SessionRow).where(SessionRow.id == session_id).with_for_update()
+            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+            if session_row is None:
+                return
+            session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+            session_occupying_slots.sync_keys(actual_allocs)
+            for key, val in session_occupying_slots.items():
+                session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
+            session_row.occupying_slots = session_occupying_slots
+
+        if update_successful:
+            await execute_with_txn_retry(_update_session, self.db.begin_session, db_conn)
+            self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
+            await self.set_status_updatable_session(session_id)
+
     async def mark_kernel_terminated(
         self,
+        db_conn: SAConnection,
         kernel_id: KernelId,
+        session_id: SessionId,
         reason: str,
         exit_code: int = None,
     ) -> None:
@@ -3071,117 +3171,133 @@ class AgentRegistry:
             self.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )
+        if kern_stat:
+            last_stat = msgpack.unpackb(kern_stat)
+        else:
+            last_stat = None
 
-        async def _update_kernel() -> tuple[AccessKey, AgentId] | None:
-            async with self.db.begin_session() as db_sess:
-                # Check the current status.
-                select_query = (
-                    sa.select(
-                        KernelRow.access_key,
-                        KernelRow.agent,
-                        KernelRow.status,
-                        KernelRow.occupied_slots,
-                        KernelRow.session_id,
-                    )
-                    .where(KernelRow.id == kernel_id)
-                    .with_for_update()
-                )
-                result = await db_sess.execute(select_query)
-                kernel = result.first()
-                if kernel is None or kernel.status in (
-                    KernelStatus.CANCELLED,
-                    KernelStatus.TERMINATED,
-                    KernelStatus.RESTARTING,
-                ):
-                    # Skip if non-existent, already terminated, or restarting.
-                    return None
+        now = datetime.now(tzutc())
 
-                # Change the status to TERMINATED.
-                # (we don't delete the row for later logging and billing)
-                now = datetime.now(tzutc())
-                values = {
-                    "status": KernelStatus.TERMINATED,
-                    "status_info": reason,
-                    "status_changed": now,
-                    "status_data": sql_json_merge(
-                        KernelRow.status_data,
-                        ("kernel",),
-                        {"exit_code": exit_code},
-                    ),
-                    "status_history": sql_json_merge(
-                        KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.TERMINATED.name: now.isoformat(),
-                        },
-                    ),
-                    "terminated_at": now,
-                }
-                if kern_stat:
-                    values["last_stat"] = msgpack.unpackb(kern_stat)
-                update_query = (
-                    sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
-                )
-                await db_sess.execute(update_query)
-                return kernel.access_key, kernel.agent
+        async def _get_and_transit(
+            db_session: AsyncSession,
+        ) -> tuple[AccessKey, AgentId] | None:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            is_terminated = kernel_row.transit_status(
+                KernelStatus.TERMINATED,
+                reason,
+                status_data=sql_json_merge(
+                    KernelRow.status_data,
+                    ("kernel",),
+                    {"exit_code": exit_code},
+                ),
+                status_changed_at=now,
+            )
+            if not is_terminated:
+                return None
+            if last_stat is not None:
+                kernel_row.last_stat = last_stat
+            return kernel_row.access_key, kernel_row.agent
 
-        result = await execute_with_retry(_update_kernel)
+        result = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
 
         if result is None:
             return
 
         access_key, agent = result
 
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
-                log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
-                    "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
-                )
-                await recalc_agent_resource_occupancy(conn, agent)
+        async def _recalc(db_session: AsyncSession) -> None:
+            log.debug(
+                "recalculate concurrency used in kernel termination (ak: {})",
+                access_key,
+            )
+            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            log.debug(
+                "recalculate agent resource occupancy in kernel termination (agent: {})",
+                agent,
+            )
+            await recalc_agent_resource_occupancy(db_session, agent)
 
-        await execute_with_retry(_recalc)
+        await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
 
-        await self.sync_kernel_stats([kernel_id])
+        # await self.sync_kernel_stats([kernel_id])
+        await self.set_status_updatable_session(session_id)
 
-    async def check_session_terminated(
-        self,
-        session_id: SessionId,
-        reason: str,
-    ) -> None:
-        new_session_status = await SessionRow.transit_session_status(
-            self.db, session_id, status_info=reason
+    async def transit_session_status(
+        self, db_conn: SAConnection, session_id: SessionId, update_time: datetime | None = None
+    ) -> SessionStatus | None:
+        now = update_time or datetime.now(tzutc())
+
+        async def _get_and_transit(
+            db_session: AsyncSession,
+        ) -> tuple[SessionRow, SessionStatus | None]:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
+            new_status, _ = session_row.determine_and_set_status(status_changed_at=now)
+            return session_row, new_status
+
+        session_row, new_status = await execute_with_txn_retry(
+            _get_and_transit, self.db.begin_session, db_conn
         )
-        do_fire_event = new_session_status in (
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
+
+        match new_status:
+            case SessionStatus.RUNNING:
+                log.debug(
+                    "Producing SessionStartedEvent({}, {})",
+                    session_row.id,
+                    session_row.creation_id,
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+                await self.hook_plugin_ctx.notify(
+                    "POST_START_SESSION",
+                    (
+                        session_row.id,
+                        session_row.name,
+                        session_row.access_key,
+                    ),
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+            case SessionStatus.TERMINATED:
+                await self.event_producer.produce_event(
+                    SessionTerminatedEvent(session_id, session_row.main_kernel.status_info),
+                )
+            case _:
+                pass
+        return new_status
+
+    async def set_status_updatable_session(self, session_id: SessionId) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.sadd("session_status_update", msgpack.packb(session_id)),
         )
-        if do_fire_event:
-            await self.event_producer.produce_event(
-                SessionTerminatedEvent(session_id, reason),
-            )
 
-    async def mark_session_terminating(
-        self,
-        session_id: SessionId,
-        reason: str,
-    ) -> None:
-        pass
+    async def reset_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
+        async def _pipe_builder(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for sid in session_ids:
+                await pipe.srem("session_status_update", msgpack.packb(sid))
+            return pipe
 
-    async def mark_session_terminated(
-        self,
-        session_id: SessionId,
-        reason: str,
-    ) -> None:
-        await self.clean_session(session_id)
+        await redis_helper.execute(self.redis_stat, _pipe_builder)
+
+    async def get_status_updatable_sessions(self) -> list[SessionId]:
+        raw_result = cast(
+            set[bytes],
+            await redis_helper.execute(
+                self.redis_stat,
+                lambda r: r.smembers("session_status_update"),
+            ),
+        )
+        result: list[SessionId] = []
+        for raw_session_id in raw_result:
+            result.append(SessionId(msgpack.unpackb(raw_session_id)))
+        await self.reset_status_updatable_session(result)
+        return result
 
     async def _get_user_email(
         self,
@@ -3429,23 +3545,23 @@ async def handle_kernel_creation_lifecycle(
         event.name,
         event.kernel_id,
     )
-    if isinstance(event, KernelPreparingEvent):
-        # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
-        pass
-    elif isinstance(event, KernelPullingEvent):
-        await KernelRow.set_kernel_status(
-            context.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
-        )
-        await SessionRow.set_session_status(context.db, event.session_id, SessionStatus.PULLING)
-    elif isinstance(event, KernelCreatingEvent):
-        await KernelRow.set_kernel_status(
-            context.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
-        )
-    elif isinstance(event, KernelStartedEvent):
-        session_id = event.session_id
-        await context.finalize_running(event.kernel_id, session_id, event.creation_info)
-    elif isinstance(event, KernelCancelledEvent):
-        log.warning(f"Kernel cancelled, {event.reason = }")
+    match event:
+        case KernelPreparingEvent():
+            # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
+            pass
+        case KernelPullingEvent(kernel_id, session_id, reason=reason):
+            async with context.db.connect() as db_conn:
+                await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
+        case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+            async with context.db.connect() as db_conn:
+                await context.mark_kernel_preparing(db_conn, kernel_id, session_id, reason)
+        case KernelStartedEvent(kernel_id, session_id, reason=reason, creation_info=creation_info):
+            async with context.db.connect() as db_conn:
+                await context.mark_kernel_running(
+                    db_conn, kernel_id, session_id, reason, creation_info
+                )
+        case KernelCancelledEvent():
+            log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
@@ -3453,13 +3569,15 @@ async def handle_kernel_termination_lifecycle(
     source: AgentId,
     event: KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
-    if isinstance(event, KernelTerminatingEvent):
-        # The destroy_kernel() API handler will set the "TERMINATING" status.
-        pass
-    elif isinstance(event, KernelTerminatedEvent):
-        await context.mark_kernel_terminated(event.kernel_id, event.reason, event.exit_code)
-        session_id = event.session_id
-        await context.check_session_terminated(session_id, event.reason)
+    match event:
+        case KernelTerminatingEvent():
+            # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
+            pass
+        case KernelTerminatedEvent(kernel_id, session_id, reason, exit_code):
+            async with context.db.connect() as db_conn:
+                await context.mark_kernel_terminated(
+                    db_conn, kernel_id, session_id, reason, exit_code
+                )
 
 
 async def handle_session_creation_lifecycle(
@@ -3495,10 +3613,11 @@ async def handle_session_termination_lifecycle(
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
-    if isinstance(event, SessionTerminatingEvent):
-        await context.mark_session_terminating(event.session_id, event.reason)
-    elif isinstance(event, SessionTerminatedEvent):
-        await context.mark_session_terminated(event.session_id, event.reason)
+    match event:
+        case SessionTerminatingEvent():
+            pass
+        case SessionTerminatedEvent(session_id=session_id):
+            await context.clean_session(session_id)
 
     await invoke_session_callback(context, agent_id, event)
 
