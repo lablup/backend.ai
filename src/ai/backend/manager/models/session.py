@@ -726,6 +726,14 @@ class SessionRow(Base):
         return kerns[0]
 
     @classmethod
+    async def get_session_id_by_kernel(
+        cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
+    ) -> SessionId:
+        query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+        async with db.begin_readonly_session() as db_session:
+            return await db_session.scalar(query)
+
+    @classmethod
     async def transit_session_status(
         cls,
         db: ExtendedAsyncSAEngine,
@@ -780,14 +788,6 @@ class SessionRow(Base):
             return determined_status
 
         return await execute_with_retry(_check_and_update)
-
-    @classmethod
-    async def get_session_id_by_kernel(
-        cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
-    ) -> SessionId:
-        query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
-        async with db.begin_readonly_session() as db_session:
-            return await db_session.scalar(query)
 
     @classmethod
     async def get_session_to_determine_status(
