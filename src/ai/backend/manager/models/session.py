@@ -866,13 +866,10 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             self.terminated_at = now
         self.status = status
-        self.status_history = sql_json_merge(
-            SessionRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_data is not None:
             self.status_data = status_data
 
@@ -1234,8 +1231,11 @@ class SessionLifecycleManager:
                 session_row.occupying_slots = session_occupying_slots
 
             match session_row.status:
-                case SessionStatus.PREPARING | SessionStatus.RUNNING:
+                case SessionStatus.PREPARING:
                     _calculate_session_occupied_slots(session_row)
+                case SessionStatus.RUNNING if transited:
+                    _calculate_session_occupied_slots(session_row)
+
             return session_row, transited
 
         return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
@@ -1276,21 +1276,24 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
-    ) -> list[SessionRow]:
+    ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
         now = status_changed_at or datetime.now(tzutc())
-        transited_sessions: list[SessionRow] = []
+        result: list[tuple[SessionRow, bool]] = []
         async with self.db.connect() as db_conn:
             for sid in session_ids:
                 row, is_transited = await self._transit_session_status(db_conn, sid, now)
-                if is_transited:
-                    transited_sessions.append(row)
-        for row in transited_sessions:
-            await self._post_status_transition(row)
-        return transited_sessions
+                result.append((row, is_transited))
+        for row, is_transited in result:
+            if is_transited:
+                await self._post_status_transition(row)
+        return result
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
+        if not session_ids:
+            return
+
         sadd_session_ids_script = textwrap.dedent("""
         local key = KEYS[1]
         local values = ARGV
@@ -1346,6 +1349,9 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
     ) -> int:
+        if not session_ids:
+            return 0
+
         srem_session_ids_script = textwrap.dedent("""
         local key = KEYS[1]
         local values = ARGV
