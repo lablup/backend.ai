@@ -796,62 +796,6 @@ class SessionRow(Base):
             return await db_session.scalar(query)
 
     @classmethod
-    async def transit_session_status(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        session_id: SessionId,
-        *,
-        status_info: str | None = None,
-    ) -> SessionStatus | None:
-        """
-        Check status of session's sibling kernels and transit the status of session.
-        Return the new status of session.
-        """
-        now = datetime.now(tzutc())
-
-        async def _check_and_update() -> SessionStatus | None:
-            async with db.begin_session() as db_session:
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == session_id)
-                    .with_for_update()
-                    .options(
-                        noload("*"),
-                        load_only(SessionRow.status),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
-                        ),
-                    )
-                )
-                session_row: SessionRow = (await db_session.scalars(session_query)).first()
-                determined_status = determine_session_status(session_row.kernels)
-                if determined_status not in SESSION_STATUS_TRANSITION_MAP[session_row.status]:
-                    # TODO: log or raise error
-                    return None
-
-                update_values = {
-                    "status": determined_status,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            determined_status.name: now.isoformat(),
-                        },
-                    ),
-                }
-                if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
-                    update_values["terminated_at"] = now
-                if status_info is not None:
-                    update_values["status_info"] = status_info
-                update_query = (
-                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
-                )
-                await db_session.execute(update_query)
-            return determined_status
-
-        return await execute_with_retry(_check_and_update)
-
-    @classmethod
     async def get_session_to_determine_status(
         cls, db_session: SASession, session_id: SessionId
     ) -> SessionRow:
