@@ -3226,7 +3226,7 @@ class AgentRegistry:
         db_conn: SAConnection,
         session_id: SessionId,
         status_changed_at: datetime | None = None,
-    ) -> None:
+    ) -> SessionStatus:
         now = status_changed_at or datetime.now(tzutc())
 
         async def _get_and_transit(
@@ -3241,7 +3241,7 @@ class AgentRegistry:
         )
 
         if not transited:
-            return
+            return session_row.status
         match session_row.status:
             case SessionStatus.RUNNING:
                 log.debug(
@@ -3269,6 +3269,7 @@ class AgentRegistry:
                 )
             case _:
                 pass
+        return session_row.status
 
     async def set_status_updatable_session(self, session_id: SessionId) -> None:
         await redis_helper.execute(
