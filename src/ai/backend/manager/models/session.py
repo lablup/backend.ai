@@ -756,20 +756,20 @@ class SessionRow(Base):
         status_info: str | None = None,
         status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
         status_changed_at: datetime | None = None,
-    ) -> tuple[SessionStatus, bool]:
+    ) -> bool:
         """
         Determine the current status of a session based on its sibling kernels.
         If it is possible to transit from the current status to the determined status, set status.
         Else, do nothing.
-        Return the determined status of session and a boolean value meaning transition happened or not.
+        Return a boolean value meaning any transition happened or not.
         """
 
         determined_status = determine_session_status(self.kernels)
         if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
-            return determined_status, False
+            return False
 
         self.set_status(determined_status, status_info, status_data, status_changed_at)
-        return determined_status, True
+        return True
 
     def set_status(
         self,
