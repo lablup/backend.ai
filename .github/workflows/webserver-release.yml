@@ -95,10 +95,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=4.0'
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'packaging>=21.3'
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v8
       with:
@@ -134,6 +131,21 @@ jobs:
     runs-on: ubuntu-latest
     environment: deploy-to-pypi
     steps:
+    - id: version
+      run: |
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.version.outputs.PATCH_VERSION }}
+    - name: Download webui release
+      run: |
+        scripts/download-webui-release.sh ${{ inputs.version }}
+    - name: Commit the prebuilt webui
+      run: |
+        git config --global user.email "mu001@lablup.com"
+        git config --global user.name "octodog"
+        git commit -m "deps: Update the prebuilt webui to latest (${{ inputs.version }})"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v5
     - name: Install local dependencies for packaging
