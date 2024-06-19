@@ -665,7 +665,7 @@ class Queries(graphene.ObjectType):
         # filters
         domain_name=graphene.String(),
         group_id=graphene.String(),
-        access_key=graphene.String(),
+        user_uuid=graphene.String(),
         project=graphene.UUID(),
     )
 

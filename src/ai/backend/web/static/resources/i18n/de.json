@@ -1509,7 +1509,10 @@
     "ModelMountDestination": "Mount-Ziel für Modellordner",
     "AdditionalMounts": "Zusätzliche Halterungen",
     "ModelDefinitionPath": "Pfad der Modelldefinitionsdatei",
-    "NoExtraMounts": "Keine zusätzlichen Halterungen"
+    "NoExtraMounts": "Keine zusätzlichen Halterungen",
+    "SyncRoutes": "Routen synchronisieren",
+    "SyncRoutesFailed": "Die Anfrage zur Routensynchronisierung ist fehlgeschlagen.",
+    "SyncRoutesRequested": "Routensynchronisierung wurde angefordert."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",

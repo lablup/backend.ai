@@ -107,7 +107,7 @@ type Queries {
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
   vfolder_host_permissions: PredefinedAtomicPermission
   endpoint(endpoint_id: UUID!): Endpoint
-  endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, project: UUID): EndpointList
+  endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
   routing(routing_id: UUID!): Routing
   routing_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): RoutingList
   endpoint_token(token: String!): EndpointToken
@@ -905,6 +905,9 @@ type Endpoint implements Item {
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
+
+  """Added in 24.03.5."""
+  runtime_variant: RuntimeVariantInfo
   created_at: DateTime!
   destroyed_at: DateTime
   routings: [Routing]
@@ -912,6 +915,12 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+}
+
+"""Added in 24.03.5."""
+type RuntimeVariantInfo {
+  name: String
+  human_readable_name: String
 }
 
 type Routing implements Item {
@@ -1794,7 +1803,9 @@ input ModifyEndpointInput {
   name: String
   resource_group: String
 
-  """Added in 24.03.4."""
+  """
+  Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`.
+  """
   model_definition_path: String
   open_to_public: Boolean
 
@@ -1802,6 +1813,12 @@ input ModifyEndpointInput {
   Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.
   """
   extra_mounts: [ExtraMountInput]
+
+  """Added in 24.03.5."""
+  environ: JSONString
+
+  """Added in 24.03.5."""
+  runtime_variant: String
 }
 
 input ImageRefType {

@@ -1563,7 +1563,10 @@
     "ModelMountDestination": "Загварын хавтасыг холбох газар",
     "AdditionalMounts": "Нэмэлт бэхэлгээ",
     "ModelDefinitionPath": "Загварын тодорхойлолтын файлын зам",
-    "NoExtraMounts": "Нэмэлт бэхэлгээ байхгүй"
+    "NoExtraMounts": "Нэмэлт бэхэлгээ байхгүй",
+    "SyncRoutes": "Замуудыг синк хийх",
+    "SyncRoutesFailed": "Маршрутын синхрончлолын хүсэлт амжилтгүй боллоо.",
+    "SyncRoutesRequested": "Маршрутыг синхрончлох хүсэлт тавьсан."
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",

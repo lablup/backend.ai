@@ -1550,7 +1550,10 @@
     "ModelMountDestination": "Lekapkan Destinasi Untuk Folder Model",
     "AdditionalMounts": "Lekapan Tambahan",
     "ModelDefinitionPath": "Laluan Fail Definisi Model",
-    "NoExtraMounts": "Tiada pelekap tambahan"
+    "NoExtraMounts": "Tiada pelekap tambahan",
+    "SyncRoutes": "Segerakkan laluan",
+    "SyncRoutesFailed": "Permintaan penyegerakan laluan gagal.",
+    "SyncRoutesRequested": "Penyegerakan laluan telah diminta."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",

@@ -295,7 +295,7 @@ jobs:
         name: local-proxy-${{ matrix.os }}
         path: dist-local-proxy/*
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -353,7 +353,7 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -401,6 +401,8 @@ jobs:
     needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
@@ -448,7 +450,7 @@ jobs:
         name: SBOM report
         path: dist
     - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
