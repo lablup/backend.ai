@@ -518,7 +518,7 @@ jobs:
         fi
         echo "IS_UNDISTRIBUTED=$is_undistributed" >> $GITHUB_OUTPUT
     - name: Update edge installer shorten URL
-      if: ${{ github.ref_name }} == ${{ steps.extract_edge_release_version.outputs.EDGE_RELEASE }}
+      if: ${{ github.ref_name }} == ${{ steps.extract_edge_release_version.outputs.EDGE_RELEASE }} || ${{ steps.extract_edge_release_version.outputs.IS_UNDISTRIBUTED }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
