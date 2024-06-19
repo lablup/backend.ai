@@ -464,7 +464,7 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
-    - name: Extract minor version
+    - name: Extract minor version
       id: extract_minor_version
       run: |
         release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
