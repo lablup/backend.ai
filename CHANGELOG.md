@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.5 (2024-06-20)
+
+* New redis client (experimental) ([#2041](https://github.com/lablup/backend.ai/issues/2041))
+* Add support for CentOS 8 based kernels ([#2220](https://github.com/lablup/backend.ai/issues/2220))
+* Allow modifying model service session's environment variable setup ([#2255](https://github.com/lablup/backend.ai/issues/2255))
+* Add `endpoint.runtime_variant` column ([#2256](https://github.com/lablup/backend.ai/issues/2256))
+* Add new API to show list of supported inference runtimes ([#2258](https://github.com/lablup/backend.ai/issues/2258))
+* Add support for model service provisioning without `model-definition.yaml` ([#2260](https://github.com/lablup/backend.ai/issues/2260))
+
+### Fixes
+* Do not omit to update session's occupying resources to DB when a kernel starts. ([#1832](https://github.com/lablup/backend.ai/issues/1832))
+* Rename no-op `access_key` parameter of `endpoint_list` GQL Query to `user_uuid` ([#2287](https://github.com/lablup/backend.ai/issues/2287))
+* Fix `ai.backend.service-ports` label syntax broken when image does not expose built-in service port ([#2288](https://github.com/lablup/backend.ai/issues/2288))
+* Improve stability of `untag_image_from_registry` mutation ([#2289](https://github.com/lablup/backend.ai/issues/2289))
+* SSH not working between kernels started with customized image ([#2290](https://github.com/lablup/backend.ai/issues/2290))
+* Invalid container memory capacity reported ([#2291](https://github.com/lablup/backend.ai/issues/2291))
+
+
 ## 24.03.5rc1 (2024-06-20)
 No significant changes.
 
