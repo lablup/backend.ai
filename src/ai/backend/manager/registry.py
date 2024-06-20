@@ -1258,16 +1258,15 @@ class AgentRegistry:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check if the user has allocated an "imbalanced" shared memory amount.
-            raw_allowed_mem_shmem_ratio = await self.shared_config.etcd.get(SHMEM_RATIO_KEY)
-            if raw_allowed_mem_shmem_ratio is None:
-                allowed_mem_shmem_ratio = DEFAULT_ALLOWED_MAX_SHMEM_RATIO
+            raw_allowed_max_shmem_ratio = await self.shared_config.etcd.get(SHMEM_RATIO_KEY)
+            if raw_allowed_max_shmem_ratio is None:
+                allowed_max_shmem_ratio = DEFAULT_ALLOWED_MAX_SHMEM_RATIO
             else:
-                allowed_mem_shmem_ratio = Decimal(raw_allowed_mem_shmem_ratio)
-            if Decimal(requested_slots["mem"]) / Decimal(shmem) <= allowed_mem_shmem_ratio:
+                allowed_max_shmem_ratio = Decimal(raw_allowed_max_shmem_ratio)
+            if Decimal(shmem) >= Decimal(requested_slots["mem"]) * allowed_max_shmem_ratio:
                 raise InvalidAPIParameters(
-                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
-                    ),
+                    f"Too large shared memory. Maximum ratio of 'shared memory / memory' is {str(allowed_max_shmem_ratio)}. "
+                    f"(s:{str(shmem)}, m:{str(BinarySize(requested_slots['mem']))}"
                 )
 
             # Check the image resource slots.
