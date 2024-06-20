@@ -157,7 +157,6 @@ from .types import (
     Container,
     ContainerLifecycleEvent,
     ContainerStatus,
-    KernelStatus,
     LifecycleEvent,
     MountInfo,
 )
@@ -561,6 +560,7 @@ class AbstractAgent(
     redis: Redis
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    terminating_kernels: Set[KernelId]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -600,6 +600,7 @@ class AbstractAgent(
         self.computers = {}
         self.images = {}  # repoTag -> digest
         self.restarting_kernels = {}
+        self.terminating_kernels = set()
         self.stat_ctx = StatContext(
             self,
             mode=StatModes(local_config["container"]["stats-type"]),
@@ -961,7 +962,7 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
+                    if not kernel_obj.stats_enabled:
                         continue
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
@@ -979,7 +980,7 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
+                    if not kernel_obj.stats_enabled:
                         continue
                     updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
@@ -1004,7 +1005,6 @@ class AbstractAgent(
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.stats_enabled = True
-                kernel_obj.status = KernelStatus.RUNNING
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
@@ -1034,8 +1034,8 @@ class AbstractAgent(
                             ev.done_future.set_result(None)
                         return
                 else:
+                    self.terminating_kernels.add(ev.kernel_id)
                     kernel_obj.stats_enabled = False
-                    kernel_obj.status = KernelStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
@@ -1108,6 +1108,7 @@ class AbstractAgent(
                             self.port_pool.update(restored_ports)
                         await kernel_obj.close()
                 finally:
+                    self.terminating_kernels.discard(ev.kernel_id)
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
@@ -1332,7 +1333,7 @@ class AbstractAgent(
                     for kernel_id in known_kernels.keys() - alive_kernels.keys():
                         if (
                             kernel_id in self.restarting_kernels
-                            or self.kernel_registry[kernel_id].status == KernelStatus.PREPARING
+                            or kernel_id in self.terminating_kernels
                         ):
                             continue
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
@@ -2101,7 +2102,6 @@ class AbstractAgent(
                         },
                     ),
                 )
-                kernel_obj.status = KernelStatus.RUNNING
 
                 if (
                     kernel_config["session_type"] == "batch"
@@ -2540,14 +2540,9 @@ class AbstractAgent(
             return  # don't save too frequently
         var_base_path = self.local_config["agent"]["var-base-path"]
         last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-        running_kernel_registry = {
-            kid: kernel_obj
-            for kid, kernel_obj in self.kernel_registry.items()
-            if kernel_obj.status == KernelStatus.RUNNING
-        }
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(running_kernel_registry, f)
+                pickle.dump(self.kernel_registry, f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
