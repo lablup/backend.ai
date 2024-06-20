@@ -2181,9 +2181,9 @@ class AgentRegistry:
                 session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
                 if session_row is None:
                     raise SessionNotFound(f"Session not found (id: {session_id})")
-                kernels = cast(list[KernelRow], session_row.kernels)
+                kernel_rows = cast(list[KernelRow], session_row.kernels)
                 kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
-                for kern in kernels:
+                for kern in kernel_rows:
                     kern.status = kernel_target_status
                     kern.terminated_at = current_time
                     kern.status_info = destroy_reason
@@ -2246,7 +2246,7 @@ class AgentRegistry:
                         self.db, session_id, SessionStatus.CANCELLED
                     )
                 case SessionStatus.PULLING:
-                    if forced and user_role is UserRole.SUPERADMIN:
+                    if forced and user_role == UserRole.SUPERADMIN:
                         log.warning(
                             "force-terminating session (s:{}, status:{})",
                             session_id,
@@ -2271,7 +2271,7 @@ class AgentRegistry:
                         session_id,
                         target_session.status,
                     )
-                    if user_role is UserRole.SUPERADMIN:
+                    if user_role == UserRole.SUPERADMIN:
                         await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
                         return {}
                     else:
