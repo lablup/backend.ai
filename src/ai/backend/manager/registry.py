@@ -141,11 +141,8 @@ from .api.exceptions import (
 from .config import LocalConfig, SharedConfig
 from .defs import (
     DEFAULT_IMAGE_ARCH,
-    DEFAULT_MIN_MEM_SHARED_MEM_RATIO,
     DEFAULT_ROLE,
-    DEFAULT_SHARED_MEMORY_SIZE,
     INTRINSIC_SLOTS,
-    MIN_MEM_SHARED_MEM_RATIO_KEY,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
@@ -1261,14 +1258,12 @@ class AgentRegistry:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check if the user has allocated an "imbalanced" shared memory amount.
-            raw_min_mem_shmem_ratio = await self.shared_config.etcd.get(
-                MIN_MEM_SHARED_MEM_RATIO_KEY
-            )
-            if raw_min_mem_shmem_ratio is None:
-                min_mem_shmem_ratio = DEFAULT_MIN_MEM_SHARED_MEM_RATIO
+            raw_allowed_mem_shmem_ratio = await self.shared_config.etcd.get(SHMEM_RATIO_KEY)
+            if raw_allowed_mem_shmem_ratio is None:
+                allowed_mem_shmem_ratio = DEFAULT_ALLOWED_MAX_SHMEM_RATIO
             else:
-                min_mem_shmem_ratio = Decimal(raw_min_mem_shmem_ratio)
-            if Decimal(requested_slots["mem"]) / Decimal(shmem) <= min_mem_shmem_ratio:
+                allowed_mem_shmem_ratio = Decimal(raw_allowed_mem_shmem_ratio)
+            if Decimal(requested_slots["mem"]) / Decimal(shmem) <= allowed_mem_shmem_ratio:
                 raise InvalidAPIParameters(
                     "Shared memory should be less than the main memory. (s:{}, m:{})".format(
                         str(shmem), str(BinarySize(requested_slots["mem"]))
