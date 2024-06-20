@@ -1713,13 +1713,11 @@ async def delete_vfolders(
             except (VFolderOperationFailed, InvalidAPIParameters) as e:
                 if e.status == 404:
                     folders_to_be_deleted.append(vfolder_info)
-                    progress_msg = f"VFolder not found in storage, transit status to DELETE_COMPLETE (id: {folder_id})"
+                    progress_msg = f"VFolder not found in storage, transit status to `DELETE_COMPLETE` (id: {folder_id})"
                 else:
                     err_str = repr(e)
                     folders_failed_to_delete.append((vfolder_info, err_str))
-                    progress_msg = (
-                        f"Delete failed (id: {folder_id}, status: {e.status}, e: {err_str})"
-                    )
+                    progress_msg = f"Delete failed (id: {folder_id}, storage response status: {e.status}, e: {err_str})"
                     log_level = LogLevel.ERROR
             except Exception as e:
                 err_str = repr(e)
