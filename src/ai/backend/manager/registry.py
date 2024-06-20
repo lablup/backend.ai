@@ -2169,6 +2169,9 @@ class AgentRegistry:
         async def _force_destroy_for_suadmin(
             target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
         ) -> None:
+            current_time = datetime.now(tzutc())
+            destroy_reason = str(KernelLifecycleEventReason.FORCE_TERMINATED)
+
             async def _destroy(db_session: AsyncSession) -> None:
                 _stmt = (
                     sa.select(SessionRow)
@@ -2179,9 +2182,28 @@ class AgentRegistry:
                 if session_row is None:
                     raise SessionNotFound(f"Session not found (id: {session_id})")
                 kernels = cast(list[KernelRow], session_row.kernels)
+                kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
                 for kern in kernels:
-                    kern.status = SESSION_KERNEL_STATUS_MAPPING[target_status]
+                    kern.status = kernel_target_status
+                    kern.terminated_at = current_time
+                    kern.status_info = destroy_reason
+                    kern.status_history = sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {
+                            kernel_target_status.name: current_time.isoformat(),
+                        },
+                    )
                 session_row.status = target_status
+                session_row.terminated_at = current_time
+                session_row.status_info = destroy_reason
+                session_row.status_history = sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {
+                        target_status.name: current_time.isoformat(),
+                    },
+                )
 
             async with self.db.connect() as db_conn:
                 await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
