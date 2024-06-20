@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Final
 
 # Redis database IDs depending on purposes
@@ -10,3 +11,8 @@ REDIS_STREAM_LOCK: Final = 5
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
+
+
+DEFAULT_SHARED_MEMORY_SIZE: Final = "64m"
+DEFAULT_ALLOWED_MAX_SHMEM_RATIO: Final = Decimal(1.0)
+SHMEM_RATIO_KEY: Final = "resources/mem-shmem-ratio"
