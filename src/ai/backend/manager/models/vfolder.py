@@ -95,6 +95,11 @@ from .group import GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
+from .storage import (
+    StorageHostACLPermission,
+    StorageHostPermissionMap,
+    get_client_accessible_storage_hosts,
+)
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -699,6 +704,39 @@ class VFolderACLPermission(BaseACLPermission):
     MOUNT_WD = enum.auto()
 
 
+_VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
+    VFolderACLPermission, StorageHostACLPermission
+] = {
+    VFolderACLPermission.CLONE: StorageHostACLPermission.CLONE,
+    VFolderACLPermission.OVERRIDE_PERMISSION_TO_OTHERS: StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS,
+    VFolderACLPermission.READ_ATTRIBUTE: StorageHostACLPermission.READ_ATTRIBUTE,
+    VFolderACLPermission.UPDATE_ATTRIBUTE: StorageHostACLPermission.UPDATE_ATTRIBUTE,
+    VFolderACLPermission.DELETE_VFOLDER: StorageHostACLPermission.DELETE_VFOLDER,
+    VFolderACLPermission.READ_CONTENT: StorageHostACLPermission.READ_CONTENT,
+    VFolderACLPermission.WRITE_CONTENT: StorageHostACLPermission.WRITE_CONTENT,
+    VFolderACLPermission.DELETE_CONTENT: StorageHostACLPermission.DELETE_CONTENT,
+    VFolderACLPermission.MOUNT_RO: StorageHostACLPermission.MOUNT_RO,
+    VFolderACLPermission.MOUNT_RW: StorageHostACLPermission.MOUNT_RW,
+    VFolderACLPermission.MOUNT_WD: StorageHostACLPermission.MOUNT_WD,
+}
+
+_STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
+    StorageHostACLPermission, VFolderACLPermission
+] = {
+    StorageHostACLPermission.CLONE: VFolderACLPermission.CLONE,
+    StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS: VFolderACLPermission.OVERRIDE_PERMISSION_TO_OTHERS,
+    StorageHostACLPermission.READ_ATTRIBUTE: VFolderACLPermission.READ_ATTRIBUTE,
+    StorageHostACLPermission.UPDATE_ATTRIBUTE: VFolderACLPermission.UPDATE_ATTRIBUTE,
+    StorageHostACLPermission.DELETE_VFOLDER: VFolderACLPermission.DELETE_VFOLDER,
+    StorageHostACLPermission.READ_CONTENT: VFolderACLPermission.READ_CONTENT,
+    StorageHostACLPermission.WRITE_CONTENT: VFolderACLPermission.WRITE_CONTENT,
+    StorageHostACLPermission.DELETE_CONTENT: VFolderACLPermission.DELETE_CONTENT,
+    StorageHostACLPermission.MOUNT_RO: VFolderACLPermission.MOUNT_RO,
+    StorageHostACLPermission.MOUNT_RW: VFolderACLPermission.MOUNT_RW,
+    StorageHostACLPermission.MOUNT_WD: VFolderACLPermission.MOUNT_WD,
+}
+
+
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 )
@@ -767,6 +805,11 @@ PERMISSION_TO_ACL_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderAC
 class ACLPermissionContext(
     AbstractACLPermissionContext[VFolderACLPermission, VFolderRow, uuid.UUID]
 ):
+    host_permission_map: StorageHostPermissionMap | None = None
+
+    def apply_host_perms(self, host_perm: StorageHostPermissionMap) -> None:
+        self.host_permission_map = host_perm
+
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -802,6 +845,13 @@ class ACLPermissionContext(
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
 
+        if self.host_permission_map is not None:
+            host_names = {*self.host_permission_map.keys()}
+            if host_names:
+                cond = _AND_coalesce(cond, VFolderRow.host.in_(host_names))
+            else:
+                return None
+
         return cond
 
     async def build_query(self) -> sa.sql.Select | None:
@@ -822,6 +872,15 @@ class ACLPermissionContext(
         permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
         permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
         permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
+
+        if self.host_permission_map is not None:
+            host_permissions: frozenset[StorageHostACLPermission] = self.host_permission_map.get(
+                vfolder_row.host, frozenset()
+            )
+            permissions &= {
+                _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP[perm]
+                for perm in host_permissions
+            }
         return frozenset(permissions)
 
 
@@ -1104,10 +1163,28 @@ async def get_vfolders(
     allowed_status: Container[VFolderOperationStatus] | None = None,
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderACLObject]:
+    requested_host_permission = (
+        _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        if requested_permission is not None
+        else None
+    )
+    host_permissions = await get_client_accessible_storage_hosts(ctx, requested_host_permission)
+
+    if extra_scope is not None:
+        host_permissions = {
+            host_name: perms
+            for host_name, perms in host_permissions.items()
+            if host_name == extra_scope.name
+        }
+    if not host_permissions:
+        return []
+
     async with SASession(ctx.db_conn) as db_session:
         permission_ctx = await ACLPermissionContextBuilder.build(
             db_session, ctx, target_scope, permission=requested_permission
         )
+        permission_ctx.apply_host_perms(host_permissions)
+
         query_stmt = await permission_ctx.build_query()
         if query_stmt is None:
             return []
