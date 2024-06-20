@@ -58,6 +58,7 @@ agent_local_config_iv = (
             | tx.Path(type="dir", allow_nonexisting=True),
             t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
             t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
+            t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
         }).allow_extra("*"),
         t.Key("container"): t.Dict({
             t.Key("kernel-uid", default=-1): tx.UserID,
