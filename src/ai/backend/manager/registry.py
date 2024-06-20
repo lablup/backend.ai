@@ -146,11 +146,8 @@ from .api.exceptions import (
 from .config import LocalConfig, SharedConfig
 from .defs import (
     DEFAULT_IMAGE_ARCH,
-    DEFAULT_MIN_MEM_SHARED_MEM_RATIO,
     DEFAULT_ROLE,
-    DEFAULT_SHARED_MEMORY_SIZE,
     INTRINSIC_SLOTS,
-    MIN_MEM_SHARED_MEM_RATIO_KEY,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
