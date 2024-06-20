@@ -983,6 +983,8 @@ class AgentRegistry:
         internal_data.update(dotfile_data)
         if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
             internal_data["model_definition_path"] = _fname
+        if _variant := session_enqueue_configs["creation_config"].get("runtime_variant"):
+            internal_data["runtime_variant"] = _variant
 
         if sudo_session_enabled:
             internal_data["sudo_session_enabled"] = True
@@ -1585,12 +1587,27 @@ class AgentRegistry:
                 ),
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
+
+            async def _update_session_occupying_slots(db_session: AsyncSession) -> None:
+                _stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                if session_row is None:
+                    raise SessionNotFound(f"Failed to fetch session (id:{session_id})")
+                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                session_occupying_slots.sync_keys(actual_allocs)
+                for key, val in session_occupying_slots.items():
+                    session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
+                session_row.occupying_slots = session_occupying_slots
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(
+                    _update_session_occupying_slots, self.db.begin_session, db_conn
+                )
             kernel_did_update = await KernelRow.update_kernel(
                 self.db, kernel_id, new_status, update_data=update_data
             )
             if not kernel_did_update:
                 return
-
             new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
@@ -3881,6 +3898,7 @@ async def handle_route_creation(
                         for m in endpoint.extra_mounts
                     },
                     "model_definition_path": endpoint.model_definition_path,
+                    "runtime_variant": endpoint.runtime_variant.value,
                     "environ": endpoint.environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,

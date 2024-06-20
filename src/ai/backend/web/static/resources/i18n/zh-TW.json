@@ -1550,7 +1550,10 @@
     "ModelMountDestination": "模型資料夾的安裝目標",
     "AdditionalMounts": "附加安裝座",
     "ModelDefinitionPath": "模型定義檔路徑",
-    "NoExtraMounts": "沒有額外的安裝座"
+    "NoExtraMounts": "沒有額外的安裝座",
+    "SyncRoutes": "同步路线",
+    "SyncRoutesFailed": "路由同步请求失败。",
+    "SyncRoutesRequested": "已請求路由同步。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",

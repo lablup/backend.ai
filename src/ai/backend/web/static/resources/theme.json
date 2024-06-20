@@ -51,7 +51,15 @@
     "logoTitle": "WebUI",
     "logoTitleCollapsed": "WebUI",
     "alt": "Backend.AI Logo",
-    "href": "/summary"
+    "href": "/summary",
+    "size": {
+      "width": 191,
+      "height": 32
+    },
+    "sizeCollapsed": {
+      "width": 48,
+      "height": 32
+    }
   },
   "sider": {
   },

@@ -42,10 +42,12 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     AgentId,
     ClusterMode,
     ImageAlias,
+    RuntimeVariant,
     SessionTypes,
     VFolderMount,
     VFolderUsageMode,
@@ -222,6 +224,10 @@ class ServeInfoModel(BaseResponseModel):
             " will be no authentication required to communicate with this API service."
         )
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(description="Type of the inference runtime the image will try to load."),
+    ]
 
 
 @auth_required
@@ -258,6 +264,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         ],
         service_endpoint=endpoint.url,
         is_public=endpoint.open_to_public,
+        runtime_variant=endpoint.runtime_variant,
     )
 
 
@@ -276,7 +283,7 @@ class ServiceConfigModel(BaseModel):
         validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
         default="/models",
         description=(
-            "Mount destination for the model VFolder will be mounted inside the inference session"
+            "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
         ),
     )
 
@@ -318,6 +325,13 @@ class NewServiceRequestModel(BaseModel):
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(
+            description="Type of the inference runtime the image will try to load.",
+            default=RuntimeVariant.CUSTOM,
+        ),
+    ]
     architecture: str = Field(
         validation_alias=AliasChoices("arch", "architecture"),
         description="Image architecture",
@@ -468,11 +482,22 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             resource_policy,
         )
 
-    yaml_path = await ModelServicePredicateChecker.validate_model_definition(
-        root_ctx.storage_manager,
-        folder_row,
-        params.config.model_definition_path,
-    )
+    if params.runtime_variant == RuntimeVariant.CUSTOM:
+        yaml_path = await ModelServicePredicateChecker.validate_model_definition(
+            root_ctx.storage_manager,
+            folder_row,
+            params.config.model_definition_path,
+        )
+    else:
+        if (
+            params.runtime_variant != RuntimeVariant.CMD
+            and params.config.model_mount_destination != "/models"
+        ):
+            raise InvalidAPIParameters(
+                "Model mount destination must be /models for non-custom runtimes"
+            )
+        # this path won't be used on actual session but just to keep the convention
+        yaml_path = "model-definition.yaml"
 
     return ValidationResult(
         model_id,
@@ -586,6 +611,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             bootstrap_script=params.bootstrap_script,
             resource_opts=params.config.resource_opts,
             open_to_public=params.open_to_public,
+            runtime_variant=params.runtime_variant,
         )
         db_sess.add(endpoint)
         await db_sess.flush()
@@ -601,6 +627,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         active_routes=[],
         service_endpoint=None,
         is_public=params.open_to_public,
+        runtime_variant=params.runtime_variant,
     )
 
 
@@ -1151,6 +1178,29 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class RuntimeInfo(BaseModel):
+    name: Annotated[str, Field(description="Identifier to be passed later inside request body")]
+    human_readable_name: Annotated[
+        str, Field(description="Use this value as displayed label to user")
+    ]
+
+
+class RuntimeInfoModel(BaseModel):
+    runtimes: list[RuntimeInfo]
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
+async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
+    return RuntimeInfoModel(
+        runtimes=[
+            RuntimeInfo(name=v.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
+            for v in RuntimeVariant
+        ]
+    )
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -1181,6 +1231,7 @@ def create_app(
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("POST", "/_/try", try_start))
+    cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))

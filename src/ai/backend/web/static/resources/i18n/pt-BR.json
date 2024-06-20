@@ -1550,7 +1550,10 @@
     "ModelMountDestination": "Montar destino para pasta de modelo",
     "AdditionalMounts": "Montarias Adicionais",
     "ModelDefinitionPath": "Caminho do arquivo de definição de modelo",
-    "NoExtraMounts": "Sem montagens extras"
+    "NoExtraMounts": "Sem montagens extras",
+    "SyncRoutes": "Sincronizar rotas",
+    "SyncRoutesFailed": "O pedido de sincronização de rotas falhou.",
+    "SyncRoutesRequested": "A sincronização de rota foi solicitada."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
