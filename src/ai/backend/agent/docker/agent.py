@@ -910,6 +910,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         kvpairs = await computer_ctx.instance.generate_resource_data(device_alloc)
                         for k, v in kvpairs.items():
                             await writer.write(f"{k}={v}\n")
+
+                await container.start()
+
+                if self.internal_data.get("sudo_session_enabled", False):
+                    exec = await container.exec(
+                        [
+                            # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                            "sh",
+                            "-c",
+                            'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                        ],
+                        user="root",
+                    )
+                    shell_response = await exec.start(detach=True)
+                    if shell_response:
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"sudoers provision failed: {shell_response.decode()}",
+                        )
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
@@ -923,33 +942,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         container_id=container._id, message=f"unknown. {repr(e)}"
                     )
                 raise
-
-            try:
-                await container.start()
-            except asyncio.CancelledError:
-                await _rollback_container_creation()
-                raise ContainerCreationError(container_id=cid, message="Container start cancelled")
-            except Exception as e:
-                await _rollback_container_creation()
-                raise ContainerCreationError(container_id=cid, message=f"unknown. {repr(e)}")
-
-            if self.internal_data.get("sudo_session_enabled", False):
-                exec = await container.exec(
-                    [
-                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
-                        "sh",
-                        "-c",
-                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
-                    ],
-                    user="root",
-                )
-                shell_response = await exec.start(detach=True)
-                if shell_response:
-                    await _rollback_container_creation()
-                    raise ContainerCreationError(
-                        container_id=cid,
-                        message=f"sudoers provision failed: {shell_response.decode()}",
-                    )
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
