@@ -297,6 +297,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
+    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -404,6 +405,7 @@ vfolder_invitations = sa.Table(
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
+    IDColumn(),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column(
         "vfolder",
@@ -413,6 +415,10 @@ vfolder_permissions = sa.Table(
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
 )
+
+
+class VFolderPermissionRow(Base):
+    __table__ = vfolder_permissions
 
 
 class VFolderRow(Base):
