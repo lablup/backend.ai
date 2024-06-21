@@ -1842,7 +1842,7 @@ class AbstractAgent(
                 if kernel_config["session_type"] == SessionTypes.INFERENCE:
                     model_definition = await self.load_model_definition(
                         RuntimeVariant(
-                            (kernel_config["internal_data"] or {}).get("runtime_variant", "CUSTOM")
+                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
                         ),
                         model_folders,
                         environ,
