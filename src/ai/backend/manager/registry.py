@@ -2246,6 +2246,9 @@ class AgentRegistry:
                         self.db, session_id, SessionStatus.CANCELLED
                     )
                 case SessionStatus.PULLING:
+                    # Exceptionally allow superadmins to destroy PULLING sessions.
+                    # Clients should be informed that they have to handle the containers destroyed here.
+                    # TODO: detach image-pull process from kernel-start process and allow all users to destroy PULLING sessions.
                     if forced and user_role == UserRole.SUPERADMIN:
                         log.warning(
                             "force-terminating session (s:{}, status:{})",
@@ -2272,6 +2275,8 @@ class AgentRegistry:
                         target_session.status,
                     )
                     if user_role == UserRole.SUPERADMIN:
+                        # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
+                        # TODO: refactor Session/Kernel status management and remove this.
                         await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
                         return {}
                     else:
