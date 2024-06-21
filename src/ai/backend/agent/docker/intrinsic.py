@@ -578,6 +578,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
