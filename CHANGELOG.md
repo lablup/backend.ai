@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.6 (2024-06-21)
+
+### Fixes
+* Fix model service sessions created before 24.03.5 failing to spawn ([#2318](https://github.com/lablup/backend.ai/issues/2318))
+* Image commit not working ([#2319](https://github.com/lablup/backend.ai/issues/2319))
+* model service session scheduler (`scale_services()`) failing when sessions bound to active route already marked as terminated ([#2320](https://github.com/lablup/backend.ai/issues/2320))
+* Fix container metric collection halted on systems with Cgroups v1 ([#2321](https://github.com/lablup/backend.ai/issues/2321))
+
+
 ## 24.03.5 (2024-06-20)
 
 * New redis client (experimental) ([#2041](https://github.com/lablup/backend.ai/issues/2041))
