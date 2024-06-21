@@ -1679,7 +1679,7 @@ class AbstractAgent(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
             )
 
-    async def trigger_batch_execution(
+    async def create_batch_execution_task(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
