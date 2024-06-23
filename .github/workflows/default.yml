@@ -163,6 +163,7 @@ jobs:
       with:
           path: .git/lfs
           key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - uses: mxschmitt/action-tmate@v3
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
