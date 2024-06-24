@@ -45,7 +45,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload, with_loader_criteria
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
@@ -1621,10 +1621,16 @@ class AgentRegistry:
                         SessionRow.session_type,
                     ),
                     selectinload(
-                        SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE).options(
-                            load_only(KernelRow.id, KernelRow.agent, KernelRow.startup_command)
+                        SessionRow.kernels,
+                    ).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.agent,
+                            KernelRow.cluster_role,
+                            KernelRow.startup_command,
                         )
                     ),
+                    with_loader_criteria(KernelRow, KernelRow.cluster_role == DEFAULT_ROLE),
                 )
             )
             async with self.db.begin_readonly_session() as db_session:
