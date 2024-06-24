@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 from tabulate import tabulate
 
-from ai.backend.agent.config import get_agent_cfg
+from ai.backend.agent.config import load_local_config
 from ai.backend.agent.server import agent_local_config_iv
 from ai.backend.cli.types import CliContextInfo
 from ai.backend.common import config
@@ -80,7 +80,7 @@ def status(
     """
     Collect and print each agent process's status.
     """
-    cfg = config.check(get_agent_cfg(config_path, log_level, debug), agent_local_config_iv)
+    cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
     pid_filepath = cfg["agent"]["pid-file"]
 
     with open(pid_filepath, "r") as file:

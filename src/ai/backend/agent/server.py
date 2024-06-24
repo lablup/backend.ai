@@ -76,7 +76,7 @@ from .config import (
     agent_etcd_config_iv,
     agent_local_config_iv,
     container_etcd_config_iv,
-    get_agent_cfg,
+    load_local_config,
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -969,7 +969,7 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
-    cfg = config.check(get_agent_cfg(config_path, log_level, debug), agent_local_config_iv)
+    cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()
