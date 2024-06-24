@@ -85,7 +85,7 @@ def status(
         local_config = load_local_config(config_path, log_level, debug=debug)
     except ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            "ConfigurationError: Could not read or validate the storage-proxy local config.",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -93,7 +93,7 @@ def status(
 
     pid_filepath = local_config["storage-proxy"]["pid-file"]
 
-    if not pid_filepath:
+    if not pid_filepath.is_file():
         print(
             'ConfigurationError: "pid-file" not found in the configuration file.',
             file=sys.stderr,

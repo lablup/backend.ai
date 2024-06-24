@@ -1,14 +1,11 @@
 import os
-import sys
 from pathlib import Path
-from pprint import pformat
 from typing import Any
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
 from ai.backend.common.config import (
-    ConfigurationError,
     check,
     etcd_config_iv,
     override_key,
@@ -132,17 +129,9 @@ def load_local_config(
     override_key(raw_cfg, ("logging", "level"), log_level)
     override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    try:
-        local_config = check(raw_cfg, storage_proxy_local_config_iv)
-        local_config["_src"] = cfg_src_path
-        return local_config
-    except ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise
+    local_config = check(raw_cfg, storage_proxy_local_config_iv)
+    local_config["_src"] = cfg_src_path
+    return local_config
 
 
 def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
