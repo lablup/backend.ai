@@ -146,7 +146,7 @@ class Agent(graphene.ObjectType):
     container_count = graphene.Int()
 
     # Dynamic fields.
-    gpu_alloc_map = graphene.JSONString(description="Added in 24.03.5")
+    gpu_alloc_map = graphene.JSONString(description="Added in 24.09.0")
 
     # Legacy fields
     mem_slots = graphene.Int()
