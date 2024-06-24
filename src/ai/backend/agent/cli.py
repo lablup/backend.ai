@@ -3,11 +3,12 @@ import pathlib
 import sys
 from pathlib import Path
 from pprint import pformat
+from typing import Any, cast
 
 import click
 from tabulate import tabulate
 
-from ai.backend.agent.config import agent_local_config_iv, load_local_config
+from ai.backend.agent.config import load_local_config
 from ai.backend.cli.types import CliContextInfo
 from ai.backend.common import config
 from ai.backend.common.types import LogSeverity
@@ -82,9 +83,7 @@ def status(
     Collect and print each agent process's status.
     """
     try:
-        local_config = config.check(
-            load_local_config(config_path, log_level, debug), agent_local_config_iv
-        )
+        local_config = cast(Any, load_local_config(config_path, log_level, debug))
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the agent local config.",
