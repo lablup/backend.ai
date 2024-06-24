@@ -15,6 +15,7 @@ from collections import OrderedDict, defaultdict
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
+from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -74,7 +75,6 @@ from ai.backend.common.utils import current_loop
 from . import __version__ as VERSION
 from .config import (
     agent_etcd_config_iv,
-    agent_local_config_iv,
     container_etcd_config_iv,
     load_local_config,
 )
@@ -969,7 +969,12 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
-    cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
+    try:
+        cfg = load_local_config(config_path, log_level, debug)
+    except config.ConfigurationError as e:
+        print("ConfigurationError: Validation of agent local config has failed.", file=sys.stderr)
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()

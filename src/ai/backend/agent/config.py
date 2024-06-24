@@ -1,9 +1,7 @@
 import os
-import sys
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 
-import click
 import trafaret as t
 
 from ai.backend.common import config
@@ -174,26 +172,19 @@ def load_local_config(
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
-    try:
-        cfg = config.check(raw_cfg, agent_local_config_iv)
+    cfg = config.check(raw_cfg, agent_local_config_iv)
 
-        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
-            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
-                cfg["container"]["scratch-nfs-address"] is None
-                or cfg["container"]["scratch-nfs-options"] is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
-        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
-            config.check(raw_cfg, docker_extra_config_iv)
-        if "debug" in cfg and cfg["debug"]["enabled"]:
-            print("== Agent configuration ==")
-            pprint(cfg)
-        cfg["_src"] = cfg_src_path
-    except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+    if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
+        if cfg["container"]["scratch-type"] == "k8s-nfs" and (
+            cfg["container"]["scratch-nfs-address"] is None
+            or cfg["container"]["scratch-nfs-options"] is None
+        ):
+            raise ValueError("scratch-nfs-address and scratch-nfs-options are required for k8s-nfs")
+    if cfg["agent"]["backend"] == AgentBackend.DOCKER:
+        config.check(raw_cfg, docker_extra_config_iv)
+    if "debug" in cfg and cfg["debug"]["enabled"]:
+        print("== Agent configuration ==")
+        pprint(cfg)
+    cfg["_src"] = cfg_src_path
 
     return cfg
