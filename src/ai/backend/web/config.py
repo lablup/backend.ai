@@ -1,13 +1,18 @@
 import os
+import sys
 from pathlib import Path
+from pprint import pformat
 from typing import Any, Mapping
 
 import pkg_resources
+import tomli
 import trafaret as t
 import yarl
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.types import LogSeverity
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
 
@@ -153,3 +158,28 @@ config_iv = t.Dict({
     t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
     t.Key("debug"): t.Dict({t.Key("enabled", default=False): t.ToBool}).allow_extra("*"),
 }).allow_extra("*")
+
+
+def load_local_config(
+    config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> dict[str, Any]:
+    # Delete this part when you remove --debug option
+    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+
+    if debug:
+        log_level = LogSeverity.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+
+    try:
+        cfg = config.check(raw_cfg, config_iv)
+        config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
+        return cfg
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Validation of webserver config has failed:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise

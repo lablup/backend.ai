@@ -11,21 +11,21 @@ import time
 import traceback
 from functools import partial
 from pathlib import Path
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, AsyncIterator, MutableMapping, Tuple
 
 import aiohttp_cors
 import aiotools
 import click
 import jinja2
-import tomli
 from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common import config, redis_helper
+from ai.backend.common import redis_helper
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
@@ -34,7 +34,7 @@ from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
-from .config import config_iv
+from .config import load_local_config
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
@@ -738,17 +738,16 @@ def main(
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
-    # Delete this part when you remove --debug option
-    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
-    if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-
-    cfg = config.check(raw_cfg, config_iv)
-    config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
+    try:
+        cfg = load_local_config(config_path, log_level, debug=debug)
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the webserver local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     if ctx.invoked_subcommand is None:
         cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
