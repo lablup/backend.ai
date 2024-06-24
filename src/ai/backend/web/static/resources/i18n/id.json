@@ -1562,7 +1562,10 @@
     "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
     "AdditionalMounts": "Pemasangan Tambahan",
     "ModelDefinitionPath": "Jalur File Definisi Model",
-    "NoExtraMounts": "Tidak ada tunggangan tambahan"
+    "NoExtraMounts": "Tidak ada tunggangan tambahan",
+    "SyncRoutes": "Menyinkronkan rute",
+    "SyncRoutesFailed": "Permintaan sinkronisasi rute gagal.",
+    "SyncRoutesRequested": "Sinkronisasi rute telah diminta."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",

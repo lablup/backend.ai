@@ -475,7 +475,10 @@
     "ModelMountDestination": "모델 폴더 마운트 할 경로",
     "AdditionalMounts": "추가 마운트",
     "ModelDefinitionPath": "모델 정의 파일 경로",
-    "NoExtraMounts": "추가 마운트 없음"
+    "NoExtraMounts": "추가 마운트 없음",
+    "SyncRoutes": "라우트 동기화",
+    "SyncRoutesFailed": "라우트 동기화 요청이 실패했습니다.",
+    "SyncRoutesRequested": "라우트 동기화를 요청하였습니다."
   },
   "button": {
     "Cancel": "취소",

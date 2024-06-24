@@ -297,6 +297,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
+    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -411,6 +412,7 @@ vfolder_invitations = sa.Table(
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
+    IDColumn(),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column(
         "vfolder",
@@ -420,6 +422,10 @@ vfolder_permissions = sa.Table(
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
 )
+
+
+class VFolderPermissionRow(Base):
+    __table__ = vfolder_permissions
 
 
 class VFolderRow(Base):
@@ -1893,7 +1899,8 @@ class VirtualFolderNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -1909,9 +1916,6 @@ class VirtualFolderNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
@@ -2489,7 +2493,8 @@ class ModelCard(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -2505,9 +2510,6 @@ class ModelCard(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             model_store_project_gids = (
                 (

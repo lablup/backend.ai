@@ -571,6 +571,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
+            "domain_name": domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
