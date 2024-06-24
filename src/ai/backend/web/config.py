@@ -1,7 +1,5 @@
 import os
-import sys
 from pathlib import Path
-from pprint import pformat
 from typing import Any, Mapping
 
 import pkg_resources
@@ -163,23 +161,23 @@ webserver_local_config_iv = t.Dict({
 def load_local_config(
     config_path: Path, log_level: LogSeverity, debug: bool = False
 ) -> dict[str, Any]:
-    # Delete this part when you remove --debug option
-    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+    try:
+        # Delete this part when you remove --debug option
+        raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+    except IOError:
+        raise ConfigurationError({
+            "load_local_config()": (
+                f"Could not read the webserver local config file: {config_path}"
+            )
+        })
 
     if debug:
         log_level = LogSeverity.DEBUG
+
     config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level)
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    try:
-        cfg = config.check(raw_cfg, webserver_local_config_iv)
-        config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
-        return cfg
-    except ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of webserver config has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise
+    cfg = config.check(raw_cfg, webserver_local_config_iv)
+    config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
+    return cfg

@@ -80,13 +80,20 @@ def status(
         local_config = load_local_config(config_path, log_level, debug=debug)
     except ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the webserver local config:",
+            "ConfigurationError: Could not read or validate the webserver local config.",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
     pid_filepath = local_config["webserver"]["pid-file"]
+
+    if not pid_filepath.is_file():
+        print(
+            'ConfigurationError: "pid-file" not found in the configuration file.',
+            file=sys.stderr,
+        )
+        raise click.Abort()
 
     with open(pid_filepath, "r") as file:
         agent_pid = int(file.read())
