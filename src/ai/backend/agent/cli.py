@@ -86,13 +86,20 @@ def status(
         cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
     except config.ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the agent local config:",
+            "ConfigurationError: Could not read or validate the agent local config.",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
     pid_filepath = cfg["agent"]["pid-file"]
+
+    if not pid_filepath.is_file():
+        print(
+            'ConfigurationError: "pid-file" not found in the configuration file.',
+            file=sys.stderr,
+        )
+        raise click.Abort()
 
     with open(pid_filepath, "r") as file:
         agent_pid = int(file.read())
