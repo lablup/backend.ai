@@ -1,9 +1,14 @@
 import os
+import sys
+from pathlib import Path
+from pprint import pformat, pprint
 
+import click
 import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.types import LogSeverity
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
@@ -138,3 +143,65 @@ container_etcd_config_iv = t.Dict({
     t.Key("kernel-uid", optional=True): t.ToInt,
     t.Key("kernel-gid", optional=True): t.ToInt,
 }).allow_extra("*")
+
+
+def get_agent_cfg(
+    config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> dict[str, t.Any]:
+    # Determine where to read configuration.
+    try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+
+    # Override the read config with environment variables (for legacy).
+    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+    config.override_with_env(
+        raw_cfg, ("agent", "rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
+    )
+    config.override_with_env(raw_cfg, ("agent", "rpc-listen-addr", "port"), "BACKEND_AGENT_PORT")
+    config.override_with_env(raw_cfg, ("agent", "pid-file"), "BACKEND_PID_FILE")
+    config.override_with_env(raw_cfg, ("container", "port-range"), "BACKEND_CONTAINER_PORT_RANGE")
+    config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
+    config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
+    config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
+
+    if debug:
+        log_level = LogSeverity.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+
+    # Validate and fill configurations
+    # (allow_extra will make configs to be forward-copmatible)
+    try:
+        cfg = config.check(raw_cfg, agent_local_config_iv)
+
+        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
+            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
+                cfg["container"]["scratch-nfs-address"] is None
+                or cfg["container"]["scratch-nfs-options"] is None
+            ):
+                raise ValueError(
+                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
+                )
+        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
+            config.check(raw_cfg, docker_extra_config_iv)
+        if "debug" in cfg and cfg["debug"]["enabled"]:
+            print("== Agent configuration ==")
+            pprint(cfg)
+        cfg["_src"] = cfg_src_path
+    except config.ConfigurationError as e:
+        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+
+    return cfg
