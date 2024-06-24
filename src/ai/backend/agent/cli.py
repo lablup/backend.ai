@@ -8,7 +8,6 @@ import click
 from tabulate import tabulate
 
 from ai.backend.agent.config import load_local_config
-from ai.backend.agent.server import agent_local_config_iv
 from ai.backend.cli.types import CliContextInfo
 from ai.backend.common import config
 from ai.backend.common.types import LogSeverity
@@ -83,7 +82,7 @@ def status(
     Collect and print each agent process's status.
     """
     try:
-        cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
+        local_config = load_local_config(config_path, log_level, debug)
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the agent local config.",
@@ -92,7 +91,7 @@ def status(
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
-    pid_filepath = cfg["agent"]["pid-file"]
+    pid_filepath = local_config["agent"]["pid-file"]
 
     if not pid_filepath.is_file():
         print(

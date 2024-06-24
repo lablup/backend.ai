@@ -970,7 +970,7 @@ def main(
 ) -> int:
     """Start the agent service as a foreground process."""
     try:
-        cfg = load_local_config(config_path, log_level, debug)
+        local_config = load_local_config(config_path, log_level, debug)
     except config.ConfigurationError as e:
         print("ConfigurationError: Validation of agent local config has failed.", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -978,11 +978,11 @@ def main(
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()
-    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+    if local_config["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = cfg["agent"]["rpc-listen-addr"].host
+    rpc_host = local_config["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
             "ConfigurationError: "
@@ -991,14 +991,14 @@ def main(
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["stats-type"] == "cgroup":
+    if os.getuid() != 0 and local_config["container"]["stats-type"] == "cgroup":
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+    if os.getuid() != 0 and local_config["container"]["scratch-type"] == "hostfile":
         print(
             "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
@@ -1006,7 +1006,7 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-        if cfg["debug"]["coredump"]["enabled"]:
+        if local_config["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
                     "ConfigurationError: Storing container coredumps is only supported in Linux.",
@@ -1022,20 +1022,20 @@ def main(
                     file=sys.stderr,
                 )
                 raise click.Abort()
-            cfg["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
+            local_config["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
 
-        cfg["agent"]["pid-file"].write_text(str(os.getpid()))
-        image_commit_path = cfg["agent"]["image-commit-path"]
+        local_config["agent"]["pid-file"].write_text(str(os.getpid()))
+        image_commit_path = local_config["agent"]["image-commit-path"]
         image_commit_path.mkdir(parents=True, exist_ok=True)
-        ipc_base_path = cfg["agent"]["ipc-base-path"]
+        ipc_base_path = local_config["agent"]["ipc-base-path"]
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg["logging"]["endpoint"] = log_endpoint
+        local_config["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(local_config["logging"], is_master=True, log_endpoint=log_endpoint)
             with logger:
-                ns = cfg["etcd"]["namespace"]
+                ns = local_config["etcd"]["namespace"]
                 setproctitle(f"backend.ai: agent {ns}")
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
@@ -1044,7 +1044,7 @@ def main(
                 if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
 
-                if cfg["agent"]["event-loop"] == "uvloop":
+                if local_config["agent"]["event-loop"] == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -1052,14 +1052,14 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
-                    args=(cfg, log_endpoint),
+                    args=(local_config, log_endpoint),
                     wait_timeout=5.0,
                 )
                 log.info("exit.")
         finally:
-            if cfg["agent"]["pid-file"].is_file():
+            if local_config["agent"]["pid-file"].is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg["agent"]["pid-file"].unlink()
+                local_config["agent"]["pid-file"].unlink()
     else:
         # Click is going to invoke a subcommand.
         pass
