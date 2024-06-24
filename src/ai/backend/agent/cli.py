@@ -1,6 +1,8 @@
 import asyncio
 import pathlib
+import sys
 from pathlib import Path
+from pprint import pformat
 
 import click
 from tabulate import tabulate
@@ -80,7 +82,16 @@ def status(
     """
     Collect and print each agent process's status.
     """
-    cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
+    try:
+        cfg = config.check(load_local_config(config_path, log_level, debug), agent_local_config_iv)
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the agent local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+
     pid_filepath = cfg["agent"]["pid-file"]
 
     with open(pid_filepath, "r") as file:

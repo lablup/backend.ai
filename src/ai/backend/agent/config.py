@@ -149,15 +149,7 @@ def load_local_config(
     config_path: Path, log_level: LogSeverity, debug: bool = False
 ) -> dict[str, t.Any]:
     # Determine where to read configuration.
-    try:
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Could not read or validate the agent local config:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+    raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
     # Override the read config with environment variables (for legacy).
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
