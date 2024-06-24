@@ -2228,15 +2228,12 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            async with root_ctx.db._begin_session(conn) as sess:
-                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
+            live_endpoints = await EndpointRow.list_by_model(conn, entry["id"])
+            if (
+                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
+                > 0
+            ):
+                raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
             conn,
