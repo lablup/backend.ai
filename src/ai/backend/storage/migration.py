@@ -25,6 +25,7 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 
 from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
@@ -324,7 +325,7 @@ def main(
     Print migration script to OUTFILE.
     Pass - as OUTFILE to print results to STDOUT.
     """
-    local_config = load_local_config(config_path, debug=debug)
+    local_config = load_local_config(config_path, LogSeverity.DEBUG, debug=debug)
     ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
     log_sockpath = Path(
         ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
