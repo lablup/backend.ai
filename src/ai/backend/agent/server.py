@@ -75,6 +75,7 @@ from ai.backend.common.utils import current_loop
 from . import __version__ as VERSION
 from .config import (
     agent_etcd_config_iv,
+    agent_local_config_iv,
     container_etcd_config_iv,
     load_local_config,
 )
@@ -970,7 +971,9 @@ def main(
 ) -> int:
     """Start the agent service as a foreground process."""
     try:
-        local_config = load_local_config(config_path, log_level, debug)
+        local_config = config.check(
+            load_local_config(config_path, log_level, debug), agent_local_config_iv
+        )
     except config.ConfigurationError as e:
         print("ConfigurationError: Validation of agent local config has failed.", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
