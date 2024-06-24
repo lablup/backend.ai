@@ -51,7 +51,7 @@ async def inspect_server_status(cli_ctx: CliContextInfo, storage_proxy_pid: int)
         path_type=pathlib.Path,
     ),
     default=None,
-    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
+    help="The config file path. (default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
 )
 @click.option(
     "--debug",
@@ -78,7 +78,7 @@ def status(
     systemctl: bool = False,
 ) -> None:
     """
-    Collect and print each storage proxy server process's status.
+    Collect and print each storage-proxy server process's status.
     """
 
     try:
@@ -93,7 +93,7 @@ def status(
 
     pid_filepath = local_config["storage-proxy"]["pid-file"]
 
-    if not pid_filepath.exists():
+    if not pid_filepath:
         print(
             'ConfigurationError: "pid-file" not found in the configuration file.',
             file=sys.stderr,

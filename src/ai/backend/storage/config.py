@@ -31,7 +31,7 @@ except IOError:
     _default_gid = os.getgid()
 
 
-local_config_iv = (
+storage_proxy_local_config_iv = (
     t.Dict(
         {
             t.Key("storage-proxy"): t.Dict(
@@ -133,7 +133,7 @@ def load_local_config(
     override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
-        local_config = check(raw_cfg, local_config_iv)
+        local_config = check(raw_cfg, storage_proxy_local_config_iv)
         local_config["_src"] = cfg_src_path
         return local_config
     except ConfigurationError as e:
