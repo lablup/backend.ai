@@ -694,7 +694,7 @@ type ScalingGroup {
   scheduler_opts: JSONString
   use_host_network: Boolean
 
-  """Added in 24.03.5."""
+  """Added in 24.03.7."""
   agent_count_by_status(
     """
     Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
@@ -702,7 +702,7 @@ type ScalingGroup {
     status: String = "ALIVE"
   ): Int
 
-  """Added in 24.03.5."""
+  """Added in 24.03.7."""
   agent_total_resource_slots_by_status(
     """
     Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
