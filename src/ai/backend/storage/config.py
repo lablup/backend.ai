@@ -17,6 +17,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import logging_config_iv
+from ai.backend.common.types import LogSeverity
 
 from .types import VolumeInfo
 
@@ -113,7 +114,9 @@ local_config_iv = (
 )
 
 
-def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str, Any]:
+def load_local_config(
+    config_path: Path | None, log_level: LogSeverity, debug: bool = False
+) -> dict[str, Any]:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = read_from_file(config_path, "storage-proxy")
     os.chdir(cfg_src_path.parent)
@@ -124,6 +127,10 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str
     override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
     if debug:
         override_key(raw_cfg, ("debug", "enabled"), True)
+
+    override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    override_key(raw_cfg, ("logging", "level"), log_level)
+    override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
         local_config = check(raw_cfg, local_config_iv)
