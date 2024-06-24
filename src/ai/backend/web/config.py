@@ -31,7 +31,7 @@ _config_defaults: Mapping[str, Any] = {
     },
 }
 
-config_iv = t.Dict({
+webserver_local_config_iv = t.Dict({
     t.Key("service"): t.Dict({
         t.Key("ip", default="0.0.0.0"): tx.IPAddress,
         t.Key("port"): t.ToInt[1:65535],
@@ -173,7 +173,7 @@ def load_local_config(
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
-        cfg = config.check(raw_cfg, config_iv)
+        cfg = config.check(raw_cfg, webserver_local_config_iv)
         config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
         return cfg
     except ConfigurationError as e:
