@@ -324,7 +324,7 @@ class ScalingGroup(graphene.ObjectType):
     # Dynamic fields.
     agent_count_by_status = graphene.Field(
         graphene.Int,
-        description="Added in 24.03.5.",
+        description="Added in 24.03.7.",
         status=graphene.String(
             default_value=AgentStatus.ALIVE.name,
             description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
@@ -333,7 +333,7 @@ class ScalingGroup(graphene.ObjectType):
 
     agent_total_resource_slots_by_status = graphene.Field(
         graphene.JSONString,
-        description="Added in 24.03.5.",
+        description="Added in 24.03.7.",
         status=graphene.String(
             default_value=AgentStatus.ALIVE.name,
             description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
