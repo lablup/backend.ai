@@ -350,7 +350,7 @@ class EndpointRow(Base):
     @classmethod
     async def list_by_model(
         cls,
-        conn: AsyncConnection,
+        session: AsyncSession,
         model_id: uuid.UUID,
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
@@ -385,7 +385,7 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.domain == domain)
         if user_uuid:
             query = query.filter(EndpointRow.session_owner == user_uuid)
-        result = await conn.execute(query)
+        result = await session.execute(query)
         return result.scalars().all()
 
 

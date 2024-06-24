@@ -2204,16 +2204,17 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=condition,
-        )
+    async with root_ctx.db.connect() as _conn:
+        async with root_ctx.db.begin_readonly(_conn) as db_conn:
+            entries = await query_accessible_vfolders(
+                db_conn,
+                user_uuid,
+                allow_privileged_access=True,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=condition,
+            )
         if len(entries) > 1:
             raise TooManyVFoldersFound(
                 extra_msg="Multiple folders with the same name.",
@@ -2228,22 +2229,26 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            live_endpoints = await EndpointRow.list_by_model(conn, entry["id"])
-            if (
-                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
-                > 0
-            ):
-                raise ModelServiceDependencyNotCleared
-        folder_host = entry["host"]
-        await ensure_host_permission_allowed(
-            conn,
-            folder_host,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_uuid,
-            resource_policy=resource_policy,
-            domain_name=domain_name,
-            permission=VFolderHostPermission.DELETE,
-        )
+            async with root_ctx.db.begin_readonly_session(_conn) as db_session:
+                live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+                if (
+                    len([
+                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
+                    ])
+                    > 0
+                ):
+                    raise ModelServiceDependencyNotCleared
+            folder_host = entry["host"]
+        async with root_ctx.db.begin_readonly(_conn) as db_conn:
+            await ensure_host_permission_allowed(
+                db_conn,
+                folder_host,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                permission=VFolderHostPermission.DELETE,
+            )
 
     await update_vfolder_status(
         root_ctx.db,
