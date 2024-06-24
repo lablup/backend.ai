@@ -3,11 +3,14 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import pkg_resources
+import tomli
 import trafaret as t
 import yarl
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.types import LogSeverity
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
 
@@ -26,7 +29,7 @@ _config_defaults: Mapping[str, Any] = {
     },
 }
 
-config_iv = t.Dict({
+webserver_local_config_iv = t.Dict({
     t.Key("service"): t.Dict({
         t.Key("ip", default="0.0.0.0"): tx.IPAddress,
         t.Key("port"): t.ToInt[1:65535],
@@ -153,3 +156,28 @@ config_iv = t.Dict({
     t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
     t.Key("debug"): t.Dict({t.Key("enabled", default=False): t.ToBool}).allow_extra("*"),
 }).allow_extra("*")
+
+
+def load_local_config(
+    config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> dict[str, Any]:
+    try:
+        # Delete this part when you remove --debug option
+        raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+    except IOError:
+        raise ConfigurationError({
+            "load_local_config()": (
+                f"Could not read the webserver local config file: {config_path}"
+            )
+        })
+
+    if debug:
+        log_level = LogSeverity.DEBUG
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+
+    cfg = config.check(raw_cfg, webserver_local_config_iv)
+    config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
+    return cfg
