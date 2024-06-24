@@ -948,7 +948,7 @@ async def server_main(
     "--config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",

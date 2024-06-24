@@ -323,7 +323,7 @@ async def watcher_server(loop, pidx, args):
     "--config",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",
