@@ -18,7 +18,7 @@ def main():
     pass
 
 
-async def inspect_agent_status(cli_ctx: CliContextInfo, agent_pid: int) -> None:
+async def inspect_server_status(cli_ctx: CliContextInfo, agent_pid: int) -> None:
     command = f"ps -p '{agent_pid}' -f"
     process = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
@@ -86,4 +86,4 @@ def status(
     with open(pid_filepath, "r") as file:
         agent_pid = int(file.read())
 
-    asyncio.run(inspect_agent_status(cli_ctx, agent_pid))
+    asyncio.run(inspect_server_status(cli_ctx, agent_pid))
