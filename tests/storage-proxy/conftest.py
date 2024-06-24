@@ -10,7 +10,7 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
+from ai.backend.common.types import HostPortPair, LogSeverity, QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
@@ -47,7 +47,7 @@ def mock_etcd() -> Iterator[AsyncEtcd]:
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
     try:
-        local_config = load_local_config(None, debug=True)
+        local_config = load_local_config(None, LogSeverity.DEBUG, debug=True)
     except ConfigurationError:
         return None
     for _, info in local_config["volume"].items():

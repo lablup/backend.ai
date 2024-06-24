@@ -1,14 +1,11 @@
 import os
-import sys
 from pathlib import Path
-from pprint import pformat
 from typing import Any
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
 from ai.backend.common.config import (
-    ConfigurationError,
     check,
     etcd_config_iv,
     override_key,
@@ -17,6 +14,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import logging_config_iv
+from ai.backend.common.types import LogSeverity
 
 from .types import VolumeInfo
 
@@ -30,7 +28,7 @@ except IOError:
     _default_gid = os.getgid()
 
 
-local_config_iv = (
+storage_proxy_local_config_iv = (
     t.Dict(
         {
             t.Key("storage-proxy"): t.Dict(
@@ -113,7 +111,9 @@ local_config_iv = (
 )
 
 
-def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str, Any]:
+def load_local_config(
+    config_path: Path | None, log_level: LogSeverity, debug: bool = False
+) -> dict[str, Any]:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = read_from_file(config_path, "storage-proxy")
     os.chdir(cfg_src_path.parent)
@@ -125,17 +125,13 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str
     if debug:
         override_key(raw_cfg, ("debug", "enabled"), True)
 
-    try:
-        local_config = check(raw_cfg, local_config_iv)
-        local_config["_src"] = cfg_src_path
-        return local_config
-    except ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise
+    override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    override_key(raw_cfg, ("logging", "level"), log_level)
+    override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+
+    local_config = check(raw_cfg, storage_proxy_local_config_iv)
+    local_config["_src"] = cfg_src_path
+    return local_config
 
 
 def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:

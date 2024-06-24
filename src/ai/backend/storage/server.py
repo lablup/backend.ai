@@ -20,7 +20,6 @@ from setproctitle import setproctitle
 
 from ai.backend.common.config import (
     ConfigurationError,
-    override_key,
     redis_config_iv,
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
@@ -252,7 +251,7 @@ def main(
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
     try:
-        local_config = load_local_config(config_path, debug=debug)
+        local_config = load_local_config(config_path, log_level, debug=debug)
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
@@ -262,10 +261,6 @@ def main(
         raise click.Abort()
     if debug:
         log_level = LogSeverity.DEBUG
-    override_key(local_config, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    override_key(local_config, ("logging", "level"), log_level)
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
-
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
