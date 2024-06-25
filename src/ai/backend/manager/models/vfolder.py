@@ -2219,7 +2219,7 @@ class ModelCard(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
-    vfolder = graphene.Field(VirtualFolder)
+    vfolder = graphene.Field(VirtualFolderNode)
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -2450,7 +2450,9 @@ class ModelCard(graphene.ObjectType):
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(db_session, uuid.UUID(vfolder_row_id))
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
