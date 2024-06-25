@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -11,6 +12,8 @@ log = BraceStyleAdapter(logging.getLogger())
 
 
 async def init_sshd_service(child_env):
+    if Path("/tmp/dropbear").is_dir():
+        shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
     auth_path = Path("/home/work/.ssh/authorized_keys")
     if not auth_path.is_file():

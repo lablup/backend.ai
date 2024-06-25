@@ -302,6 +302,7 @@ manager_local_config_iv = (
                 1:65535
             ],
             t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
+            t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
         }).allow_extra("*"),
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
             t.Key("ssl-verify", default=True): t.ToBool,

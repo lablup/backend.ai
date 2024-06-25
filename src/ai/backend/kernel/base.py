@@ -237,15 +237,13 @@ class BaseRunner(metaclass=ABCMeta):
         self._log_task = loop.create_task(self._handle_logs())
         await asyncio.sleep(0)
 
+        self.service_parser = ServiceParser({
+            "runtime_path": str(self.runtime_path),
+        })
         service_def_folder = Path("/etc/backend.ai/service-defs")
         if service_def_folder.is_dir():
-            self.service_parser = ServiceParser({
-                "runtime_path": str(self.runtime_path),
-            })
             await self.service_parser.parse(service_def_folder)
             log.debug("Loaded new-style service definitions.")
-        else:
-            self.service_parser = None
 
         self._main_task = loop.create_task(self.main_loop(cmdargs))
         self._run_task = loop.create_task(self.run_tasks())

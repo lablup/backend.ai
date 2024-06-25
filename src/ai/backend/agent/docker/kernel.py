@@ -208,6 +208,7 @@ class DockerKernel(AbstractKernel):
 
                     container = docker.containers.container(container_id)
                     changes: list[str] = []
+
                     for label_name, label_value in extra_labels.items():
                         changes.append(f"LABEL {label_name}={label_value}")
                     if canonical:

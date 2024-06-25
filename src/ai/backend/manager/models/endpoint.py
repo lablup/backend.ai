@@ -2,24 +2,50 @@ import datetime
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
 
 import graphene
 import jwt
 import sqlalchemy as sa
+import trafaret as t
+import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, ResourceSlot
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    AccessKey,
+    ClusterMode,
+    MountPermission,
+    MountTypes,
+    ResourceSlot,
+    RuntimeVariant,
+    SessionTypes,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
+)
+from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
+from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.types import MountOptionModel, UserScope
 
-from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound
+from ..api.exceptions import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
+    InvalidAPIParameters,
+    ObjectNotFound,
+    ServiceUnavailable,
+)
 from .base import (
     GUID,
     Base,
@@ -31,15 +57,21 @@ from .base import (
     Item,
     PaginatedList,
     ResourceSlotColumn,
+    StrEnumType,
+    StructuredJSONObjectListColumn,
     URLColumn,
-    set_if_set,
-    simple_db_mutate_returning_item,
+    gql_mutation_wrapper,
 )
 from .image import ImageNode, ImageRefType, ImageRow
+from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
-from .user import UserRole
+from .scaling_group import scaling_groups
+from .user import UserRole, UserRow
+from .vfolder import VFolderRow, VirtualFolderNode, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
+    from ai.backend.manager.config import SharedConfig
+
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -47,6 +79,7 @@ __all__ = (
     "Endpoint",
     "EndpointLifecycle",
     "EndpointList",
+    "ModelServicePredicateChecker",
     "ModifyEndpoint",
     "EndpointTokenRow",
     "EndpointToken",
@@ -87,8 +120,8 @@ class EndpointRow(Base):
         sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
-    model_mount_destiation = sa.Column(
-        "model_mount_destiation",
+    model_mount_destination = sa.Column(
+        "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
@@ -124,6 +157,14 @@ class EndpointRow(Base):
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
+    runtime_variant = sa.Column(
+        "runtime_variant",
+        StrEnumType(RuntimeVariant),
+        nullable=False,
+        default=RuntimeVariant.CUSTOM,
+    )
+
+    model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     url = sa.Column("url", sa.String(length=1024))
@@ -137,6 +178,14 @@ class EndpointRow(Base):
     )
     cluster_size = sa.Column(
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
+    )
+
+    extra_mounts = sa.Column(
+        "extra_mounts",
+        StructuredJSONObjectListColumn(VFolderMount),
+        nullable=False,
+        default=[],
+        server_default="[]",
     )
 
     retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
@@ -155,6 +204,7 @@ class EndpointRow(Base):
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
+    model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -165,6 +215,7 @@ class EndpointRow(Base):
     def __init__(
         self,
         name: str,
+        model_definition_path: str | None,
         created_user: uuid.UUID,
         session_owner: uuid.UUID,
         desired_session_count: int,
@@ -176,6 +227,9 @@ class EndpointRow(Base):
         resource_slots: Mapping[str, Any],
         cluster_mode: ClusterMode,
         cluster_size: int,
+        extra_mounts: Sequence[VFolderMount],
+        runtime_variant: RuntimeVariant,
+        *,
         model_mount_destination: Optional[str] = None,
         tag: Optional[str] = None,
         startup_command: Optional[str] = None,
@@ -187,6 +241,7 @@ class EndpointRow(Base):
     ):
         self.id = uuid.uuid4()
         self.name = name
+        self.model_definition_path = model_definition_path
         self.created_user = created_user
         self.session_owner = session_owner
         self.desired_session_count = desired_session_count
@@ -198,7 +253,8 @@ class EndpointRow(Base):
         self.resource_slots = resource_slots
         self.cluster_mode = cluster_mode.name
         self.cluster_size = cluster_size
-        self.model_mount_destination = model_mount_destination
+        self.extra_mounts = extra_mounts
+        self.model_mount_destination = model_mount_destination or "/models"
         self.tag = tag
         self.startup_command = startup_command
         self.bootstrap_script = bootstrap_script
@@ -206,6 +262,7 @@ class EndpointRow(Base):
         self.environ = environ
         self.resource_opts = resource_opts
         self.open_to_public = open_to_public
+        self.runtime_variant = runtime_variant
 
     @classmethod
     async def get(
@@ -220,6 +277,7 @@ class EndpointRow(Base):
         load_image=False,
         load_created_user=False,
         load_session_owner=False,
+        load_model=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -230,11 +288,15 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_row))
+            query = query.options(
+                selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases)
+            )
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
             query = query.options(selectinload(EndpointRow.session_owner_row))
+        if load_model:
+            query = query.options(selectinload(EndpointRow.model_row))
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -424,30 +486,255 @@ class EndpointTokenRow(Base):
         return row
 
 
+class ModelServicePredicateChecker:
+    @staticmethod
+    async def check_scaling_group(
+        conn: AsyncConnection,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        target_domain: str,
+        target_project: str | uuid.UUID,
+    ) -> str:
+        """
+        Wrapper of `registry.check_scaling_group()` with additional guards flavored for
+        model service included
+        """
+        from ai.backend.manager.registry import check_scaling_group
+
+        checked_scaling_group = await check_scaling_group(
+            conn,
+            scaling_group,
+            SessionTypes.INFERENCE,
+            owner_access_key,
+            target_domain,
+            target_project,
+        )
+
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == checked_scaling_group))
+        )
+
+        result = await conn.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
+
+        if not sgroup["wsproxy_api_token"]:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
+        return checked_scaling_group
+
+    @staticmethod
+    async def check_extra_mounts(
+        conn: AsyncConnection,
+        shared_config: "SharedConfig",
+        storage_manager: StorageSessionManager,
+        model_id: uuid.UUID,
+        model_mount_destination: str,
+        extra_mounts: dict[uuid.UUID, MountOptionModel],
+        user_scope: UserScope,
+        resource_policy: dict[str, Any],
+    ) -> Sequence[VFolderMount]:
+        """
+        check if user is allowed to access every folders eagering to mount (other than model VFolder)
+        on general session creation lifecycle this check will be completed by `enqueue_session()` function,
+        which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
+        so we have to manually cover this part here.
+        """
+
+        if model_id in extra_mounts:
+            raise InvalidAPIParameters(
+                "Same VFolder appears on both model specification and VFolder mount"
+            )
+
+        requested_mounts = [*extra_mounts.keys()]
+        requested_mount_map: dict[str | uuid.UUID, str] = {
+            folder_id: options.mount_destination
+            for folder_id, options in extra_mounts.items()
+            if options.mount_destination
+        }
+        requested_mount_options: dict[str | uuid.UUID, Any] = {
+            folder_id: {
+                "type": options.type,
+                "permission": options.permission,
+            }
+            for folder_id, options in extra_mounts.items()
+        }
+        log.debug(
+            "requested mounts: {}, mount_map: {}, mount_options: {}",
+            requested_mounts,
+            requested_mount_map,
+            requested_mount_options,
+        )
+        allowed_vfolder_types = await shared_config.get_vfolder_types()
+        vfolder_mounts = await prepare_vfolder_mounts(
+            conn,
+            storage_manager,
+            allowed_vfolder_types,
+            user_scope,
+            resource_policy,
+            requested_mounts,
+            requested_mount_map,
+            requested_mount_options,
+        )
+
+        for vfolder in vfolder_mounts:
+            if vfolder.kernel_path == model_mount_destination:
+                raise InvalidAPIParameters(
+                    "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
+                )
+            if vfolder.usage_mode == VFolderUsageMode.MODEL:
+                raise InvalidAPIParameters(
+                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
+                )
+
+        return vfolder_mounts
+
+    @staticmethod
+    async def _listdir(
+        storage_manager: StorageSessionManager,
+        proxy_name: str,
+        volume_name: str,
+        vfid: VFolderID,
+        relpath: str,
+    ) -> dict[str, Any]:
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": relpath,
+            },
+        ) as (client_api_url, storage_resp):
+            return await storage_resp.json()
+
+    @staticmethod
+    async def validate_model_definition(
+        storage_manager: StorageSessionManager,
+        model_vfolder_row: VFolderRow | Mapping[str, Any],
+        model_definition_path: str | None,
+    ) -> str | None:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        Returns relative path to customized model-definition.yaml (if any) or None.
+        """
+        match model_vfolder_row:
+            case VFolderRow():
+                folder_name = model_vfolder_row.name
+                vfid = model_vfolder_row.vfid
+                folder_host = model_vfolder_row.host
+            case _:
+                folder_name = model_vfolder_row["name"]
+                vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
+                folder_host = model_vfolder_row["host"]
+
+        proxy_name, volume_name = storage_manager.split_host(folder_host)
+
+        if model_definition_path:
+            path = Path(model_definition_path)
+            storage_reply = await ModelServicePredicateChecker._listdir(
+                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
+            )
+            for item in storage_reply["items"]:
+                if item["name"] == path.name:
+                    yaml_name = model_definition_path
+                    break
+            else:
+                raise InvalidAPIParameters(
+                    f"Model definition YAML file {model_definition_path} not found inside the model storage"
+                )
+        else:
+            storage_reply = await ModelServicePredicateChecker._listdir(
+                storage_manager, proxy_name, volume_name, vfid, "."
+            )
+            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
+            for item in storage_reply["items"]:
+                if item["name"] in model_definition_candidates:
+                    yaml_name = item["name"]
+                    break
+            else:
+                raise InvalidAPIParameters(
+                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
+                )
+
+        chunks = bytes()
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": f"./{yaml_name}",
+            },
+        ) as (client_api_url, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        model_definition_yaml = chunks.decode("utf-8")
+        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+        try:
+            model_definition = model_definition_iv.check(model_definition_dict)
+            assert model_definition is not None
+        except t.DataError as e:
+            raise InvalidAPIParameters(
+                f"Failed to validate model definition from vFolder {folder_name} (ID"
+                f" {vfid.folder_id}): {e}",
+            ) from e
+        except yaml.error.YAMLError as e:
+            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+
+        return yaml_name
+
+
+class RuntimeVariantInfo(graphene.ObjectType):
+    """Added in 24.03.5."""
+
+    name = graphene.String()
+    human_readable_name = graphene.String()
+
+    @classmethod
+    def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
+        return cls(name=enum.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String(deprecation_reason="Deprecated since 23.09.9; use `image_object`")
-    image_object = graphene.Field(ImageNode, description="Added at 23.09.9")
+    image = graphene.String(deprecation_reason="Deprecated since 23.09.9. use `image_object`")
+    image_object = graphene.Field(ImageNode, description="Added in 23.09.9.")
     domain = graphene.String()
     project = graphene.String()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
     model = graphene.UUID()
-    model_mount_destiation = graphene.String()
+    model_definition_path = graphene.String(description="Added in 24.03.4.")
+    model_vfolder = VirtualFolderNode()
+    model_mount_destiation = graphene.String(
+        deprecation_reason="Deprecated since 24.03.4; use `model_mount_destination` instead"
+    )
+    model_mount_destination = graphene.String(description="Added in 24.03.4.")
+    extra_mounts = graphene.List(lambda: VirtualFolderNode, description="Added in 24.03.4.")
     created_user = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `created_user_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `created_user_id`"
     )
-    created_user_email = graphene.String(description="Added at 23.09.8")
-    created_user_id = graphene.UUID(description="Added at 23.09.8")
+    created_user_email = graphene.String(description="Added in 23.09.8.")
+    created_user_id = graphene.UUID(description="Added in 23.09.8.")
     session_owner = graphene.UUID(
-        deprecation_reason="Deprecated since 23.09.8; use `session_owner_id`"
+        deprecation_reason="Deprecated since 23.09.8. use `session_owner_id`"
     )
-    session_owner_email = graphene.String(description="Added at 23.09.8")
-    session_owner_id = graphene.UUID(description="Added at 23.09.8")
+    session_owner_email = graphene.String(description="Added in 23.09.8.")
+    session_owner_id = graphene.UUID(description="Added in 23.09.8.")
     tag = graphene.String()
     startup_command = graphene.String()
     bootstrap_script = graphene.String()
@@ -459,6 +746,7 @@ class Endpoint(graphene.ObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
+    runtime_variant = graphene.Field(RuntimeVariantInfo, description="Added in 24.03.5.")
 
     created_at = GQLDateTime(required=True)
     destroyed_at = GQLDateTime()
@@ -487,7 +775,9 @@ class Endpoint(graphene.ObjectType):
             resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
-            model_mount_destiation=row.model_mount_destiation,
+            model_definition_path=row.model_definition_path,
+            model_mount_destiation=row.model_mount_destination,
+            model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
             created_user_email=row.created_user_row.email,
@@ -510,6 +800,7 @@ class Endpoint(graphene.ObjectType):
             retries=row.retries,
             routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
+            runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
@@ -558,7 +849,7 @@ class Endpoint(graphene.ObjectType):
             sa.select(EndpointRow)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_row))
+            .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -642,7 +933,7 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
             return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
@@ -659,10 +950,39 @@ class Endpoint(graphene.ObjectType):
                 return "DEGRADED"
         return "PROVISIONING"
 
+    async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
+        if not self.model:
+            raise ObjectNotFound(object_name="VFolder")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            vfolder_row = await VFolderRow.get(sess, self.model, load_user=True, load_group=True)
+            return VirtualFolderNode.from_row(info, vfolder_row)
+
+    async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
+        if not self.endpoint_id:
+            raise ObjectNotFound(object_name="Endpoint")
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as sess:
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id)
+            extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
+            query = (
+                sa.select(VFolderRow)
+                .where(VFolderRow.id.in_(extra_mount_folder_ids))
+                .options(selectinload(VFolderRow.user_row))
+                .options(selectinload(VFolderRow.group_row))
+            )
+            return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
+
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
         for route in error_routes:
+            if not route.error_data:
+                continue
             match route.error_data["type"]:
                 case "session_cancelled":
                     session_id = route.error_data["session_id"]
@@ -690,6 +1010,19 @@ class EndpointList(graphene.ObjectType):
     items = graphene.List(Endpoint, required=True)
 
 
+class ExtraMountInput(graphene.InputObjectType):
+    """Added in 24.03.4."""
+
+    vfolder_id = graphene.String()
+    mount_destination = graphene.String()
+    type = graphene.String(
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+    )
+    permission = graphene.String(
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
+    )
+
+
 class ModifyEndpointInput(graphene.InputObjectType):
     resource_slots = graphene.JSONString()
     resource_opts = graphene.JSONString()
@@ -699,7 +1032,16 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
+    model_definition_path = graphene.String(
+        description="Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
+    )
     open_to_public = graphene.Boolean()
+    extra_mounts = graphene.List(
+        ExtraMountInput,
+        description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
+    )
+    environ = graphene.JSONString(description="Added in 24.03.5.")
+    runtime_variant = graphene.String(description="Added in 24.03.5.")
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -709,7 +1051,7 @@ class ModifyEndpoint(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added at 23.09.8")
+    endpoint = graphene.Field(lambda: Endpoint, required=False, description="Added in 23.09.8.")
 
     @classmethod
     async def mutate(
@@ -720,86 +1062,205 @@ class ModifyEndpoint(graphene.Mutation):
         props: ModifyEndpointInput,
     ) -> "ModifyEndpoint":
         graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(
-            props,
-            data,
-            "resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        set_if_set(props, data, "resource_opts")
-        set_if_set(props, data, "cluster_mode")
-        set_if_set(props, data, "cluster_size")
-        set_if_set(props, data, "desired_session_count")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "resource_group")
-        image = data.pop("image", None)
 
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    domain_name = graph_ctx.user["domain_name"]
-                    stmt = (
-                        sa.select(EndpointRow)
-                        .where(EndpointRow.id == endpoint_id)
-                        .where(EndpointRow.domain == domain_name)
-                    )
-                    endpoint_row = (await db_session.scalars(stmt)).first()
-                    if endpoint_row is None:
-                        raise EndpointNotFound
-                case _:
-                    user_id = graph_ctx.user["uuid"]
-                    stmt = (
-                        sa.select(EndpointRow)
-                        .where(EndpointRow.id == endpoint_id)
-                        .where(
-                            (EndpointRow.session_owner == user_id)
-                            | (EndpointRow.created_user == user_id)
-                        )
-                    )
-                    endpoint_row = (await db_session.scalars(stmt)).first()
-                    if endpoint_row is None:
-                        raise EndpointNotFound
-
-            if image is not None:
-                image_name = image["name"]
-                registry = image.get("registry") or ["*"]
-                arch = image.get("architecture")
-                if arch is not None:
-                    image_ref = ImageRef(image_name, registry, arch)
-                else:
-                    image_ref = ImageRef(
-                        image_name,
-                        registry,
-                    )
-                image_object = await ImageRow.resolve(db_session, [image_ref])
-                data["image"] = image_object.id
-
-        update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
-
-        async def _post(conn, result) -> EndpointRow:
-            endpoint = result.first()
-            try:
-                async with AsyncSession(conn) as session:
-                    row = await EndpointRow.get(
-                        session,
-                        endpoint_id=endpoint.id,
-                        domain=endpoint.domain,
-                        user_uuid=endpoint.created_user,
-                        project=endpoint.project,
-                        load_image=True,
-                        load_routes=True,
-                        load_created_user=True,
+        async def _do_mutate() -> ModifyEndpoint:
+            async with graph_ctx.db.begin_session() as db_session:
+                try:
+                    endpoint_row = await EndpointRow.get(
+                        db_session,
+                        endpoint_id,
                         load_session_owner=True,
+                        load_model=True,
+                        load_routes=True,
                     )
-                return row
-            except NoResultFound:
-                raise EndpointNotFound
+                    match graph_ctx.user["role"]:
+                        case UserRole.SUPERADMIN:
+                            pass
+                        case UserRole.ADMIN:
+                            domain_name = graph_ctx.user["domain_name"]
+                            if endpoint_row.domain != domain_name:
+                                raise EndpointNotFound
+                        case _:
+                            user_id = graph_ctx.user["uuid"]
+                            if endpoint_row.session_owner != user_id:
+                                raise EndpointNotFound
+                except NoResultFound:
+                    raise EndpointNotFound
 
-        return await simple_db_mutate_returning_item(
-            cls, graph_ctx, update_query, item_cls=Endpoint, post_func=_post
+                if (_newval := props.resource_slots) and _newval is not Undefined:
+                    endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
+
+                if (_newval := props.resource_opts) and _newval is not Undefined:
+                    endpoint_row.resource_opts = _newval
+
+                if (_newval := props.cluster_mode) and _newval is not Undefined:
+                    endpoint_row.cluster_mode = _newval
+
+                if (_newval := props.cluster_size) and _newval is not Undefined:
+                    endpoint_row.cluster_size = _newval
+
+                if (_newval := props.model_definition_path) and _newval is not Undefined:
+                    endpoint_row.model_definition_path = _newval
+
+                if (_newval := props.environ) and _newval is not Undefined:
+                    endpoint_row.environ = _newval
+
+                if (_newval := props.runtime_variant) and _newval is not Undefined:
+                    try:
+                        endpoint_row.runtime_variant = RuntimeVariant[_newval]
+                    except KeyError:
+                        raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
+
+                if (
+                    _newval := props.desired_session_count
+                ) is not None and _newval is not Undefined:
+                    endpoint_row.desired_session_count = _newval
+
+                if (_newval := props.resource_group) and _newval is not Undefined:
+                    endpoint_row.resource_group = _newval
+
+                if (image := props.image) and image is not Undefined:
+                    image_name = image["name"]
+                    registry = image.get("registry") or ["*"]
+                    arch = image.get("architecture")
+                    if arch is not None:
+                        image_ref = ImageRef(image_name, registry, arch)
+                    else:
+                        image_ref = ImageRef(
+                            image_name,
+                            registry,
+                        )
+                    image_object = await ImageRow.resolve(db_session, [image_ref])
+                    endpoint_row.image = image_object.id
+
+                session_owner: UserRow = endpoint_row.session_owner_row
+
+                conn = await db_session.connection()
+                assert conn
+
+                await ModelServicePredicateChecker.check_scaling_group(
+                    conn,
+                    endpoint_row.resource_group,
+                    session_owner.main_access_key,
+                    endpoint_row.domain,
+                    endpoint_row.project,
+                )
+
+                def _get_vfolder_id(id_input: str) -> uuid.UUID:
+                    _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
+                    if not raw_vfolder_id:
+                        raw_vfolder_id = id_input
+                    return uuid.UUID(raw_vfolder_id)
+
+                user_scope = UserScope(
+                    domain_name=endpoint_row.domain,
+                    group_id=endpoint_row.project,
+                    user_uuid=session_owner.uuid,
+                    user_role=session_owner.role,
+                )
+
+                query = (
+                    sa.select([keypair_resource_policies])
+                    .select_from(keypair_resource_policies)
+                    .where(keypair_resource_policies.c.name == session_owner.resource_policy)
+                )
+                result = await conn.execute(query)
+
+                resource_policy = result.first()
+                if (extra_mounts_input := props.extra_mounts) is not Undefined:
+                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
+                    extra_mounts = {
+                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
+                            mount_destination=(
+                                m.mount_destination
+                                if m.mount_destination is not Undefined
+                                else None
+                            ),
+                            type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
+                            permission=(
+                                MountPermission(m.permission)
+                                if m.permission is not Undefined
+                                else None
+                            ),
+                        )
+                        for m in extra_mounts_input
+                    }
+                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                        conn,
+                        graph_ctx.shared_config,
+                        graph_ctx.storage_manager,
+                        endpoint_row.model,
+                        endpoint_row.model_mount_destination,
+                        extra_mounts,
+                        user_scope,
+                        resource_policy,
+                    )
+                    endpoint_row.extra_mounts = vfolder_mounts
+
+                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    await ModelServicePredicateChecker.validate_model_definition(
+                        graph_ctx.storage_manager,
+                        endpoint_row.model_row,
+                        endpoint_row.model_definition_path,
+                    )
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
+                # from AgentRegistry.handle_route_creation()
+                await graph_ctx.registry.create_session(
+                    "",
+                    endpoint_row.image_row.name,
+                    endpoint_row.image_row.architecture,
+                    user_scope,
+                    session_owner.main_access_key,
+                    resource_policy,
+                    SessionTypes.INFERENCE,
+                    {
+                        "mounts": [
+                            endpoint_row.model,
+                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
+                        ],
+                        "mount_map": {
+                            endpoint_row.model: endpoint_row.model_mount_destination,
+                            **{
+                                m.vfid.folder_id: m.kernel_path.as_posix()
+                                for m in endpoint_row.extra_mounts
+                            },
+                        },
+                        "mount_options": {
+                            m.vfid.folder_id: {"permission": m.mount_perm}
+                            for m in endpoint_row.extra_mounts
+                        },
+                        "environ": endpoint_row.environ,
+                        "scaling_group": endpoint_row.resource_group,
+                        "resources": endpoint_row.resource_slots,
+                        "resource_opts": endpoint_row.resource_opts,
+                        "preopen_ports": None,
+                        "agent_list": None,
+                    },
+                    ClusterMode[endpoint_row.cluster_mode],
+                    endpoint_row.cluster_size,
+                    bootstrap_script=endpoint_row.bootstrap_script,
+                    startup_command=endpoint_row.startup_command,
+                    tag=endpoint_row.tag,
+                    callback_url=endpoint_row.callback_url,
+                    sudo_session_enabled=session_owner.sudo_session_enabled,
+                    dry_run=True,
+                )
+
+                await db_session.commit()
+
+                return ModifyEndpoint(
+                    True, "success", await Endpoint.from_row(graph_ctx, endpoint_row)
+                )
+
+        return await gql_mutation_wrapper(
+            cls,
+            _do_mutate,
         )
 
 
