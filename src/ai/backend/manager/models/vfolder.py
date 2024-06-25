@@ -2336,7 +2336,7 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
-            vfolder=VirtualFolder.from_row(resolve_info.context, vfolder_row),
+            vfolder=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
             author=metadata.get("author") or vfolder_row.creator or "",
             title=metadata.get("title") or vfolder_row.name,
