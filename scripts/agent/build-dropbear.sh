@@ -2,7 +2,7 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8")
+distros=("alpine3.8" "centos8.0" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04")
 
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
@@ -31,6 +31,16 @@ RUN apk add --no-cache make gcc musl-dev
 RUN apk add --no-cache autoconf automake zlib-dev
 EOF
 )
+centos8_builder_dockerfile=$(cat <<'EOF'
+FROM centos:centos8
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
+RUN dnf install -y make gcc automake autoconf dnf-plugins-core
+RUN dnf config-manager --set-enabled powertools
+RUN dnf install -y zlib-static glibc-static libxcrypt-static
+EOF
+)
+
 
 build_script=$(cat <<'EOF'
 #! /bin/sh
@@ -67,6 +77,7 @@ echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu18.0
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu20.04.dockerfile"
 echo "$ubuntu2204_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu22.04.dockerfile"
 echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.alpine3.8.dockerfile"
+echo "$centos8_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.centos8.0.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t dropbear-builder:$distro \

@@ -5,15 +5,13 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
 
 import aiohttp
 import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
-import trafaret as t
-import yaml
 from aiohttp import web
 from pydantic import (
     AliasChoices,
@@ -31,7 +29,6 @@ from yarl import URL
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     EventHandler,
@@ -45,17 +42,18 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     AgentId,
     ClusterMode,
     ImageAlias,
+    RuntimeVariant,
     SessionTypes,
-    VFolderID,
+    VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.registry import check_scaling_group
 
-from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
+from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
     EndpointLifecycle,
     EndpointRow,
@@ -63,18 +61,20 @@ from ..models import (
     ImageRow,
     KernelLoadingStrategy,
     KeyPairRow,
+    ModelServicePredicateChecker,
     RouteStatus,
     RoutingRow,
     SessionRow,
+    UserRole,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
-from ..types import UserScope
+from ..types import MountOptionModel, UserScope
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable, VFolderNotFound
+from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -195,9 +195,17 @@ class RouteInfoModel(BaseModel):
 
 class ServeInfoModel(BaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
+    model_id: Annotated[uuid.UUID, Field(description="ID of model VFolder.")]
+    extra_mounts: Annotated[
+        Sequence[uuid.UUID],
+        Field(description="List of extra VFolders which will be mounted to model service session."),
+    ]
     name: str = Field(description="Name of the model service.")
     desired_session_count: NonNegativeInt = Field(
         description="Number of identical inference sessions."
+    )
+    model_definition_path: str | None = Field(
+        description="Path to the the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default."
     )
     active_routes: list[RouteInfoModel] = Field(
         description="Information of routes which are bound with healthy sessions."
@@ -216,6 +224,10 @@ class ServeInfoModel(BaseResponseModel):
             " will be no authentication required to communicate with this API service."
         )
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(description="Type of the inference runtime the image will try to load."),
+    ]
 
 
 @auth_required
@@ -240,7 +252,10 @@ async def get_info(request: web.Request) -> ServeInfoModel:
 
     return ServeInfoModel(
         endpoint_id=endpoint.id,
+        model_id=endpoint.model,
+        extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=endpoint.name,
+        model_definition_path=endpoint.model_definition_path,
         desired_session_count=endpoint.desired_session_count,
         active_routes=[
             RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
@@ -249,11 +264,16 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         ],
         service_endpoint=endpoint.url,
         is_public=endpoint.open_to_public,
+        runtime_variant=endpoint.runtime_variant,
     )
 
 
 class ServiceConfigModel(BaseModel):
     model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
+    model_definition_path: str | None = Field(
+        description="Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
+        default=None,
+    )
     model_version: int = Field(
         validation_alias=AliasChoices("model_version", "modelVersion"),
         description="Unused; Reserved for future works",
@@ -263,9 +283,21 @@ class ServiceConfigModel(BaseModel):
         validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
         default="/models",
         description=(
-            "Mount destination for the model VFolder will be mounted inside the inference session"
+            "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
         ),
     )
+
+    extra_mounts: Annotated[
+        dict[uuid.UUID, MountOptionModel],
+        Field(
+            description=(
+                "Specifications about extra VFolders mounted to model service session. "
+                "MODEL type VFolders are not allowed to be attached to model service session with this option."
+            ),
+            default={},
+        ),
+    ]
+
     environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
@@ -293,6 +325,13 @@ class NewServiceRequestModel(BaseModel):
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
     )
+    runtime_variant: Annotated[
+        RuntimeVariant,
+        Field(
+            description="Type of the inference runtime the image will try to load.",
+            default=RuntimeVariant.CUSTOM,
+        ),
+    ]
     architecture: str = Field(
         validation_alias=AliasChoices("arch", "architecture"),
         description="Image architecture",
@@ -345,12 +384,15 @@ class NewServiceRequestModel(BaseModel):
 @dataclass
 class ValidationResult:
     model_id: uuid.UUID
+    model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
+    owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict
     scaling_group: str
+    extra_mounts: Sequence[VFolderMount]
 
 
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
@@ -368,42 +410,30 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
     async with root_ctx.db.begin_readonly() as conn:
-        checked_scaling_group = await check_scaling_group(
+        checked_scaling_group = await ModelServicePredicateChecker.check_scaling_group(
             conn,
             params.config.scaling_group,
-            SessionTypes.INFERENCE,
             owner_access_key,
             params.domain,
             params.group,
         )
-
-        query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
-            .select_from(scaling_groups)
-            .where((scaling_groups.c.name == checked_scaling_group))
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
-        if not wsproxy_addr:
-            raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup["wsproxy_api_token"]:
-            raise ServiceUnavailable("Scaling group not ready to start model service")
 
         params.config.scaling_group = checked_scaling_group
 
         owner_uuid, group_id, resource_policy = await query_userinfo(
             request, params.model_dump(), conn
         )
+        query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
+        owner_role = (await conn.execute(query)).scalar()
+        assert owner_role
+
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
             extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
             matched_vfolders = await query_accessible_vfolders(
                 conn,
                 owner_uuid,
-                user_role=request["user"]["role"],
+                user_role=owner_role,
                 domain_name=params.domain,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
@@ -419,7 +449,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
                     matched_vfolders = await query_accessible_vfolders(
                         conn,
                         owner_uuid,
-                        user_role=request["user"]["role"],
+                        user_role=owner_role,
                         domain_name=params.domain,
                         allowed_vfolder_types=allowed_vfolder_types,
                         extra_vf_conds=extra_vf_conds,
@@ -432,68 +462,54 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             raise VFolderNotFound
         folder_row = matched_vfolders[0]
         if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
-            raise InvalidAPIParameters("Selected vFolder is not a model folder")
+            raise InvalidAPIParameters("Selected VFolder is not a model folder")
 
         model_id = folder_row["id"]
 
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_row["host"])
+        vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+            conn,
+            root_ctx.shared_config,
+            root_ctx.storage_manager,
+            model_id,
+            params.config.model_mount_destination,
+            params.config.extra_mounts,
+            UserScope(
+                domain_name=params.domain,
+                group_id=group_id,
+                user_uuid=owner_uuid,
+                user_role=owner_role,
+            ),
+            resource_policy,
+        )
 
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "POST",
-        "folder/file/list",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID(folder_row["quota_scope_id"], folder_row["id"])),
-            "relpath": ".",
-        },
-    ) as (client_api_url, storage_resp):
-        storage_reply = await storage_resp.json()
-
-    for item in storage_reply["items"]:
-        if item["name"] == "model-definition.yml" or item["name"] == "model-definition.yaml":
-            yaml_name = item["name"]
-            break
+    if params.runtime_variant == RuntimeVariant.CUSTOM:
+        yaml_path = await ModelServicePredicateChecker.validate_model_definition(
+            root_ctx.storage_manager,
+            folder_row,
+            params.config.model_definition_path,
+        )
     else:
-        raise InvalidAPIParameters("Model definition YAML file not found inside the model storage")
-
-    chunks = bytes()
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "POST",
-        "folder/file/fetch",
-        json={
-            "volume": volume_name,
-            "vfid": str(VFolderID(folder_row["quota_scope_id"], folder_row["id"])),
-            "relpath": f"./{yaml_name}",
-        },
-    ) as (client_api_url, storage_resp):
-        while True:
-            chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-            if not chunk:
-                break
-            chunks += chunk
-    model_definition_yaml = chunks.decode("utf-8")
-    model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-    try:
-        model_definition = model_definition_iv.check(model_definition_dict)
-        assert model_definition is not None
-    except t.DataError as e:
-        raise InvalidAPIParameters(
-            f"Failed to validate model definition from vFolder {folder_row['name']} (ID"
-            f" {folder_row['id']}): {e}",
-        ) from e
-    except yaml.error.YAMLError as e:
-        raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+        if (
+            params.runtime_variant != RuntimeVariant.CMD
+            and params.config.model_mount_destination != "/models"
+        ):
+            raise InvalidAPIParameters(
+                "Model mount destination must be /models for non-custom runtimes"
+            )
+        # this path won't be used on actual session but just to keep the convention
+        yaml_path = "model-definition.yaml"
 
     return ValidationResult(
         model_id,
+        yaml_path,
         requester_access_key,
         owner_access_key,
         owner_uuid,
+        owner_role,
         group_id,
         resource_policy,
         checked_scaling_group,
+        vfolder_mounts,
     )
 
 
@@ -519,8 +535,16 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         )
 
     creation_config = params.config.model_dump()
+    creation_config["mounts"] = [
+        validation_result.model_id,
+        *[m.vfid.folder_id for m in validation_result.extra_mounts],
+    ]
     creation_config["mount_map"] = {
-        validation_result.model_id: params.config.model_mount_destination
+        validation_result.model_id: params.config.model_mount_destination,
+        **{m.vfid.folder_id: m.kernel_path.as_posix() for m in validation_result.extra_mounts},
+    }
+    creation_config["mount_options"] = {
+        m.vfid.folder_id: {"permission": m.mount_perm} for m in validation_result.extra_mounts
     }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
@@ -532,8 +556,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         UserScope(
             domain_name=params.domain,
             group_id=validation_result.group_id,
-            user_uuid=request["user"]["uuid"],
-            user_role=request["user"]["role"],
+            user_uuid=validation_result.owner_uuid,
+            user_role=validation_result.owner_role,
         ),
         validation_result.owner_access_key,
         validation_result.resource_policy,
@@ -566,6 +590,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
             params.service_name,
+            validation_result.model_definition_path,
             request["user"]["uuid"],
             validation_result.owner_uuid,
             params.desired_session_count,
@@ -577,6 +602,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.config.resources,
             params.cluster_mode,
             params.cluster_size,
+            validation_result.extra_mounts,
             model_mount_destination=params.config.model_mount_destination,
             tag=params.tag,
             startup_command=params.startup_command,
@@ -585,6 +611,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             bootstrap_script=params.bootstrap_script,
             resource_opts=params.config.resource_opts,
             open_to_public=params.open_to_public,
+            runtime_variant=params.runtime_variant,
         )
         db_sess.add(endpoint)
         await db_sess.flush()
@@ -592,11 +619,15 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
 
     return ServeInfoModel(
         endpoint_id=endpoint_id,
+        model_id=endpoint.model,
+        extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=params.service_name,
+        model_definition_path=validation_result.model_definition_path,
         desired_session_count=params.desired_session_count,
         active_routes=[],
         service_endpoint=None,
         is_public=params.open_to_public,
+        runtime_variant=params.runtime_variant,
     )
 
 
@@ -649,10 +680,18 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             validation_result.resource_policy,
             SessionTypes.INFERENCE,
             {
-                "mounts": [validation_result.model_id],
+                "mounts": [
+                    validation_result.model_id,
+                    *[m.vfid for m in validation_result.extra_mounts],
+                ],
                 "mount_map": {
-                    validation_result.model_id: creation_config["model_mount_destination"]
+                    validation_result.model_id: params.config.model_mount_destination,
+                    **{m.vfid: m.kernel_path for m in validation_result.extra_mounts},
                 },
+                "mount_options": {
+                    m.vfid: {"permission": m.mount_perm} for m in validation_result.extra_mounts
+                },
+                "model_definition_path": validation_result.model_definition_path,
                 "environ": creation_config["environ"],
                 "scaling_group": validation_result.scaling_group,
                 "resources": creation_config["resources"],
@@ -1139,6 +1178,29 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+class RuntimeInfo(BaseModel):
+    name: Annotated[str, Field(description="Identifier to be passed later inside request body")]
+    human_readable_name: Annotated[
+        str, Field(description="Use this value as displayed label to user")
+    ]
+
+
+class RuntimeInfoModel(BaseModel):
+    runtimes: list[RuntimeInfo]
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
+async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
+    return RuntimeInfoModel(
+        runtimes=[
+            RuntimeInfo(name=v.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
+            for v in RuntimeVariant
+        ]
+    )
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -1169,6 +1231,7 @@ def create_app(
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("POST", "/_/try", try_start))
+    cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
     cors.add(add_route("GET", "/{service_id}/errors", list_errors))
