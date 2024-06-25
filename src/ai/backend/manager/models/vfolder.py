@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -1910,6 +1910,10 @@ class VirtualFolderNode(graphene.ObjectType):
             last=last,
         )
 
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(cls.from_row(info, vf)) for vf in vfolder_rows]
@@ -2302,7 +2306,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.created_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.created_at
 
     def resolve_modified_at(
@@ -2311,7 +2315,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.modified_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.modified_at
 
     @classmethod
@@ -2523,7 +2527,10 @@ class ModelCard(graphene.ObjectType):
             VFolderRow.group.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
-        cnt_query = cnt_query.where(additional_cond)
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
