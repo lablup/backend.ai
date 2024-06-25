@@ -12,6 +12,7 @@ import typing
 import uuid
 import zlib
 from collections import defaultdict
+from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -45,6 +46,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
@@ -87,6 +89,7 @@ from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
+    AgentKernelRegistryByStatus,
     BinarySize,
     ClusterInfo,
     ClusterMode,
@@ -173,7 +176,7 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
-from .types import UserScope
+from .types import AgentResourceSyncTrigger, UserScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.row import Row
@@ -183,6 +186,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events import EventDispatcher, EventProducer
 
     from .agent_cache import AgentRPCCache
+    from .exceptions import ErrorDetail
     from .models.storage import StorageSessionManager
     from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 
@@ -1658,6 +1662,10 @@ class AgentRegistry:
         is_local = image_info["is_local"]
         resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
+        agent_resource_sync_trigger = cast(
+            list[AgentResourceSyncTrigger],
+            self.local_config["manager"]["agent-resource-sync-trigger"],
+        )
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
 
@@ -1675,6 +1683,10 @@ class AgentRegistry:
                 await db_sess.execute(kernel_query)
 
         await execute_with_retry(_update_kernel)
+
+        if AgentResourceSyncTrigger.BEFORE_KERNEL_CREATION in agent_resource_sync_trigger:
+            async with self.db.begin() as db_conn:
+                await self.sync_agent_resource(db_conn, [agent_alloc_ctx.agent_id])
 
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
@@ -1751,9 +1763,27 @@ class AgentRegistry:
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
             except Exception as e:
+                ex = e
+                err_info = convert_to_status_data(ex, self.debug)
+
+                def _has_insufficient_resource_err(_err_info: ErrorDetail) -> bool:
+                    if _err_info["name"] == "InsufficientResource":
+                        return True
+                    if (sub_errors := _err_info.get("collection")) is not None:
+                        for suberr in sub_errors:
+                            if _has_insufficient_resource_err(suberr):
+                                return True
+                    return False
+
+                if AgentResourceSyncTrigger.ON_CREATION_FAILURE in agent_resource_sync_trigger:
+                    if _has_insufficient_resource_err(err_info["error"]):
+                        async with self.db.begin() as db_conn:
+                            await self.sync_agent_resource(
+                                db_conn,
+                                [agent_alloc_ctx.agent_id],
+                            )
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
-                ex = e
                 for binding in items:
                     kernel_id = binding.kernel.id
 
@@ -1777,7 +1807,7 @@ class AgentRegistry:
                                             ),  # ["PULLING", "PREPARING"]
                                         },
                                     ),
-                                    status_data=convert_to_status_data(ex, self.debug),
+                                    status_data=err_info,
                                 )
                             )
                             await db_sess.execute(query)
@@ -3055,6 +3085,102 @@ class AgentRegistry:
                 return await rpc.call.sync_kernel_registry([
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
                 ])
+
+    async def _sync_agent_resource_and_get_kerenels(
+        self,
+        agent_id: AgentId,
+        preparing_kernels: Collection[KernelId],
+        pulling_kernels: Collection[KernelId],
+        running_kernels: Collection[KernelId],
+        terminating_kernels: Collection[KernelId],
+    ) -> AgentKernelRegistryByStatus:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            resp: dict[str, Any] = await rpc.call.sync_and_get_kernels(
+                preparing_kernels,
+                pulling_kernels,
+                running_kernels,
+                terminating_kernels,
+            )
+        return AgentKernelRegistryByStatus.from_json(resp)
+
+    async def sync_agent_resource(
+        self,
+        db_connection: SAConnection,
+        agent_ids: Collection[AgentId],
+    ) -> dict[AgentId, AgentKernelRegistryByStatus | MultiAgentError]:
+        result: dict[AgentId, AgentKernelRegistryByStatus | MultiAgentError] = {}
+        agent_kernel_by_status: dict[AgentId, dict[str, list[KernelId]]] = {}
+        stmt = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(agent_ids))
+            .options(
+                selectinload(
+                    AgentRow.kernels.and_(
+                        KernelRow.status.in_([
+                            KernelStatus.PREPARING,
+                            KernelStatus.PULLING,
+                            KernelStatus.RUNNING,
+                            KernelStatus.TERMINATING,
+                        ])
+                    ),
+                ).options(load_only(KernelRow.id, KernelRow.status))
+            )
+        )
+        async with SASession(bind=db_connection) as db_session:
+            for _agent_row in await db_session.scalars(stmt):
+                agent_row = cast(AgentRow, _agent_row)
+                preparing_kernels: list[KernelId] = []
+                pulling_kernels: list[KernelId] = []
+                running_kernels: list[KernelId] = []
+                terminating_kernels: list[KernelId] = []
+                for kernel in agent_row.kernels:
+                    kernel_status = cast(KernelStatus, kernel.status)
+                    match kernel_status:
+                        case KernelStatus.PREPARING:
+                            preparing_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.PULLING:
+                            pulling_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.RUNNING:
+                            running_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.TERMINATING:
+                            terminating_kernels.append(KernelId(kernel.id))
+                        case _:
+                            continue
+                agent_kernel_by_status[AgentId(agent_row.id)] = {
+                    "preparing_kernels": preparing_kernels,
+                    "pulling_kernels": pulling_kernels,
+                    "running_kernels": running_kernels,
+                    "terminating_kernels": terminating_kernels,
+                }
+        tasks = []
+        for agent_id in agent_ids:
+            tasks.append(
+                self._sync_agent_resource_and_get_kerenels(
+                    agent_id,
+                    agent_kernel_by_status[agent_id]["preparing_kernels"],
+                    agent_kernel_by_status[agent_id]["pulling_kernels"],
+                    agent_kernel_by_status[agent_id]["running_kernels"],
+                    agent_kernel_by_status[agent_id]["terminating_kernels"],
+                )
+            )
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        for aid, resp in zip(agent_ids, responses):
+            agent_errors = []
+            if isinstance(resp, aiotools.TaskGroupError):
+                agent_errors.extend(resp.__errors__)
+            elif isinstance(result, Exception):
+                agent_errors.append(resp)
+            if agent_errors:
+                result[aid] = MultiAgentError(
+                    "agent(s) raise errors during kernel resource sync",
+                    agent_errors,
+                )
+            else:
+                assert isinstance(
+                    resp, AgentKernelRegistryByStatus
+                ), f"response should be `AgentKernelRegistryByStatus`, not {type(resp)}"
+                result[aid] = resp
+        return result
 
     async def mark_kernel_terminated(
         self,

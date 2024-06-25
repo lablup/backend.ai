@@ -20,6 +20,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    cast,
 )
 
 import aiotools
@@ -93,6 +94,7 @@ from ..models import (
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
+from ..types import AgentResourceSyncTrigger
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -264,6 +266,10 @@ class SchedulerDispatcher(aobject):
         log.debug("schedule(): triggered")
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.schedule"
+        agent_resource_sync_trigger = cast(
+            list[AgentResourceSyncTrigger],
+            self.local_config["manager"]["agent-resource-sync-trigger"],
+        )
 
         def _pipeline(r: Redis) -> RedisPipeline:
             pipe = r.pipeline()
@@ -292,10 +298,6 @@ class SchedulerDispatcher(aobject):
             # as its individual steps are composed of many short-lived transactions.
             async with self.lock_factory(LockID.LOCKID_SCHEDULE, 60):
                 async with self.db.begin_readonly_session() as db_sess:
-                    # query = (
-                    #     sa.select(ScalingGroupRow)
-                    #     .join(ScalingGroupRow.agents.and_(AgentRow.status == AgentStatus.ALIVE))
-                    # )
                     query = (
                         sa.select(AgentRow.scaling_group)
                         .where(AgentRow.status == AgentStatus.ALIVE)
@@ -303,22 +305,38 @@ class SchedulerDispatcher(aobject):
                     )
                     result = await db_sess.execute(query)
                     schedulable_scaling_groups = [row.scaling_group for row in result.fetchall()]
-                for sgroup_name in schedulable_scaling_groups:
-                    try:
-                        await self._schedule_in_sgroup(
-                            sched_ctx,
-                            sgroup_name,
-                        )
-                        await redis_helper.execute(
-                            self.redis_live,
-                            lambda r: r.hset(
-                                redis_key,
-                                "resource_group",
+
+                async with self.db.begin() as db_conn:
+                    for sgroup_name in schedulable_scaling_groups:
+                        try:
+                            kernel_agent_bindings = await self._schedule_in_sgroup(
+                                sched_ctx,
                                 sgroup_name,
-                            ),
-                        )
-                    except Exception as e:
-                        log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
+                            )
+                            await redis_helper.execute(
+                                self.redis_live,
+                                lambda r: r.hset(
+                                    redis_key,
+                                    "resource_group",
+                                    sgroup_name,
+                                ),
+                            )
+                        except Exception as e:
+                            log.exception(
+                                "schedule({}): scheduling error!\n{}", sgroup_name, repr(e)
+                            )
+                        else:
+                            if (
+                                AgentResourceSyncTrigger.AFTER_SCHEDULING
+                                in agent_resource_sync_trigger
+                                and kernel_agent_bindings
+                            ):
+                                selected_agent_ids = [
+                                    binding.agent_alloc_ctx.agent_id
+                                    for binding in kernel_agent_bindings
+                                    if binding.agent_alloc_ctx.agent_id is not None
+                                ]
+                                await self.registry.sync_agent_resource(db_conn, selected_agent_ids)
                 await redis_helper.execute(
                     self.redis_live,
                     lambda r: r.hset(
@@ -360,7 +378,7 @@ class SchedulerDispatcher(aobject):
         self,
         sched_ctx: SchedulingContext,
         sgroup_name: str,
-    ) -> None:
+    ) -> list[KernelAgentBinding]:
         async def _apply_cancellation(
             db_sess: SASession, session_ids: list[SessionId], reason="pending-timeout"
         ):
@@ -432,6 +450,8 @@ class SchedulerDispatcher(aobject):
         )
         zero = ResourceSlot()
         num_scheduled = 0
+        kernel_agent_bindings_in_sgroup: list[KernelAgentBinding] = []
+
         while len(pending_sessions) > 0:
             async with self.db.begin_readonly_session() as db_sess:
                 candidate_agents = await list_schedulable_agents_by_sgroup(db_sess, sgroup_name)
@@ -445,7 +465,7 @@ class SchedulerDispatcher(aobject):
             if picked_session_id is None:
                 # no session is picked.
                 # continue to next sgroup.
-                return
+                return []
             for picked_idx, sess_ctx in enumerate(pending_sessions):
                 if sess_ctx.id == picked_session_id:
                     break
@@ -656,7 +676,7 @@ class SchedulerDispatcher(aobject):
             try:
                 match schedulable_sess.cluster_mode:
                     case ClusterMode.SINGLE_NODE:
-                        await self._schedule_single_node_session(
+                        kernel_agent_bindings = await self._schedule_single_node_session(
                             sched_ctx,
                             scheduler,
                             sgroup_name,
@@ -666,7 +686,7 @@ class SchedulerDispatcher(aobject):
                             check_results,
                         )
                     case ClusterMode.MULTI_NODE:
-                        await self._schedule_multi_node_session(
+                        kernel_agent_bindings = await self._schedule_multi_node_session(
                             sched_ctx,
                             scheduler,
                             sgroup_name,
@@ -700,9 +720,12 @@ class SchedulerDispatcher(aobject):
                 # _schedule_{single,multi}_node_session() already handle general exceptions.
                 # Proceed to the next pending session and come back later
                 continue
+            else:
+                kernel_agent_bindings_in_sgroup.extend(kernel_agent_bindings)
             num_scheduled += 1
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
+        return kernel_agent_bindings_in_sgroup
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
@@ -735,7 +758,7 @@ class SchedulerDispatcher(aobject):
         sess_ctx: SessionRow,
         agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
-    ) -> None:
+    ) -> list[KernelAgentBinding]:
         """
         Finds and assigns an agent having resources enough to host the entire session.
         """
@@ -999,6 +1022,11 @@ class SchedulerDispatcher(aobject):
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
+        kernel_agent_bindings: list[KernelAgentBinding] = []
+        for kernel_row in sess_ctx.kernels:
+            kernel_agent_bindings.append(KernelAgentBinding(kernel_row, agent_alloc_ctx, set()))
+        return kernel_agent_bindings
+
     async def _schedule_multi_node_session(
         self,
         sched_ctx: SchedulingContext,
@@ -1008,7 +1036,7 @@ class SchedulerDispatcher(aobject):
         sess_ctx: SessionRow,
         agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
-    ) -> None:
+    ) -> list[KernelAgentBinding]:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
         """
@@ -1236,6 +1264,7 @@ class SchedulerDispatcher(aobject):
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
+        return kernel_agent_bindings
 
     async def prepare(
         self,
