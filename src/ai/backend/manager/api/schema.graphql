@@ -1004,7 +1004,7 @@ type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
-  vfolder: VirtualFolder
+  vfolder: VirtualFolderNode
   author: String
 
   """Human readable name of the model."""
