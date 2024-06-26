@@ -231,6 +231,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 resp.raise_for_status()
                 resp_json = await resp.json()
                 match content_type:
+                    # TODO: Support `self.MEDIA_TYPE_DOCKER_MANIFEST`
                     case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                         manifest_list = resp_json["manifests"]
                         request_type = self.MEDIA_TYPE_DOCKER_MANIFEST
