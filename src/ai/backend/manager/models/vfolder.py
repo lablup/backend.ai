@@ -279,6 +279,7 @@ class VFolderDeletionInfo(NamedTuple):
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
+    domain_name: str
 
     # Target Vfolder infos
     target_quota_scope_id: str
@@ -1094,6 +1095,7 @@ async def initiate_vfolder_clone(
                 insert_values = {
                     "id": target_folder_id.folder_id,
                     "name": vfolder_info.target_vfolder_name,
+                    "domain_name": vfolder_info.domain_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
                     "last_used": None,

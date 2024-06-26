@@ -2806,6 +2806,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            domain_name,
             target_quota_scope_id,
             params["target_name"],
             target_folder_host,
