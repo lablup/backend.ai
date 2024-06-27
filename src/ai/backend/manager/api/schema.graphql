@@ -297,7 +297,7 @@ type AuditLog implements Item {
   target_type: String
   target: String
   created_at: DateTime
-  rest_api_path: String
+  rest_resource: String
   gql_query: String
 }
 
