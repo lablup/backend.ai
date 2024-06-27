@@ -2225,7 +2225,7 @@ class ModelCard(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
-    vfolder = graphene.Field(VirtualFolderNode)
+    vfolder = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
