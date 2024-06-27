@@ -1014,7 +1014,7 @@ async def update_vfolder_status(
                 updated_rows_list[0] if len(updated_rows_list) == 1 else updated_rows_list
             )
 
-            audit_log.update_after_data(after_data_to_insert)
+            audit_log.update_current(after_data_to_insert)
 
     await execute_with_retry(_update)
     if do_log:
