@@ -1004,6 +1004,8 @@ type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
+
+  """Added in 24.09.0."""
   vfolder: VirtualFolderNode
   author: String
 
