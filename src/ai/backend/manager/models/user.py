@@ -175,6 +175,7 @@ class UserRow(Base):
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+    kernels = relationship("KernelRow", back_populates="user_row")
 
     created_endpoints = relationship(
         "EndpointRow", back_populates="created_user_row", foreign_keys="EndpointRow.created_user"
@@ -184,6 +185,8 @@ class UserRow(Base):
     )
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
+
+    vfolder_row = relationship("VFolderRow", back_populates="user_row")
 
 
 class UserGroup(graphene.ObjectType):
@@ -1445,7 +1448,8 @@ class UserNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -1461,9 +1465,6 @@ class UserNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(UserRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(row) for row in user_rows]

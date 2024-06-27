@@ -18,6 +18,7 @@ from typing import (
     cast,
     overload,
 )
+from uuid import UUID
 
 import aiotools
 import graphene
@@ -27,7 +28,7 @@ from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
@@ -36,7 +37,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 
-from ..api.exceptions import ImageNotFound
+from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
 from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
@@ -67,16 +68,36 @@ __all__ = (
     "rescan_images",
     "ImageType",
     "ImageAliasRow",
+    "ImageLoadFilter",
     "ImageRow",
     "Image",
     "PreloadImage",
+    "PublicImageLoadFilter",
     "RescanImages",
     "ForgetImage",
+    "ForgetImageById",
+    "UntagImageFromRegistry",
     "ModifyImage",
     "AliasImage",
     "DealiasImage",
     "ClearImages",
 )
+
+
+class PublicImageLoadFilter(enum.StrEnum):
+    OPERATIONAL = "operational"
+    """Include operational images."""
+    CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
+
+
+class ImageLoadFilter(enum.StrEnum):
+    OPERATIONAL = "operational"
+    """Include operational images."""
+    CUSTOMIZED = "customized"
+    """Include customized images owned or accessible by API callee."""
+    CUSTOMIZED_GLOBAL = "customized-global"
+    """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
 async def rescan_images(
@@ -191,7 +212,6 @@ class ImageRow(Base):
     )
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
-    # kernels = relationship("KernelRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
     def __init__(
@@ -331,6 +351,16 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
+
+    @classmethod
+    async def get(
+        cls, session: AsyncSession, image_id: UUID, load_aliases=False
+    ) -> ImageRow | None:
+        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+        result = await session.execute(query)
+        return result.scalar()
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
@@ -497,6 +527,9 @@ class Image(graphene.ObjectType):
     # legacy field
     hash = graphene.String()
 
+    # internal attributes
+    raw_labels: dict[str, Any]
+
     @classmethod
     def populate_row(
         cls,
@@ -506,7 +539,7 @@ class Image(graphene.ObjectType):
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
-        return cls(
+        ret = cls(
             id=row.id,
             name=row.image,
             humanized_name=row.image,
@@ -532,6 +565,8 @@ class Image(graphene.ObjectType):
             # legacy
             hash=row.config_digest,
         )
+        ret.raw_labels = row.labels
+        return ret
 
     @classmethod
     async def from_row(
@@ -600,6 +635,19 @@ class Image(graphene.ObjectType):
         return await cls.batch_load_by_canonical(graph_ctx, image_names)
 
     @classmethod
+    async def load_item_by_id(
+        cls,
+        ctx: GraphQueryContext,
+        id: UUID,
+    ) -> Image:
+        async with ctx.db.begin_readonly_session() as session:
+            row = await ImageRow.get(session, id, load_aliases=True)
+            if not row:
+                raise ImageNotFound
+
+            return await cls.from_row(ctx, row)
+
+    @classmethod
     async def load_item(
         cls,
         ctx: GraphQueryContext,
@@ -624,24 +672,14 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_installed: bool = None,
-        is_operation: bool = None,
+        filters: set[ImageLoadFilter] = set(),
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
-        items = [item async for item in cls.bulk_load(ctx, rows)]
-        # Convert to GQL objects
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
+        items: list[Image] = [
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+        ]
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
-
-            items = [*filter(_filter_operation, items)]
         return items
 
     @staticmethod
@@ -649,9 +687,6 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         items: Sequence[Image],
         domain_name: str,
-        *,
-        is_installed: bool = None,
-        is_operation: bool = None,
     ) -> Sequence[Image]:
         from .domain import domains
 
@@ -663,25 +698,60 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
-        items = [item for item in items if item.registry in allowed_docker_registries]
-        if is_installed is not None:
-            items = [*filter(lambda item: item.installed == is_installed, items)]
-        if is_operation is not None:
 
-            def _filter_operation(item):
-                for label in item.labels:
-                    if label.key == "ai.backend.features" and "operation" in label.value:
-                        return not is_operation
-                return not is_operation
+        filtered_items: list[Image] = [
+            item for item in items if item.registry in allowed_docker_registries
+        ]
 
-            items = [*filter(_filter_operation, items)]
-        return items
+        return filtered_items
+
+    def matches_filter(
+        self,
+        ctx: GraphQueryContext,
+        filters: set[ImageLoadFilter],
+    ) -> bool:
+        """
+        Determine if the image is filtered according to the `filters` parameter.
+        """
+        user_role = ctx.user["role"]
+
+        if not filters:
+            return True
+
+        # If the image filtered by any of its labels, return False early.
+        # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
+        is_valid = False
+        for label in self.labels:
+            match label.key:
+                case "ai.backend.features" if "operation" in label.value:
+                    if ImageLoadFilter.OPERATIONAL in filters:
+                        is_valid = True
+                    else:
+                        return False
+                case "ai.backend.customized-image.owner":
+                    if (
+                        ImageLoadFilter.CUSTOMIZED not in filters
+                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                    ):
+                        return False
+                    if ImageLoadFilter.CUSTOMIZED in filters:
+                        if label.value == f"user:{ctx.user['uuid']}":
+                            is_valid = True
+                        else:
+                            return False
+                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
+                        if user_role == UserRole.SUPERADMIN:
+                            is_valid = True
+                        else:
+                            return False
+        return is_valid
 
 
 class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -693,6 +763,9 @@ class ImageNode(graphene.ObjectType):
     size_bytes = BigInt()
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
+    aliases = graphene.List(
+        graphene.String, description="Added in 24.03.4. The array of image aliases."
+    )
 
     @overload
     @classmethod
@@ -708,6 +781,7 @@ class ImageNode(graphene.ObjectType):
             return None
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.image,
             humanized_name=row.image,
             tag=row.tag,
@@ -726,6 +800,25 @@ class ImageNode(graphene.ObjectType):
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
+            aliases=[alias_row.alias for alias_row in row.aliases],
+        )
+
+    @classmethod
+    def from_legacy_image(cls, row: Image) -> ImageNode:
+        return cls(
+            id=row.id,
+            name=row.name,
+            humanized_name=row.humanized_name,
+            tag=row.tag,
+            registry=row.registry,
+            architecture=row.architecture,
+            is_local=row.is_local,
+            digest=row.digest,
+            labels=row.labels,
+            size_bytes=row.size_bytes,
+            resource_limits=row.resource_limits,
+            supported_accelerators=row.supported_accelerators,
+            aliases=row.aliases,
         )
 
     @classmethod
@@ -733,7 +826,11 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
 
         _, image_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(ImageRow).where(ImageRow.id == image_id)
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id == image_id)
+            .options(selectinload(ImageRow.aliases).options(load_only(ImageAliasRow.alias)))
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             image_row = await db_session.scalar(query)
             if image_row is None:
@@ -812,8 +909,64 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
+class ForgetImageById(graphene.Mutation):
+    """Added in 24.03.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> ForgetImageById:
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("forget image {0} by API request", image_id)
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_session() as session:
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            if not image_row:
+                raise ObjectNotFound("image")
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return ForgetImageById(ok=False, msg="Forbidden")
+            await session.delete(image_row)
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
 class ForgetImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
 
     class Arguments:
         reference = graphene.String(required=True)
@@ -821,6 +974,7 @@ class ForgetImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
 
     @staticmethod
     async def mutate(
@@ -831,6 +985,8 @@ class ForgetImage(graphene.Mutation):
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
         async with ctx.db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session,
@@ -839,8 +995,80 @@ class ForgetImage(graphene.Mutation):
                     ImageAlias(reference),
                 ],
             )
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-        return ForgetImage(ok=True, msg="")
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
+class UntagImageFromRegistry(graphene.Mutation):
+    """Added in 24.03.1"""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> UntagImageFromRegistry:
+        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("remove image from registry {0} by API request", str(_image_id))
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_readonly_session() as session:
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            if not image_row:
+                raise ImageNotFound
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
+
+            registry_info = await ctx.shared_config.get_container_registry(
+                image_row.image_ref.registry
+            )
+            if registry_info.get("type", "") != "harbor2":
+                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
+        await scanner.untag(image_row.image_ref)
+
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
 class AliasImage(graphene.Mutation):
@@ -995,7 +1223,7 @@ class ModifyImage(graphene.Mutation):
         )
         set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not None:
+        if props.resource_limits is not Undefined:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}

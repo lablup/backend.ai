@@ -827,7 +827,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
@@ -873,6 +875,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
+
+                if self.internal_data.get("sudo_session_enabled", False):
+                    exec = await container.exec(
+                        [
+                            # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                            "sh",
+                            "-c",
+                            'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                        ],
+                        user="root",
+                    )
+                    shell_response = await exec.start(detach=True)
+                    if shell_response:
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"sudoers provision failed: {shell_response.decode()}",
+                        )
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
@@ -1105,6 +1124,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -1258,6 +1282,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.info("handle_agent_socket(): rebinding the socket")
                 else:
                     zmq_ctx.destroy()
+
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        if image_ref.is_local:
+            return
+        auth_config = None
+        reg_user = registry_conf.get("username")
+        reg_passwd = registry_conf.get("password")
+        log.info("pushing image {} to registry", image_ref.canonical)
+        if reg_user and reg_passwd:
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
+                "ascii"
+            )
+            auth_config = {
+                "auth": encoded_creds,
+            }
+
+        async with closing_async(Docker()) as docker:
+            await docker.images.push(image_ref.canonical, auth=auth_config)
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         auth_config = None

@@ -357,7 +357,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 await volume.quota_model.create_quota_scope(
                     params["vfid"].quota_scope_id, options=options
                 )
-                await volume.create_vfolder(params["vfid"])
+                try:
+                    await volume.create_vfolder(params["vfid"])
+                except QuotaScopeNotFoundError:
+                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
 
 

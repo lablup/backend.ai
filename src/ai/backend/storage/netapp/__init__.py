@@ -18,6 +18,14 @@ from typing import (
 
 import aiofiles
 import aiofiles.os
+from tenacity import (
+    AsyncRetrying,
+    RetryError,
+    TryAgain,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
@@ -31,7 +39,12 @@ from ..abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..exception import ExecutionError, InvalidQuotaScopeError, NotEmptyError
+from ..exception import (
+    ExecutionError,
+    InvalidQuotaScopeError,
+    NotEmptyError,
+    QuotaScopeNotFoundError,
+)
 from ..subproc import spawn_and_watch
 from ..types import (
     SENTINEL,
@@ -47,7 +60,7 @@ from ..types import (
 )
 from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
-from .netappclient import NetAppClient, StorageID, VolumeID
+from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 xcp_lic_check_path = Path("/tmp/backend.ai/storage.netapp.xcp-license-check")
@@ -69,6 +82,7 @@ class QTreeQuotaModel(BaseQuotaModel):
         self.netapp_client = netapp_client
         self.svm_id = svm_id
         self.volume_id = volume_id
+        self.quota_enabled: bool = False
 
     async def create_quota_scope(
         self,
@@ -79,8 +93,34 @@ class QTreeQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         self.netapp_client.check_job_result(result, [])
+
+        # Ensure the quota scope path is successfully created
+        try:
+            async for attempt in AsyncRetrying(
+                wait=wait_fixed(0.1),
+                stop=stop_after_attempt(30),
+                retry=retry_if_exception_type(TryAgain),
+            ):
+                with attempt:
+                    if not qspath.exists():
+                        raise TryAgain
+        except RetryError:
+            raise QuotaScopeNotFoundError
+
         if options is not None:
-            await self.update_quota_scope(quota_scope_id, options)
+            result = await self.netapp_client.set_quota_rule(
+                self.svm_id,
+                self.volume_id,
+                qspath.name,
+                options,
+            )
+            self.netapp_client.check_job_result(result, [])
+            if not self.quota_enabled:
+                result = await self.netapp_client.enable_quota(self.volume_id)
+                self.netapp_client.check_job_result(
+                    result, [JobResponseCode.QUOTA_ALEADY_ENABLED]
+                )  # pass if "already on"
+                self.quota_enabled = True
 
     async def describe_quota_scope(
         self,
@@ -97,15 +137,13 @@ class QTreeQuotaModel(BaseQuotaModel):
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        result = await self.netapp_client.set_quota_rule(
+        result = await self.netapp_client.update_quota_rule(
             self.svm_id,
             self.volume_id,
             qspath.name,
             config,
         )
         self.netapp_client.check_job_result(result, [])
-        result = await self.netapp_client.enable_quota(self.volume_id)
-        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     # FIXME: How do we implement unset_quota() for NetApp?
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
@@ -419,6 +457,8 @@ class NetAppVolume(BaseVolume):
             self.ontap_endpoint,
             self.config["netapp_ontap_user"],
             self.config["netapp_ontap_password"],
+            self.local_config["storage-proxy"]["user"],
+            self.local_config["storage-proxy"]["group"],
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]

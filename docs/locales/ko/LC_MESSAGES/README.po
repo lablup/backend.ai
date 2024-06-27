@@ -51,7 +51,7 @@ msgstr ""
 
 #: ../../README.md:18 5564b6e3c712470388f16d777160759d
 msgid ""
-"```console $ pyenv virtualenv $(pyenv latest 3.11) bai-docs $ git clone "
+"```console $ pyenv virtualenv $(pyenv latest 3.12) bai-docs $ git clone "
 "https://github.com/lablup/backend.ai bai-dev $ cd ./bai-dev/docs $ pyenv "
 "local bai-docs $ pip install -U pip setuptools wheel $ pip install -U \\ "
 ">     --find-links=https://dist.backend.ai/pypi/simple/grpcio \\ >     "

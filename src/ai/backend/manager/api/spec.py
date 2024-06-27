@@ -44,6 +44,7 @@ GRAPHIQL_HTML = """
 <html>
   <head>
     <title>Backend.AI GraphQL API Reference</title>
+	<meta charset="UTF-8">
     <link href="../static/vendor/graphiql.min.css" rel="stylesheet" />
   </head>
   <body style="margin: 0;">

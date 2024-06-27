@@ -3,8 +3,6 @@ import os
 from pathlib import Path
 from typing import Final
 
-from async_timeout import timeout
-
 __all__ = (
     "current_loop",
     "find_executable",
@@ -45,7 +43,7 @@ async def safe_close_task(task):
 async def wait_local_port_open(port):
     while True:
         try:
-            with timeout(10.0):
+            async with asyncio.timeout(10.0):
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)

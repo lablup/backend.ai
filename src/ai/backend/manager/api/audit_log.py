@@ -1,7 +1,7 @@
 import contextvars
 import json
 import uuid
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
@@ -23,31 +23,30 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
 
     root_ctx: RootContext = request.app["_root.context"]
     handler_attr = getattr(handler, "_backend_attrs", {})
+    success = False
 
     try:
         res = await handler(request)
         success = True
         return res
     except Exception:
-        success = False
         raise
     finally:
-        if not request.get("audit_log_applicable"):
-            return
-        async with root_ctx.db.begin_session() as sess:
-            new_log = AuditLogRow(
-                uuid.uuid4(),
-                request["user"]["uuid"],
-                request["keypair"]["access_key"],
-                request["user"]["email"],
-                handler_attr.get("audit_log_action"),
-                audit_log_data.get(),
-                handler_attr.get("audit_log_target_type"),
-                success,
-                target=audit_log_target.get(),
-                rest_resource=f"{request.method} {request.path}",
-            )
-            sess.add(new_log)
+        if request.get("audit_log_applicable"):
+            async with root_ctx.db.begin_session() as sess:
+                new_log = AuditLogRow(
+                    uuid.uuid4(),
+                    request["user"]["uuid"],
+                    request["keypair"]["access_key"],
+                    request["user"]["email"],
+                    handler_attr["audit_log_action"],
+                    audit_log_data.get(),
+                    handler_attr["audit_log_target_type"],
+                    success,
+                    target=audit_log_target.get(),
+                    rest_resource=f"{request.method} {request.path}",
+                )
+                sess.add(new_log)
 
 
 def set_target(target: Any) -> None:
@@ -55,7 +54,7 @@ def set_target(target: Any) -> None:
 
 
 def update_after_data(
-    data_to_insert: dict[str, Any] | Sequence[Any],
+    data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
     prev_audit_log_data = audit_log_data.get().copy()
     prev_audit_log_data["after"] = json.dumps(data_to_insert)
@@ -63,7 +62,7 @@ def update_after_data(
 
 
 def update_before_data(
-    data_to_insert: dict[str, Any] | Sequence[Any],
+    data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
     prev_audit_log_data = audit_log_data.get().copy()
     prev_audit_log_data["before"] = json.dumps(data_to_insert)

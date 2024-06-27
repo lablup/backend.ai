@@ -29,3 +29,8 @@ python_requirements(
     source="towncrier-requirements.txt",
     resolve="towncrier",
 )
+python_requirements(
+    name="reqs-setuptools",
+    source="setuptools-requirements.txt",
+    resolve="setuptools",
+)

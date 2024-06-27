@@ -20,6 +20,7 @@ from typing import (
 import aiotools
 import graphene
 import sqlalchemy as sa
+import trafaret as t
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
@@ -41,6 +42,7 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
+    StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
@@ -111,6 +113,11 @@ association_groups_users = sa.Table(
     sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
 
+container_registry_iv = t.Dict({}) | t.Dict({
+    t.Key("registry"): t.String(),
+    t.Key("project"): t.String(),
+})
+
 
 class AssocGroupUserRow(Base):
     __table__ = association_groups_users
@@ -170,6 +177,12 @@ groups = sa.Table(
         nullable=False,
         default=ProjectType.GENERAL,
     ),
+    sa.Column(
+        "container_registry",
+        StructuredJSONColumn(container_registry_iv),
+        nullable=True,
+        default=None,
+    ),
     sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
 )
 
@@ -183,6 +196,8 @@ class GroupRow(Base):
     )
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
+    kernels = relationship("KernelRow", back_populates="group_row")
+    vfolder_row = relationship("VFolderRow", back_populates="group_row")
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -262,7 +277,8 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added since 24.03.0.")
+    type = graphene.String(description="Added in 24.03.0.")
+    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -283,6 +299,7 @@ class Group(graphene.ObjectType):
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
             type=row["type"].name,
+            container_registry=row["container_registry"],
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -362,8 +379,13 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        *,
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Sequence[Group | None]]:
+        if type is None:
+            _type = [ProjectType.GENERAL]
+        else:
+            _type = type
         j = sa.join(
             groups,
             association_groups_users,
@@ -372,7 +394,7 @@ class Group(graphene.ObjectType):
         query = (
             sa.select([groups, association_groups_users.c.user_id])
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(type)))
+            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -411,7 +433,7 @@ class GroupInput(graphene.InputObjectType):
         required=False,
         default_value="GENERAL",
         description=(
-            f"Added since 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
         ),
     )
     description = graphene.String(required=False, default_value="")
@@ -421,6 +443,9 @@ class GroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
+    container_registry = graphene.JSONString(
+        required=False, default_value={}, description="Added in 24.03.0"
+    )
 
 
 class ModifyGroupInput(graphene.InputObjectType):
@@ -434,6 +459,9 @@ class ModifyGroupInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
+    container_registry = graphene.JSONString(
+        required=False, default_value={}, description="Added in 24.03.0"
+    )
 
 
 class CreateGroup(graphene.Mutation):
@@ -470,6 +498,7 @@ class CreateGroup(graphene.Mutation):
             "domain_name": props.domain_name,
             "integration_id": props.integration_id,
             "resource_policy": props.resource_policy,
+            "container_registry": props.container_registry,
         }
         # set_if_set() applies to optional without defaults
         set_if_set(
@@ -521,6 +550,7 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "integration_id")
         set_if_set(props, data, "resource_policy")
+        set_if_set(props, data, "container_registry")
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
@@ -846,6 +876,7 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
+            _,
             conditions,
             cursor,
             pagination_order,
@@ -906,7 +937,8 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -922,9 +954,6 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(row) for row in group_rows]

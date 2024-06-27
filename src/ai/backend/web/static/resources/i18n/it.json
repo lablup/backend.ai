@@ -64,7 +64,9 @@
       "Data&Model": "Dati",
       "InvalidBlankPassword": "Inserisci la tua password",
       "InvalidBlankEmail": "Inserisci il tuo indirizzo email",
-      "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde"
+      "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde",
+      "MyEnvironments": "I miei ambienti",
+      "ResourcePolicy": "Politica delle risorse"
     },
     "YouAreOffline": "Ora sei offline",
     "YouAreOnline": "Ora sei online",
@@ -113,7 +115,8 @@
     "ATOMEnabled": "NPU ATOM abilitata",
     "WarboyEnabled": "NPU Warboy abilitata",
     "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
-    "FastTrack": "FastTrack"
+    "FastTrack": "FastTrack",
+    "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato"
   },
   "session": {
     "launcher": {
@@ -194,7 +197,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "Fessura",
       "Architecture": "Architettura",
-      "ModelStorageToMount": "Modello di magazzino da montare",
+      "ModelStorageToMount": "Conservazione del modello da montare",
       "MinMemory": "La capacità minima di memoria per l'ambiente di runtime attualmente selezionato è {{size}}iB.",
       "AIAccelerator": "Acceleratore AI",
       "ModelStorage": "Modello di stoccaggio",
@@ -243,7 +246,7 @@
       "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-).",
       "PreOpenPortMaxCountLimit": "È possibile impostare fino a {{count}} porte pre-aperte.",
       "StartTimeMustBeInTheFuture": "L'ora di inizio deve essere successiva all'ora corrente.",
-      "EnqueueComputeSessionWarning": "Se lo imposti su un valore maggiore rispetto alle risorse attualmente disponibili, la creazione della sessione verrà ritardata nella coda finché non diventerà disponibile.",
+      "EnqueueComputeSessionWarning": "Risorse insufficienti. \nLa sessione potrebbe essere in sospeso.",
       "SessionName": "Nome della sessione",
       "ResetFormConfirm": "Vuoi reimpostare tutte le tue voci?",
       "TemplateAndHistory": "Modelli",
@@ -255,11 +258,23 @@
       "EnvironmentVariableNamePatternError": "Il nome della variabile deve iniziare con una lettera o un trattino basso e può contenere solo lettere, numeri e trattini bassi.",
       "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente.",
       "Template": "Modello di sessione",
-      "EnableAutomaticShmem": "Memoria condivisa automatica",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnableAutomaticMiniumShmem": "Impostare la memoria condivisa minima",
       "OnlyAllowsDiscreteNumberByClusterSize": "È consentito solo un numero intero quando la dimensione del cluster non è inferiore a 2.",
       "StartAfter": "Inizia dopo:",
-      "StartTimeDoesNotApply": "Se l'ora di inizio non è impostata, non si applica."
+      "StartTimeDoesNotApply": "Se l'ora di inizio non è impostata, non si applica.",
+      "MiniumAllocation": "Requisiti minimi",
+      "MiniumAllocationTooltip": "Selezionare come requisito minimo per l'ambiente di esecuzione selezionato",
+      "PreviousLauncher": "Classic",
+      "NeoLauncher": "NEO",
+      "NeoSwitchDescription": "Si sta utilizzando il lanciatore di sessione \"{{launcher}}\".",
+      "SkipToConfirmAndLaunch": "Vai alla recensione",
+      "InteractiveModeDesc": "permette di creare, testare ed eseguire codice in modo interattivo tramite jupyter notebook, visual studio code, ecc.",
+      "BatchModeDesc": "È possibile eseguire il codice con più nodi e cluster per scalare la propria idea.",
+      "AddEnvironmentVariable": "Aggiungere le variabili d'ambiente",
+      "EnvironmentVariableValueRequired": "Inserire un valore.",
+      "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti.",
+      "FailedToStartNewSession": "Creazione della sessione non riuscita. \nControlla la scheda \"FINITO\" nella pagina della sessione.",
+      "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -293,7 +308,8 @@
       "Prepared": "Preparato",
       "NoExistingConnectionExample": "Nessun esempio di connessione da copiare.",
       "SSHConnectionExampleClipboardCopy": "L'esempio di connessione SSH è stato copiato negli appunti.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "L'URL di connessione non è valido."
     },
     "TensorboardPath": "Directory di registro per TensorBoard",
     "InputTensorboardPath": "Si prega di inserire la directory di registro a cui farà riferimento TensorBoard. Si noti che la directory del registro non verrà creata automaticamente..",
@@ -312,12 +328,16 @@
     "Architecture": "Architettura",
     "SessionType": "Tipo di sessione",
     "Validation": {
-      "EnterValidSessionName": "Inserire un nome di sessione valido",
+      "EnterValidSessionName": "Inserisci una combinazione di almeno 4 lettere dell'alfabeto, numeri, trattini o trattini bassi.",
       "SessionNameRequired": "Il nome della sessione è obbligatorio",
       "SluggedStrings": "Stringhe con slugged (>3 caratteri)",
       "SessionNameAlreadyExist": "Il nome della sessione esiste già",
       "SessionNameTooLong64": "Inserisci 64 caratteri o meno.",
-      "PleaseFollowSessionNameRule": "Inserisci una combinazione di almeno 4 lettere, numeri, \".\", \"_\" e \"-\"."
+      "PleaseFollowSessionNameRule": "Inserisci una combinazione di almeno 4 lettere, numeri, \".\", \"_\" e \"-\".",
+      "SessionNameTooShort": "Inserire almeno 4 caratteri.",
+      "SessionNameShouldStartWith": "Deve iniziare con una lettera dell'alfabeto, un numero o '_'.",
+      "SessionNameShouldEndWith": "Deve terminare con una lettera dell'alfabeto, un numero o '_'.",
+      "SessionNameInvalidCharacter": "Il centro di un nome può contenere solo lettere dell'alfabeto, numeri e '_'."
     },
     "Interactive": "Interattivo",
     "Batch": "Lotto",
@@ -377,7 +397,16 @@
     "CPU": "CPU",
     "MEM": "Memoria",
     "GPU": "GPU",
-    "GPU(MEM)": "GPU (memoria)"
+    "GPU(MEM)": "GPU (memoria)",
+    "Agents": "Agenti",
+    "IPU": "IPU",
+    "IPU(MEM)": "IPU (memoria)",
+    "ConvertSessionToImage": "Converti sessione in immagine",
+    "SessionName": "Nome della sessione",
+    "SessionId": "ID sessione",
+    "EnvironmentAndVersion": "Ambiente e versione",
+    "Tags": "Tag",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Annulla",
@@ -411,7 +440,10 @@
     "EnterManually": "Inserire manualmente",
     "Download": "Scarica",
     "Clone": "Clone",
-    "Config": "Configurazione"
+    "Config": "Configurazione",
+    "Next": "Avanti",
+    "Previous": "Precedente",
+    "PushToImage": "Push della sessione all'immagine personalizzata"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -436,7 +468,9 @@
     "Allocation": "Assegnazione",
     "Utilization": "Utilizzo",
     "DiskPerc": "Disco %",
-    "NoAgentToDisplay": "Nessun agente da visualizzare"
+    "NoAgentToDisplay": "Nessun agente da visualizzare",
+    "AutoRefreshEvery5s": "Aggiornamento automatico ogni 5 secondi",
+    "Agent": "Agente"
   },
   "general": {
     "cores": "core",
@@ -458,7 +492,8 @@
     "Image": "Immagine",
     "All": "Tutti",
     "InProgress": "In corso",
-    "Session": "Sessione"
+    "Session": "Sessione",
+    "General": "Generale"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -537,7 +572,8 @@
     "Status": "Stato",
     "NoUserToDisplay": "Nessun utente da visualizzare",
     "EnableSudoSession": "Abilita la sessione sudo",
-    "MainAccessKey": "Chiave di accesso principale"
+    "MainAccessKey": "Chiave di accesso principale",
+    "InactivateTheFollowingUsers": "Disattiva i seguenti utenti."
   },
   "data": {
     "Folders": "cartelle",
@@ -590,7 +626,7 @@
       "FolderRenamed": "Cartella rinominata",
       "FolderNameMismatched": "Il nome della cartella non corrisponde. Si prega di verificare se il carattere spazio nel campo di input o meno.",
       "SameFileName": "Il valore di input è lo stesso del nome del file da aggiornare. Si prega di cambiarlo con un nome diverso.",
-      "FolderDeleted": "Cartella eliminata",
+      "FolderDeleted": "La cartella {{ folderName }} è stata eliminata.",
       "FolderUpdated": "Opzioni cartella aggiornate",
       "FolderDisconnected": "La cartella è stata disconnessa.",
       "FileRenamed": "File rinominato",
@@ -617,7 +653,13 @@
       "CloneFolder": "Clona la cartella",
       "ShareFolder": "Cartella di condivisione",
       "ModifyPermissions": "Modificare le autorizzazioni",
-      "LeaveFolder": "Lasciare la cartella"
+      "LeaveFolder": "Lasciare la cartella",
+      "Restore": "Ristabilire",
+      "DeleteForever": "Elimina per sempre",
+      "FolderRestored": "La cartella {{ folderName }} è stata ripristinata.",
+      "FolderDeletedForever": "La cartella {{ folderName }} è stata eliminata per sempre.",
+      "MoveToTrashBin": "Sposta nel cestino",
+      "MovedToTrashBin": "La cartella {{ folderName }} è stata spostata nel cestino."
     },
     "explorer": {
       "Delete": "Elimina...",
@@ -668,7 +710,8 @@
       "SFTPSessionNotAvailable": "SFTP Session non è disponibile ora",
       "StartingSSH/SFTPSession": "Avvio della sessione SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Raggiunto il limite del conteggio della sessione di caricamento in corso",
-      "NumberOfSFTPSessionsExceededBody": "Si stanno eseguendo tutte le sessioni di caricamento disponibili che si possono creare. Chiudere le sessioni di caricamento inutilizzate prima di avviare una nuova sessione."
+      "NumberOfSFTPSessionsExceededBody": "Si stanno eseguendo tutte le sessioni di caricamento disponibili che si possono creare. Chiudere le sessioni di caricamento inutilizzate prima di avviare una nuova sessione.",
+      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella."
     },
     "invitation": {
       "NoValidEmails": "Non sono state inserite email valide",
@@ -707,21 +750,25 @@
     "ModelStore": "Negozio di modelli",
     "New": "Nuovo",
     "Add": "Aggiungi",
-    "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host."
+    "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host.",
+    "userQuotaScopeId": "Quota Scope ID"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ATTENZIONE: questa operazione non può essere annullata!",
       "LogDeletion": "Sei sicuro di voler eliminare tutti i messaggi di registro?",
       "WillBeAppliedToNewSessions": "Questo aggiornamento verrà applicato alle nuove sessioni.",
-      "Required": "Richiesto"
+      "Required": "Richiesto",
+      "DeleteForeverDesc": "ATTENZIONE: gli elementi selezionati verranno eliminati per sempre e non potrai ripristinarli."
     },
     "ask": {
-      "DoYouWantToProceed": "Vuoi procedere?"
+      "DoYouWantToProceed": "Vuoi procedere?",
+      "DoYouWantToDeleteSomething": "Si è sicuri di voler eliminare \"{{ nome }}\"?"
     },
     "title": {
       "LetsDouble-Check": "Ricontrolliamo",
-      "Notice": "Avviso"
+      "Notice": "Avviso",
+      "DeleteForever": "Elimina per sempre?"
     },
     "ErrorOccurred": "Errore",
     "error": {
@@ -776,7 +823,11 @@
     "PasswordsDoNotMatch": "Password e conferma non coincidono.",
     "NoChangeMade": "Non sono state apportate modifiche",
     "Architecture": "Architettura",
-    "NoImageToDisplay": "Nessuna immagine da visualizzare"
+    "NoImageToDisplay": "Nessuna immagine da visualizzare",
+    "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo.",
+    "DescImageResourceModified": "Limite delle risorse modificato con successo",
+    "DescImagePortsModified": "Porte immagine modificate con successo",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -908,8 +959,22 @@
     "SuccessfullyDeleted": "Criterio delle risorse eliminato con successo.",
     "PolicyNameEmpty": "Il nome del criterio non deve essere vuoto.",
     "AboutToDeleteResourcePolicy": "Stai per eliminare questa policy sulle risorse:",
-    "MaxSessionLifeTime": "Durata della sessione (sec.)",
-    "NoResourcePolicyToDisplay": "Nessuna politica delle risorse da visualizzare"
+    "MaxSessionLifetime": "Durata della sessione (sec.)",
+    "NoResourcePolicyToDisplay": "Nessuna politica delle risorse da visualizzare",
+    "Keypair": "Coppia di chiavi",
+    "User": "Utente",
+    "Project": "Progetto",
+    "KeypairResourcePolicy": "Politica delle risorse per la coppia di chiavi",
+    "IdleTimeout": "Timeout di inattività",
+    "CreateResourcePolicy": "Creare una politica delle risorse",
+    "ResourcePolicyNameAlreadyExists": "Il nome della policy delle risorse esiste già. \nSi prega di modificare il nome da aggiungere.",
+    "UserResourcePolicy": "Politica sulle risorse utente",
+    "MaxVFolderCount": "Conteggio massimo cartelle",
+    "MaxSessionCountPerModelSession": "Conteggio massimo delle sessioni per sessione del modello",
+    "MaxQuotaScopeSize": "Dimensione massima ambito quota (GB)",
+    "MaxCustomizedImageCount": "Conteggio massimo di immagini personalizzate",
+    "CreatedAt": "Creato a",
+    "MaxFolderCount": "Conteggio massimo cartelle"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1086,7 +1151,7 @@
     "Scaling": "Ridimensionamento",
     "AllowAgentSideRegistration": "Consenti registrazione lato agente",
     "DescAllowAgentSideRegistration": "Consenti all'agente di registrarsi al gestore. <br/> Utilizzare solo se il cluster Backend.AI è gestito in una posizione sicura.",
-    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di backend.AI.",
+    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Disabilitato perché il sistema utilizza il plug-in Fractional GPU",
     "ROCMGPUsupport": "Supporto GPU ROCm",
     "DescROCMGPUsupport": "Supporto per GPU AMD ROCm. <br/> Richiede il plug-in ROCm Backend.AI.",
@@ -1138,7 +1203,11 @@
     "OutOfRange": "Fuori portata.",
     "Plugins": "Plugin",
     "OpenSourceCUDAGPUsupport": "Supporto GPU CUDA open source",
-    "ShowOnlyChanged": "Visualizza solo modifiche"
+    "ShowOnlyChanged": "Visualizza solo modifiche",
+    "HyperaccelLPUsupport": "Hyperaccel LPU",
+    "DescHyperaccelLPUsupport": "Utilizzare l'acceleratore Hyperaccel LPU.",
+    "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Ricerca"
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1191,14 +1260,12 @@
     "LeaveService": "Lascia il servizio",
     "DescConfirmLeave": "Per confermare, digita nuovamente la tua e-mail e la password.",
     "Password": "Parola d'ordine",
-    "E-mail": "E-mail",
     "APIKey": "Chiave API",
     "SecretKey": "Chiave segreta",
     "Endpoint": "Endpoint",
     "NotAUser": "Non sei un utente?",
     "LoginAnotherway": "Vuoi accedere in un altro modo?",
     "SignUp": "Iscriviti",
-    "LoginWithE-mail": "Accedi con e-mail",
     "LoginWithIAM": "Accedi con IAM",
     "ClickToUseIAM": "Fai clic per utilizzare IAM",
     "ClickToUseID": "Fare clic per utilizzare l'ID",
@@ -1226,7 +1293,9 @@
     "SingleSignOn": {
       "LoginWithSAML": "Accesso con SAML",
       "LoginWithRealm": "Accesso con {{ realmName }}"
-    }
+    },
+    "LoginWithE-mailorUsername": "Accedi con e-mail o nome utente",
+    "E-mailorUsername": "Email o nome utente"
   },
   "signup": {
     "SignupBETA": "Registrazione (solo su invito beta)",
@@ -1358,7 +1427,8 @@
     "ResourcePolicyStillReferenced": "Esistono coppie di chiavi che fanno riferimento a questa politica delle risorse.",
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
-    "WrongAPIServerAddress": "Indirizzo del server API errato."
+    "WrongAPIServerAddress": "Indirizzo del server API errato.",
+    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore."
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1417,14 +1487,32 @@
     "RoutingsCount": "Conteggio delle rotte",
     "Active/Total": "Attivo/Totale",
     "Public": "Pubblico",
-    "YouAreAboutToTerminate": "State per terminare",
     "Owner": "Proprietario",
+    "Processing": "In lavorazione...",
+    "Success": "Successo",
+    "Error": "Errore",
+    "SeeContainerLogs": "Consulta Log del contenitore",
+    "TimeStamp": "Timestamp",
+    "Result": "Risultato",
+    "Finished": "Finito",
     "ServiceDelegatedFrom": "Il servizio modello è creato da {{ createdUser }}, ma la proprietà della sessione sarà delegata a {{ sessionOwner }}.",
     "FailedToTerminateService": "La richiesta di terminare il servizio è fallita.",
     "FailedToUpdateService": "Impossibile aggiornare il servizio.",
     "ServiceCreated": "Il servizio modello {{ name }} è stato creato correttamente.",
     "ServiceUpdated": "Il servizio modello {{ name }} è stato aggiornato correttamente.",
-    "ServiceTerminated": "Il servizio modello {{ name }} è stato terminato correttamente."
+    "CannotValidateNow": "Impossibile convalidare il servizio adesso. \nControlla l'allocazione delle risorse o altre configurazioni.",
+    "Ready": "Pronto",
+    "ValidationInfo": "Informazioni sulla convalida",
+    "Validate": "Convalidare",
+    "ServiceTerminated": "È stata inviata una richiesta di arresto per il servizio modello '{{ name }}'.",
+    "ModelMountDestination": "Destinazione di montaggio per la cartella del modello",
+    "AdditionalMounts": "Supporti aggiuntivi",
+    "ModelDefinitionPath": "Percorso del file di definizione del modello",
+    "NoExtraMounts": "Nessun supporto aggiuntivo",
+    "SyncRoutes": "Sincronizzazione dei percorsi",
+    "SyncRoutesFailed": "La richiesta di sincronizzazione del percorso non è riuscita.",
+    "SyncRoutesSuccess": "La richiesta di sincronizzazione del percorso è andata a buon fine.",
+    "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1464,7 +1552,8 @@
     "ForUser": "Per l'utente",
     "ForProject": "Per il progetto",
     "QuotaDoesNotSupported": "Questo backend di archiviazione non supporta le quote.",
-    "BeCarefulToSetUserResourcePolicy": "La modifica di un criterio di risorse può influire su tutti gli utenti che utilizzano quel criterio di risorse utente, quindi va usata con cautela."
+    "BeCarefulToSetUserResourcePolicy": "La modifica di un criterio di risorse può influire su tutti gli utenti che utilizzano quel criterio di risorse utente, quindi va usata con cautela.",
+    "StorageSetting": "Impostazione di archiviazione"
   },
   "totp": {
     "TotpSetupCompleted": "Abilitato 2FA",
@@ -1481,7 +1570,8 @@
   },
   "OpenVSCodeRemote": "Aprire il codice locale di Visual Studio",
   "inputLimit": {
-    "4to64chars": "(4~64 caratteri)"
+    "4to64chars": "(4~64 caratteri)",
+    "4to32chars": "(4~32 caratteri)"
   },
   "modelStore": {
     "Description": "Descrizione",
@@ -1516,7 +1606,20 @@
     "SelectColumnToDisplay": "Seleziona le colonne da visualizzare",
     "SearchTableColumn": "Cerca colonne della tabella"
   },
-  "setting": {
-    "SearchPlaceholder": "Inserisci il termine di ricerca"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Errori di convalida del campo di input",
+      "ValidationErrorText": "Se non inserisci un valore in un campo obbligatorio o inserisci un valore non valido, in quel campo viene visualizzato un messaggio di errore.",
+      "FixErrorAndTryAgainText": "Se è presente un campo di errore, il pulsante Avvia sessione è disabilitato. \nCorreggi l'errore e riprova.",
+      "FixErrorFieldbyModifyButton": "Per quel campo di errore, puoi andare direttamente al pulsante Modifica nell'angolo in alto a destra per modificarlo."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "copia",
+    "Copied": "Copiato"
+  },
+  "propertyFilter": {
+    "placeHolder": "Ricerca",
+    "ResetFilter": "Reimposta filtro"
   }
 }

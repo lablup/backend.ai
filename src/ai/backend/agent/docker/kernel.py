@@ -158,13 +158,20 @@ class DockerKernel(AbstractKernel):
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
-    async def commit(self, kernel_id: KernelId, subdir: str, filename: str):
+    async def commit(
+        self,
+        kernel_id,
+        subdir,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
+    ) -> None:
         assert self.runner is not None
 
         loop = asyncio.get_running_loop()
         path, lock_path = self._get_commit_path(kernel_id, subdir)
         container_id: str = str(self.data["container_id"])
-        filepath = path / filename
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
@@ -184,37 +191,68 @@ class DockerKernel(AbstractKernel):
 
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
-                log.info("Container is being committed to {}", filepath)
+                log.info("Container (k: {}) is being committed", kernel_id)
                 docker = Docker()
-                container = docker.containers.container(container_id)
                 try:
-                    response: Mapping[str, Any] = await container.commit()
+                    # There is a known issue at certain versions of Docker Engine
+                    # which prevents container from being committed when request config body is empty
+                    # https://github.com/moby/moby/issues/45543
+                    docker_info = await docker.system.info()
+                    docker_version = docker_info["ServerVersion"]
+                    major, _, patch = docker_version.split(".", maxsplit=2)
+                    config = None
+                    if (int(major) == 23 and int(patch) < 8) or (
+                        int(major) == 24 and int(patch) < 1
+                    ):
+                        config = {"ContainerSpec": {}}
+
+                    container = docker.containers.container(container_id)
+                    changes: list[str] = []
+
+                    for label_name, label_value in extra_labels.items():
+                        changes.append(f"LABEL {label_name}={label_value}")
+                    if canonical:
+                        if ":" in canonical:
+                            repo, tag = canonical.rsplit(":", maxsplit=1)
+                        else:
+                            repo, tag = canonical, "latest"
+                        log.debug("tagging image as {}:{}", repo, tag)
+                    else:
+                        repo, tag = None, None
+                    response: Mapping[str, Any] = await container.commit(
+                        changes=changes,
+                        repository=repo,
+                        tag=tag,
+                        config=config,
+                    )
                     image_id = response["Id"]
-                    try:
-                        q: janus.Queue[bytes | Sentinel] = janus.Queue(
-                            maxsize=DEFAULT_INFLIGHT_CHUNKS
-                        )
-                        async with docker._query(f"images/{image_id}/get") as tb_resp:
-                            with gzip.open(filepath, "wb") as fileobj:
-                                write_task = loop.run_in_executor(
-                                    None,
-                                    functools.partial(
-                                        _write_chunks,
-                                        fileobj,
-                                        q.sync_q,
-                                    ),
-                                )
-                                try:
-                                    await asyncio.sleep(0)  # let write_task get started
-                                    async for chunk in tb_resp.content.iter_chunked(
-                                        DEFAULT_CHUNK_SIZE
-                                    ):
-                                        await q.async_q.put(chunk)
-                                finally:
-                                    await q.async_q.put(Sentinel.TOKEN)
-                                    await write_task
-                    finally:
-                        await docker.images.delete(image_id)
+                    if filename:
+                        filepath = path / filename
+                        try:
+                            q: janus.Queue[bytes | Sentinel] = janus.Queue(
+                                maxsize=DEFAULT_INFLIGHT_CHUNKS
+                            )
+                            async with docker._query(f"images/{image_id}/get") as tb_resp:
+                                with gzip.open(filepath, "wb") as fileobj:
+                                    write_task = loop.run_in_executor(
+                                        None,
+                                        functools.partial(
+                                            _write_chunks,
+                                            fileobj,
+                                            q.sync_q,
+                                        ),
+                                    )
+                                    try:
+                                        await asyncio.sleep(0)  # let write_task get started
+                                        async for chunk in tb_resp.content.iter_chunked(
+                                            DEFAULT_CHUNK_SIZE
+                                        ):
+                                            await q.async_q.put(chunk)
+                                    finally:
+                                        await q.async_q.put(Sentinel.TOKEN)
+                                        await write_task
+                        finally:
+                            await docker.images.delete(image_id)
                 finally:
                     await docker.close()
         except asyncio.TimeoutError:

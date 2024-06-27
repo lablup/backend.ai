@@ -57,8 +57,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import enum
 import uuid
-from collections.abc import Container
+from collections.abc import Iterable
 from pathlib import Path
 from typing import (
     Any,
@@ -74,11 +75,16 @@ from typing import (
 
 import aiohttp
 
+from ..exception import ExternalError
 from ..types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
 QTreeID: TypeAlias = int
+
+
+class JobResponseCode(enum.StrEnum):
+    QUOTA_ALEADY_ENABLED = "5308507"
 
 
 class AsyncJobResult(TypedDict):
@@ -116,7 +122,7 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
-class NetAppClientError(RuntimeError):
+class NetAppClientError(ExternalError):
     pass
 
 
@@ -124,6 +130,8 @@ class NetAppClient:
     endpoint: str
     user: str
     password: str
+    user_id: int
+    group_id: int
     _session: aiohttp.ClientSession
 
     def __init__(
@@ -131,10 +139,14 @@ class NetAppClient:
         endpoint: str,
         user: str,
         password: str,
+        user_id: int,
+        group_id: int,
     ) -> None:
         self.endpoint = endpoint
         self.user = user
         self.password = password
+        self.user_id = user_id
+        self.group_id = group_id
         _connector = aiohttp.TCPConnector(ssl=False)
         _auth = aiohttp.BasicAuth(self.user, self.password)
         self._session = aiohttp.ClientSession(
@@ -179,9 +191,10 @@ class NetAppClient:
                 }
 
     @staticmethod
-    def check_job_result(result: AsyncJobResult, allowed_codes: Container[str]) -> None:
+    def check_job_result(result: AsyncJobResult, allowed_codes: Iterable[JobResponseCode]) -> None:
+        _allowed_codes = {code.value for code in allowed_codes}
         if result["state"] == "failure":
-            if result["code"] in allowed_codes:
+            if result["code"] in _allowed_codes:
                 pass
             else:
                 raise NetAppClientError(f"{result['state']} [{result['code']}] {result['message']}")
@@ -414,6 +427,8 @@ class NetAppClient:
                 "svm.uuid": str(svm_id),
                 "volume.uuid": str(volume_id),
                 "name": qtree_name,
+                "user.id": self.user_id,
+                "group.id": self.group_id,
             },
         ) as resp:
             data = await resp.json()
@@ -471,6 +486,31 @@ class NetAppClient:
                     f"Quota rule not found for the volume {volume_id} and the qtree {qtree_name}"
                 )
             return records[0]
+
+    async def update_quota_rule(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+        config: QuotaConfig,
+    ) -> AsyncJobResult:
+        record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
+        async with self.send_request(
+            "patch",
+            f"/api/storage/quota/rules/{record['uuid']}",
+            data={
+                "space": {
+                    "hard_limit": config.limit_bytes,
+                    "soft_limit": config.limit_bytes,
+                },
+                # 'files': {  # not supported yet from Backend.AI
+                #     'hard_limit': 0,
+                #     'soft_limit': 0,
+                # },
+            },
+        ) as resp:
+            data = await resp.json()
+        return await self.wait_job(data["job"]["uuid"])
 
     async def get_quota_rule(
         self,

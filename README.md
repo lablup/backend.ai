@@ -6,8 +6,8 @@ Backend.AI
 ![Wheels](https://img.shields.io/pypi/wheel/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined, container-based computing cluster platform 
-that hosts popular computing/ML frameworks and diverse programming languages, 
+Backend.AI is a streamlined, container-based computing cluster platform
+that hosts popular computing/ML frameworks and diverse programming languages,
 with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
 
 It allocates and isolates the underlying computing resources for multi-tenant
@@ -175,7 +175,6 @@ and basic administration tasks.
 
 **Synchronizing the static Backend.AI WebUI version:**
 ```console
-$ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
 $ scripts/download-webui-release.sh <target version to download>
 ```
 
@@ -268,11 +267,12 @@ or native SSH connection to kernels via our client SDK or desktop apps.
 Python Version Compatibility
 ----------------------------
 
-| Backend.AI Core Version | Compatible Python Version |
-|:-----------------------:|:-------------------------:|
-| 23.03.x / 23.09.x       | 3.11.x                    |
-| 22.03.x / 22.09.x       | 3.10.x                    |
-| 21.03.x / 21.09.x       | 3.8.x                     |
+| Backend.AI Core Version | Python Version | Pantsbuild version |
+|:-----------------------:|:--------------:|:------------------:|
+| 24.03.x / 24.09.x       | 3.12.x         | 2.21.x             |
+| 23.03.x / 23.09.x       | 3.11.x         | 2.19.x             |
+| 22.03.x / 22.09.x       | 3.10.x         |                    |
+| 21.03.x / 21.09.x       | 3.8.x          |                    |
 
 
 License
