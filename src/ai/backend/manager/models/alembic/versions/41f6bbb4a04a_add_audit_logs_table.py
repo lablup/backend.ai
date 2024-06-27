@@ -1,7 +1,7 @@
 """add audit_logs table
 
 Revision ID: 41f6bbb4a04a
-Revises: 75ea2b136830
+Revises: fdb2dcdb8811
 Create Date: 2024-03-31 14:57:34.598304
 
 """
@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "41f6bbb4a04a"
-down_revision = "75ea2b136830"
+down_revision = "fdb2dcdb8811"
 branch_labels = None
 depends_on = None
 
@@ -47,6 +47,7 @@ def upgrade():
             nullable=False,
         ),
         sa.Column("target", sa.String(length=64), nullable=True),
+        sa.Column("error", sa.String(length=128), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
         ),

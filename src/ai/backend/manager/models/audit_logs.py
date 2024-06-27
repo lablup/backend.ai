@@ -15,7 +15,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .base import GUID, Base, EnumValueType, IDColumn, Item, PaginatedList
+from .base import GUID, Base, IDColumn, Item, PaginatedList, StrEnumType
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 
@@ -37,7 +37,7 @@ class AuditLogAction(str, enum.Enum):
     """AuditLog Action's Enum"""
 
     CREATE = "CREATE"
-    CHANGE = "CHANGE"
+    UPDATE = "UPDATE"
     DELETE = "DELETE"
     PURGE = "PURGE"
     RESTORE = "RESTORE"
@@ -61,7 +61,7 @@ class AuditLogRow(Base):
     user_id = sa.Column("user_id", GUID, nullable=False)
     access_key = sa.Column("access_key", sa.String(length=20), nullable=False)
     email = sa.Column("email", sa.String(length=64), nullable=False)
-    action = sa.Column("action", EnumValueType(AuditLogAction), nullable=False)
+    action = sa.Column("action", StrEnumType(AuditLogAction), nullable=False)
     data = sa.Column("data", pgsql.JSONB(), nullable=True)
     target_type = sa.Column(
         "target_type",
@@ -71,6 +71,7 @@ class AuditLogRow(Base):
     target = sa.Column("target", sa.String(length=64), nullable=True)
     created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
     success = sa.Column("success", sa.Boolean(), server_default=sa.true(), nullable=False)
+    error = sa.Column("error", sa.String(length=128), nullable=True)
     rest_resource = sa.Column("rest_resource", sa.String(length=256), nullable=True)
     gql_query = sa.Column("gql_query", sa.String(length=1024), nullable=True)
 

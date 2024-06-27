@@ -129,13 +129,14 @@ from .utils import (
     pydantic_params_api_handler,
 )
 from .utils import (
-    audit_log_request as _audit_log_request,
+    audit_log as _audit_log,
 )
 
 if TYPE_CHECKING:
     from .context import RootContext
 
-audit_log_request = functools.partial(_audit_log_request, target_type=AuditLogTargetType.VFOLDER)
+capture_audit_log = functools.partial(_audit_log, target_type=AuditLogTargetType.VFOLDER)
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow: TypeAlias = Mapping[str, Any]
@@ -340,6 +341,7 @@ def vfolder_check_exists(
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
+@capture_audit_log(AuditLogAction.CREATE)
 @check_api_params(
     t.Dict({
         t.Key("name"): tx.Slug(allow_dot=True),
@@ -351,9 +353,6 @@ def vfolder_check_exists(
         t.Key("cloneable", default=False): t.Bool,
     }),
 )
-@audit_log_request(
-    action=AuditLogAction.CREATE,
-)
 async def create(request: web.Request, params: Any) -> web.Response:
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
@@ -363,22 +362,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
-    vfolder_name = params["name"]
-
-    audit_log.set_target(vfolder_name)
-
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
         access_key,
-        vfolder_name,
+        params["name"],
         params["folder_host"],
         params["usage_mode"].value,
         params["permission"].value,
     )
     folder_host = params["folder_host"]
     unmanaged_path = params["unmanaged_path"]
-
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
@@ -395,9 +389,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
-    if not verify_vfolder_name(vfolder_name):
-        raise InvalidAPIParameters(f"{vfolder_name} is reserved for internal operations.")
-    if vfolder_name.startswith(".") and vfolder_name != ".local":
+    if not verify_vfolder_name(params["name"]):
+        raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
+    if params["name"].startswith(".") and params["name"] != ".local":
         if params["group"] is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
@@ -461,9 +455,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     user_row.resource_policy_row.max_quota_scope_size,
                 )
             case _:
-                raise GroupNotFound(
-                    extra_data=group_id_or_name,
-                )
+                raise GroupNotFound(extra_data=group_id_or_name)
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
@@ -486,11 +478,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
     if group_type == ProjectType.MODEL_STORE:
         if params["permission"] != VFolderPermission.READ_WRITE:
             raise InvalidAPIParameters(
-                "Setting custom permission is not supported for model store vfolder",
+                "Setting custom permission is not supported for model store vfolder"
             )
         if params["usage_mode"] != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
-                "Only Model VFolder can be created under the model store project",
+                "Only Model VFolder can be created under the model store project"
             )
 
     async with root_ctx.db.begin() as conn:
@@ -518,9 +510,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             result = await conn.scalar(query)
             if result >= max_vfolder_count and ownership_type == "user":
-                raise InvalidAPIParameters(
-                    "You cannot create more vfolders.",
-                )
+                raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
         # max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
@@ -531,7 +521,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [
-            (vfolders.c.name == vfolder_name),
+            (vfolders.c.name == params["name"]),
             (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
         ]
         entries = await query_accessible_vfolders(
@@ -543,7 +533,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
         if len(entries) > 0:
-            raise VFolderAlreadyExists(extra_data=vfolder_name)
+            raise VFolderAlreadyExists(extra_data=params["name"])
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
@@ -626,11 +616,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             })
             resp["unmanaged_path"] = unmanaged_path
         try:
-            query = sa.insert(vfolders, insert_values).returning(*vfolders.c)
+            query = sa.insert(vfolders, insert_values)
             result = await conn.execute(query)
-            data_to_insert = result.one()
 
-            audit_log.update_after_data(data_to_insert)
             # Here we grant creator the permission to alter VFolder contents
             if group_type == ProjectType.MODEL_STORE:
                 query = sa.insert(vfolder_permissions).values({
@@ -642,7 +630,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
-
+        audit_log.update_current(insert_values)
     return web.json_response(resp, status=201)
 
 
@@ -1023,17 +1011,12 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         t.Key("input"): t.Mapping(t.String, t.Any),
     }),
 )
-@audit_log_request(
-    action=AuditLogAction.CHANGE,
-)
 async def update_quota(request: web.Request, params: Any) -> web.Response:
     vfolder_row = (
         await resolve_vfolder_rows(request, VFolderPermissionSetAlias.READABLE, params["id"])
     )[0]
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
-    audit_log.set_target(params["id"])
-
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
     quota = int(params["input"]["size_bytes"])
@@ -1173,15 +1156,15 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@capture_audit_log(AuditLogAction.UPDATE)
 @check_api_params(
     t.Dict({
         t.Key("new_name"): tx.Slug(allow_dot=True),
     })
 )
-@audit_log_request(
-    action=AuditLogAction.CHANGE,
-)
-async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+async def rename_vfolder(
+    request: web.Request, params: Any, row: Sequence[VFolderRow]
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1191,8 +1174,9 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
 
-    audit_log.set_target(old_name)
-
+    audit_log.set_target(request.match_info["name"])
+    audit_log.update_previous(old_name)
+    audit_log.update_current(new_name)
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.RENAME (email:{}, ak:{}, vf.old:{}, vf.new:{})",
@@ -1201,7 +1185,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         old_name,
         new_name,
     )
-
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -1210,16 +1193,11 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
         )
-
-        entries_filtered = [entry for entry in entries if entry["name"] == old_name]
-        audit_log.update_before_data(entries_filtered)
-
         for entry in entries:
             if entry["name"] == new_name:
                 raise InvalidAPIParameters(
                     "One of your accessible vfolders already has the name you requested."
                 )
-
         for entry in entries:
             if entry["name"] == old_name:
                 if not entry["is_owner"]:
@@ -1240,15 +1218,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
                 )
                 await conn.execute(query)
                 break
-
-        updated_ids = [entry["id"] for entry in entries if entry["name"] == old_name]
-        find_updated_row_queries = sa.select([vfolders]).where(vfolders.c.id.in_(updated_ids))
-
-        updated_rows = await conn.execute(find_updated_row_queries)
-        updated_rows_list = [row for row in updated_rows.all()]
-
-        audit_log.update_after_data(updated_rows_list)
-
     return web.Response(status=201)
 
 
@@ -1256,34 +1225,29 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 @server_status_required(ALL_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@capture_audit_log(AuditLogAction.UPDATE)
 @check_api_params(
     t.Dict({
         t.Key("cloneable", default=None): t.Bool | t.Null,
         t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
     })
 )
-@audit_log_request(
-    action=AuditLogAction.CHANGE,
-)
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    audit_log.set_target(request.match_info["name"])
-
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+
+    audit_log.set_target(request.match_info["name"])
+    audit_log.update_previous(row["cloneable"])
+    audit_log.update_current(row["permission"])
+
     async with root_ctx.db.begin_readonly() as conn:
-        # change to bring all columns due to
-        query = sa.select([vfolders]).select_from(vfolders).where(vfolders.c.id == row["id"])
-
-        result = await conn.execute(query)
-        db_row_to_update = result.one()
-        audit_log.update_before_data([db_row_to_update])
-
-        folder_host = db_row_to_update._mapping["host"]
+        query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
+        folder_host = await conn.scalar(query)
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1304,21 +1268,10 @@ async def update_vfolder_options(
             "Cannot change the options of a vfolder that is not owned by myself."
         )
 
-    after_data_to_insert = db_row_to_update
-
     if len(updated_fields) > 0:
         async with root_ctx.db.begin() as conn:
-            query = (
-                sa.update(vfolders)
-                .values(**updated_fields)
-                .where(vfolders.c.id == row["id"])
-                .returning(vfolders)
-            )
-            result = await conn.execute(query)
-            updated_result = result.one()
-            after_data_to_insert = updated_result
-
-    audit_log.update_after_data([after_data_to_insert])
+            query = sa.update(vfolders).values(**updated_fields).where(vfolders.c.id == row["id"])
+            await conn.execute(query)
     return web.Response(status=201)
 
 
@@ -1333,12 +1286,7 @@ async def update_vfolder_options(
         t.Key("exist_ok", default=False): t.ToBool,
     })
 )
-@audit_log_request(
-    action=AuditLogAction.CREATE,
-)
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    audit_log.set_target(request.match_info["name"])
-
     if isinstance(params["path"], list) and len(params["path"]) > 50:
         raise InvalidAPIParameters("Too many directories specified.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -1429,7 +1377,6 @@ async def create_download_session(
             "token": storage_reply["token"],
             "url": str(client_api_url / "download"),
         }
-
     return web.json_response(resp, status=200)
 
 
@@ -1482,7 +1429,6 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
             "token": storage_reply["token"],
             "url": str(client_api_url / "upload"),
         }
-
     return web.json_response(resp, status=200)
 
 
@@ -2137,7 +2083,6 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
         # Convert users' emails to uuids and check if user belong to the group of vfolder.
         j = users.join(agus, users.c.uuid == agus.c.user_id)
-
         query = (
             sa.select([users.c.uuid, users.c.email])
             .select_from(j)
@@ -2262,24 +2207,12 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
         if len(users_to_unshare) < 1:
             raise ObjectNotFound(object_name="user(s).")
 
-        query = sa.select(vfolder_permissions).where(
-            (vfolder_permissions.c.vfolder == vf_info["id"])
-            & (vfolder_permissions.c.user.in_(users_to_unshare)),
-        )
-        result = await conn.execute(query)
-        row_to_delete = result.fetchall()
-
-        if row_to_delete:
-            audit_log.update_before_data(row_to_delete)
-
         # Delete vfolder_permission(s).
         query = sa.delete(vfolder_permissions).where(
             (vfolder_permissions.c.vfolder == vf_info["id"])
             & (vfolder_permissions.c.user.in_(users_to_unshare)),
         )
         await conn.execute(query)
-        audit_log.update_after_data({})
-
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
 
 
@@ -2311,8 +2244,6 @@ async def _delete(
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
-
-        audit_log.update_before_data(entry)
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
@@ -2354,12 +2285,12 @@ class DeleteRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
+@capture_audit_log(AuditLogAction.DELETE)
 @pydantic_params_api_handler(DeleteRequestModel)
-@audit_log_request(
-    action=AuditLogAction.DELETE,
-)
 async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
+
+    audit_log.set_target(params.vfolder_id)
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     user_role = request["user"]["role"]
@@ -2374,7 +2305,6 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         folder_id,
     )
 
-    audit_log.set_target(folder_id)
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
     await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
@@ -2400,20 +2330,18 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@audit_log_request(
-    action=AuditLogAction.DELETE,
-)
+@capture_audit_log(AuditLogAction.DELETE)
 async def delete_by_name(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
+
     folder_name = request.match_info["name"]
+    audit_log.set_target(folder_name)
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     resource_policy = request["keypair"]["resource_policy"]
-
-    audit_log.set_target(folder_name)
 
     log.info(
         "VFOLDER.DELETE (email:{}, ak:{}, vf:{})",
@@ -2510,7 +2438,7 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 @auth_required
 @pydantic_params_api_handler(DeleteFromTrashRequestModel)
-@audit_log_request(
+@capture_audit_log(
     action=AuditLogAction.PURGE,
 )
 async def delete_from_trash_bin(
@@ -2519,6 +2447,7 @@ async def delete_from_trash_bin(
     """
     Delete `delete-pending` vfolders in storage proxy
     """
+    audit_log.set_target(params.vfolder_id)
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
     folder_id = params.vfolder_id
@@ -2527,8 +2456,6 @@ async def delete_from_trash_bin(
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    audit_log.set_target(folder_id)
-
     log.info(
         "VFOLDER.DELETE_FROM_TRASH_BIN (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2586,9 +2513,6 @@ class PurgeRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(PurgeRequestModel)
-@audit_log_request(
-    action=AuditLogAction.PURGE,
-)
 async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
     """
     Delete `delete-complete`d vfolder rows in DB
@@ -2599,9 +2523,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-
-    audit_log.set_target(folder_id)
-
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
@@ -2642,11 +2563,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
-        # Folder owner OR user who have DELETE permission can delete folder.
-        audit_log.update_before_data(entry)
-
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
@@ -2663,9 +2579,7 @@ class RestoreRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(RestoreRequestModel)
-@audit_log_request(
-    action=AuditLogAction.RESTORE,
-)
+@capture_audit_log(AuditLogAction.RESTORE)
 async def restore(request: web.Request, params: RestoreRequestModel) -> web.Response:
     """
     Recover vfolder from trash bin, by changing status.
@@ -2785,6 +2699,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @server_status_required(ALL_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@capture_audit_log(AuditLogAction.CREATE)
 @check_api_params(
     t.Dict({
         t.Key("cloneable", default=False): t.Bool,
@@ -2794,9 +2709,6 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
     }),
 )
-@audit_log_request(
-    action=AuditLogAction.CREATE,
-)
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
@@ -2805,6 +2717,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
+    audit_log.set_target(params["target_name"])
     log.info(
         "VFOLDER.CLONE (email:{}, ak:{}, vf:{}, vft:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -2821,8 +2734,6 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     target_quota_scope_id = "..."  # TODO: implement
     source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)
     target_proxy_name, target_volume_name = root_ctx.storage_manager.split_host(target_folder_host)
-
-    audit_log.set_target(params["target_name"])
 
     # check if the source vfolder is allowed to be cloned
     if not row["cloneable"]:
@@ -3046,25 +2957,13 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
-
     async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select(vfolder_permissions)
-            .where(vfolder_permissions.c.vfolder == vfolder_id)
-            .where(vfolder_permissions.c.user == user_uuid)
-        )
-
-        result = await conn.execute(query)
-        if not result.first():
-            raise ObjectNotFound("vfolder_permissions")
-
         if perm is not None:
             query = (
                 sa.update(vfolder_permissions)
                 .values(permission=perm)
                 .where(vfolder_permissions.c.vfolder == vfolder_id)
                 .where(vfolder_permissions.c.user == user_uuid)
-                .returning(vfolder_permissions)
             )
         else:
             query = (
@@ -3072,12 +2971,7 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
                 .where(vfolder_permissions.c.vfolder == vfolder_id)
                 .where(vfolder_permissions.c.user == user_uuid)
             )
-
-        result = await conn.execute(query)
-
-        if perm and not result.first():
-            raise ObjectNotFound("vfolder_permissions")
-
+        await conn.execute(query)
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=200)
 
@@ -3496,14 +3390,12 @@ async def storage_task_exception_handler(
 
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
+@capture_audit_log(AuditLogAction.UPDATE)
 @check_api_params(
     t.Dict({
         t.Key("vfolder"): tx.UUID,
         t.Key("user_email"): t.String,
     }),
-)
-@audit_log_request(
-    action=AuditLogAction.CHANGE,
 )
 async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
     """
@@ -3513,7 +3405,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     vfolder_id = params["vfolder"]
     user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
-
+    audit_log.update_current(user_email)
     audit_log.set_target(vfolder_id)
 
     allowed_hosts_by_user = VFolderHostPermissionMap()
@@ -3531,6 +3423,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")
+        audit_log.update_current(user_info.uuid)
+
         resource_policy_name = user_info.resource_policy
         result = await conn.execute(
             sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
@@ -3552,18 +3446,20 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         user_info.uuid,
     )
     async with root_ctx.db.begin_readonly() as conn:
-        query = sa.select([vfolders]).where(
-            (vfolders.c.id == vfolder_id) & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+        query = (
+            sa.select([vfolders.c.user, vfolders.c.host])
+            .select_from(vfolders)
+            .where(
+                (vfolders.c.id == vfolder_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+            )
         )
-        # get host
         result = await conn.execute(query)
-
-        if (row_to_update := result.first()) is None:
-            raise ObjectNotFound(object_name="vfolders")
-
-        audit_log.update_before_data(row_to_update)
-
-        folder_host = row_to_update._mapping["host"]
+        row = result.scalar()
+        if not row:
+            raise ObjectNotFound(object_name="vfolder")
+        folder_host = row["folder_host"]
+        audit_log.update_previous(row["user"])
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
@@ -3579,14 +3475,8 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
-                .returning(vfolders)
             )
-            result = await conn.execute(query)
-
-            if (updated_row := result.one()) is None:
-                raise ObjectNotFound(object_name="vfolders")
-
-            audit_log.update_after_data(updated_row)
+            await conn.execute(query)
 
     await execute_with_retry(_update)
 

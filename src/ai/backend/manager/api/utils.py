@@ -213,15 +213,14 @@ def check_api_params(
     return wrap
 
 
-def audit_log_request(
-    *,
+def audit_log(
     action: AuditLogAction,
     target_type: AuditLogTargetType,
 ):
-    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]):
+    def wrap(handler: Callable[..., Awaitable[TAnyResponse]]):
         @functools.wraps(handler)
         async def wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
-            request["audit_log_applicable"] = True
+            request["audit_log"] = True
             request["audit_log_action"] = action
             request["audit_log_target_type"] = target_type
 

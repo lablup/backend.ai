@@ -9,7 +9,7 @@ from aiohttp.typedefs import Handler
 from .context import RootContext
 
 audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "audit_log_data", default={"before": {}, "after": {}}
+    "audit_log_data", default={"previous": {}, "current": {}}
 )
 
 audit_log_target: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -22,30 +22,33 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
     from ai.backend.manager.models import AuditLogRow
 
     root_ctx: RootContext = request.app["_root.context"]
-    handler_attr = getattr(handler, "_backend_attrs", {})
     success = False
+    exc = None
 
     try:
         res = await handler(request)
         success = True
         return res
-    except Exception:
+    except Exception as e:
+        exc = e
         raise
     finally:
-        if request.get("audit_log_applicable"):
+        if request.get("audit_log"):
             async with root_ctx.db.begin_session() as sess:
                 new_log = AuditLogRow(
                     uuid.uuid4(),
                     request["user"]["uuid"],
                     request["keypair"]["access_key"],
                     request["user"]["email"],
-                    handler_attr["audit_log_action"],
+                    request["audit_log_action"],
                     audit_log_data.get(),
-                    handler_attr["audit_log_target_type"],
+                    request["audit_log_target_type"],
                     success,
                     target=audit_log_target.get(),
                     rest_resource=f"{request.method} {request.path}",
                 )
+                if exc:
+                    new_log.error = str(exc)
                 sess.add(new_log)
 
 
@@ -53,17 +56,17 @@ def set_target(target: Any) -> None:
     audit_log_target.set(str(target))
 
 
-def update_after_data(
+def update_previous(
     data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
     prev_audit_log_data = audit_log_data.get().copy()
-    prev_audit_log_data["after"] = json.dumps(data_to_insert)
+    prev_audit_log_data["previous"] = json.dumps(data_to_insert)
     audit_log_data.set(prev_audit_log_data)
 
 
-def update_before_data(
+def update_current(
     data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
     prev_audit_log_data = audit_log_data.get().copy()
-    prev_audit_log_data["before"] = json.dumps(data_to_insert)
+    prev_audit_log_data["current"] = json.dumps(data_to_insert)
     audit_log_data.set(prev_audit_log_data)
