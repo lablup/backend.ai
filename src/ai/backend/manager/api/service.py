@@ -72,6 +72,7 @@ from ..models import (
     scaling_groups,
     vfolders,
 )
+from ..models.utils import execute_with_retry
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
@@ -573,62 +574,65 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         sudo_session_enabled=sudo_session_enabled,
     )
 
-    async with root_ctx.db.begin_session() as db_sess:
-        query = sa.select(EndpointRow).where(
-            (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
-            & (EndpointRow.name == params.service_name)
-        )
-        result = await db_sess.execute(query)
-        service_with_duplicate_name = result.scalar()
-        if service_with_duplicate_name is not None:
-            raise InvalidAPIParameters("Cannot create multiple services with same name")
+    async def _create() -> ServeInfoModel:
+        async with root_ctx.db.begin_session() as db_sess:
+            query = sa.select(EndpointRow).where(
+                (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
+                & (EndpointRow.name == params.service_name)
+            )
+            result = await db_sess.execute(query)
+            service_with_duplicate_name = result.scalar()
+            if service_with_duplicate_name is not None:
+                raise InvalidAPIParameters("Cannot create multiple services with same name")
 
-        project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params.domain, params.group
-        )
-        if project_id is None:
-            raise InvalidAPIParameters(f"Invalid group name {project_id}")
-        endpoint = EndpointRow(
-            params.service_name,
-            validation_result.model_definition_path,
-            request["user"]["uuid"],
-            validation_result.owner_uuid,
-            params.desired_session_count,
-            image_row,
-            validation_result.model_id,
-            params.domain,
-            project_id,
-            validation_result.scaling_group,
-            params.config.resources,
-            params.cluster_mode,
-            params.cluster_size,
-            validation_result.extra_mounts,
-            model_mount_destination=params.config.model_mount_destination,
-            tag=params.tag,
-            startup_command=params.startup_command,
-            callback_url=URL(params.callback_url.unicode_string()) if params.callback_url else None,
-            environ=params.config.environ,
-            bootstrap_script=params.bootstrap_script,
-            resource_opts=params.config.resource_opts,
-            open_to_public=params.open_to_public,
-            runtime_variant=params.runtime_variant,
-        )
-        db_sess.add(endpoint)
-        await db_sess.flush()
-        endpoint_id = endpoint.id
+            project_id = await resolve_group_name_or_id(
+                await db_sess.connection(), params.domain, params.group
+            )
+            if project_id is None:
+                raise InvalidAPIParameters(f"Invalid group name {project_id}")
+            endpoint = EndpointRow(
+                params.service_name,
+                validation_result.model_definition_path,
+                request["user"]["uuid"],
+                validation_result.owner_uuid,
+                params.desired_session_count,
+                image_row,
+                validation_result.model_id,
+                params.domain,
+                project_id,
+                validation_result.scaling_group,
+                params.config.resources,
+                params.cluster_mode,
+                params.cluster_size,
+                validation_result.extra_mounts,
+                model_mount_destination=params.config.model_mount_destination,
+                tag=params.tag,
+                startup_command=params.startup_command,
+                callback_url=URL(params.callback_url.unicode_string())
+                if params.callback_url
+                else None,
+                environ=params.config.environ,
+                bootstrap_script=params.bootstrap_script,
+                resource_opts=params.config.resource_opts,
+                open_to_public=params.open_to_public,
+                runtime_variant=params.runtime_variant,
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+            return ServeInfoModel(
+                endpoint_id=endpoint.id,
+                model_id=endpoint.model,
+                extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
+                name=params.service_name,
+                model_definition_path=validation_result.model_definition_path,
+                desired_session_count=params.desired_session_count,
+                active_routes=[],
+                service_endpoint=None,
+                is_public=params.open_to_public,
+                runtime_variant=params.runtime_variant,
+            )
 
-    return ServeInfoModel(
-        endpoint_id=endpoint_id,
-        model_id=endpoint.model,
-        extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
-        name=params.service_name,
-        model_definition_path=validation_result.model_definition_path,
-        desired_session_count=params.desired_session_count,
-        active_routes=[],
-        service_endpoint=None,
-        is_public=params.open_to_public,
-        runtime_variant=params.runtime_variant,
-    )
+    return await execute_with_retry(_create)
 
 
 class TryStartResponseModel(BaseModel):
