@@ -21,7 +21,25 @@ type Queries {
   group_node(id: String!): GroupNode
 
   """Added in 24.03.0."""
-  group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  group_nodes(
+    filter: String
+    order: String
+    offset: Int
+
+    """Returns the first n elements from the list."""
+    first: Int
+
+    """Returns the last n elements from the list."""
+    last: Int
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """Returns the elements in the list that come after the specified cursor."""
+    after: String
+  ): GroupConnection
   group(
     id: UUID!
     domain_name: String
@@ -67,7 +85,25 @@ type Queries {
   user_node(id: String!): UserNode
 
   """Added in 24.03.0."""
-  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
+  user_nodes(
+    filter: String
+    order: String
+    offset: Int
+
+    """Returns the first n elements from the list."""
+    first: Int
+
+    """Returns the last n elements from the list."""
+    last: Int
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """Returns the elements in the list that come after the specified cursor."""
+    after: String
+  ): UserConnection
   keypair(domain_name: String, access_key: String): KeyPair
   keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair]
   keypair_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, email: String, is_active: Boolean): KeyPairList
@@ -92,7 +128,25 @@ type Queries {
   vfolder_node(id: String!): VirtualFolderNode
 
   """Added in 24.03.4."""
-  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
+  vfolder_nodes(
+    filter: String
+    order: String
+    offset: Int
+
+    """Returns the first n elements from the list."""
+    first: Int
+
+    """Returns the last n elements from the list."""
+    last: Int
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """Returns the elements in the list that come after the specified cursor."""
+    after: String
+  ): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
@@ -120,7 +174,25 @@ type Queries {
   model_card(id: String!): ModelCard
 
   """Added in 24.03.0."""
-  model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+  model_cards(
+    filter: String
+    order: String
+    offset: Int
+
+    """Returns the first n elements from the list."""
+    first: Int
+
+    """Returns the last n elements from the list."""
+    last: Int
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """Returns the elements in the list that come after the specified cursor."""
+    after: String
+  ): ModelCardConnection
 }
 
 """
@@ -322,7 +394,25 @@ type GroupNode implements Node {
   integration_id: String
   resource_policy: String
   scaling_groups: [String]
-  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
+  user_nodes(
+    filter: String
+    order: String
+    offset: Int
+
+    """Returns the first n elements from the list."""
+    first: Int
+
+    """Returns the last n elements from the list."""
+    last: Int
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """Returns the elements in the list that come after the specified cursor."""
+    after: String
+  ): UserConnection
 }
 
 type UserConnection {
