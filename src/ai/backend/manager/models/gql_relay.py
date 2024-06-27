@@ -6,6 +6,7 @@ import re
 from typing import Any, Awaitable, Callable, NamedTuple, Protocol
 
 import graphene
+from graphene import Int, String
 from graphene.relay.connection import (
     ConnectionOptions,
     IterableConnectionField,
@@ -210,6 +211,21 @@ class AsyncListConnectionField(IterableConnectionField):
     to accept only one complete array (Iterable values) without considering pagination, which is a huge performance issue.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
     """
+
+    def __init__(self, type, **kwargs):
+        if "first" not in kwargs:
+            kwargs["first"] = Int(description="Returns the first n elements from the list.")
+        if "last" not in kwargs:
+            kwargs["last"] = Int(description="Returns the last n elements from the list.")
+        if "before" not in kwargs:
+            kwargs["before"] = String(
+                description="Returns the elements in the list that come before the specified cursor."
+            )
+        if "after" not in kwargs:
+            kwargs["after"] = String(
+                description="Returns the elements in the list that come after the specified cursor."
+            )
+        super().__init__(type, **kwargs)
 
     @property
     def type(self):
