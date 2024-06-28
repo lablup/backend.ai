@@ -39,8 +39,7 @@ import yarl
 from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
-from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql import Undefined
+from graphql import StringValueNode, Undefined
 from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
@@ -757,27 +756,23 @@ class BigInt(Scalar):
 
     @staticmethod
     def coerce_bigint(value):
-        num = int(value)
-        if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-            raise ValueError("Cannot serialize integer out of the safe range.")
-        if not (MIN_INT <= num <= MAX_INT):
-            # treat as float
-            return float(int(num))
-        return num
+        return str(int(value))
+        # if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
+        #     raise ValueError("Cannot serialize integer out of the safe range.")
+        # if not (MIN_INT <= num <= MAX_INT):
+        #     # treat as float
+        #     return float(int(num))
 
     serialize = coerce_bigint
     parse_value = coerce_bigint
 
     @staticmethod
     def parse_literal(node):
-        if isinstance(node, IntValueNode):
-            num = int(node.value)
-            if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-                raise ValueError("Cannot parse integer out of the safe range.")
-            if not (MIN_INT <= num <= MAX_INT):
-                # treat as float
-                return float(int(num))
-            return num
+        match node:
+            case IntValueNode() | StringValueNode():
+                return int(node.value)
+            case _:
+                raise ValueError("Invalid expression type for BigInt")
 
 
 class Item(graphene.Interface):
