@@ -19,9 +19,11 @@ class GitLabRegistry_v2(BaseContainerRegistry):
             self.registry_info["password"],
             self.registry_info["gitlab_project"],
         )
-        encoded_project_id = urllib.parse.quote(gitlab_project, safe="")
 
-        base_url = f"https://gitlab.com/api/v4/projects/{encoded_project_id}/registry/repositories"
+        encoded_project = urllib.parse.quote(gitlab_project, safe="")
+        repo_list_url = (
+            f"https://gitlab.com/api/v4/projects/{encoded_project}/registry/repositories"
+        )
 
         headers = {
             "Accept": "application/json",
@@ -31,9 +33,9 @@ class GitLabRegistry_v2(BaseContainerRegistry):
 
         while True:
             async with sess.get(
-                base_url,
+                repo_list_url,
                 headers=headers,
-                params={"per_page": 30, "page": page, "membership": "true"},
+                params={"per_page": 30, "page": page},
             ) as response:
                 if response.status == 200:
                     data = await response.json()
