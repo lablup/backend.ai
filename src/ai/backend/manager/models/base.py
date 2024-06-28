@@ -1273,6 +1273,7 @@ class ConnectionArgs(NamedTuple):
 
 def validate_connection_args(
     *,
+    info: graphene.ResolveInfo,
     after: str | None = None,
     first: int | None = None,
     before: str | None = None,
@@ -1286,6 +1287,10 @@ def validate_connection_args(
     cursor: str | None = None
     requested_page_size: int | None = None
 
+    if first is None and last is None:
+        raise ValueError(
+            f"You must provide a 'first' or 'last' value to properly paginate the `{info.field_name}` connection."
+        )
     if after is not None:
         order = ConnectionPaginationOrder.FORWARD
         cursor = after
@@ -1480,7 +1485,7 @@ def generate_sql_info_for_gql_connection(
 
     if offset is None:
         connection_args = validate_connection_args(
-            after=after, first=first, before=before, last=last
+            info=info, after=after, first=first, before=before, last=last
         )
         stmt, count_stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
