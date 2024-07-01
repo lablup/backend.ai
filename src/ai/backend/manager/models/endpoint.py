@@ -22,14 +22,17 @@ from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
     MountPermission,
     MountTypes,
     ResourceSlot,
+    RuntimeVariant,
     SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_relay import AsyncNode
@@ -54,6 +57,7 @@ from .base import (
     Item,
     PaginatedList,
     ResourceSlotColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     gql_mutation_wrapper,
@@ -153,6 +157,12 @@ class EndpointRow(Base):
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
+    runtime_variant = sa.Column(
+        "runtime_variant",
+        StrEnumType(RuntimeVariant),
+        nullable=False,
+        default=RuntimeVariant.CUSTOM,
+    )
 
     model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
 
@@ -218,6 +228,7 @@ class EndpointRow(Base):
         cluster_mode: ClusterMode,
         cluster_size: int,
         extra_mounts: Sequence[VFolderMount],
+        runtime_variant: RuntimeVariant,
         *,
         model_mount_destination: Optional[str] = None,
         tag: Optional[str] = None,
@@ -251,6 +262,7 @@ class EndpointRow(Base):
         self.environ = environ
         self.resource_opts = resource_opts
         self.open_to_public = open_to_public
+        self.runtime_variant = runtime_variant
 
     @classmethod
     async def get(
@@ -276,7 +288,9 @@ class EndpointRow(Base):
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
-            query = query.options(selectinload(EndpointRow.image_row))
+            query = query.options(
+                selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases)
+            )
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -572,6 +586,10 @@ class ModelServicePredicateChecker:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
+            if vfolder.usage_mode == VFolderUsageMode.MODEL:
+                raise InvalidAPIParameters(
+                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
+                )
 
         return vfolder_mounts
 
@@ -676,6 +694,17 @@ class ModelServicePredicateChecker:
         return yaml_name
 
 
+class RuntimeVariantInfo(graphene.ObjectType):
+    """Added in 24.03.5."""
+
+    name = graphene.String()
+    human_readable_name = graphene.String()
+
+    @classmethod
+    def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
+        return cls(name=enum.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -717,6 +746,7 @@ class Endpoint(graphene.ObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
+    runtime_variant = graphene.Field(RuntimeVariantInfo, description="Added in 24.03.5.")
 
     created_at = GQLDateTime(required=True)
     destroyed_at = GQLDateTime()
@@ -770,6 +800,7 @@ class Endpoint(graphene.ObjectType):
             retries=row.retries,
             routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
+            runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
@@ -818,7 +849,7 @@ class Endpoint(graphene.ObjectType):
             sa.select(EndpointRow)
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_row))
+            .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -902,7 +933,7 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
             return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
@@ -950,6 +981,8 @@ class Endpoint(graphene.ObjectType):
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
         for route in error_routes:
+            if not route.error_data:
+                continue
             match route.error_data["type"]:
                 case "session_cancelled":
                     session_id = route.error_data["session_id"]
@@ -999,9 +1032,16 @@ class ModifyEndpointInput(graphene.InputObjectType):
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
-    model_definition_path = graphene.String(description="Added in 24.03.4.")
+    model_definition_path = graphene.String(
+        description="Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
+    )
     open_to_public = graphene.Boolean()
-    extra_mounts = graphene.List(ExtraMountInput, description="Added in 24.03.4.")
+    extra_mounts = graphene.List(
+        ExtraMountInput,
+        description="Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.",
+    )
+    environ = graphene.JSONString(description="Added in 24.03.5.")
+    runtime_variant = graphene.String(description="Added in 24.03.5.")
 
 
 class ModifyEndpoint(graphene.Mutation):
@@ -1061,6 +1101,15 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
+
+                if (_newval := props.environ) and _newval is not Undefined:
+                    endpoint_row.environ = _newval
+
+                if (_newval := props.runtime_variant) and _newval is not Undefined:
+                    try:
+                        endpoint_row.runtime_variant = RuntimeVariant[_newval]
+                    except KeyError:
+                        raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
                 if (
                     _newval := props.desired_session_count
@@ -1148,12 +1197,19 @@ class ModifyEndpoint(graphene.Mutation):
                     )
                     endpoint_row.extra_mounts = vfolder_mounts
 
-                await ModelServicePredicateChecker.validate_model_definition(
-                    graph_ctx.storage_manager,
-                    endpoint_row.model_row,
-                    endpoint_row.model_definition_path,
-                )
-
+                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    await ModelServicePredicateChecker.validate_model_definition(
+                        graph_ctx.storage_manager,
+                        endpoint_row.model_row,
+                        endpoint_row.model_definition_path,
+                    )
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
                 # from AgentRegistry.handle_route_creation()
                 await graph_ctx.registry.create_session(
                     "",

@@ -66,7 +66,12 @@ from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
+from ..api.exceptions import (
+    GenericBadRequest,
+    GenericForbidden,
+    InstanceNotAvailable,
+    SessionNotFound,
+)
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
@@ -1404,6 +1409,26 @@ class SchedulerDispatcher(aobject):
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
+        async with self.db.begin_session() as session:
+            query = (
+                sa.select(RoutingRow)
+                .join(
+                    RoutingRow.session_row.and_(
+                        SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
+                    )
+                )
+                .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
+                .options(selectinload(RoutingRow.session_row))
+            )
+            result = await session.execute(query)
+            zombie_routes = result.scalars().all()
+            if len(zombie_routes) > 0:
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.id.in_([r.id for r in zombie_routes])
+                )
+                result = await session.execute(query)
+                log.info("Cleared {} zombie routes", result.rowcount)
+
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(
                 session,
@@ -1482,7 +1507,7 @@ class SchedulerDispatcher(aobject):
                     forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
-            except SessionNotFound:
+            except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
         await redis_helper.execute(
