@@ -1,6 +1,5 @@
 import contextvars
 import json
-import uuid
 from typing import Any, Mapping, Sequence
 
 from aiohttp import web
@@ -36,14 +35,13 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
         if request.get("audit_log"):
             async with root_ctx.db.begin_session() as sess:
                 new_log = AuditLogRow(
-                    uuid.uuid4(),
-                    request["user"]["uuid"],
-                    request["keypair"]["access_key"],
-                    request["user"]["email"],
-                    request["audit_log_action"],
-                    audit_log_data.get(),
-                    request["audit_log_target_type"],
-                    success,
+                    user_id=request["user"]["uuid"],
+                    access_key=request["keypair"]["access_key"],
+                    email=request["user"]["email"],
+                    action=request["audit_log_action"],
+                    data=audit_log_data.get(),
+                    target_type=request["audit_log_target_type"],
+                    success=success,
                     target=audit_log_target.get(),
                     rest_resource=f"{request.method} {request.path}",
                 )

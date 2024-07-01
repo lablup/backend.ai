@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import datetime
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Sequence
-from uuid import UUID
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -74,34 +72,6 @@ class AuditLogRow(Base):
     error = sa.Column("error", sa.String(length=128), nullable=True)
     rest_resource = sa.Column("rest_resource", sa.String(length=256), nullable=True)
     gql_query = sa.Column("gql_query", sa.String(length=1024), nullable=True)
-
-    def __init__(
-        self,
-        id: UUID,
-        user_id: UUID,
-        access_key: str,
-        email: str,
-        action: AuditLogAction,
-        data: dict[str, Any],
-        target_type: AuditLogTargetType,
-        success: bool,
-        *,
-        target: str | None = None,
-        rest_resource: str | None = None,
-        gql_query: str | None = None,
-    ) -> None:
-        self.id = id
-        self.user_id = user_id
-        self.access_key = access_key
-        self.email = email
-        self.action = action
-        self.data = data
-        self.target_type = target_type.value
-        self.success = success
-        self.target = target
-        self.rest_resource = rest_resource
-        self.gql_query = gql_query
-        self.created_at = datetime.datetime.now()
 
 
 class AuditLog(graphene.ObjectType):
