@@ -225,7 +225,7 @@ def audit_log(
             request["audit_log_target_type"] = target_type
 
             # Call the original function
-            return await handler(*args, **kwargs)
+            return await handler(request, *args, **kwargs)
 
         return wrapped
 

@@ -1175,8 +1175,8 @@ async def rename_vfolder(
     new_name = params["new_name"]
 
     audit_log.set_target(request.match_info["name"])
-    audit_log.update_previous(old_name)
-    audit_log.update_current(new_name)
+    audit_log.update_previous({"name": old_name})
+    audit_log.update_current({"name": new_name})
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.RENAME (email:{}, ak:{}, vf.old:{}, vf.new:{})",
@@ -1242,8 +1242,7 @@ async def update_vfolder_options(
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     audit_log.set_target(request.match_info["name"])
-    audit_log.update_previous(row["cloneable"])
-    audit_log.update_current(row["permission"])
+    audit_log.update_previous({"cloneable": row["cloneable"], "permission": row["permission"]})
 
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
@@ -1267,6 +1266,7 @@ async def update_vfolder_options(
         raise InvalidAPIParameters(
             "Cannot change the options of a vfolder that is not owned by myself."
         )
+    audit_log.update_current(updated_fields)
 
     if len(updated_fields) > 0:
         async with root_ctx.db.begin() as conn:
@@ -2513,6 +2513,7 @@ class PurgeRequestModel(BaseModel):
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(PurgeRequestModel)
+@capture_audit_log(AuditLogAction.PURGE)
 async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response:
     """
     Delete `delete-complete`d vfolder rows in DB
@@ -3405,7 +3406,6 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     vfolder_id = params["vfolder"]
     user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
-    audit_log.update_current(user_email)
     audit_log.set_target(vfolder_id)
 
     allowed_hosts_by_user = VFolderHostPermissionMap()
@@ -3423,7 +3423,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")
-        audit_log.update_current(user_info.uuid)
+        audit_log.update_current({"user_id": str(user_info.uuid)})
 
         resource_policy_name = user_info.resource_policy
         result = await conn.execute(
@@ -3447,19 +3447,18 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.user, vfolders.c.host])
+            sa.select(vfolders.c.user, vfolders.c.host)
             .select_from(vfolders)
             .where(
                 (vfolders.c.id == vfolder_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
             )
         )
-        result = await conn.execute(query)
-        row = result.scalar()
+        row = (await conn.execute(query)).first()
         if not row:
             raise ObjectNotFound(object_name="vfolder")
-        folder_host = row["folder_host"]
-        audit_log.update_previous(row["user"])
+        folder_host = row.host
+        audit_log.update_previous({"user_id": str(row.user)})
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
