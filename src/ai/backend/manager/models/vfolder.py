@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -1347,6 +1347,31 @@ class VirtualFolder(graphene.ObjectType):
             cur_size=row["cur_size"],
         )
 
+    @classmethod
+    def from_orm_row(cls, row: VFolderRow) -> VirtualFolder:
+        return cls(
+            id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user,
+            user_email=row.user_row.email if row.user_row is not None else None,
+            group=row.group,
+            group_name=row.group_row.name if row.group_row is not None else None,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
+        )
+
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly
         return 0
@@ -1912,6 +1937,10 @@ class VirtualFolderNode(graphene.ObjectType):
             last=last,
         )
 
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(cls.from_row(info, vf)) for vf in vfolder_rows]
@@ -2222,6 +2251,7 @@ class ModelCard(graphene.ObjectType):
 
     name = graphene.String()
     vfolder = graphene.Field(VirtualFolder)
+    vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -2304,7 +2334,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.created_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.created_at
 
     def resolve_modified_at(
@@ -2313,7 +2343,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.modified_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.modified_at
 
     @classmethod
@@ -2338,6 +2368,8 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
+            vfolder=VirtualFolder.from_orm_row(vfolder_row),
+            vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
             author=metadata.get("author") or vfolder_row.creator or "",
             title=metadata.get("title") or vfolder_row.name,
@@ -2451,7 +2483,9 @@ class ModelCard(graphene.ObjectType):
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(db_session, uuid.UUID(vfolder_row_id))
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
@@ -2522,7 +2556,10 @@ class ModelCard(graphene.ObjectType):
             VFolderRow.group.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
-        cnt_query = cnt_query.where(additional_cond)
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
