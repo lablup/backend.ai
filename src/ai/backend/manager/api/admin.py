@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import traceback
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
@@ -45,6 +46,9 @@ class GQLLoggingMiddleware:
         return next(root, info, **args)
 
 
+GQL_TIMEOUT = 60
+
+
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
@@ -77,17 +81,20 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
     )
-    result = await app_ctx.gql_schema.execute_async(
-        params["query"],
-        None,  # root
-        variable_values=params["variables"],
-        operation_name=params["operation_name"],
-        context_value=gql_ctx,
-        middleware=[
-            GQLLoggingMiddleware(),
-            GQLMutationUnfrozenRequiredMiddleware(),
-            GQLMutationPrivilegeCheckMiddleware(),
-        ],
+    result = await asyncio.wait_for(
+        app_ctx.gql_schema.execute_async(
+            params["query"],
+            None,  # root
+            variable_values=params["variables"],
+            operation_name=params["operation_name"],
+            context_value=gql_ctx,
+            middleware=[
+                GQLLoggingMiddleware(),
+                GQLMutationUnfrozenRequiredMiddleware(),
+                GQLMutationPrivilegeCheckMiddleware(),
+            ],
+        ),
+        timeout=GQL_TIMEOUT,
     )
 
     if result.errors:
@@ -110,8 +117,11 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     })
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
-    result = await _handle_gql_common(request, params)
-    return web.json_response(result.formatted, status=200)
+    try:
+        result = await _handle_gql_common(request, params)
+        return web.json_response(result.formatted, status=200)
+    except asyncio.TimeoutError:
+        return web.json_response(status=504)
 
 
 @auth_required
