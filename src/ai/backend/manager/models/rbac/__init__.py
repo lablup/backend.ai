@@ -56,10 +56,9 @@ class ClientContext:
     user_id: uuid.UUID
     user_role: UserRole
 
-    _project_ctx: ProjectContext | None = field(init=False, default=None)
     _domain_project_ctx: Mapping[str, ProjectContext] | None = field(init=False, default=None)
 
-    async def get_or_init_project_ctx_in_domain(
+    async def get_accessible_projects_in_domain(
         self, db_session: AsyncSession, domain_name: str
     ) -> ProjectContext | None:
         _project_ctx = await self._get_or_init_project_ctx(db_session)
@@ -100,18 +99,25 @@ class ClientContext:
                 # Let's not fetch all project data from DB.
                 return bypass
             case UserRole.ADMIN:
-                if self._project_ctx is None:
+                if (
+                    self._domain_project_ctx is None
+                    or self.domain_name not in self._domain_project_ctx
+                ):
                     stmt = (
                         sa.select(GroupRow)
                         .where(GroupRow.domain_name == self.domain_name)
                         .options(load_only(GroupRow.id))
                     )
-                    self._project_ctx = {
+                    _project_ctx = {
                         row.id: UserRoleInProject.ADMIN for row in await db_session.scalars(stmt)
                     }
-                return self._project_ctx
+                    self._domain_project_ctx = {self.domain_name: _project_ctx}
+                return self._domain_project_ctx[self.domain_name]
             case UserRole.USER:
-                if self._project_ctx is None:
+                if (
+                    self._domain_project_ctx is None
+                    or self.domain_name not in self._domain_project_ctx
+                ):
                     stmt = (
                         sa.select(AssocGroupUserRow)
                         .select_from(sa.join(AssocGroupUserRow, GroupRow))
@@ -120,11 +126,11 @@ class ClientContext:
                             & (GroupRow.domain_name == self.domain_name)
                         )
                     )
-                    self._project_ctx = {
-                        row.group_id: UserRoleInProject.USER
-                        for row in await db_session.scalars(stmt)
+                    _project_ctx = {
+                        row.id: UserRoleInProject.USER for row in await db_session.scalars(stmt)
                     }
-                return self._project_ctx
+                    self._domain_project_ctx = {self.domain_name: _project_ctx}
+                return self._domain_project_ctx[self.domain_name]
 
 
 class BaseScope(metaclass=ABCMeta):

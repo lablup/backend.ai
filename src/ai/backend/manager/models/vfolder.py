@@ -1004,7 +1004,7 @@ class PermissionContextBuilder(
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
 
-                project_ctx = await ctx.get_or_init_project_ctx_in_domain(db_session, domain_name)
+                project_ctx = await ctx.get_accessible_projects_in_domain(db_session, domain_name)
                 if project_ctx is not None:
                     project_id_to_permission_map = {
                         project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
@@ -1027,7 +1027,7 @@ class PermissionContextBuilder(
             case UserRole.ADMIN:
                 if ctx.domain_name == domain_name:
                     domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
-                    project_ctx = await ctx.get_or_init_project_ctx_in_domain(
+                    project_ctx = await ctx.get_accessible_projects_in_domain(
                         db_session, domain_name
                     )
                     if project_ctx is not None:
@@ -1054,7 +1054,7 @@ class PermissionContextBuilder(
                     pass
             case UserRole.USER:
                 if ctx.domain_name == domain_name:
-                    project_ctx = await ctx.get_or_init_project_ctx_in_domain(
+                    project_ctx = await ctx.get_accessible_projects_in_domain(
                         db_session, domain_name
                     )
                     if project_ctx is not None:
