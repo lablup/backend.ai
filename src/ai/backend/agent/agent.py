@@ -1683,11 +1683,11 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
-        startup_command: str,
+        code_to_execute: str,
     ) -> None:
         self._ongoing_exec_batch_tasks.add(
             asyncio.create_task(
-                self.execute_batch(session_id, kernel_id, startup_command),
+                self.execute_batch(session_id, kernel_id, code_to_execute),
             ),
         )
 
