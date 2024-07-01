@@ -354,7 +354,7 @@ def vfolder_check_exists(
     }),
 )
 async def create(request: web.Request, params: Any) -> web.Response:
-    resp: Dict[str, Any] = {}
+    json_serialized_values: dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
@@ -594,7 +594,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
         }
-        resp = {
+        json_serialized_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
             "quota_scope_id": str(quota_scope_id),
@@ -614,7 +614,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 "host": "",
                 "unmanaged_path": unmanaged_path,
             })
-            resp["unmanaged_path"] = unmanaged_path
+            json_serialized_values["unmanaged_path"] = unmanaged_path
         try:
             query = sa.insert(vfolders, insert_values)
             result = await conn.execute(query)
@@ -630,8 +630,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
-        audit_log.update_current(insert_values)
-    return web.json_response(resp, status=201)
+        audit_log.update_current(json_serialized_values)
+    return web.json_response(json_serialized_values, status=201)
 
 
 @auth_required
