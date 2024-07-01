@@ -1,14 +1,27 @@
 import contextvars
 import json
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, NamedTuple
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from .context import RootContext
 
-audit_log_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "audit_log_data", default={"previous": {}, "current": {}}
+
+class AuditLogData(NamedTuple):
+    previous: str = json.dumps({})
+    current: str = json.dumps({})
+
+    def to_dict(self) -> Mapping[str, str]:
+        return {
+            "previous": self.previous,
+            "current": self.current,
+        }
+
+
+audit_log_data: contextvars.ContextVar[AuditLogData] = contextvars.ContextVar(
+    "audit_log_data", default=AuditLogData()
 )
 
 audit_log_target: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -39,7 +52,7 @@ async def audit_log_middleware(request: web.Request, handler: Handler) -> web.St
                     access_key=request["keypair"]["access_key"],
                     email=request["user"]["email"],
                     action=request["audit_log_action"],
-                    data=audit_log_data.get(),
+                    data=audit_log_data.get().to_dict(),
                     target_type=request["audit_log_target_type"],
                     success=success,
                     target=audit_log_target.get(),
@@ -57,14 +70,16 @@ def set_target(target: Any) -> None:
 def update_previous(
     data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
-    prev_audit_log_data = audit_log_data.get().copy()
-    prev_audit_log_data["previous"] = json.dumps(data_to_insert)
+    prev_audit_log_data = AuditLogData(
+        previous=json.dumps(data_to_insert), current=audit_log_data.get().current
+    )
     audit_log_data.set(prev_audit_log_data)
 
 
 def update_current(
     data_to_insert: Mapping[str, Any] | Sequence[Any],
 ) -> None:
-    prev_audit_log_data = audit_log_data.get().copy()
-    prev_audit_log_data["current"] = json.dumps(data_to_insert)
+    prev_audit_log_data = AuditLogData(
+        previous=audit_log_data.get().previous, current=json.dumps(data_to_insert)
+    )
     audit_log_data.set(prev_audit_log_data)
