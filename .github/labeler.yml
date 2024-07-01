@@ -9,8 +9,6 @@ area:docs:
     - 'docs/**/*'
     - 'src/ai/backend/manager/api/**/*.py'
     - 'src/ai/backend/manager/models/gql.py'
-  - all-globs-to-all-files:
-    - '!docs/release-notes/*'
 
 comp:storage-proxy:
 - changed-files:
