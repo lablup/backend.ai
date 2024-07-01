@@ -94,6 +94,12 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
+
+class UserRoleInProject(enum.StrEnum):
+    ADMIN = enum.auto()  # TODO: impl project admin
+    USER = enum.auto()  # User is associated as user
+
+
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
@@ -197,7 +203,7 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
-    vfolder_row = relationship("VFolderRow", back_populates="group_row")
+    vfolder_rows = relationship("VFolderRow", back_populates="group_row")
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:

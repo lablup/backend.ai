@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Mapping, Sequence
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, List, Sequence
 
 import graphene
 
