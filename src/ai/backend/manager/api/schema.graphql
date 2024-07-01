@@ -1027,6 +1027,9 @@ type ModelCard implements Node {
   id: ID!
   name: String
   vfolder: VirtualFolder
+
+  """Added in 24.09.0."""
+  vfolder_node: VirtualFolderNode
   author: String
 
   """Human readable name of the model."""
