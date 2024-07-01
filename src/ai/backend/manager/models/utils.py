@@ -271,13 +271,13 @@ async def execute_with_txn_retry(
             retry=retry_if_exception_type(TryAgain),
         ):
             with attempt:
-                async with begin_trx(bind=connection) as session_or_conn:
-                    try:
+                try:
+                    async with begin_trx(bind=connection) as session_or_conn:
                         result = await txn_func(session_or_conn)
-                    except DBAPIError as e:
-                        if is_db_retry_error(e):
-                            raise TryAgain
-                        raise
+                except DBAPIError as e:
+                    if is_db_retry_error(e):
+                        raise TryAgain
+                    raise
     except RetryError:
         raise asyncio.TimeoutError(
             f"DB serialization failed after {max_attempts} retry transactions"
