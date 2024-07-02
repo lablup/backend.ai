@@ -246,11 +246,24 @@ class VFolder(BaseFunction):
         async with rqst.fetch() as resp:
             return await resp.json()
 
-    @api_function
-    async def delete(self):
-        rqst = Request("DELETE", "/folders/{0}".format(self.name))
+    async def _trash(self) -> Mapping[str, Any]:
+        if self.id is None:
+            vfolder_id = await self._get_id_by_name()
+            self.id = vfolder_id
+        rqst = Request("DELETE", "/folders")
+        rqst.set_json({
+            "id": self.id.hex,
+        })
         async with rqst.fetch():
             return {}
+
+    @api_function
+    async def delete(self):
+        return await self._trash()
+
+    @api_function
+    async def move_to_trash(self):
+        return await self._trash()
 
     @api_function
     async def purge(self) -> Mapping[str, Any]:
@@ -268,7 +281,7 @@ class VFolder(BaseFunction):
         if self.id is None:
             vfolder_id = await self._get_id_by_name()
             self.id = vfolder_id
-        rqst = Request("POST", "/folders/restore-from-trash-bin")
+        rqst = Request("POST", "/folders/restore")
         rqst.set_json({
             "id": self.id.hex,
         })
@@ -283,17 +296,27 @@ class VFolder(BaseFunction):
     async def restore(self):
         return await self._restore()
 
-    @api_function
-    async def delete_trash(self) -> Mapping[str, Any]:
+    async def _delete_forever(self) -> Mapping[str, Any]:
         if self.id is None:
             vfolder_id = await self._get_id_by_name()
             self.id = vfolder_id
-        rqst = Request("POST", "/folders/delete-from-trash-bin")
+        rqst = Request("POST", "/folders/delete-forever")
         rqst.set_json({
             "id": self.id.hex,
         })
         async with rqst.fetch():
             return {}
+
+    @api_function
+    async def delete_trash(self) -> Mapping[str, Any]:
+        """
+        Deprecated, use `delete_forever()`.
+        """
+        return await self._delete_forever()
+
+    @api_function
+    async def delete_forever(self) -> Mapping[str, Any]:
+        return await self._delete_forever()
 
     @api_function
     async def rename(self, new_name):

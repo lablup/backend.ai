@@ -29,7 +29,6 @@ from typing import (
 
 import aiohttp
 import aiohttp_cors
-import aiotools
 import attrs
 import sqlalchemy as sa
 import trafaret as t
@@ -137,6 +136,12 @@ P = ParamSpec("P")
 
 class SuccessResponseModel(BaseResponseModel):
     success: bool = Field(default=True)
+
+
+class BackgroundTaskResponseModel(BaseResponseModel):
+    task_id: uuid.UUID | None = Field(
+        description="Background task id. `None` when there is no vfolders to delete."
+    )
 
 
 async def check_vfolder_status(
@@ -2413,14 +2418,13 @@ class DeleteFromTrashRequestModel(BaseModel):
 
 @auth_required
 @pydantic_params_api_handler(DeleteFromTrashRequestModel)
-async def delete_from_trash_bin(
+async def delete_forever(
     request: web.Request, params: DeleteFromTrashRequestModel
-) -> web.Response:
+) -> BackgroundTaskResponseModel:
     """
     Delete `delete-pending` vfolders in storage proxy
     """
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["folders.context"]
     folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
@@ -2465,13 +2469,13 @@ async def delete_from_trash_bin(
 
     folder_host = entry["host"]
     # fs-level deletion may fail or take longer time
-    await initiate_vfolder_deletion(
+    task_id = await initiate_vfolder_deletion(
         root_ctx.db,
         [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
-        app_ctx.storage_ptask_group,
+        root_ctx.background_task_manager,
     )
-    return web.Response(status=204)
+    return BackgroundTaskResponseModel(task_id=task_id)
 
 
 class PurgeRequestModel(BaseModel):
@@ -3458,22 +3462,15 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    database_ptask_group: aiotools.PersistentTaskGroup
-    storage_ptask_group: aiotools.PersistentTaskGroup
+    pass
 
 
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["folders.context"]
-    app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-    app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup(
-        exception_handler=storage_task_exception_handler
-    )
+    pass
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["folders.context"]
-    await app_ctx.database_ptask_group.shutdown()
-    await app_ctx.storage_ptask_group.shutdown()
+    pass
 
 
 def create_app(default_cors_options):
@@ -3517,7 +3514,9 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/clone", clone))
     cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
-    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
+    cors.add(add_route("POST", r"/restore", restore))
+    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_forever))
+    cors.add(add_route("POST", r"/delete-forever", delete_forever))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
