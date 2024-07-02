@@ -92,7 +92,7 @@ jobs:
         run: |
           git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
           git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
-          git fetch origin main --depth=2
+          git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
             --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \
