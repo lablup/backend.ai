@@ -47,6 +47,7 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
+from ai.backend.agent.resources import scan_gpu_alloc_map
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
@@ -805,6 +806,14 @@ class AgentRPCServer(aobject):
     async def release_port(self, port_no: int):
         log.debug("rpc::release_port(port_no:{})", port_no)
         self.agent.port_pool.add(port_no)
+
+    @rpc_function
+    @collect_error
+    async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
+        log.debug("rpc::scan_gpu_alloc_map()")
+        scratch_root = self.agent.local_config["container"]["scratch-root"]
+        result = await scan_gpu_alloc_map(list(self.agent.kernel_registry.keys()), scratch_root)
+        return {k: str(v) for k, v in result.items()}
 
 
 @aiotools.server
