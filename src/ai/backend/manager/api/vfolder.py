@@ -2238,7 +2238,7 @@ async def _delete(
                     > 0
                 ):
                     raise ModelServiceDependencyNotCleared
-            folder_host = entry["host"]
+        folder_host = entry["host"]
         async with root_ctx.db.begin_readonly(_conn) as db_conn:
             await ensure_host_permission_allowed(
                 db_conn,
