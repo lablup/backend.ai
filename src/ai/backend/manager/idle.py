@@ -882,10 +882,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 lambda r: r.get(util_first_collected_key),
             ),
         )
-        util_first_collected: float = (
-            float(raw_util_first_collected) if raw_util_first_collected is not None else util_now
-        )
         if raw_util_first_collected is None:
+            util_first_collected = util_now
             await redis_helper.execute(
                 self._redis_live,
                 lambda r: r.set(
@@ -894,6 +892,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     ex=max(86400, int(self.time_window.total_seconds() * 2)),
                 ),
             )
+        else:
+            util_first_collected = float(raw_util_first_collected)
 
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await get_db_now(dbconn)
