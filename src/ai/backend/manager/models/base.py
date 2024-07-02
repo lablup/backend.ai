@@ -66,6 +66,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.common.utils import compile_slug_re_pattern
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
@@ -604,6 +605,30 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
             else:
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+
+
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for slug type string
+    """
+
+    impl = sa.types.Unicode
+    cache_ok = True
+
+    def __init__(
+        self,
+        *,
+        length: int | None = None,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
+    ) -> None:
+        super().__init__(length=length)
+        self._rx_slug = compile_slug_re_pattern(allow_space, allow_unicode)
+
+    def process_bind_param(self, value: str, dialect) -> str:
+        if self._rx_slug.search(string=value) is None:
+            raise ValueError("invalid name format. slug format required.", value)
+        return value
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
