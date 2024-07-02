@@ -2110,14 +2110,20 @@ async def list_files(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict({
         t.Key("owner_access_key", default=None): t.Null | t.String,
+        t.Key("kernel_id", default=None): t.Null | tx.UUID,
     })
 )
 async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    kernel_id = params["kernel_id"]
     log.info(
-        "GET_CONTAINER_LOG (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+        "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
+        requester_access_key,
+        owner_access_key,
+        session_name,
+        kernel_id,
     )
     resp = {"result": {"logs": ""}}
     async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -2126,8 +2132,20 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
             session_name,
             owner_access_key,
             allow_stale=True,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY
+            if kernel_id
+            else KernelLoadingStrategy.ALL_KERNELS,
         )
+        if kernel_id is not None:
+            container_log_by_kernel_id = compute_session.get_kernel_by_id(kernel_id).container_log
+            if (
+                compute_session.status in DEAD_SESSION_STATUSES
+                and container_log_by_kernel_id is not None
+            ):
+                log.debug("returning log from database record")
+                resp["result"]["logs"] = container_log_by_kernel_id.decode("utf-8")
+                return web.json_response(resp, status=200)
+
         if (
             compute_session.status in DEAD_SESSION_STATUSES
             and compute_session.main_kernel.container_log is not None
@@ -2138,13 +2156,16 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     try:
         registry = root_ctx.registry
         await registry.increment_session_usage(compute_session)
-        resp["result"]["logs"] = await registry.get_logs_from_agent(compute_session)
+        resp["result"]["logs"] = await registry.get_logs_from_agent(
+            session=compute_session, kernel_id=kernel_id
+        )
         log.debug("returning log from agent")
     except BackendError:
         log.exception(
-            "GET_CONTAINER_LOG(ak:{}/{}, s:{}): unexpected error",
+            "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
             requester_access_key,
             owner_access_key,
+            kernel_id,
             session_name,
         )
         raise
