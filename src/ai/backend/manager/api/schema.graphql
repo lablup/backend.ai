@@ -12,6 +12,8 @@ type Queries {
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
+  auditlog_list(limit: Int!, offset: Int!, filter: String, order: String, user_id: String): AuditLogList
+  auditlog(user_id: ID): [AuditLog]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
   domain(name: String): Domain
@@ -61,6 +63,7 @@ type Queries {
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
+  user_from_email(email: String): User
   user_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, is_active: Boolean, status: String): UserList
 
   """Added in 24.03.0."""
@@ -277,6 +280,25 @@ type AgentList implements PaginatedList {
 interface PaginatedList {
   items: [Item]!
   total_count: Int!
+}
+
+type AuditLogList implements PaginatedList {
+  items: [AuditLog]!
+  total_count: Int!
+}
+
+type AuditLog implements Item {
+  id: ID
+  user_id: String
+  access_key: String
+  email: String
+  action: String
+  data: JSONString
+  target_type: String
+  target: String
+  created_at: DateTime
+  rest_resource: String
+  gql_query: String
 }
 
 """A schema for normal users."""
