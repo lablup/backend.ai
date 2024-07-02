@@ -22,12 +22,18 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    JSONSerializableMixin,
+    ResourceSlot,
+    SessionTypes,
+)
 
+from .agent import AgentStatus
 from .base import (
     Base,
     IDColumn,
@@ -314,6 +320,65 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+
+    # Dynamic fields.
+    agent_count_by_status = graphene.Field(
+        graphene.Int,
+        description="Added in 24.03.7.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    agent_total_resource_slots_by_status = graphene.Field(
+        graphene.JSONString,
+        description="Added in 24.03.7.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    async def resolve_agent_count_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> int:
+        from .agent import Agent
+
+        return await Agent.load_count(
+            info.context,
+            raw_status=status,
+            scaling_group=self.name,
+        )
+
+    async def resolve_agent_total_resource_slots_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow, AgentStatus
+
+        graph_ctx = info.context
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query_stmt = (
+                sa.select(AgentRow)
+                .where(
+                    (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
+                )
+                .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
+            )
+            result = (await db_session.scalars(query_stmt)).all()
+            agent_rows = cast(list[AgentRow], result)
+
+            total_occupied_slots = ResourceSlot()
+            total_available_slots = ResourceSlot()
+
+            for agent_row in agent_rows:
+                total_occupied_slots += agent_row.occupied_slots
+                total_available_slots += agent_row.available_slots
+
+            return {
+                "occupied_slots": total_occupied_slots.to_json(),
+                "available_slots": total_available_slots.to_json(),
+            }
 
     @classmethod
     def from_row(
