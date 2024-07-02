@@ -1,8 +1,11 @@
+import asyncio
+import os
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Mapping, Sequence
+from typing import Any, Collection, Mapping, Sequence, cast
 
 import aiodocker
+import psutil
 
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.types import (
@@ -18,30 +21,33 @@ from .. import __version__
 from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
 from ..stats import (
     ContainerMeasurement,
+    Measurement,
+    MetricKey,
+    MetricTypes,
     NodeMeasurement,
     ProcessMeasurement,
     StatContext,
 )
 from .agent import Container
+from .compute_plugin import DummyComputePlugin, DummyDevice
+from .config import Intrinsic as IntrinsicConfig
 
 
-class CPUDevice(AbstractComputeDevice):
+class CPUDevice(DummyDevice):
     pass
 
 
-class CPUPlugin(AbstractComputePlugin):
+class CPUPlugin(DummyComputePlugin):
     """
     Represents the CPU.
     """
 
-    resource_config: Mapping[str, Any]
+    resource_config: IntrinsicConfig
 
     config_watch_enabled = False
 
@@ -54,10 +60,8 @@ class CPUPlugin(AbstractComputePlugin):
         self,
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config)
-        self.resource_config = dummy_config["agent"]["resource"]
+        self.resource_config = cast(IntrinsicConfig, local_config["dummy"].agent.intrinsic)
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -78,10 +82,13 @@ class CPUPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
-    async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        cores = self.resource_config["cpu"]["core-indexes"]
+    async def list_devices(self) -> Collection[CPUDevice]:
+        cores = self.resource_config.cpu_core_indexes
         return [
             CPUDevice(
+                model_name=None,
+                mother_uuid=None,
+                slot_type=SlotTypes.COUNT,
                 device_id=DeviceId(str(core_idx)),
                 hw_location="root",
                 numa_node=None,
@@ -104,7 +111,30 @@ class CPUPlugin(AbstractComputePlugin):
         return {}
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        return []
+        _cstat = psutil.cpu_times(True)
+        q = Decimal("0.000")
+        total_cpu_used = cast(
+            Decimal, sum((Decimal(c.user + c.system) * 1000).quantize(q) for c in _cstat)
+        )
+        now, raw_interval = ctx.update_timestamp("cpu-node")
+        interval = Decimal(raw_interval * 1000).quantize(q)
+
+        return [
+            NodeMeasurement(
+                MetricKey("cpu_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="msec",
+                current_hook=lambda metric: metric.stats.diff,
+                per_node=Measurement(total_cpu_used, interval),
+                per_device={
+                    DeviceId(str(idx)): Measurement(
+                        (Decimal(c.user + c.system) * 1000).quantize(q),
+                        interval,
+                    )
+                    for idx, c in enumerate(_cstat)
+                },
+            ),
+        ]
 
     async def gather_container_measures(
         self,
@@ -183,16 +213,16 @@ class CPUPlugin(AbstractComputePlugin):
         return []
 
 
-class MemoryDevice(AbstractComputeDevice):
+class MemoryDevice(DummyDevice):
     pass
 
 
-class MemoryPlugin(AbstractComputePlugin):
+class MemoryPlugin(DummyComputePlugin):
     """
     Represents the main memory.
     """
 
-    resource_config: Mapping[str, Any]
+    resource_config: IntrinsicConfig
 
     config_watch_enabled = False
 
@@ -205,10 +235,8 @@ class MemoryPlugin(AbstractComputePlugin):
         self,
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config)
-        self.resource_config = dummy_config["agent"]["resource"]
+        self.resource_config = cast(IntrinsicConfig, local_config["dummy"].agent.intrinsic)
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -229,10 +257,13 @@ class MemoryPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
-    async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        memory_size = self.resource_config["memory"]["size"]
+    async def list_devices(self) -> Collection[MemoryDevice]:
+        memory_size = self.resource_config.memory_size
         return [
             MemoryDevice(
+                model_name=None,
+                mother_uuid=None,
+                slot_type=SlotTypes.BYTES,
                 device_id=DeviceId("root"),
                 device_name=self.key,
                 hw_location="root",
@@ -255,7 +286,69 @@ class MemoryPlugin(AbstractComputePlugin):
         return {}
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        return []
+        _mstat = psutil.virtual_memory()
+        total_mem_used_bytes = Decimal(_mstat.total - _mstat.available)
+        total_mem_capacity_bytes = Decimal(_mstat.total)
+        _nstat = psutil.net_io_counters()
+        net_rx_bytes = _nstat.bytes_recv
+        net_tx_bytes = _nstat.bytes_sent
+
+        def get_disk_stat():
+            pruned_disk_types = frozenset(["squashfs", "vfat", "tmpfs"])
+            total_disk_usage = Decimal(0)
+            total_disk_capacity = Decimal(0)
+            per_disk_stat = {}
+            for disk_info in psutil.disk_partitions():
+                if disk_info.fstype not in pruned_disk_types:
+                    if "/var/lib/docker/btrfs" == disk_info.mountpoint:
+                        continue
+                    dstat = os.statvfs(disk_info.mountpoint)
+                    disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
+                    disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
+                    per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                    total_disk_usage += disk_usage
+                    total_disk_capacity += disk_capacity
+            return total_disk_usage, total_disk_capacity, per_disk_stat
+
+        loop = asyncio.get_running_loop()
+        total_disk_usage, total_disk_capacity, per_disk_stat = await loop.run_in_executor(
+            None, get_disk_stat
+        )
+        return [
+            NodeMeasurement(
+                MetricKey("mem"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_node=Measurement(total_mem_used_bytes, total_mem_capacity_bytes),
+                per_device={
+                    DeviceId("root"): Measurement(total_mem_used_bytes, total_mem_capacity_bytes)
+                },
+            ),
+            NodeMeasurement(
+                MetricKey("disk"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                per_node=Measurement(total_disk_usage, total_disk_capacity),
+                per_device=per_disk_stat,
+            ),
+            NodeMeasurement(
+                MetricKey("net_rx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_node=Measurement(Decimal(net_rx_bytes)),
+                per_device={DeviceId("node"): Measurement(Decimal(net_rx_bytes))},
+            ),
+            NodeMeasurement(
+                MetricKey("net_tx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_node=Measurement(Decimal(net_tx_bytes)),
+                per_device={DeviceId("node"): Measurement(Decimal(net_tx_bytes))},
+            ),
+        ]
 
     async def gather_container_measures(
         self,

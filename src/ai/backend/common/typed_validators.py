@@ -1,10 +1,12 @@
 import datetime
+import random
 import re
 from typing import Annotated, Any, TypeAlias
 
 from dateutil.relativedelta import relativedelta
 from pydantic import (
     AfterValidator,
+    BeforeValidator,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
 )
@@ -156,3 +158,21 @@ def session_name_validator(s: str) -> str:
 
 SessionName = Annotated[str, AfterValidator(session_name_validator)]
 """Validator with extended re.ASCII option to match session name string literal"""
+
+
+def random_float(val: Any) -> float:
+    match val:
+        case float() | int():
+            return float(val)
+        case (a, b):
+            try:
+                return random.uniform(a, b)
+            except TypeError as e:
+                raise AssertionError(e)
+        case None:
+            return 0
+        case _:
+            raise AssertionError(f"Value must be (float, tuple of float, None), not {type(val)}.")
+
+
+RandomFloat = Annotated[float, BeforeValidator(random_float)]

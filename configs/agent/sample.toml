@@ -7,7 +7,7 @@ password = ""				    # env: BACKEND_ETCD_PASSWORD
 
 [agent]
 # Agent mode; required
-# One of: "kubernetes", "docker"
+# One of: "kubernetes", "docker", "dummy"
 mode = "docker"
 
 # Change the reported host/address of the agent.
