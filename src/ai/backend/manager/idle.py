@@ -950,18 +950,18 @@ class UtilizationIdleChecker(BaseIdleChecker):
         except TypeError:
             util_series = {k: [] for k in self.resource_thresholds.keys()}
 
-        enough_data: bool = True
+        do_idle_check: bool = True
 
         for k in util_series:
             util_series[k].append(current_utilizations[k])
             if len(util_series[k]) > window_size:
                 util_series[k].pop(0)
             else:
-                enough_data = False
+                do_idle_check = False
 
         # Do not skip idleness-check if the current time passed the time window
         if util_now - util_first_collected >= time_window.total_seconds():
-            enough_data = True
+            do_idle_check = True
 
         await redis_helper.execute(
             self._redis_live,
@@ -1004,7 +1004,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ),
         )
 
-        if not enough_data:
+        if not do_idle_check:
             return True
 
         # Check over-utilized (not to be collected) resources.
