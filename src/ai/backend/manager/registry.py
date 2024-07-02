@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import copy
 import itertools
 import logging
 import re
@@ -51,6 +50,11 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.defs import (
+    DEFAULT_ALLOWED_MAX_SHMEM_RATIO,
+    DEFAULT_SHARED_MEMORY_SIZE,
+    SHMEM_RATIO_KEY,
+)
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -126,7 +130,11 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
+from .defs import (
+    DEFAULT_IMAGE_ARCH,
+    DEFAULT_ROLE,
+    INTRINSIC_SLOTS,
+)
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1078,16 +1086,14 @@ class AgentRegistry:
             )
 
             # Shared memory.
-            # We need to subtract the amount of shared memory from the memory limit of
-            # a container, since tmpfs including /dev/shm uses host-side kernel memory
-            # and cgroup's memory limit does not apply.
-            shmem = resource_opts.get("shmem", None)
-            if shmem is None:
-                shmem = labels.get("ai.backend.resource.preferred.shmem", "64m")
-            shmem = BinarySize.from_str(shmem)
+            # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
+            raw_shmem: str | None = resource_opts.get("shmem")
+            if raw_shmem is None:
+                raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
+            if raw_shmem is None:
+                raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
+            shmem = BinarySize.from_str(raw_shmem)
             resource_opts["shmem"] = shmem
-            image_min_slots = copy.deepcopy(image_min_slots)
-            image_min_slots["mem"] += shmem
 
             # Sanitize user input: does it have resource config?
             if (resources := creation_config.get("resources")) is not None:
@@ -1140,6 +1146,18 @@ class AgentRegistry:
                 if tpu is not None:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
+            # Check if the user has allocated an "imbalanced" shared memory amount.
+            raw_allowed_max_shmem_ratio = await self.shared_config.etcd.get(SHMEM_RATIO_KEY)
+            if raw_allowed_max_shmem_ratio is None:
+                allowed_max_shmem_ratio = DEFAULT_ALLOWED_MAX_SHMEM_RATIO
+            else:
+                allowed_max_shmem_ratio = Decimal(raw_allowed_max_shmem_ratio)
+            if Decimal(shmem) >= Decimal(requested_slots["mem"]) * allowed_max_shmem_ratio:
+                raise InvalidAPIParameters(
+                    f"Too large shared memory. Maximum ratio of 'shared memory / memory' is {str(allowed_max_shmem_ratio)}. "
+                    f"(s:{str(shmem)}, m:{str(BinarySize(requested_slots['mem']))}"
+                )
+
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
             log_args = (session_id, kernel_id, kernel["cluster_role"], kernel["cluster_idx"])
@@ -1170,14 +1188,6 @@ class AgentRegistry:
                             for k, v in image_max_slots.to_humanized(known_slot_types).items()
                         )
                     )
-                )
-
-            # Check if: shmem < memory
-            if shmem >= requested_slots["mem"]:
-                raise InvalidAPIParameters(
-                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
-                    ),
                 )
 
             # Add requested resource slot data to session
