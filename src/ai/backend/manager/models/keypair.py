@@ -13,12 +13,14 @@ from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
@@ -167,6 +169,7 @@ class KeyPair(graphene.ObjectType):
     last_used = GQLDateTime()
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
+    rolling_count = graphene.Int(description="Added in 24.09.0.")
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
@@ -227,6 +230,18 @@ class KeyPair(graphene.ObjectType):
         if n is not None:
             return n
         return 0
+
+    async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        redis_rlim = redis_helper.get_redis_object(
+            ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+        )
+
+        async def _zcard(r: Redis):
+            return await r.zcard(self.access_key)
+
+        ret = await redis_helper.execute(redis_rlim, _zcard)
+        return int(ret) if ret is not None else 0
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
