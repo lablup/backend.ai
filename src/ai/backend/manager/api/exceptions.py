@@ -216,6 +216,10 @@ class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
 
 
+class KernelNotFound(ObjectNotFound):
+    object_name = "kernel"
+
+
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
 

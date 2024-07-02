@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Mapping,
     Tuple,
+    TypeAlias,
     TypeVar,
     overload,
 )
@@ -403,13 +404,16 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
     return result
 
 
+JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
+
+
 def sql_json_merge(
     col,
     key: Tuple[str, ...],
     obj: Mapping[str, Any],
     *,
     _depth: int = 0,
-):
+) -> JSONCoalesceExpr:
     """
     Generate an SQLAlchemy column update expression that merges the given object with
     the existing object at a specific (nested) key of the given JSONB column,
@@ -445,7 +449,7 @@ def sql_json_increment(
     *,
     parent_updates: Mapping[str, Any] = None,
     _depth: int = 0,
-):
+) -> JSONCoalesceExpr:
     """
     Generate an SQLAlchemy column update expression that increments the value at a specific
     (nested) key of the given JSONB column,
