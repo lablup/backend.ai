@@ -1346,8 +1346,9 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
 async def destroy(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
+    user_role = cast(UserRole, request["user"]["role"])
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    if requester_access_key != owner_access_key and request["user"]["role"] not in (
+    if requester_access_key != owner_access_key and user_role not in (
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
     ):
@@ -1395,7 +1396,9 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
 
         last_stats = await asyncio.gather(
             *[
-                root_ctx.registry.destroy_session(sess, forced=params["forced"])
+                root_ctx.registry.destroy_session(
+                    sess, forced=params["forced"], user_role=user_role
+                )
                 for sess in sessions
                 if isinstance(sess, SessionRow)
             ],
@@ -1420,6 +1423,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         last_stat = await root_ctx.registry.destroy_session(
             session,
             forced=params["forced"],
+            user_role=user_role,
         )
         resp = {
             "stats": last_stat,
