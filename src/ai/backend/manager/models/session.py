@@ -3,18 +3,18 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Iterable,
     List,
-    Mapping,
+    NamedTuple,
     Optional,
-    Sequence,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -68,7 +68,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
-from .kernel import ComputeContainer, KernelRow, KernelStatus
+from .kernel import PRIVATE_KERNEL_ROLES, ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -505,6 +505,49 @@ async def _match_sessions_by_name(
     )
     result = await db_session.execute(query)
     return result.scalars().all()
+
+
+CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
+SFTP_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
+
+
+class ConcurrencyCount(NamedTuple):
+    access_key: AccessKey
+    concurrency_used: set[SessionId]
+    sftp_concurrency_used: set[SessionId]
+
+    @property
+    def concurrency_used_key(self) -> str:
+        return f"{CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def sftp_concurrency_used_key(self) -> str:
+        return f"{SFTP_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_concurrency_map(self) -> Mapping[str, int]:
+        return {
+            self.concurrency_used_key: len(self.concurrency_used),
+            self.sftp_concurrency_used_key: len(self.sftp_concurrency_used),
+        }
+
+
+def map_ak_to_concurrenct_session_cnt(
+    sessions: Iterable[SessionRow],
+) -> Mapping[AccessKey, ConcurrencyCount]:
+    result: dict[AccessKey, ConcurrencyCount] = {}
+    for session_row in sessions:
+        status = cast(SessionStatus, session_row.status)
+        if status not in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
+            continue
+        owner_access_key = cast(AccessKey, session_row.access_key)
+        if owner_access_key not in result:
+            result[owner_access_key] = ConcurrencyCount(owner_access_key, set(), set())
+        for kernel in cast(list[KernelRow], session_row.kernels):
+            if kernel.role in PRIVATE_KERNEL_ROLES:
+                result[owner_access_key].sftp_concurrency_used.add(session_row.id)
+            else:
+                result[owner_access_key].concurrency_used.add(session_row.id)
+    return result
 
 
 class SessionOp(enum.StrEnum):

@@ -166,7 +166,14 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
-from .models.session import SESSION_KERNEL_STATUS_MAPPING
+from .models.agent import recalc_agent_resource_occupancy_using_orm
+from .models.session import (
+    CONCURRENCY_USED_KEY_PREFIX,
+    SESSION_KERNEL_STATUS_MAPPING,
+    SFTP_CONCURRENCY_USED_KEY_PREFIX,
+    ConcurrencyCount,
+    map_ak_to_concurrenct_session_cnt,
+)
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -1960,17 +1967,11 @@ class AgentRegistry:
                 await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
-            set
-        )  # key: access_key, value: set of session_id
-        sftp_concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
-            set
-        )  # key: access_key, value: set of session_id
-
-        async def _recalc() -> None:
+        async def _recalc() -> Mapping[AccessKey, ConcurrencyCount]:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
+            session_rows: list[SessionRow] = []
 
             async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
@@ -1993,20 +1994,17 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    session_row = cast(SessionRow, session_row)
-                    for kernel in session_row.kernels:
-                        session_status = cast(SessionStatus, session_row.status)
-                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                    session_rows.append(cast(SessionRow, session_row))
+
+                for session_row in session_rows:
+                    session_status = cast(SessionStatus, session_row.status)
+                    if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                        kernel_rows = cast(list[KernelRow], session_row.kernels)
+                        for kernel in kernel_rows:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
                                 kernel.occupied_slots
                             )
-                        if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            if kernel.role in PRIVATE_KERNEL_ROLES:
-                                sftp_concurrency_used_per_key[session_row.access_key].add(
-                                    session_row.id
-                                )
-                            else:
-                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
+                access_key_to_concurrency = map_ak_to_concurrenct_session_cnt(session_rows)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -2036,54 +2034,55 @@ class AgentRegistry:
                         .where(AgentRow.status == AgentStatus.ALIVE)
                     )
                     await db_sess.execute(query)
+            return access_key_to_concurrency
 
-        await execute_with_retry(_recalc)
+        access_key_to_concurrency = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
-        kp_key = "keypair.concurrency_used"
-        sftp_kp_key = "keypair.sftp_concurrency_used"
-
         async def _update(r: Redis):
-            updates = {
-                f"{kp_key}.{ak}": len(session_ids)
-                for ak, session_ids in concurrency_used_per_key.items()
-            } | {
-                f"{sftp_kp_key}.{ak}": len(session_ids)
-                for ak, session_ids in sftp_concurrency_used_per_key.items()
-            }
+            updates: dict[str, int] = {}
+            for concurrency in access_key_to_concurrency.values():
+                updates |= concurrency.to_concurrency_map()
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
-            keys = await r.keys(f"{kp_key}.*")
+            keys = await r.keys(f"{CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
-                    _stat_key = stat_key
-                ak = _stat_key.replace(f"{kp_key}.", "")
-                session_concurrency = concurrency_used_per_key.get(ak)
-                usage = len(session_concurrency) if session_concurrency is not None else 0
+                    _stat_key = cast(str, stat_key)
+                ak = _stat_key.replace(CONCURRENCY_USED_KEY_PREFIX, "")
+                session_concurrency = access_key_to_concurrency.get(AccessKey(ak))
+                usage = (
+                    len(session_concurrency.concurrency_used)
+                    if session_concurrency is not None
+                    else 0
+                )
                 updates[_stat_key] = usage
-            keys = await r.keys(f"{sftp_kp_key}.*")
+            keys = await r.keys(f"{SFTP_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
-                    _stat_key = stat_key
-                ak = _stat_key.replace(f"{sftp_kp_key}.", "")
-                session_concurrency = sftp_concurrency_used_per_key.get(ak)
-                usage = len(session_concurrency) if session_concurrency is not None else 0
+                    _stat_key = cast(str, stat_key)
+                ak = _stat_key.replace(SFTP_CONCURRENCY_USED_KEY_PREFIX, "")
+                session_concurrency = access_key_to_concurrency.get(AccessKey(ak))
+                usage = (
+                    len(session_concurrency.sftp_concurrency_used)
+                    if session_concurrency is not None
+                    else 0
+                )
                 updates[_stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
+        print(f"{access_key_to_concurrency = }")
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or (
-            not concurrency_used_per_key and not sftp_concurrency_used_per_key
-        )
+        _do_fullscan = do_fullscan or not access_key_to_concurrency
         if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
@@ -2172,7 +2171,7 @@ class AgentRegistry:
             current_time = datetime.now(tzutc())
             destroy_reason = str(KernelLifecycleEventReason.FORCE_TERMINATED)
 
-            async def _destroy(db_session: AsyncSession) -> None:
+            async def _destroy(db_session: AsyncSession) -> SessionRow:
                 _stmt = (
                     sa.select(SessionRow)
                     .where(SessionRow.id == session_id)
@@ -2204,9 +2203,54 @@ class AgentRegistry:
                         target_status.name: current_time.isoformat(),
                     },
                 )
+                return session_row
+
+            async def _recalc_agent_resource(db_session: AsyncSession) -> None:
+                await recalc_agent_resource_occupancy_using_orm(db_session, agent_ids.pop())
 
             async with self.db.connect() as db_conn:
-                await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
+                destroyed_session = await execute_with_txn_retry(
+                    _destroy, self.db.begin_session, db_conn
+                )
+                owner_access_key = cast(AccessKey, destroyed_session.access_key)
+                agent_ids = set([
+                    cast(AgentId, kernel_row.agent)
+                    for kernel_row in destroyed_session.kernels
+                    if kernel_row.agent is not None
+                ])
+                while agent_ids:
+                    # Don't need to update all agent records in a single db transaction
+                    await execute_with_txn_retry(
+                        _recalc_agent_resource,
+                        self.db.begin_session,
+                        db_conn,
+                    )
+
+                # Update concurrency
+                async with self.db.begin_readonly_session(db_conn) as db_session:
+                    session_query = (
+                        sa.select(SessionRow)
+                        .where(
+                            (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
+                            & (SessionRow.user_uuid == destroyed_session.user_uuid)
+                        )
+                        .options(
+                            load_only(SessionRow.id),
+                            selectinload(SessionRow.kernels).options(load_only(KernelRow.role)),
+                        )
+                    )
+                    session_rows = cast(list[SessionRow], await db_session.scalars(session_query))
+
+            update_value = map_ak_to_concurrenct_session_cnt(session_rows)[owner_access_key]
+
+            async def _update(r: Redis) -> None:
+                _update_value = update_value.to_concurrency_map()
+                await r.mset(cast(MSetType, _update_value))
+
+            await redis_helper.execute(
+                self.redis_stat,
+                _update,
+            )
 
         async with handle_session_exception(
             self.db,
