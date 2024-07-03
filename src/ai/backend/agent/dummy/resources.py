@@ -19,7 +19,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 async def load_resources(
     etcd: AsyncEtcd,
     local_config: Mapping[str, Any],
-    dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
     """
     Detect and load the accelerator plugins.
@@ -42,28 +41,29 @@ async def load_resources(
     )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
-        cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
+        cpu_plugin = CPUPlugin(cpu_config, local_config)
         compute_plugin_ctx.attach_intrinsic_device(cpu_plugin)
     if "mem" not in compute_plugin_ctx.plugins:
         memory_config = await etcd.get_prefix("config/plugins/memory")
-        memory_plugin = MemoryPlugin(memory_config, local_config, dummy_config)
+        memory_plugin = MemoryPlugin(memory_config, local_config)
         compute_plugin_ctx.attach_intrinsic_device(memory_plugin)
     for plugin_name, plugin_instance in compute_plugin_ctx.plugins.items():
         if not all(
-            (invalid_name := sname, sname.startswith(f"{plugin_instance.key}."))[1]
+            (sname.startswith(f"{plugin_instance.key}."))
             for sname, _ in plugin_instance.slot_types
             if sname not in {"cpu", "mem"}
         ):
-            raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
-                invalid_name,  # noqa: F821
-                plugin_instance.key,
-            )
+            # raise InitializationError(
+            #     "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
+            #     invalid_name,  # noqa: F821
+            #     plugin_instance.key,
+            # )
+            # Skip raising slot name error for easy test.
+            pass
         if plugin_instance.key in compute_device_types:
-            raise InitializationError(
-                f"A plugin defining the same key '{plugin_instance.key}' already exists. "
-                "You may need to uninstall it first."
-            )
+            # Skip the duplicate name of compute plugin
+            # since this is a dummy agent.
+            pass
         compute_device_types[plugin_instance.key] = plugin_instance
 
     return compute_device_types
@@ -93,7 +93,5 @@ async def scan_available_resources(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "
                     "Try to adjust the reserved resources or use a larger machine."
                 )
-    log.info("Resource slots: {!r}", slots)
-    log.info("Slot types: {!r}", known_slot_types)
 
     return slots

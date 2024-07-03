@@ -7,6 +7,7 @@ from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, c
 
 import tomli
 import trafaret as t
+from pydantic import BaseModel, ConfigDict
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -28,6 +29,14 @@ __all__ = (
     "check",
     "merge",
 )
+
+
+class ConfigModel(BaseModel):
+    # No extra field allowed.
+    # Override with `ConfigDict(extra="allow")` or use pydantic.BaseModel
+    # if you want to allow extra fields.
+    model_config = ConfigDict(extra="forbid")
+
 
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
