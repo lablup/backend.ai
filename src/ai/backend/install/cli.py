@@ -279,7 +279,7 @@ class InstallReport(Static):
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
-                $ ./backendai-wsproxy
+                $ ./backendai-wsproxy wsproxy start-server
                 ```
 
                 It works if the console output ends with something like:
