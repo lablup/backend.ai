@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, cast
 
 import graphene
 import sqlalchemy as sa
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload, with_loader_criteria
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
@@ -32,7 +32,7 @@ from .base import (
     simple_db_mutate,
 )
 from .group import association_groups_users
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, kernels
 from .keypair import keypairs
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -41,6 +41,7 @@ from .user import UserRole, users
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
+
 
 __all__: Sequence[str] = (
     "agents",
@@ -616,6 +617,28 @@ async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: Agent
         .where(agents.c.id == agent_id)
     )
     await db_conn.execute(query)
+
+
+async def recalc_agent_resource_occupancy_using_orm(
+    db_session: SASession, agent_id: AgentId
+) -> None:
+    agent_query = (
+        sa.select(AgentRow)
+        .where(AgentRow.id == agent_id)
+        .options(
+            selectinload(AgentRow.kernels),
+            with_loader_criteria(
+                KernelRow, KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
+            ),
+        )
+    )
+    occupied_slots = ResourceSlot()
+    agent_row = cast(AgentRow, await db_session.scalar(agent_query))
+    kernel_rows = cast(list[KernelRow], agent_row.kernels)
+    for kernel in kernel_rows:
+        if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+            occupied_slots += kernel.occupied_slots
+    agent_row.occupied_slots = occupied_slots
 
 
 class ModifyAgent(graphene.Mutation):
