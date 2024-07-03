@@ -540,6 +540,23 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
+    async def configure_wsproxy(self) -> None:
+        conf_path = self.copy_config("wsproxy.toml")
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        assert halfstack.redis_addr is not None
+        with conf_path.open("r") as fp:
+            data = tomlkit.load(fp)
+            wsproxy_itable = tomlkit.inline_table()
+            wsproxy_itable["url"] = (
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            )
+            data["wsproxy"]["bind_host"] = service.local_proxy_addr.face.host
+            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host
+            data["wsproxy"]["bind_port"] = service.local_proxy_addr.face.port
+        with conf_path.open("w") as fp:
+            tomlkit.dump(data, fp)
+
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
         service = self.install_info.service_config
@@ -835,6 +852,8 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
@@ -1038,6 +1057,8 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")

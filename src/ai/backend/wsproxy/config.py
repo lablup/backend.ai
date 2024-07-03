@@ -394,11 +394,11 @@ class WSProxyConfig(BaseSchema):
     ]
 
     bind_api_port: Annotated[
-        int, Field(default=5090, description="Port number to bind for API server")
+        int, Field(default=5050, description="Port number to bind for API server")
     ]
     advertised_api_port: Annotated[
         int | None,
-        Field(default=None, examples=[15090], description="API port number reachable from client"),
+        Field(default=None, examples=[15050], description="API port number reachable from client"),
     ]
 
     bind_proxy_port_range: Annotated[

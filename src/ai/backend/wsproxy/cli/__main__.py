@@ -6,7 +6,7 @@ from typing import Any
 
 import aiohttp_cors
 import click
-import tomli_w
+import tomlkit
 from aiohttp import web
 from setproctitle import setproctitle
 
@@ -49,10 +49,10 @@ def generate_example_configuration(output: Path) -> None:
     """
     generated_example = generate_example_json(ServerConfig)
     if output == "-" or output is None:
-        print(tomli_w.dumps(ensure_json_serializable(generated_example)))
+        print(tomlkit.dumps(ensure_json_serializable(generated_example)))
     else:
         with open(output, mode="w") as fw:
-            fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
+            fw.write(tomlkit.dumps(ensure_json_serializable(generated_example)))
 
 
 async def _generate() -> dict[str, Any]:
