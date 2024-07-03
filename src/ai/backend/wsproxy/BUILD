@@ -81,8 +81,5 @@ resources(
     dependencies=[
         ":version",
     ],
-    sources=[
-        "**/py.typed",
-        "templates/**"
-    ],
+    sources=["**/py.typed", "templates/**"],
 )
