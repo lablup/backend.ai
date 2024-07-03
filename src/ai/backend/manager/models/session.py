@@ -708,12 +708,12 @@ class SessionRow(Base):
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
 
-    def get_kernel_by_id(self, id: UUID) -> KernelRow:
-        kerns = tuple(kern for kern in self.kernels if kern.id == id)
+    def get_kernel_by_id(self, kernel_id: UUID) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
         if len(kerns) > 1:
-            raise TooManyKernelsFound(f"Kernel {id} cannot be more than 2.")
+            raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
         if len(kerns) == 0:
-            raise KernelNotFound(f"Session (id: {self.id} has no kernel (id: {id}))")
+            raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
         return kerns[0]
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:

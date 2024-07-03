@@ -2739,22 +2739,19 @@ class AgentRegistry:
     async def get_logs_from_agent(
         self,
         session: SessionRow,
-        kernel_id: uuid.UUID | None,
+        kernel_id: uuid.UUID | None = None,
     ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
-            agent_by_kernel_id = (
-                session.get_kernel_by_id(kernel_id).agent
-                if kernel_id
-                else session.main_kernel.agent
-            )
+            if kernel_id is not None:
+                kernel = session.get_kernel_by_id(kernel_id)
+            else:
+                kernel = session.main_kernel
             async with self.agent_cache.rpc_context(
-                agent_id=agent_by_kernel_id,
+                agent_id=kernel.agent,
                 invoke_timeout=30,
-                order_key=session.main_kernel.id,
+                order_key=kernel.id,
             ) as rpc:
-                reply = await rpc.call.get_logs(
-                    str(kernel_id if kernel_id else session.main_kernel.id)
-                )
+                reply = await rpc.call.get_logs(str(kernel.id))
                 return reply["logs"]
 
     async def increment_session_usage(
