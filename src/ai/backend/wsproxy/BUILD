@@ -1,6 +1,8 @@
 python_sources(
     name="src",
     dependencies=[
+        "src/ai/backend/wsproxy/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
+        "src/ai/backend/wsproxy/api:src",  # not auto-inferred (due to lazy-loading cmdgroup)
         ":resources",
     ],
 )
