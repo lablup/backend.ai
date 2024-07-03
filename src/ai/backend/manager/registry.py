@@ -2179,42 +2179,42 @@ class AgentRegistry:
             current_time = datetime.now(tzutc())
             destroy_reason = str(KernelLifecycleEventReason.FORCE_TERMINATED)
 
-            async def _destroy(db_session: AsyncSession) -> SessionRow:
-                _stmt = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == session_id)
-                    .options(selectinload(SessionRow.kernels))
-                )
-                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
-                if session_row is None:
-                    raise SessionNotFound(f"Session not found (id: {session_id})")
-                kernel_rows = cast(list[KernelRow], session_row.kernels)
-                kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
-                for kern in kernel_rows:
-                    kern.status = kernel_target_status
-                    kern.terminated_at = current_time
-                    kern.status_info = destroy_reason
-                    kern.status_history = sql_json_merge(
-                        KernelRow.status_history,
+            async def _destroy() -> SessionRow:
+                async with self.db.begin_session() as db_session:
+                    _stmt = (
+                        sa.select(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .options(selectinload(SessionRow.kernels))
+                    )
+                    session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                    if session_row is None:
+                        raise SessionNotFound(f"Session not found (id: {session_id})")
+                    kernel_rows = cast(list[KernelRow], session_row.kernels)
+                    kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
+                    for kern in kernel_rows:
+                        kern.status = kernel_target_status
+                        kern.terminated_at = current_time
+                        kern.status_info = destroy_reason
+                        kern.status_history = sql_json_merge(
+                            KernelRow.status_history,
+                            (),
+                            {
+                                kernel_target_status.name: current_time.isoformat(),
+                            },
+                        )
+                    session_row.status = target_status
+                    session_row.terminated_at = current_time
+                    session_row.status_info = destroy_reason
+                    session_row.status_history = sql_json_merge(
+                        SessionRow.status_history,
                         (),
                         {
-                            kernel_target_status.name: current_time.isoformat(),
+                            target_status.name: current_time.isoformat(),
                         },
                     )
-                session_row.status = target_status
-                session_row.terminated_at = current_time
-                session_row.status_info = destroy_reason
-                session_row.status_history = sql_json_merge(
-                    SessionRow.status_history,
-                    (),
-                    {
-                        target_status.name: current_time.isoformat(),
-                    },
-                )
-                return session_row
+                    return session_row
 
-            async with self.db.connect() as db_conn:
-                await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
+            await execute_with_retry(_destroy)
             await self.recalc_resource_usage()
 
         async with handle_session_exception(
