@@ -544,13 +544,10 @@ class Context(metaclass=ABCMeta):
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
-            wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable["url"] = (
-                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
-            )
-            data["wsproxy"]["bind_host"] = service.local_proxy_addr.face.host  # type: ignore
+            data["wsproxy"]["bind_host"] = service.local_proxy_addr.bind.host  # type: ignore
             data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
-            data["wsproxy"]["bind_port"] = service.local_proxy_addr.face.port  # type: ignore
+            data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
+            data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
