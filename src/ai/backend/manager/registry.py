@@ -2742,10 +2742,11 @@ class AgentRegistry:
         kernel_id: uuid.UUID | None = None,
     ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
-            if kernel_id is not None:
-                kernel = session.get_kernel_by_id(kernel_id)
-            else:
-                kernel = session.main_kernel
+            kernel = (
+                session.get_kernel_by_id(kernel_id)
+                if kernel_id is not None
+                else session.main_kernel
+            )
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
