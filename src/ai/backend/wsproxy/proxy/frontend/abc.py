@@ -45,7 +45,7 @@ class AbstractFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
         key = self.get_circuit_key(circuit)
         self.circuits[key] = circuit
         self.backends[key] = await self.initialize_backend(circuit, routes)
-        log.debug(
+        log.info(
             "circuit {} (app:{}, mode: {}) registered", circuit.id, circuit.app, circuit.app_mode
         )
 
@@ -62,6 +62,9 @@ class AbstractFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
         await self.terminate_backend(self.backends[key])
         del self.backends[key]
         del self.circuits[key]
+        log.info(
+            "circuit {} (app:{}, mode: {}) unregistered", circuit.id, circuit.app, circuit.app_mode
+        )
 
     async def terminate_all_circuits(self) -> None:
         for circuit in list(self.circuits.values()):

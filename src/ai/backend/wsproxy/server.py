@@ -120,7 +120,7 @@ async def exception_middleware(
             )
         else:
             return aiohttp_jinja2.render_template(
-                "error",
+                "error.jinja2",
                 request,
                 ex.body_dict,
             )

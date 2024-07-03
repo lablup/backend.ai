@@ -3,13 +3,16 @@ from logging import LoggerAdapter
 from typing import Annotated, Iterable
 from uuid import UUID
 
+import aiohttp_cors
 import jwt
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 
 from ..defs import RootContext
 from ..exceptions import (
+    GenericForbidden,
     InvalidCredentials,
+    ObjectNotFound,
 )
 from ..registry import add_circuit
 from ..types import (
@@ -22,9 +25,9 @@ from ..types import (
     SessionConfig,
     WebMiddleware,
 )
-from ..utils import mime_match
-from .types import ConfRequestModel
-from .utils import pydantic_api_handler
+from ..utils import is_permit_valid, mime_match
+from .types import ConfRequestModel, StubResponseModel
+from .utils import pydantic_api_handler, pydantic_api_response_handler
 
 
 class AddRequestModel(BaseModel):
@@ -60,6 +63,60 @@ class TokenBodyModel(ConfRequestModel):
     exp: int
 
 
+@pydantic_api_response_handler
+async def check_session_existence(request: web.Request) -> PydanticResponse[StubResponseModel]:
+    root_ctx: RootContext = request.app["_root.context"]
+    try:
+        session_id = UUID(request.match_info["session_id"])
+    except ValueError:
+        raise ObjectNotFound(object_name="Circuit")
+
+    token = request.match_info["token"]
+
+    for _, circuit in root_ctx.proxy_frontend.circuits.items():
+        if session_id in circuit.session_ids and (
+            token == circuit.access_key or token == circuit.user_id
+        ):
+            break
+    else:
+        raise ObjectNotFound(object_name="Circuit")
+
+    return PydanticResponse(StubResponseModel(success=True))
+
+
+@pydantic_api_response_handler
+async def delete_circuit_by_session(request: web.Request) -> PydanticResponse[StubResponseModel]:
+    root_ctx: RootContext = request.app["_root.context"]
+    try:
+        session_id = UUID(request.match_info["session_id"])
+    except ValueError:
+        raise ObjectNotFound(object_name="Circuit")
+
+    token = request.match_info["token"]
+
+    for _, circuit in root_ctx.proxy_frontend.circuits.items():
+        if session_id in circuit.session_ids and (
+            token == circuit.access_key or token == str(circuit.user_id)
+        ):
+            break
+    else:
+        raise ObjectNotFound(object_name="Circuit")
+    permit_key = request.query.get("permit_key")
+    if (
+        not permit_key
+        or not circuit.user_id
+        or (
+            not is_permit_valid(
+                root_ctx.local_config.wsproxy.permit_hash_key, circuit.user_id, permit_key
+            )
+        )
+    ):
+        raise GenericForbidden
+
+    await root_ctx.proxy_frontend.break_circuit(circuit)
+    return PydanticResponse(StubResponseModel(success=True))
+
+
 @pydantic_api_handler(AddRequestModel, is_deprecated=True)
 async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse[AddResponseModel]:
     """
@@ -81,7 +138,6 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
         AddResponseModel(
             code=200, url=AnyUrl(f"{base_url}/v2/proxy/auth?{urllib.parse.urlencode(qdict)}")
         ),
-        headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
     )
 
 
@@ -193,7 +249,6 @@ async def proxy(
                 # Current version of WebUI always expects this to be False for TCP protocols
                 reuse=reuse if params.protocol != ProxyProtocol.TCP else False,
             ),
-            headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
     else:
         return web.HTTPPermanentRedirect(app_url)
@@ -214,6 +269,9 @@ def create_app(
     app["prefix"] = "v2/proxy"
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app.router.add_route("GET", "/{token}/{session_id}/add", add)
-    app.router.add_route("GET", "/auth", proxy)
+    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    cors.add(app.router.add_route("GET", "/{token}/{session_id}", check_session_existence))
+    cors.add(app.router.add_route("GET", "/{token}/{session_id}/add", add))
+    cors.add(app.router.add_route("GET", "/{token}/{session_id}/delete", delete_circuit_by_session))
+    cors.add(app.router.add_route("GET", "/auth", proxy))
     return app, []

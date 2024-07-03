@@ -47,6 +47,7 @@ async def add_circuit(
         arguments=args,
         port=port,
         user_id=session_info.user_uuid,
+        access_key=session_info.access_key,
         endpoint_id=(endpoint_info.id if endpoint_info else None),
         route_info=routes,
         session_ids=[r.session_id for r in routes],

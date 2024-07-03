@@ -153,6 +153,7 @@ class Circuit(BaseModel):
     ]
 
     user_id: Annotated[UUID | None, Field(UUID | None, description="Session owner's UUID.")]
+    access_key: Annotated[str | None, Field(str | None, description="Session owner's access key.")]
     endpoint_id: Annotated[
         UUID | None,
         Field(
