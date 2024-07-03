@@ -129,7 +129,7 @@ class PersistentServiceContainer:
                 pass
             else:
                 raise
-        container_config = {
+        container_config: dict[str, Any] = {
             "Image": self.image_ref,
             "Tty": True,
             "Privileged": False,

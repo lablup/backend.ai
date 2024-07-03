@@ -2,10 +2,10 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
+distros=("alpine3.8" "centos7.6" "centos8.0" "ubuntu16.04" "ubuntu18.04" "ubuntu20.04")
 
 static_libs_dockerfile_part=$(cat <<'EOF'
-ENV ZLIB_VER=1.2.11 \
+ENV ZLIB_VER=1.3.1 \
     SSL_VER=1.1.1i
 
 RUN wget https://www.zlib.net/zlib-${ZLIB_VER}.tar.gz -O /root/zlib-${ZLIB_VER}.tar.gz && \
@@ -70,6 +70,16 @@ RUN yum install -y wget
 EOF
 )
 
+centos8_builder_dockerfile=$(cat <<'EOF'
+FROM centos:centos8
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
+RUN dnf install -y make gcc
+RUN dnf install -y autoconf
+RUN dnf install -y wget
+EOF
+)
+
 alpine_builder_dockerfile=$(cat <<'EOF'
 FROM alpine:3.8
 RUN apk add --no-cache make gcc musl-dev
@@ -107,6 +117,7 @@ echo -e "$ubuntu1604_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIP
 echo -e "$ubuntu1804_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu18.04.dockerfile"
 echo -e "$ubuntu2004_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu20.04.dockerfile"
 echo -e "$centos_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.centos7.6.dockerfile"
+echo -e "$centos8_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.centos8.0.dockerfile"
 echo -e "$alpine_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.alpine3.8.dockerfile"
 
 for distro in "${distros[@]}"; do
@@ -129,8 +140,8 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp sftp-server.*.bin $SCRIPT_DIR/../src/ai/backend/runner
-cp scp.*.bin $SCRIPT_DIR/../src/ai/backend/runner
+cp sftp-server.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+cp scp.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 
 cd $SCRIPT_DIR/..
 rm -rf "$temp_dir"

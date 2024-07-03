@@ -77,7 +77,7 @@
       },
       "display_icon": "ipu"
     },
-    "atom": {
+    "atom.device": {
       "slot_name": "atom.device",
       "description": "ATOM",
       "human_readable_name": "ATOM Device",
@@ -88,7 +88,7 @@
       },
       "display_icon": "rebel"
     },
-    "warboy": {
+    "warboy.device": {
       "slot_name": "warboy.device",
       "description": "Furiosa Warboy",
       "human_readable_name": "Warboy Device",
@@ -99,7 +99,7 @@
       },
       "display_icon": "furiosa"
     },
-    "hyperaccel-lpu": {
+    "hyperaccel-lpu.device": {
       "slot_name": "hyperaccel-lpu.device",
       "description": "Hyperaccel LPU",
       "human_readable_name": "Hyperaccel LPU Device",
