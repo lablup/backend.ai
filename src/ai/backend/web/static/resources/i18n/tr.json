@@ -1509,7 +1509,10 @@
     "ModelMountDestination": "Model Klasörü İçin Montaj Hedefi",
     "AdditionalMounts": "Ek Montajlar",
     "ModelDefinitionPath": "Model Tanımı Dosya Yolu",
-    "NoExtraMounts": "Ekstra montaj yok"
+    "NoExtraMounts": "Ekstra montaj yok",
+    "SyncRoutes": "Rotaları senkronize et",
+    "SyncRoutesFailed": "Rota senkronizasyon isteği başarısız oldu.",
+    "SyncRoutesRequested": "Rota senkronizasyonu talep edildi."
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
