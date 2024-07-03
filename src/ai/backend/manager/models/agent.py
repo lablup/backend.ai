@@ -637,7 +637,8 @@ async def recalc_agent_resource_occupancy_using_orm(
     agent_row = cast(AgentRow, await db_session.scalar(agent_query))
     kernel_rows = cast(list[KernelRow], agent_row.kernels)
     for kernel in kernel_rows:
-        occupied_slots += kernel.occupied_slots
+        if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+            occupied_slots += kernel.occupied_slots
     agent_row.occupied_slots = occupied_slots
 
 

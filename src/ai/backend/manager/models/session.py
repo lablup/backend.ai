@@ -5,13 +5,13 @@ import enum
 import logging
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
     List,
-    NamedTuple,
     Optional,
     Union,
     cast,
@@ -511,10 +511,11 @@ CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
 SFTP_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
 
 
-class ConcurrencyCount(NamedTuple):
+@dataclass
+class ConcurrencyCount:
     access_key: AccessKey
-    concurrency_used: set[SessionId]
-    sftp_concurrency_used: set[SessionId]
+    concurrency_used: set[SessionId] = field(default_factory=set)
+    sftp_concurrency_used: set[SessionId] = field(default_factory=set)
 
     @property
     def concurrency_used_key(self) -> str:

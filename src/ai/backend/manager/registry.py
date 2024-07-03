@@ -2239,12 +2239,21 @@ class AgentRegistry:
                             selectinload(SessionRow.kernels).options(load_only(KernelRow.role)),
                         )
                     )
-                    session_rows = cast(list[SessionRow], await db_session.scalars(session_query))
+                    session_rows = cast(
+                        list[SessionRow], (await db_session.scalars(session_query)).all()
+                    )
 
-            update_value = map_ak_to_concurrenct_session_cnt(session_rows)[owner_access_key]
+            if session_rows:
+                access_key_to_concurrency = map_ak_to_concurrenct_session_cnt(session_rows)
+                _update_value = access_key_to_concurrency[owner_access_key].to_concurrency_map()
+            else:
+                empty_concurrency = ConcurrencyCount(owner_access_key)
+                _update_value = {
+                    empty_concurrency.concurrency_used_key: 0,
+                    empty_concurrency.sftp_concurrency_used_key: 0,
+                }
 
             async def _update(r: Redis) -> None:
-                _update_value = update_value.to_concurrency_map()
                 await r.mset(cast(MSetType, _update_value))
 
             await redis_helper.execute(
