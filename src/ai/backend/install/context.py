@@ -548,9 +548,9 @@ class Context(metaclass=ABCMeta):
             wsproxy_itable["url"] = (
                 f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
             )
-            data["wsproxy"]["bind_host"] = service.local_proxy_addr.face.host
-            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host
-            data["wsproxy"]["bind_port"] = service.local_proxy_addr.face.port
+            data["wsproxy"]["bind_host"] = service.local_proxy_addr.face.host  # type: ignore
+            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
+            data["wsproxy"]["bind_port"] = service.local_proxy_addr.face.port  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
