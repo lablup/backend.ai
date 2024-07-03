@@ -286,7 +286,7 @@ class InstallReport(Static):
                 ```
                 ...
                 2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.proxy.frontend.http.port [2596460] accepting proxy requests from 0.0.0.0:10200~10300
-                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.server [2596460] started handling API requests at 0.0.0.0:5090
+                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.server [2596460] started handling API requests at 0.0.0.0:{service.local_proxy_addr.bind.port}
                 ...
                 ```
 
