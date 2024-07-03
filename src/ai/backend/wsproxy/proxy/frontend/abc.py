@@ -35,6 +35,12 @@ class AbstractFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
                 return circuit
         raise ObjectNotFound(object_name="Circuit")
 
+    def get_circuit_by_id(self, id: UUID) -> Circuit:
+        for _, circuit in self.circuits.items():
+            if circuit.id == id:
+                return circuit
+        raise ObjectNotFound(object_name="Circuit")
+
     async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
         key = self.get_circuit_key(circuit)
         self.circuits[key] = circuit

@@ -104,9 +104,11 @@ async def proxy(
     token_str = params.token
     session_id = params.session_id
 
-    token = jwt.decode(token_str, root_ctx.local_config.wsproxy.jwt_encrypt_key)
+    token = jwt.decode(
+        token_str, root_ctx.local_config.wsproxy.jwt_encrypt_key, algorithms=["HS256"]
+    )
 
-    if token["session_id"] != session_id:
+    if token["session_id"] != str(session_id):
         log.warn(
             "User requested to create app of session {} but token authorizes session {}",
             session_id,

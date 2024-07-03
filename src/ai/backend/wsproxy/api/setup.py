@@ -1,4 +1,5 @@
 import urllib.parse
+from logging import LoggerAdapter
 from typing import Iterable
 from uuid import UUID
 
@@ -10,7 +11,6 @@ from ..config import ServerConfig
 from ..defs import RootContext
 from ..exceptions import (
     InvalidAPIParameters,
-    ObjectNotFound,
 )
 from ..types import (
     PERMIT_COOKIE_NAME,
@@ -48,67 +48,71 @@ class ProxySetupResponseModel(BaseModel):
 async def setup(
     request: web.Request, params: ProxySetupRequestModel
 ) -> web.StreamResponse | PydanticResponse[ProxySetupResponseModel]:
-    root_ctx: RootContext = request.app["_root.context"]
-    jwt_body = jwt.decode(
-        params.token, root_ctx.local_config.wsproxy.jwt_encrypt_key, algorithms=["HS256"]
-    )
-    requested_circuit_id = UUID(jwt_body["circuit"])
+    log: LoggerAdapter = request["log"]
 
     try:
-        circuit = root_ctx.proxy_frontend.circuits[requested_circuit_id]
-    except KeyError:
-        raise ObjectNotFound(object_name="Circuit")
+        root_ctx: RootContext = request.app["_root.context"]
+        jwt_body = jwt.decode(
+            params.token, root_ctx.local_config.wsproxy.jwt_encrypt_key, algorithms=["HS256"]
+        )
+        requested_circuit_id = UUID(jwt_body["circuit"])
 
-    if not isinstance(circuit.app_info, InteractiveAppInfo):
-        raise InvalidAPIParameters("E20011: Not supported for inference apps")
+        circuit = root_ctx.proxy_frontend.get_circuit_by_id(requested_circuit_id)
 
-    # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
-    # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
-    cors_headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Expose-Headers": "*",
-    }
-    match circuit.protocol:
-        case ProxyProtocol.HTTP:
-            protocol = "http"
-            response = web.HTTPPermanentRedirect(
-                generate_proxy_url(root_ctx.local_config, protocol, circuit), headers=cors_headers
-            )
-            response.set_cookie(
-                PERMIT_COOKIE_NAME,
-                calculate_permit_hash(
-                    root_ctx.local_config.wsproxy.permit_hash_key, circuit.app_info.user_id
-                ),
-            )
-            return response
-        case ProxyProtocol.TCP:
-            protocol = "tcp"
-            queryparams = {
-                "directTCP": "true",
-                "auth": params.token,
-                "proto": protocol,
-                "gateway": generate_proxy_url(root_ctx.local_config, protocol, circuit),
-            }
-            if jwt_body["redirect"]:
-                return web.HTTPPermanentRedirect(
-                    f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
+        if not isinstance(circuit.app_info, InteractiveAppInfo):
+            raise InvalidAPIParameters("E20011: Not supported for inference apps")
+
+        # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
+        # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
+        cors_headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+        }
+        match circuit.protocol:
+            case ProxyProtocol.HTTP:
+                protocol = "http"
+                response = web.HTTPPermanentRedirect(
+                    generate_proxy_url(root_ctx.local_config, protocol, circuit),
                     headers=cors_headers,
                 )
-            else:
-                return PydanticResponse(
-                    ProxySetupResponseModel(
-                        redirect=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
-                        redirectURI=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
+                response.set_cookie(
+                    PERMIT_COOKIE_NAME,
+                    calculate_permit_hash(
+                        root_ctx.local_config.wsproxy.permit_hash_key, circuit.app_info.user_id
                     ),
-                    headers=cors_headers,
                 )
-        case _:
-            raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
+                return response
+            case ProxyProtocol.TCP:
+                protocol = "tcp"
+                queryparams = {
+                    "directTCP": "true",
+                    "auth": params.token,
+                    "proto": protocol,
+                    "gateway": generate_proxy_url(root_ctx.local_config, protocol, circuit),
+                }
+                if jwt_body["redirect"]:
+                    return web.HTTPPermanentRedirect(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
+                        headers=cors_headers,
+                    )
+                else:
+                    return PydanticResponse(
+                        ProxySetupResponseModel(
+                            redirect=AnyUrl(
+                                f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
+                            ),
+                            redirectURI=AnyUrl(
+                                f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
+                            ),
+                        ),
+                        headers=cors_headers,
+                    )
+            case _:
+                raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
+    except:
+        log.exception("")
+        raise
 
 
 async def init(app: web.Application) -> None:

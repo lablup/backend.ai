@@ -6,10 +6,11 @@ import jwt
 from aiohttp import web
 from pydantic import BaseModel
 
-from ai.backend.wsproxy.api.types import ConfRequestModel
-from ai.backend.wsproxy.api.utils import pydantic_api_handler
-from ai.backend.wsproxy.defs import RootContext
-from ai.backend.wsproxy.types import CORSOptions, PydanticResponse, WebMiddleware
+from ..defs import RootContext
+from ..types import CORSOptions, PydanticResponse, WebMiddleware
+from ..utils import ensure_json_serializable
+from .types import ConfRequestModel
+from .utils import pydantic_api_handler
 
 
 class TokenResponseModel(BaseModel):
@@ -31,7 +32,7 @@ async def conf_v2(
     assert params.session.id and params.session.access_key, "Not meant for inference apps"
 
     token = jwt.encode(
-        {
+        ensure_json_serializable({
             "login_session_token": params.login_session_token,
             "kernel_host": params.kernel_host,
             "kernel_port": params.kernel_port,
@@ -40,7 +41,7 @@ async def conf_v2(
             "group_id": params.session.group_id,
             "access_key": params.session.access_key,
             "domain_name": params.session.domain_name,
-        },
+        }),
         root_ctx.local_config.wsproxy.jwt_encrypt_key,
     )
     log.debug("built token with body {}", params.model_dump())
