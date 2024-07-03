@@ -260,6 +260,7 @@ class Context(metaclass=ABCMeta):
         await self.run_shell(
             f"""
         {sudo} docker compose pull && \\
+        {sudo} docker compose up -d --wait backendai-half-db && \\
         {sudo} docker compose up -d && \\
         {sudo} docker compose ps
         """,
