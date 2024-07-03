@@ -171,7 +171,6 @@ from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
     SFTP_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyCount,
-    map_ak_to_concurrenct_session_cnt,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1970,7 +1969,7 @@ class AgentRegistry:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
-            session_rows: list[SessionRow] = []
+            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyCount] = {}
 
             async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
@@ -1993,17 +1992,27 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    session_rows.append(cast(SessionRow, session_row))
-
-                for session_row in session_rows:
-                    session_status = cast(SessionStatus, session_row.status)
-                    if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                        kernel_rows = cast(list[KernelRow], session_row.kernels)
-                        for kernel in kernel_rows:
+                    session_row = cast(SessionRow, session_row)
+                    for kernel in session_row.kernels:
+                        session_status = cast(SessionStatus, session_row.status)
+                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
                                 kernel.occupied_slots
                             )
-                access_key_to_concurrency = map_ak_to_concurrenct_session_cnt(session_rows)
+                        if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                            access_key = cast(AccessKey, session_row.access_key)
+                            if access_key not in access_key_to_concurrency_used:
+                                access_key_to_concurrency_used[access_key] = ConcurrencyCount(
+                                    access_key
+                                )
+                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                                access_key_to_concurrency_used[
+                                    access_key
+                                ].sftp_concurrency_used.add(session_row.id)
+                            else:
+                                access_key_to_concurrency_used[access_key].concurrency_used.add(
+                                    session_row.id
+                                )
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -2033,7 +2042,7 @@ class AgentRegistry:
                         .where(AgentRow.status == AgentStatus.ALIVE)
                     )
                     await db_sess.execute(query)
-            return access_key_to_concurrency
+            return access_key_to_concurrency_used
 
         access_key_to_concurrency = await execute_with_retry(_recalc)
 
