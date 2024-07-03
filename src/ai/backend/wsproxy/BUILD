@@ -81,5 +81,6 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "templates/**"
     ],
 )
