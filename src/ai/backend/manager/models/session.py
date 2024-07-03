@@ -506,28 +506,28 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
-CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
-SFTP_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
 
 
 @dataclass
-class ConcurrencyCount:
+class ConcurrencyUsed:
     access_key: AccessKey
-    concurrency_used: set[SessionId] = field(default_factory=set)
-    sftp_concurrency_used: set[SessionId] = field(default_factory=set)
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
 
     @property
-    def concurrency_used_key(self) -> str:
-        return f"{CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
 
     @property
-    def sftp_concurrency_used_key(self) -> str:
-        return f"{SFTP_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
 
-    def to_map(self) -> Mapping[str, int]:
+    def to_cnt_map(self) -> Mapping[str, int]:
         return {
-            self.concurrency_used_key: len(self.concurrency_used),
-            self.sftp_concurrency_used_key: len(self.sftp_concurrency_used),
+            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
+            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
         }
 
 

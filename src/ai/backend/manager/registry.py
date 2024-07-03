@@ -167,10 +167,10 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.session import (
-    CONCURRENCY_USED_KEY_PREFIX,
+    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
-    SFTP_CONCURRENCY_USED_KEY_PREFIX,
-    ConcurrencyCount,
+    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
+    ConcurrencyUsed,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1965,11 +1965,11 @@ class AgentRegistry:
                 await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        async def _recalc() -> Mapping[AccessKey, ConcurrencyCount]:
+        async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
-            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyCount] = {}
+            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
 
             async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
@@ -2002,15 +2002,15 @@ class AgentRegistry:
                         if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             access_key = cast(AccessKey, session_row.access_key)
                             if access_key not in access_key_to_concurrency_used:
-                                access_key_to_concurrency_used[access_key] = ConcurrencyCount(
+                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
                                     access_key
                                 )
                             if kernel.role in PRIVATE_KERNEL_ROLES:
-                                access_key_to_concurrency_used[
-                                    access_key
-                                ].sftp_concurrency_used.add(session_row.id)
+                                access_key_to_concurrency_used[access_key].system_session_ids.add(
+                                    session_row.id
+                                )
                             else:
-                                access_key_to_concurrency_used[access_key].concurrency_used.add(
+                                access_key_to_concurrency_used[access_key].compute_session_ids.add(
                                     session_row.id
                                 )
 
@@ -2050,36 +2050,36 @@ class AgentRegistry:
         async def _update(r: Redis):
             updates: dict[str, int] = {}
             for concurrency in access_key_to_concurrency_used.values():
-                updates |= concurrency.to_map()
+                updates |= concurrency.to_cnt_map()
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
-            keys = await r.keys(f"{CONCURRENCY_USED_KEY_PREFIX}*")
+            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
                     _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(CONCURRENCY_USED_KEY_PREFIX, "")
+                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
                 concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
-                    len(concurrent_sessions.concurrency_used)
+                    len(concurrent_sessions.compute_session_ids)
                     if concurrent_sessions is not None
                     else 0
                 )
                 updates[_stat_key] = usage
-            keys = await r.keys(f"{SFTP_CONCURRENCY_USED_KEY_PREFIX}*")
+            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
                     _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SFTP_CONCURRENCY_USED_KEY_PREFIX, "")
+                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
                 concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
-                    len(concurrent_sessions.sftp_concurrency_used)
+                    len(concurrent_sessions.system_concurrency_used_key)
                     if concurrent_sessions is not None
                     else 0
                 )
