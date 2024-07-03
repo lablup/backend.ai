@@ -524,7 +524,7 @@ class ConcurrencyCount:
     def sftp_concurrency_used_key(self) -> str:
         return f"{SFTP_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
 
-    def to_concurrency_map(self) -> Mapping[str, int]:
+    def to_map(self) -> Mapping[str, int]:
         return {
             self.concurrency_used_key: len(self.concurrency_used),
             self.sftp_concurrency_used_key: len(self.sftp_concurrency_used),

@@ -2044,13 +2044,13 @@ class AgentRegistry:
                     await db_sess.execute(query)
             return access_key_to_concurrency_used
 
-        access_key_to_concurrency = await execute_with_retry(_recalc)
+        access_key_to_concurrency_used = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
         async def _update(r: Redis):
             updates: dict[str, int] = {}
-            for concurrency in access_key_to_concurrency.values():
-                updates |= concurrency.to_concurrency_map()
+            for concurrency in access_key_to_concurrency_used.values():
+                updates |= concurrency.to_map()
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2063,10 +2063,10 @@ class AgentRegistry:
                 else:
                     _stat_key = cast(str, stat_key)
                 ak = _stat_key.replace(CONCURRENCY_USED_KEY_PREFIX, "")
-                session_concurrency = access_key_to_concurrency.get(AccessKey(ak))
+                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
-                    len(session_concurrency.concurrency_used)
-                    if session_concurrency is not None
+                    len(concurrent_sessions.concurrency_used)
+                    if concurrent_sessions is not None
                     else 0
                 )
                 updates[_stat_key] = usage
@@ -2077,10 +2077,10 @@ class AgentRegistry:
                 else:
                     _stat_key = cast(str, stat_key)
                 ak = _stat_key.replace(SFTP_CONCURRENCY_USED_KEY_PREFIX, "")
-                session_concurrency = access_key_to_concurrency.get(AccessKey(ak))
+                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
                 usage = (
-                    len(session_concurrency.sftp_concurrency_used)
-                    if session_concurrency is not None
+                    len(concurrent_sessions.sftp_concurrency_used)
+                    if concurrent_sessions is not None
                     else 0
                 )
                 updates[_stat_key] = usage
@@ -2089,7 +2089,7 @@ class AgentRegistry:
 
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or not access_key_to_concurrency
+        _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
