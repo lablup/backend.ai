@@ -1,7 +1,7 @@
 """add plugin_data column to various tables
 
 Revision ID: debf782b4823
-Revises: f56a82d0ac9f
+Revises: fdb2dcdb8811
 Create Date: 2024-06-10 07:03:55.203832
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "debf782b4823"
-down_revision = "f56a82d0ac9f"
+down_revision = "fdb2dcdb8811"
 branch_labels = None
 depends_on = None
 
