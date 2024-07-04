@@ -576,6 +576,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
+            "domain_name": domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
@@ -2809,6 +2810,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            domain_name,
             target_quota_scope_id,
             params["target_name"],
             target_folder_host,

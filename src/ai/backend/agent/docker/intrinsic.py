@@ -90,12 +90,13 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         )
         return None
     else:
+        entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
         if isinstance(ret, list):
             if not ret:
                 # The API may return an empty result upon container termination.
                 return None
-            ret = ret[0]
+            entry = ret[0]
         # The API may return an invalid or empty result upon container termination.
         if ret is None or not isinstance(ret, dict):
             log.warning(
@@ -104,9 +105,9 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
                 ret,
             )
             return None
-        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
+        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
-        return ret
+        return entry
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -578,6 +579,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
