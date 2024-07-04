@@ -5,9 +5,11 @@ import enum
 import importlib.resources
 import json
 import os
+import random
 import re
 import secrets
 import shutil
+import tempfile
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
@@ -61,6 +63,12 @@ from .types import (
 from .widgets import SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+PASSWD_POOL = (
+    [chr(x) for x in range(ord("a"), ord("z") + 1)]
+    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
+    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
+    + ["*$./"]
+)
 
 
 class PostGuide(enum.Enum):
@@ -104,6 +112,9 @@ class Context(metaclass=ABCMeta):
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
+
+    def generate_passphrase(self, len=16) -> str:
+        return "".join(random.sample(PASSWD_POOL, len))
 
     @staticmethod
     @contextmanager
@@ -549,8 +560,27 @@ class Context(metaclass=ABCMeta):
             data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
             data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
             data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
+            data["wsproxy"]["jwt_encrypt_key"] = service.wsproxy_jwt_key  # type: ignore
+            data["wsproxy"]["permit_hash_key"] = service.wsproxy_hash_key  # type: ignore
+            data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
+                                "wsproxy_api_token": service.wsproxy_api_token,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -809,6 +839,9 @@ class DevContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -898,6 +931,9 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
