@@ -1064,6 +1064,9 @@ class PurgeUser(graphene.Mutation):
                             await cls.delete_vfolders(db_session.bind, user_uuid)
                             await db_session.execute(delete_query)
                         else:
+                            # TODO: Show an explicit error that represents failure of vfolder deletion
+                            # Option 1: Remove the foreign key constraint betweeen users and vfolders and delete the user record even though vfolder deletion fails.
+                            # Option 2: Do not delete the user record.
                             log.info(
                                 "failed to delete some vfolders. delete them manually and try again."
                             )
