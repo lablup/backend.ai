@@ -59,7 +59,9 @@
             "driver": "static",
             "driver_opts": {},
             "scheduler": "fifo",
-            "scheduler_opts": {}
+            "scheduler_opts": {},
+            "wsproxy_addr": "http://127.0.0.1:5050",
+            "wsproxy_api_token": "v625xZLOgbMHhl0s49VuqQ"
         }
     ],
     "sgroups_for_domains": [
