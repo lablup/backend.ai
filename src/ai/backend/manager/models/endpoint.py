@@ -702,7 +702,7 @@ class RuntimeVariantInfo(graphene.ObjectType):
 
     @classmethod
     def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
-        return cls(name=enum.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
+        return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
 class Endpoint(graphene.ObjectType):
@@ -1107,7 +1107,7 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (_newval := props.runtime_variant) and _newval is not Undefined:
                     try:
-                        endpoint_row.runtime_variant = RuntimeVariant[_newval]
+                        endpoint_row.runtime_variant = RuntimeVariant(_newval)
                     except KeyError:
                         raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 

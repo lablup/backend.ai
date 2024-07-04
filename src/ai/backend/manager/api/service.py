@@ -1195,7 +1195,7 @@ class RuntimeInfoModel(BaseModel):
 async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
     return RuntimeInfoModel(
         runtimes=[
-            RuntimeInfo(name=v.name, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
+            RuntimeInfo(name=v.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
             for v in RuntimeVariant
         ]
     )
