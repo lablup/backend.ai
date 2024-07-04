@@ -19,7 +19,7 @@ advertised_proxy_port_range = [
 ]
 protocol = "http"
 
-# replace these values with randomly generated string
+# replace these values with your passphrase
 jwt_encrypt_key = "50M3G00DL00KING53CR3T"
 permit_hash_key = "50M3G00DL00KING53CR3T"
 api_secret = "50M3G00DL00KING53CR3T"
