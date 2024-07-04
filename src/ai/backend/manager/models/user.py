@@ -981,7 +981,7 @@ class PurgeUser(graphene.Mutation):
             delete_kernels_by_access_key,
             delete_sessions_by_access_key,
         )
-        from .vfolder import VFolderDeletionInfo, delete_vfolders_in_bgtask
+        from .vfolder import VFolderDeletionInfo, delete_vfolders
 
         graph_ctx: GraphQueryContext = info.context
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1052,8 +1052,8 @@ class PurgeUser(graphene.Mutation):
             # Run bgtask
             bgtask_manager = graph_ctx.background_task_manager
 
-            async def _delete_vfolders_task(reporter: ProgressReporter) -> None:
-                await delete_vfolders_in_bgtask(
+            async def _delete_vfolders_task(reporter: ProgressReporter | None) -> None:
+                await delete_vfolders(
                     [VFolderDeletionInfo(row.vfid, row.host) for row in alive_vfolders],
                     storage_manager=graph_ctx.storage_manager,
                     db=graph_ctx.db,
