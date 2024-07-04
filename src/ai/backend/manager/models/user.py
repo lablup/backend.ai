@@ -1400,7 +1400,7 @@ class UserNode(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", enum_field_getter(UserRole)),
-        "resource_policy": ("domain_name", None),
+        "resource_policy": ("resource_policy", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
