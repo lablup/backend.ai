@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
       "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
       "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein",
-      "MyEnvironments": "Meine Umgebungen"
+      "MyEnvironments": "Meine Umgebungen",
+      "ResourcePolicy": "Ressourcenpolitik"
     },
     "YouAreOffline": "Du bist jetzt offline",
     "YouAreOnline": "Sie sind jetzt online",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "SCHMEM",
       "GPUSlot": "Slot",
       "Architecture": "Architektur",
-      "ModelStorageToMount": "Modellspeicher zu montieren",
+      "ModelStorageToMount": "Modellspeicher zum Montieren",
       "MinMemory": "Die minimale Speicherkapazität für die aktuell ausgewählte Laufzeitumgebung beträgt {{size}}iB.",
       "AIAccelerator": "KI-Beschleuniger",
       "ModelStorage": "Modell Lagerung",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
       "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
       "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
-      "EnqueueComputeSessionWarning": "Wenn Sie einen größeren Wert als die derzeit verfügbaren Ressourcen festlegen, wird die Sitzungserstellung in der Warteschlange verzögert, bis sie verfügbar wird.",
+      "EnqueueComputeSessionWarning": "Unzureichende Ressourcen. \nDie Sitzung steht möglicherweise noch aus.",
       "SessionName": "Sitzungsname",
       "ResetFormConfirm": "Möchten Sie alle Ihre Einträge zurücksetzen?",
       "TemplateAndHistory": "Vorlagen",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
       "Template": "Sitzungsvorlage",
       "EnableAutomaticMiniumShmem": "Minimalen gemeinsamen Speicher festlegen",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Nur Ganzzahlen sind zulässig, wenn die Clustergröße nicht weniger als 2 beträgt.",
       "StartAfter": "Beginnen Sie nach:",
       "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht.",
@@ -272,7 +272,9 @@
       "BatchModeDesc": "Sie können Ihren Code mit mehreren Knoten und Clustern ausführen, um Ihre Idee zu skalieren",
       "AddEnvironmentVariable": "Umgebungsvariablen hinzufügen",
       "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
-      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben."
+      "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben.",
+      "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite.",
+      "ProxyDirectTCPNotSupported": "Eine direkte Proxy-TCP-Verbindung wird noch nicht unterstützt"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -306,7 +308,8 @@
       "Prepared": "Bereit",
       "NoExistingConnectionExample": "Keine Verbindung Zu kopierendes Beispiel.",
       "SSHConnectionExampleClipboardCopy": "SSH Connection Example wurde in die Zwischenablage kopiert.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "Die Verbindungs-URL ist ungültig."
     },
     "TensorboardPath": "Protokollverzeichnis für TensorBoard",
     "InputTensorboardPath": "Bitte geben Sie das Protokollverzeichnis ein, auf das sich TensorBoard bezieht. Beachten Sie, dass das Protokollverzeichnis nicht automatisch erstellt wird.",
@@ -398,11 +401,11 @@
     "Agents": "Agenten",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (Speicher)",
-    "ConvertSessionToImage": "Konvertieren Sie die Sitzung in ein Bild",
     "SessionName": "Sitzungsname",
     "SessionId": "Session-ID",
     "EnvironmentAndVersion": "Umgebung und Version",
-    "Tags": "Stichworte"
+    "Tags": "Stichworte",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -464,7 +467,9 @@
     "Allocation": "Zuteilung",
     "Utilization": "Inanspruchnahme",
     "DiskPerc": "Platte %",
-    "NoAgentToDisplay": "Keine Agenten zum Anzeigen"
+    "NoAgentToDisplay": "Keine Agenten zum Anzeigen",
+    "AutoRefreshEvery5s": "Automatische Aktualisierung alle 5 Sekunden",
+    "Agent": "Agent"
   },
   "general": {
     "cores": "Kerne",
@@ -486,7 +491,8 @@
     "Image": "Bild",
     "All": "Alle",
     "InProgress": "In Arbeit",
-    "Session": "Sitzung"
+    "Session": "Sitzung",
+    "General": "Allgemein"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -755,7 +761,8 @@
       "DeleteForeverDesc": "ACHTUNG: Ausgewählte Elemente werden für immer gelöscht und Sie können sie nicht wiederherstellen."
     },
     "ask": {
-      "DoYouWantToProceed": "Willst du fortfahren?"
+      "DoYouWantToProceed": "Willst du fortfahren?",
+      "DoYouWantToDeleteSomething": "Sind Sie sicher, dass Sie \"{{ Name }}\" löschen wollen?"
     },
     "title": {
       "LetsDouble-Check": "Lass uns das überprüfen",
@@ -816,7 +823,10 @@
     "NoChangeMade": "Es wurden keine Änderungen vorgenommen.",
     "Architecture": "Architektur",
     "NoImageToDisplay": "Keine Bilder zum Anzeigen",
-    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht."
+    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht.",
+    "DescImageResourceModified": "Ressourcenlimit erfolgreich geändert",
+    "DescImagePortsModified": "Bildports erfolgreich geändert",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Wenn Sie ein bereits installiertes Image ändern, müssen Sie das Image neu installieren.</p><p>Änderungen werden erst übernommen, wenn das Image erneut installiert wird.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -948,8 +958,23 @@
     "SuccessfullyDeleted": "Ressourcenrichtlinie erfolgreich gelöscht.",
     "PolicyNameEmpty": "Der Richtlinienname darf nicht leer sein.",
     "AboutToDeleteResourcePolicy": "Sie sind im Begriff, diese Ressourcenrichtlinie zu löschen:",
-    "MaxSessionLifeTime": "Lebensdauer der Sitzung (Sek.)",
-    "NoResourcePolicyToDisplay": "Keine Ressourcenrichtlinien zum Anzeigen"
+    "MaxSessionLifetime": "Lebensdauer der Sitzung (Sek.)",
+    "NoResourcePolicyToDisplay": "Keine Ressourcenrichtlinien zum Anzeigen",
+    "Keypair": "Schlüsselpaar",
+    "User": "Benutzer",
+    "Project": "Projekt",
+    "KeypairResourcePolicy": "Schlüsselpaar-Ressourcenrichtlinie",
+    "IdleTimeout": "Leerlauf-Timeout",
+    "CreateResourcePolicy": "Erstellen Sie eine Ressourcenrichtlinie",
+    "ResourcePolicyNameAlreadyExists": "Der Name der Ressourcenrichtlinie ist bereits vorhanden. \nBitte ändern Sie den hinzuzufügenden Namen.",
+    "UserResourcePolicy": "Benutzerressourcenrichtlinie",
+    "MaxVFolderCount": "Maximale Ordneranzahl",
+    "MaxSessionCountPerModelSession": "Maximale Sitzungsanzahl pro Modellsitzung",
+    "MaxQuotaScopeSize": "Maximale Kontingentumfangsgröße (GB)",
+    "MaxCustomizedImageCount": "Maximale Anzahl benutzerdefinierter Bilder",
+    "CreatedAt": "Hergestellt in",
+    "MaxFolderCount": "Maximale Ordneranzahl",
+    "ProjectResourcePolicy": "Projektressourcenrichtlinie"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1181,7 +1206,8 @@
     "ShowOnlyChanged": "Nur Änderungen anzeigen",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Verwenden Sie den Hyperaccel LPU-Beschleuniger.",
-    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin."
+    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin.",
+    "SearchPlaceholder": "Suche"
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
@@ -1461,14 +1487,32 @@
     "RoutingsCount": "Routings zählen",
     "Active/Total": "Aktiv/Gesamt",
     "Public": "Öffentlich",
-    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
     "Owner": "Eigentümer",
+    "Validate": "Bestätigen",
+    "Cancel": "Stornieren",
+    "ValidationInfo": "Validierungsinformationen",
+    "Processing": "Wird bearbeitet...",
+    "Success": "Erfolg",
+    "Error": "Fehler",
+    "SeeContainerLogs": "Siehe Containerprotokolle",
+    "TimeStamp": "Zeitstempel",
+    "Result": "Ergebnis",
+    "Finished": "Fertig",
     "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert.",
     "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen.",
     "FailedToUpdateService": "Der Dienst konnte nicht aktualisiert werden.",
     "ServiceCreated": "Der Modelldienst {{ name }} wurde erfolgreich erstellt.",
     "ServiceUpdated": "Der Modelldienst {{ name }} wurde erfolgreich aktualisiert.",
-    "ServiceTerminated": "Der Modelldienst {{ name }} wurde erfolgreich beendet."
+    "CannotValidateNow": "Der Dienst kann derzeit nicht validiert werden. \nBitte überprüfen Sie die Ressourcenzuweisung oder andere Konfigurationen.",
+    "Ready": "Bereit",
+    "ServiceTerminated": "Für den Modelldienst „{{ name }}“ wurde eine Anforderung zum Herunterfahren gesendet.",
+    "ModelMountDestination": "Mount-Ziel für Modellordner",
+    "AdditionalMounts": "Zusätzliche Halterungen",
+    "ModelDefinitionPath": "Pfad der Modelldefinitionsdatei",
+    "NoExtraMounts": "Keine zusätzlichen Halterungen",
+    "SyncRoutes": "Routen synchronisieren",
+    "SyncRoutesFailed": "Die Anfrage zur Routensynchronisierung ist fehlgeschlagen.",
+    "SyncRoutesRequested": "Routensynchronisierung wurde angefordert."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1562,7 +1606,20 @@
     "SelectColumnToDisplay": "Wählen Sie die anzuzeigenden Spalten aus",
     "SearchTableColumn": "Tabellenspalten durchsuchen"
   },
-  "setting": {
-    "SearchPlaceholder": "Geben Sie einen Suchbegriff ein"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Fehler bei der Validierung des Eingabefelds",
+      "ValidationErrorText": "Wenn Sie in einem Pflichtfeld keinen Wert eingeben oder einen ungültigen Wert eingeben, wird in diesem Feld eine Fehlermeldung angezeigt.",
+      "FixErrorAndTryAgainText": "Wenn ein Fehlerfeld vorhanden ist, ist die Schaltfläche „Sitzung starten“ deaktiviert. \nBitte beheben Sie den Fehler und versuchen Sie es erneut.",
+      "FixErrorFieldbyModifyButton": "Für dieses Fehlerfeld können Sie direkt auf die Schaltfläche „Bearbeiten“ in der oberen rechten Ecke gehen, um es zu bearbeiten."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopieren",
+    "Copied": "Kopiert"
+  },
+  "propertyFilter": {
+    "placeHolder": "Suche",
+    "ResetFilter": "Filter zurücksetzen"
   }
 }

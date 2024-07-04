@@ -207,7 +207,9 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
+from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
@@ -222,6 +224,7 @@ from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
+from .pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -269,8 +272,18 @@ manager_local_config_iv = (
             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("distributed-lock", default="pg_advisory"): t.Enum(
-                "filelock", "pg_advisory", "redlock", "etcd"
+                "filelock",
+                "pg_advisory",
+                "redlock",
+                "etcd",
+                "etcetra",
             ),
+            t.Key(
+                "pg-advisory-config", default=PgAdvisoryLock.default_config
+            ): PgAdvisoryLock.config_iv,
+            t.Key("filelock-config", default=FileLock.default_config): FileLock.config_iv,
+            t.Key("redlock-config", default=RedisLock.default_config): RedisLock.config_iv,
+            t.Key("etcdlock-config", default=EtcdLock.default_config): EtcdLock.config_iv,
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
                 allow_nonexisting=True,
@@ -289,6 +302,7 @@ manager_local_config_iv = (
                 1:65535
             ],
             t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
+            t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
         }).allow_extra("*"),
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
             t.Key("ssl-verify", default=True): t.ToBool,
@@ -590,6 +604,9 @@ class SharedConfig(AbstractConfig):
             # TODO: provide a way to specify other scope prefixes
         }
         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+        self.etcetra_etcd = EtcetraAsyncEtcd(
+            etcd_addr, namespace, scope_prefix_map, credentials=credentials
+        )
 
     async def close(self) -> None:
         await self.etcd.close()

@@ -45,6 +45,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -400,11 +401,17 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
+        event_dispatcher_cls = ExperimentalEventDispatcher
+    else:
+        event_dispatcher_cls = EventDispatcher
+
     root_ctx.event_producer = await EventProducer.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
     )
-    root_ctx.event_dispatcher = await EventDispatcher.new(
+    root_ctx.event_dispatcher = await event_dispatcher_cls.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
@@ -733,10 +740,13 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
         case "redlock":
             from ai.backend.common.lock import RedisLock
 
+            redlock_config = root_ctx.local_config["manager"]["redlock-config"]
+
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
                 root_ctx.redis_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+                lock_retry_interval=redlock_config["lock_retry_interval"],
             )
         case "etcd":
             from ai.backend.common.lock import EtcdLock
@@ -744,6 +754,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             return lambda lock_id, lifetime_hint: EtcdLock(
                 str(lock_id),
                 root_ctx.shared_config.etcd,
+                lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+            )
+        case "etcetra":
+            from ai.backend.common.lock import EtcetraLock
+
+            return lambda lock_id, lifetime_hint: EtcetraLock(
+                str(lock_id),
+                root_ctx.shared_config.etcetra_etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case other:

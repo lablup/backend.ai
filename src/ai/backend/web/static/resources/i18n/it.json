@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Inserisci la tua password",
       "InvalidBlankEmail": "Inserisci il tuo indirizzo email",
       "DisMatchUserEmail": "L'e-mail dell'utente non corrisponde",
-      "MyEnvironments": "I miei ambienti"
+      "MyEnvironments": "I miei ambienti",
+      "ResourcePolicy": "Politica delle risorse"
     },
     "YouAreOffline": "Ora sei offline",
     "YouAreOnline": "Ora sei online",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "Fessura",
       "Architecture": "Architettura",
-      "ModelStorageToMount": "Modello di magazzino da montare",
+      "ModelStorageToMount": "Conservazione del modello da montare",
       "MinMemory": "La capacità minima di memoria per l'ambiente di runtime attualmente selezionato è {{size}}iB.",
       "AIAccelerator": "Acceleratore AI",
       "ModelStorage": "Modello di stoccaggio",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-).",
       "PreOpenPortMaxCountLimit": "È possibile impostare fino a {{count}} porte pre-aperte.",
       "StartTimeMustBeInTheFuture": "L'ora di inizio deve essere successiva all'ora corrente.",
-      "EnqueueComputeSessionWarning": "Se lo imposti su un valore maggiore rispetto alle risorse attualmente disponibili, la creazione della sessione verrà ritardata nella coda finché non diventerà disponibile.",
+      "EnqueueComputeSessionWarning": "Risorse insufficienti. \nLa sessione potrebbe essere in sospeso.",
       "SessionName": "Nome della sessione",
       "ResetFormConfirm": "Vuoi reimpostare tutte le tue voci?",
       "TemplateAndHistory": "Modelli",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "Un nome di variabile già esistente.",
       "Template": "Modello di sessione",
       "EnableAutomaticMiniumShmem": "Impostare la memoria condivisa minima",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "È consentito solo un numero intero quando la dimensione del cluster non è inferiore a 2.",
       "StartAfter": "Inizia dopo:",
       "StartTimeDoesNotApply": "Se l'ora di inizio non è impostata, non si applica.",
@@ -272,7 +272,9 @@
       "BatchModeDesc": "È possibile eseguire il codice con più nodi e cluster per scalare la propria idea.",
       "AddEnvironmentVariable": "Aggiungere le variabili d'ambiente",
       "EnvironmentVariableValueRequired": "Inserire un valore.",
-      "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti."
+      "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti.",
+      "FailedToStartNewSession": "Creazione della sessione non riuscita. \nControlla la scheda \"FINITO\" nella pagina della sessione.",
+      "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -306,7 +308,8 @@
       "Prepared": "Preparato",
       "NoExistingConnectionExample": "Nessun esempio di connessione da copiare.",
       "SSHConnectionExampleClipboardCopy": "L'esempio di connessione SSH è stato copiato negli appunti.",
-      "App": "App"
+      "App": "App",
+      "ConnectUrlIsNotValid": "L'URL di connessione non è valido."
     },
     "TensorboardPath": "Directory di registro per TensorBoard",
     "InputTensorboardPath": "Si prega di inserire la directory di registro a cui farà riferimento TensorBoard. Si noti che la directory del registro non verrà creata automaticamente..",
@@ -402,7 +405,8 @@
     "SessionName": "Nome della sessione",
     "SessionId": "ID sessione",
     "EnvironmentAndVersion": "Ambiente e versione",
-    "Tags": "Tag"
+    "Tags": "Tag",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Annulla",
@@ -464,7 +468,9 @@
     "Allocation": "Assegnazione",
     "Utilization": "Utilizzo",
     "DiskPerc": "Disco %",
-    "NoAgentToDisplay": "Nessun agente da visualizzare"
+    "NoAgentToDisplay": "Nessun agente da visualizzare",
+    "AutoRefreshEvery5s": "Aggiornamento automatico ogni 5 secondi",
+    "Agent": "Agente"
   },
   "general": {
     "cores": "core",
@@ -486,7 +492,8 @@
     "Image": "Immagine",
     "All": "Tutti",
     "InProgress": "In corso",
-    "Session": "Sessione"
+    "Session": "Sessione",
+    "General": "Generale"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -755,7 +762,8 @@
       "DeleteForeverDesc": "ATTENZIONE: gli elementi selezionati verranno eliminati per sempre e non potrai ripristinarli."
     },
     "ask": {
-      "DoYouWantToProceed": "Vuoi procedere?"
+      "DoYouWantToProceed": "Vuoi procedere?",
+      "DoYouWantToDeleteSomething": "Si è sicuri di voler eliminare \"{{ nome }}\"?"
     },
     "title": {
       "LetsDouble-Check": "Ricontrolliamo",
@@ -816,7 +824,10 @@
     "NoChangeMade": "Non sono state apportate modifiche",
     "Architecture": "Architettura",
     "NoImageToDisplay": "Nessuna immagine da visualizzare",
-    "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo."
+    "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo.",
+    "DescImageResourceModified": "Limite delle risorse modificato con successo",
+    "DescImagePortsModified": "Porte immagine modificate con successo",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -948,8 +959,22 @@
     "SuccessfullyDeleted": "Criterio delle risorse eliminato con successo.",
     "PolicyNameEmpty": "Il nome del criterio non deve essere vuoto.",
     "AboutToDeleteResourcePolicy": "Stai per eliminare questa policy sulle risorse:",
-    "MaxSessionLifeTime": "Durata della sessione (sec.)",
-    "NoResourcePolicyToDisplay": "Nessuna politica delle risorse da visualizzare"
+    "MaxSessionLifetime": "Durata della sessione (sec.)",
+    "NoResourcePolicyToDisplay": "Nessuna politica delle risorse da visualizzare",
+    "Keypair": "Coppia di chiavi",
+    "User": "Utente",
+    "Project": "Progetto",
+    "KeypairResourcePolicy": "Politica delle risorse per la coppia di chiavi",
+    "IdleTimeout": "Timeout di inattività",
+    "CreateResourcePolicy": "Creare una politica delle risorse",
+    "ResourcePolicyNameAlreadyExists": "Il nome della policy delle risorse esiste già. \nSi prega di modificare il nome da aggiungere.",
+    "UserResourcePolicy": "Politica sulle risorse utente",
+    "MaxVFolderCount": "Conteggio massimo cartelle",
+    "MaxSessionCountPerModelSession": "Conteggio massimo delle sessioni per sessione del modello",
+    "MaxQuotaScopeSize": "Dimensione massima ambito quota (GB)",
+    "MaxCustomizedImageCount": "Conteggio massimo di immagini personalizzate",
+    "CreatedAt": "Creato a",
+    "MaxFolderCount": "Conteggio massimo cartelle"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1126,7 +1151,7 @@
     "Scaling": "Ridimensionamento",
     "AllowAgentSideRegistration": "Consenti registrazione lato agente",
     "DescAllowAgentSideRegistration": "Consenti all'agente di registrarsi al gestore. <br/> Utilizzare solo se il cluster Backend.AI è gestito in una posizione sicura.",
-    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di backend.AI.",
+    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Disabilitato perché il sistema utilizza il plug-in Fractional GPU",
     "ROCMGPUsupport": "Supporto GPU ROCm",
     "DescROCMGPUsupport": "Supporto per GPU AMD ROCm. <br/> Richiede il plug-in ROCm Backend.AI.",
@@ -1181,7 +1206,8 @@
     "ShowOnlyChanged": "Visualizza solo modifiche",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilizzare l'acceleratore Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU."
+    "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Ricerca"
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1461,14 +1487,32 @@
     "RoutingsCount": "Conteggio delle rotte",
     "Active/Total": "Attivo/Totale",
     "Public": "Pubblico",
-    "YouAreAboutToTerminate": "State per terminare",
     "Owner": "Proprietario",
+    "Processing": "In lavorazione...",
+    "Success": "Successo",
+    "Error": "Errore",
+    "SeeContainerLogs": "Consulta Log del contenitore",
+    "TimeStamp": "Timestamp",
+    "Result": "Risultato",
+    "Finished": "Finito",
     "ServiceDelegatedFrom": "Il servizio modello è creato da {{ createdUser }}, ma la proprietà della sessione sarà delegata a {{ sessionOwner }}.",
     "FailedToTerminateService": "La richiesta di terminare il servizio è fallita.",
     "FailedToUpdateService": "Impossibile aggiornare il servizio.",
     "ServiceCreated": "Il servizio modello {{ name }} è stato creato correttamente.",
     "ServiceUpdated": "Il servizio modello {{ name }} è stato aggiornato correttamente.",
-    "ServiceTerminated": "Il servizio modello {{ name }} è stato terminato correttamente."
+    "CannotValidateNow": "Impossibile convalidare il servizio adesso. \nControlla l'allocazione delle risorse o altre configurazioni.",
+    "Ready": "Pronto",
+    "ValidationInfo": "Informazioni sulla convalida",
+    "Validate": "Convalidare",
+    "ServiceTerminated": "È stata inviata una richiesta di arresto per il servizio modello '{{ name }}'.",
+    "ModelMountDestination": "Destinazione di montaggio per la cartella del modello",
+    "AdditionalMounts": "Supporti aggiuntivi",
+    "ModelDefinitionPath": "Percorso del file di definizione del modello",
+    "NoExtraMounts": "Nessun supporto aggiuntivo",
+    "SyncRoutes": "Sincronizzazione dei percorsi",
+    "SyncRoutesFailed": "La richiesta di sincronizzazione del percorso non è riuscita.",
+    "SyncRoutesSuccess": "La richiesta di sincronizzazione del percorso è andata a buon fine.",
+    "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1562,7 +1606,20 @@
     "SelectColumnToDisplay": "Seleziona le colonne da visualizzare",
     "SearchTableColumn": "Cerca colonne della tabella"
   },
-  "setting": {
-    "SearchPlaceholder": "Inserisci il termine di ricerca"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Errori di convalida del campo di input",
+      "ValidationErrorText": "Se non inserisci un valore in un campo obbligatorio o inserisci un valore non valido, in quel campo viene visualizzato un messaggio di errore.",
+      "FixErrorAndTryAgainText": "Se è presente un campo di errore, il pulsante Avvia sessione è disabilitato. \nCorreggi l'errore e riprova.",
+      "FixErrorFieldbyModifyButton": "Per quel campo di errore, puoi andare direttamente al pulsante Modifica nell'angolo in alto a destra per modificarlo."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "copia",
+    "Copied": "Copiato"
+  },
+  "propertyFilter": {
+    "placeHolder": "Ricerca",
+    "ResetFilter": "Reimposta filtro"
   }
 }

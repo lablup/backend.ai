@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "Nhập mật khẩu của bạn",
       "InvalidBlankEmail": "Nhập email của bạn",
       "DisMatchUserEmail": "E-mail của người dùng không khớp",
-      "MyEnvironments": "Môi trường của tôi"
+      "MyEnvironments": "Môi trường của tôi",
+      "ResourcePolicy": "Chính sách tài nguyên"
     },
     "YouAreOffline": "Bạn hiện đang ngoại tuyến",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
@@ -244,7 +245,7 @@
       "Enable": "Cho phép",
       "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
       "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
-      "EnqueueComputeSessionWarning": "Nếu bạn đặt nó lớn hơn tài nguyên hiện có, việc tạo phiên sẽ bị trì hoãn trong hàng đợi cho đến khi tài nguyên đó có sẵn.",
+      "EnqueueComputeSessionWarning": "Nguồn lực không đủ. \nPhiên có thể đang chờ xử lý.",
       "SessionName": "Tên phiên",
       "ResetFormConfirm": "Bạn có muốn đặt lại tất cả các mục nhập của mình không?",
       "TemplateAndHistory": "Mẫu",
@@ -258,7 +259,6 @@
       "Template": "Mẫu phiên",
       "EnableAutomaticMiniumShmem": "Đặt bộ nhớ chia sẻ tối thiểu",
       "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Chỉ cho phép số nguyên khi kích thước cụm không nhỏ hơn 2.",
       "StartAfter": "Bắt đầu sau:",
       "StartTimeDoesNotApply": "Nếu thời gian bắt đầu không được đặt, nó sẽ không được áp dụng.",
@@ -272,7 +272,9 @@
       "BatchModeDesc": "Bạn có thể chạy mã của mình với nhiều nút",
       "AddEnvironmentVariable": "Thêm biến môi trường",
       "EnvironmentVariableValueRequired": "Vui lòng nhập một giá trị.",
-      "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn."
+      "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn.",
+      "FailedToStartNewSession": "Tạo phiên không thành công. \nVui lòng kiểm tra tab 'Đã kết thúc' trên trang phiên.",
+      "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -306,7 +308,8 @@
       "Prepared": "Chuẩn bị",
       "NoExistingConnectionExample": "Không có ví dụ kết nối nào được sao chép.",
       "SSHConnectionExampleClipboardCopy": "Ví dụ về kết nối SSH đã được sao chép vào bảng nhớ tạm.",
-      "App": "Ứng dụng"
+      "App": "Ứng dụng",
+      "ConnectUrlIsNotValid": "URL kết nối không hợp lệ."
     },
     "TensorboardPath": "Thư mục nhật ký cho TensorBoard",
     "InputTensorboardPath": "Vui lòng nhập thư mục nhật ký mà TensorBoard sẽ tham chiếu đến. Lưu ý rằng thư mục nhật ký sẽ không được tạo tự động ..",
@@ -398,11 +401,11 @@
     "Agents": "Đại lý",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (bộ nhớ)",
-    "ConvertSessionToImage": "Chuyển đổi phiên thành hình ảnh",
     "SessionName": "Tên phiên",
     "SessionId": "Id phiên",
     "EnvironmentAndVersion": "Môi trường và phiên bản",
-    "Tags": "Thẻ"
+    "Tags": "Thẻ",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -464,7 +467,9 @@
     "Allocation": "Phân bổ",
     "Utilization": "Sử dụng",
     "DiskPerc": "Đĩa %",
-    "NoAgentToDisplay": "Không có đại lý để hiển thị"
+    "NoAgentToDisplay": "Không có đại lý để hiển thị",
+    "AutoRefreshEvery5s": "Tự động làm mới sau mỗi 5 giây",
+    "Agent": "Đại lý"
   },
   "general": {
     "cores": "lõi",
@@ -486,7 +491,8 @@
     "Image": "Hình ảnh",
     "All": "toàn bộ",
     "InProgress": "Đang tiến hành",
-    "Session": "Phiên họp"
+    "Session": "Phiên họp",
+    "General": "Tổng quan"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -755,7 +761,8 @@
       "DeleteForeverDesc": "CẢNH BÁO: các mục đã chọn sẽ bị xóa vĩnh viễn và bạn sẽ không thể khôi phục chúng."
     },
     "ask": {
-      "DoYouWantToProceed": "Bạn có muốn tiếp tục?"
+      "DoYouWantToProceed": "Bạn có muốn tiếp tục?",
+      "DoYouWantToDeleteSomething": "Bạn có chắc chắn muốn xóa \"{{ name }}\" không?"
     },
     "title": {
       "LetsDouble-Check": "Hãy kiểm tra kỹ",
@@ -816,7 +823,10 @@
     "NoChangeMade": "Không có thay đổi nào được thực hiện",
     "Architecture": "Ngành kiến ​​​​trúc",
     "NoImageToDisplay": "Không có hình ảnh để hiển thị",
-    "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công."
+    "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công.",
+    "DescImageResourceModified": "Đã sửa đổi giới hạn tài nguyên thành công",
+    "DescImagePortsModified": "Cổng hình ảnh được sửa đổi thành công",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -948,8 +958,23 @@
     "SuccessfullyDeleted": "Chính sách tài nguyên đã được xóa thành công.",
     "PolicyNameEmpty": "Tên chính sách không được để trống.",
     "AboutToDeleteResourcePolicy": "Bạn sắp xóa chính sách tài nguyên này:",
-    "MaxSessionLifeTime": "Thời gian tồn tại của phiên (giây)",
-    "NoResourcePolicyToDisplay": "Không có chính sách tài nguyên nào để hiển thị"
+    "MaxSessionLifetime": "Thời gian tồn tại của phiên (giây)",
+    "NoResourcePolicyToDisplay": "Không có chính sách tài nguyên nào để hiển thị",
+    "Keypair": "Cặp khóa",
+    "User": "Người dùng",
+    "Project": "Dự án",
+    "KeypairResourcePolicy": "Chính sách tài nguyên cặp khóa",
+    "IdleTimeout": "Hết thời gian chờ",
+    "CreateResourcePolicy": "Tạo chính sách tài nguyên",
+    "ResourcePolicyNameAlreadyExists": "Tên chính sách tài nguyên đã tồn tại. \nVui lòng thay đổi tên để thêm.",
+    "UserResourcePolicy": "Chính sách tài nguyên người dùng",
+    "MaxVFolderCount": "Số lượng thư mục tối đa",
+    "MaxSessionCountPerModelSession": "Số phiên tối đa trên mỗi phiên mô hình",
+    "MaxQuotaScopeSize": "Kích thước phạm vi hạn ngạch tối đa (GB)",
+    "MaxCustomizedImageCount": "Số lượng hình ảnh tùy chỉnh tối đa",
+    "CreatedAt": "Được tạo tại",
+    "MaxFolderCount": "Số lượng thư mục tối đa",
+    "ProjectResourcePolicy": "Chính sách tài nguyên dự án"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1181,7 +1206,8 @@
     "ShowOnlyChanged": "Chỉ hiển thị các thay đổi",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
-    "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel."
+    "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel.",
+    "SearchPlaceholder": "Tìm kiếm"
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1502,14 +1528,32 @@
     "RoutingsCount": "Số lượng định tuyến",
     "Active/Total": "Đang hoạt động/Tổng cộng",
     "Public": "Công cộng",
-    "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
     "Owner": "Người sở hữu",
+    "Validate": "Xác thực",
+    "Cancel": "Hủy bỏ",
+    "ValidationInfo": "Thông tin xác thực",
+    "Processing": "Xử lý...",
+    "Success": "Thành công",
+    "Error": "Lỗi",
+    "SeeContainerLogs": "Xem nhật ký vùng chứa",
+    "TimeStamp": "Dấu thời gian",
+    "Result": "Kết quả",
+    "Finished": "Hoàn thành",
     "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}",
     "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công.",
     "FailedToUpdateService": "Không thể cập nhật dịch vụ.",
     "ServiceCreated": "Dịch vụ mẫu {{ name }} đã được tạo thành công.",
     "ServiceUpdated": "Dịch vụ mẫu {{ name }} đã được cập nhật thành công.",
-    "ServiceTerminated": "Dịch vụ mẫu {{ name }} đã được chấm dứt thành công."
+    "CannotValidateNow": "Không thể xác nhận dịch vụ bây giờ. \nVui lòng kiểm tra phân bổ tài nguyên hoặc các cấu hình khác.",
+    "Ready": "Sẵn sàng",
+    "ServiceTerminated": "Yêu cầu tắt máy đã được gửi cho dịch vụ mẫu '{{ name }}'.",
+    "ModelMountDestination": "Mount đích cho thư mục mẫu",
+    "AdditionalMounts": "Gắn kết bổ sung",
+    "ModelDefinitionPath": "Đường dẫn tệp định nghĩa mô hình",
+    "NoExtraMounts": "Không có gắn kết bổ sung",
+    "SyncRoutes": "Đồng bộ hóa tuyến đường",
+    "SyncRoutesFailed": "Yêu cầu đồng bộ hóa tuyến đường không thành công.",
+    "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1562,7 +1606,20 @@
     "SelectColumnToDisplay": "Chọn các cột để hiển thị",
     "SearchTableColumn": "Tìm kiếm các cột trong bảng"
   },
-  "setting": {
-    "SearchPlaceholder": "Nhập cụm từ tìm kiếm"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Lỗi xác thực trường đầu vào",
+      "ValidationErrorText": "Nếu bạn không nhập giá trị vào trường bắt buộc hoặc nhập giá trị không hợp lệ, thông báo lỗi sẽ hiển thị trong trường đó.",
+      "FixErrorAndTryAgainText": "Nếu có trường lỗi, nút Khởi chạy phiên sẽ bị tắt. \nVui lòng sửa lỗi và thử lại.",
+      "FixErrorFieldbyModifyButton": "Đối với trường lỗi đó, bạn có thể vào thẳng nút Chỉnh sửa ở góc trên cùng bên phải để chỉnh sửa."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Sao chép",
+    "Copied": "Đã sao chép"
+  },
+  "propertyFilter": {
+    "placeHolder": "Tìm kiếm",
+    "ResetFilter": "Đặt lại bộ lọc"
   }
 }

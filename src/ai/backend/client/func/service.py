@@ -4,6 +4,7 @@ from uuid import UUID
 
 from faker import Faker
 
+from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import service_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
@@ -90,6 +91,9 @@ class Service(BaseFunction):
         model_id_or_name: str,
         initial_session_count: int,
         *,
+        extra_mounts: Sequence[str] = [],
+        extra_mount_map: Mapping[str, str] = {},
+        extra_mount_options: Mapping[str, Mapping[str, str]] = {},
         service_name: Optional[str] = None,
         model_version: Optional[str] = None,
         dependencies: Optional[Sequence[str]] = None,
@@ -107,6 +111,7 @@ class Service(BaseFunction):
         architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
+        model_definition_path: Optional[str] = None,
         expose_to_public=False,
     ) -> Any:
         """
@@ -134,6 +139,7 @@ class Service(BaseFunction):
         :param tag: An optional string to annotate extra information.
         :param owner: An optional access key that owns the created session. (Only
             available to administrators)
+        :param model_definition_path: Relative path to model definition file. Defaults to `model-definition.yaml`.
         :param expose_to_public: Visibility of API Endpoint which serves inference workload.
             If set to true, no authentication will be required to access the endpoint.
 
@@ -143,6 +149,44 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"
 
+        if extra_mounts:
+            vfolder_id_to_name: dict[UUID, str] = {}
+            vfolder_name_to_id: dict[str, UUID] = {}
+
+            rqst = Request("GET", "/folders")
+            async with rqst.fetch() as resp:
+                body = await resp.json()
+                for folder_info in body:
+                    vfolder_id_to_name[UUID(folder_info["id"])] = folder_info["name"]
+                    vfolder_name_to_id[folder_info["name"]] = UUID(folder_info["id"])
+
+            extra_mount_body = {}
+
+            for mount in extra_mounts:
+                try:
+                    vfolder_id = UUID(mount)
+                    if vfolder_id not in vfolder_id_to_name:
+                        raise BackendClientError(f"VFolder (id: {vfolder_id}) not found")
+                except ValueError:
+                    if mount not in vfolder_name_to_id:
+                        raise BackendClientError(f"VFolder (name: {vfolder_id}) not found")
+                    vfolder_id = vfolder_name_to_id[mount]
+                extra_mount_body[str(vfolder_id)] = {
+                    "mount_destination": extra_mount_map.get(mount),
+                    "type": extra_mount_options.get(mount, {}).get("type"),
+                }
+        model_config = {
+            "model": model_id_or_name,
+            "model_mount_destination": model_mount_destination,
+            "extra_mounts": extra_mount_body,
+            "environ": envs,
+            "scaling_group": scaling_group,
+            "resources": resources,
+            "resource_opts": resource_opts,
+            "model_definition_path": model_definition_path,
+        }
+        if model_version:
+            model_config["model_version"] = model_version
         rqst = Request("POST", "/services")
         rqst.set_json({
             "name": service_name,
@@ -158,15 +202,7 @@ class Service(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "owner_access_key": owner_access_key,
             "open_to_public": expose_to_public,
-            "config": {
-                "model": model_id_or_name,
-                "model_version": model_version,
-                "model_mount_destination": model_mount_destination,
-                "environ": envs,
-                "scaling_group": scaling_group,
-                "resources": resources,
-                "resource_opts": resource_opts,
-            },
+            "config": model_config,
         })
         async with rqst.fetch() as resp:
             body = await resp.json()

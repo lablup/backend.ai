@@ -65,7 +65,8 @@
       "InvalidBlankPassword": "パスワードを入力してください",
       "InvalidBlankEmail": "メールアドレスを入力",
       "DisMatchUserEmail": "ユーザーの電子メールが一致しません",
-      "MyEnvironments": "私の環境"
+      "MyEnvironments": "私の環境",
+      "ResourcePolicy": "リソースポリシー"
     },
     "YouAreOffline": "あなたは今オフラインです",
     "YouAreOnline": "あなたは今オンラインです",
@@ -196,7 +197,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "スロット",
       "Architecture": "アーキテクチャ",
-      "ModelStorageToMount": "マウントするモデルのストレージフォルダ",
+      "ModelStorageToMount": "マウントするモデルストレージ",
       "MinMemory": "現在選択した実行環境の最小メモリ容量は{{size}}iBです。",
       "AIAccelerator": "AIアクセラレータ",
       "FailedToConnectCoordinator": "アプリ接続マネージャーの接続に失敗しました。ネットワーク接続とファイアウォールの状態を確認してください。",
@@ -245,7 +246,7 @@
       "FolderAliasInvalid": "英語の大文字と小文字、数字、アンダースコア（_）、スラッシュ（/）、ダッシュ（-）のみを入力できます。",
       "PreOpenPortMaxCountLimit": "count}}までプレオープンポートを設定できる。",
       "StartTimeMustBeInTheFuture": "開始時刻は現在時刻より後でなければならない。",
-      "EnqueueComputeSessionWarning": "現在利用可能なリソースよりも大きく設定すると、セッションの作成は利用可能になるまでキュー内で遅延します。",
+      "EnqueueComputeSessionWarning": "リソースが不十分です。\nセッションが保留中の可能性があります。",
       "SessionName": "セッション名",
       "ResetFormConfirm": "入力した内容をすべて初期化しますか？",
       "TemplateAndHistory": "テンプレート",
@@ -258,7 +259,6 @@
       "EnvironmentVariableDuplicateName": "既に存在する変数名です。",
       "Template": "セッションテンプレート",
       "EnableAutomaticMiniumShmem": "最小共有メモリの設定",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "クラスター サイズが 2 以上の場合は、整数のみが許可されます。",
       "StartAfter": "次の後に開始します:",
       "StartTimeDoesNotApply": "開始時間が設定されていない場合は適用されません。",
@@ -272,7 +272,9 @@
       "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
       "AddEnvironmentVariable": "環境変数の追加",
       "EnvironmentVariableValueRequired": "値を入力してください。",
-      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。"
+      "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。",
+      "FailedToStartNewSession": "セッションの作成に失敗しました。\nセッションページの「終了しました」タブをご確認ください。",
+      "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -306,7 +308,8 @@
       "Prepared": "準備",
       "NoExistingConnectionExample": "コピーする接続例がありません。",
       "SSHConnectionExampleClipboardCopy": "SSH接続例がクリップボードにコピーされました。",
-      "App": "アプリ"
+      "App": "アプリ",
+      "ConnectUrlIsNotValid": "接続 URL が無効です。"
     },
     "TensorboardPath": "TensorBoardのログディレクトリ",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",
@@ -398,11 +401,11 @@
     "Agents": "エージェント",
     "IPU": "IPU",
     "IPU(MEM)": "IPU(メモリ)",
-    "ConvertSessionToImage": "セッションをイメージに変換",
     "SessionName": "セッション名",
     "SessionId": "セッションID",
     "EnvironmentAndVersion": "環境とバージョン",
-    "Tags": "タグ"
+    "Tags": "タグ",
+    "fGPU": "fGPU"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -464,7 +467,9 @@
     "Allocation": "割り当て情報",
     "Utilization": "使用量",
     "DiskPerc": "ディスク %の",
-    "NoAgentToDisplay": "エージェント情報がありません。"
+    "NoAgentToDisplay": "エージェント情報がありません。",
+    "AutoRefreshEvery5s": "5秒ごとに自動更新",
+    "Agent": "代理店"
   },
   "general": {
     "cores": "コア",
@@ -486,7 +491,8 @@
     "Image": "画像",
     "All": "全体",
     "InProgress": "進行中",
-    "Session": "セッション"
+    "Session": "セッション",
+    "General": "一般"
   },
   "credential": {
     "Permission": "許可",
@@ -755,7 +761,8 @@
       "DeleteForeverDesc": "警告: 選択したアイテムは完全に削除され、復元することはできません。"
     },
     "ask": {
-      "DoYouWantToProceed": "続行しますか？"
+      "DoYouWantToProceed": "続行しますか？",
+      "DoYouWantToDeleteSomething": "本当に\"{{ name }}\"を削除しますか？"
     },
     "title": {
       "LetsDouble-Check": "再確認しましょう",
@@ -816,7 +823,10 @@
     "NoChangeMade": "変更された部分はありません。",
     "Architecture": "アーキテクチャ",
     "NoImageToDisplay": "画像情報がありません。",
-    "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。"
+    "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。",
+    "DescImageResourceModified": "リソース制限が正常に変更されました",
+    "DescImagePortsModified": "イメージポートが正常に変更されました",
+    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -948,8 +958,23 @@
     "SuccessfullyDeleted": "リソースポリシーが正常に削除されました。",
     "PolicyNameEmpty": "ポリシー名は空にしないでください。",
     "AboutToDeleteResourcePolicy": "このリソースポリシーを削除しようとしています。",
-    "MaxSessionLifeTime": "セッションの最大実行時間",
-    "NoResourcePolicyToDisplay": "リソースポリシー情報がありません。"
+    "MaxSessionLifetime": "セッションの最大実行時間",
+    "NoResourcePolicyToDisplay": "リソースポリシー情報がありません。",
+    "Keypair": "キーペア",
+    "User": "ユーザー",
+    "Project": "プロジェクト",
+    "KeypairResourcePolicy": "キーペアのリソースポリシー",
+    "IdleTimeout": "アイドルタイムアウト",
+    "CreateResourcePolicy": "リソースポリシーの作成",
+    "ResourcePolicyNameAlreadyExists": "リソースポリシー名はすでに存在します。\n追加する名前を変更してください。",
+    "UserResourcePolicy": "ユーザーリソースポリシー",
+    "MaxVFolderCount": "最大フォルダ数",
+    "MaxSessionCountPerModelSession": "モデルセッションごとの最大セッション数",
+    "MaxQuotaScopeSize": "最大クォータ スコープ サイズ (GB)",
+    "MaxCustomizedImageCount": "カスタマイズされた画像の最大数",
+    "CreatedAt": "作成日",
+    "MaxFolderCount": "最大フォルダ数",
+    "ProjectResourcePolicy": "プロジェクトリソースポリシー"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1181,7 +1206,8 @@
     "ShowOnlyChanged": "表示のみの変更",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
-    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。"
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。",
+    "SearchPlaceholder": "検索"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1460,15 +1486,33 @@
     "RoutingsCount": "ルーティング数",
     "Active/Total": "アクティブ/全体",
     "Public": "公開",
-    "YouAreAboutToTerminate": "以下のサービスを削除しようとします：",
     "Image": "イメージ",
     "Owner": "所有者",
+    "Validate": "検証",
+    "Cancel": "キャンセル",
+    "ValidationInfo": "検証情報",
+    "Processing": "処理...",
+    "Success": "成功",
+    "Error": "エラー",
+    "SeeContainerLogs": "コンテナログを参照",
+    "TimeStamp": "タイムスタンプ",
+    "Result": "結果",
+    "Finished": "終了した",
     "ServiceDelegatedFrom": "モデルサービスは{{ createdUser }}によって作成されますが、セッションの所有権は{{ sessionOwner }}に委譲されます。",
     "FailedToTerminateService": "サービス終了のリクエストに失敗しました。",
     "FailedToUpdateService": "サービスの更新に失敗しました。",
     "ServiceCreated": "モデル サービス {{ name }} が正常に作成されました。",
     "ServiceUpdated": "モデル サービス {{ name }} は正常に更新されました。",
-    "ServiceTerminated": "モデル サービス {{ name }} は正常に終了しました。"
+    "CannotValidateNow": "現在サービスを検証できません。\nリソース割り当てまたはその他の構成を確認してください。",
+    "Ready": "準備ができて",
+    "ServiceTerminated": "モデルサービス「{{name}}」の終了要求が送信されました。",
+    "ModelMountDestination": "モデルフォルダーのマウント先",
+    "AdditionalMounts": "追加のマウント",
+    "ModelDefinitionPath": "モデル定義ファイルのパス",
+    "NoExtraMounts": "余分なマウントはありません",
+    "SyncRoutes": "同期ルート",
+    "SyncRoutesFailed": "ルート同期要求に失敗しました。",
+    "SyncRoutesRequested": "ルート同期をリクエストしました。"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",
@@ -1562,7 +1606,20 @@
     "SelectColumnToDisplay": "表示する列を選択します",
     "SearchTableColumn": "テーブルの列を検索する"
   },
-  "setting": {
-    "SearchPlaceholder": "検索用語を入力してください"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "入力フィールド検証エラー",
+      "ValidationErrorText": "必須フィールドに値を入力しなかったり、無効な値を入力したりすると、そのフィールドにエラー メッセージが表示されます。",
+      "FixErrorAndTryAgainText": "エラーフィールドがある場合、「セッションの起動」ボタンは無効になります。\nエラーを修正して再試行してください。",
+      "FixErrorFieldbyModifyButton": "そのエラー フィールドについては、右上隅にある [編集] ボタンに直接移動して編集できます。"
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "コピー",
+    "Copied": "コピーされました"
+  },
+  "propertyFilter": {
+    "placeHolder": "検索",
+    "ResetFilter": "リセットフィルター"
   }
 }

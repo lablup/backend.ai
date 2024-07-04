@@ -38,6 +38,7 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
@@ -827,7 +828,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
@@ -873,6 +876,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
+
+                if self.internal_data.get("sudo_session_enabled", False):
+                    exec = await container.exec(
+                        [
+                            # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                            "sh",
+                            "-c",
+                            'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                        ],
+                        user="root",
+                    )
+                    shell_response = await exec.start(detach=True)
+                    if shell_response:
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"sudoers provision failed: {shell_response.decode()}",
+                        )
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
@@ -916,7 +936,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
@@ -1104,6 +1124,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return await scan_available_resources(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
+
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,

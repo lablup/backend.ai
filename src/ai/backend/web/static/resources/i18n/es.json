@@ -98,7 +98,9 @@
     "Starts": "Inicia",
     "Status": "Estado",
     "Terminated": "Terminado",
-    "Utilization": "Utilización"
+    "Utilization": "Utilización",
+    "AutoRefreshEvery5s": "Actualización automática cada 5 segundos",
+    "Agent": "Agente"
   },
   "button": {
     "Add": "Añadir",
@@ -397,7 +399,27 @@
   },
   "dialog": {
     "warning": {
-      "DeleteForeverDesc": "ADVERTENCIA: los elementos seleccionados se eliminarán para siempre y no podrás restaurarlos."
+      "DeleteForeverDesc": "ADVERTENCIA: los elementos seleccionados se eliminarán para siempre y no podrás restaurarlos.",
+      "CannotBeUndone": "ATENCIÓN: ¡esto no se puede deshacer!",
+      "LogDeletion": "¿Estás seguro de que quieres borrar todos los mensajes de registro?",
+      "Required": "Requerido",
+      "WillBeAppliedToNewSessions": "Esta actualización se aplicará a las nuevas sesiones."
+    },
+    "ErrorOccurred": "Se ha producido un error",
+    "error": {
+      "Error": "Error"
+    },
+    "ask": {
+      "DoYouWantToProceed": "¿Quieres continuar?",
+      "DoYouWantToDeleteSomething": "¿Estás seguro de que quieres borrar \"{{ name }}\"?"
+    },
+    "title": {
+      "LetsDouble-Check": "Doble comprobación",
+      "Notice": "Aviso",
+      "DeleteForever": "¿Borrar para siempre?"
+    },
+    "hide": {
+      "DonotShowThisAgain": "No vuelvas a mostrar esto."
     }
   },
   "eduapi": {
@@ -459,7 +481,10 @@
     "SuccessfullyModified": "Modificado con éxito",
     "TakesTime": ". Lleva tiempo, así que tómate un café.",
     "Version": "Versión",
-    "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente."
+    "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente.",
+    "DescImageResourceModified": "Límite de recursos modificado con éxito",
+    "DescImagePortsModified": "Puertos de imagen modificados exitosamente",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Si modifica una imagen que ya se ha instalado, deberá volver a instalarla.</p><p>Las modificaciones no se aplicarán hasta que se reinstale la imagen.\n\n</p>"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -485,7 +510,8 @@
     "Image": "Imagen",
     "All": "Todos",
     "InProgress": "En curso",
-    "Session": "Sesión"
+    "Session": "Sesión",
+    "General": "General"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -722,15 +748,33 @@
     "TokenGenerated": "Token generado",
     "TokenGenerationFailed": "Generación de token fallida. Por favor, inténtelo de nuevo.",
     "TrafficRatio": "Ratio de tráfico",
-    "YouAreAboutToTerminate": "Está a punto de terminar",
     "resources": "Recursos",
     "Owner": "Dueño",
+    "Validate": "Validar",
+    "Cancel": "Cancelar",
+    "ValidationInfo": "Información de validación",
+    "Processing": "Procesando...",
+    "Success": "Éxito",
+    "Error": "Error",
+    "SeeContainerLogs": "Ver registros de contenedores",
+    "TimeStamp": "Marca de tiempo",
+    "Result": "Resultado",
+    "Finished": "Finalizado",
     "ServiceDelegatedFrom": "El servicio modelo es creado por {{ createdUser }} pero la propiedad de la sesión será delegada a {{ sessionOwner }}",
     "FailedToTerminateService": "La solicitud para finalizar el servicio ha fallado.",
     "FailedToUpdateService": "No se pudo actualizar el servicio.",
     "ServiceCreated": "El servicio modelo {{ name }} se ha creado correctamente.",
     "ServiceUpdated": "El servicio de modelo {{ name }} se ha actualizado correctamente.",
-    "ServiceTerminated": "El servicio de modelo {{ name }} se ha finalizado correctamente."
+    "CannotValidateNow": "No se puede validar el servicio ahora. \nVerifique la asignación de recursos u otras configuraciones.",
+    "Ready": "Listo",
+    "ServiceTerminated": "Se envió una solicitud de cierre para el servicio modelo '{{ name }}'.",
+    "ModelMountDestination": "Destino de montaje para carpeta de modelo",
+    "AdditionalMounts": "Montajes adicionales",
+    "ModelDefinitionPath": "Ruta del archivo de definición del modelo",
+    "NoExtraMounts": "Sin soportes adicionales",
+    "SyncRoutes": "Rutas de sincronización",
+    "SyncRoutesFailed": "La solicitud de sincronización de ruta ha fallado.",
+    "SyncRoutesRequested": "Se ha solicitado sincronización de ruta."
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -860,7 +904,7 @@
     "ContainerPerSession": "Contenedor por sesión",
     "Folders": "Carpetas",
     "IdleTimeoutSec": "Tiempo de espera (seg.)",
-    "MaxSessionLifeTime": "Duración de la sesión (seg.)",
+    "MaxSessionLifetime": "Duración de la sesión (seg.)",
     "Name": "Nombre",
     "NoResourcePolicyToDisplay": "No hay políticas de recursos que mostrar",
     "PolicyName": "Nombre de la póliza",
@@ -873,7 +917,22 @@
     "SuccessfullyDeleted": "Política de recursos eliminada correctamente.",
     "SuccessfullyUpdated": "Política de recursos actualizada correctamente.",
     "Unlimited": "Sin límites",
-    "UpdateResourcePolicy": "Actualizar la política de recursos"
+    "UpdateResourcePolicy": "Actualizar la política de recursos",
+    "Keypair": "Par de claves",
+    "User": "Usuario",
+    "Project": "Proyecto",
+    "KeypairResourcePolicy": "Política de recursos de par de claves",
+    "IdleTimeout": "Tiempo de inactividad",
+    "CreateResourcePolicy": "Crear política de recursos",
+    "ResourcePolicyNameAlreadyExists": "El nombre de la política de recursos ya existe. \nCambie el nombre para agregarlo.",
+    "UserResourcePolicy": "Política de recursos del usuario",
+    "MaxVFolderCount": "Número máximo de carpetas",
+    "MaxSessionCountPerModelSession": "Recuento máximo de sesiones por sesión de modelo",
+    "MaxQuotaScopeSize": "Tamaño máximo del alcance de la cuota (GB)",
+    "MaxCustomizedImageCount": "Número máximo de imágenes personalizadas",
+    "CreatedAt": "Creado en",
+    "MaxFolderCount": "Número máximo de carpetas",
+    "ProjectResourcePolicy": "Política de recursos del proyecto"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -1011,7 +1070,8 @@
       "ConfirmAndRun": "Lo he comprobado y voy a empezar",
       "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
       "Prepared": "Preparado",
-      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles."
+      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles.",
+      "ConnectUrlIsNotValid": "La URL de conexión no es válida."
     },
     "core": "núcleo",
     "exportCSV": "exportar CSV",
@@ -1072,7 +1132,7 @@
       "Memory": "Memoria",
       "MinMemory": "La capacidad mínima de memoria para el entorno de ejecución seleccionado actualmente es de {{size}}iB.",
       "ModelStorage": "Almacenamiento de modelos",
-      "ModelStorageToMount": "Modelo de almacenamiento para montar",
+      "ModelStorageToMount": "Almacenamiento de modelos para montar",
       "MountedFolders": "Carpetas montadas",
       "MultiNode": "Nodo múltiple",
       "MustSpecifyVersion": "Debe especificar Entorno y Versión.",
@@ -1142,7 +1202,7 @@
       "Network": "Red",
       "Enable": "Permitir",
       "StartTimeMustBeInTheFuture": "La hora de inicio debe ser posterior a la hora actual.",
-      "EnqueueComputeSessionWarning": "Si lo configura en un valor mayor que los recursos disponibles actualmente, la creación de la sesión se retrasará en la cola hasta que esté disponible.",
+      "EnqueueComputeSessionWarning": "Recursos insuficientes. \nLa sesión puede estar pendiente.",
       "SessionName": "Nombre de la sesión",
       "ResetFormConfirm": "¿Quieres restablecer todas tus entradas?",
       "TemplateAndHistory": "Plantillas",
@@ -1155,7 +1215,6 @@
       "EnvironmentVariableDuplicateName": "Un nombre de variable que ya existe.",
       "Template": "Plantilla de sesión",
       "EnableAutomaticMiniumShmem": "Establecer la memoria compartida mínima",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Solo se permiten números enteros cuando el tamaño del clúster no es inferior a 2.",
       "StartAfter": "Empezar después:",
       "StartTimeDoesNotApply": "Si no se establece la hora de inicio, no se aplica.",
@@ -1169,7 +1228,9 @@
       "BatchModeDesc": "Puedes ejecutar tu código con múltiples nodos y clusters para escalar tu idea",
       "AddEnvironmentVariable": "Añadir variables de entorno",
       "EnvironmentVariableValueRequired": "Por favor, introduzca un valor.",
-      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos."
+      "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos.",
+      "FailedToStartNewSession": "Error al crear la sesión. \nPor favor marque la pestaña 'TERMINADO' en la página de la sesión.",
+      "ProxyDirectTCPNotSupported": "La conexión TCP directa de proxy aún no es compatible"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1179,11 +1240,11 @@
     "Agents": "Agentes",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (memoria)",
-    "ConvertSessionToImage": "Convertir sesión en imagen",
     "SessionName": "Nombre de la sesión",
     "SessionId": "ID de sesión",
     "EnvironmentAndVersion": "Entorno y versión",
-    "Tags": "Etiquetas"
+    "Tags": "Etiquetas",
+    "fGPU": "fGPU"
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1251,7 +1312,8 @@
     "ShowOnlyChanged": "Mostrar solo cambios",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilice el acelerador Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel."
+    "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel.",
+    "SearchPlaceholder": "Buscar en"
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",
@@ -1509,7 +1571,8 @@
       "InvalidBlankPassword": "Ingresa tu contraseña",
       "InvalidBlankEmail": "Introduce tu correo electrónico",
       "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
-      "MyEnvironments": "Mis ambientes"
+      "MyEnvironments": "Mis ambientes",
+      "ResourcePolicy": "Política de recursos"
     }
   },
   "modelStore": {
@@ -1545,7 +1608,20 @@
     "SelectColumnToDisplay": "Seleccionar columnas para mostrar",
     "SearchTableColumn": "Buscar columnas de la tabla"
   },
-  "setting": {
-    "SearchPlaceholder": "Ingrese el término de búsqueda"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Errores de validación del campo de entrada",
+      "ValidationErrorText": "Si no ingresa un valor en un campo obligatorio o ingresa un valor no válido, aparece un mensaje de error en ese campo.",
+      "FixErrorAndTryAgainText": "Si hay un campo de error, el botón Iniciar sesión está deshabilitado. \nCorrija el error y vuelva a intentarlo.",
+      "FixErrorFieldbyModifyButton": "Para ese campo de error, puede ir directamente al botón Editar en la esquina superior derecha para editarlo."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Copiar",
+    "Copied": "Copiado"
+  },
+  "propertyFilter": {
+    "placeHolder": "Buscar en",
+    "ResetFilter": "Restablecer filtro"
   }
 }

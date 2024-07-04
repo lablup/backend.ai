@@ -1,5 +1,5 @@
 aiodataloader-ng~=0.2.1
-aiodocker~=0.21.0
+aiodocker==0.22.0
 aiofiles~=23.2.1
 aiohttp~=3.9.1
 aiohttp_cors~=0.7
@@ -27,6 +27,7 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
+etcetra~=0.1.19
 faker~=24.7.1
 graphene~=3.3.0
 graypy==2.1.0
