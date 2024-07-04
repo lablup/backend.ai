@@ -22,6 +22,7 @@ jobs:
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         ref: ${{ github.head_ref }}
+        token: ${{ secrets.OCTODOG }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
