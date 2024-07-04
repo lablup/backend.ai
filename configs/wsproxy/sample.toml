@@ -18,9 +18,12 @@ advertised_proxy_port_range = [
     20300,
 ]
 protocol = "http"
+
+# replace these values with randomly generated string
 jwt_encrypt_key = "50M3G00DL00KING53CR3T"
 permit_hash_key = "50M3G00DL00KING53CR3T"
 api_secret = "50M3G00DL00KING53CR3T"
+
 aiomonitor_termui_port = 48500
 aiomonitor_webui_port = 49500
 
