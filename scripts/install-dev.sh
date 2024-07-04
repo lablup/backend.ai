@@ -183,9 +183,9 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
   show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
@@ -838,7 +838,7 @@ setup_environment() {
 
 configure_backendai() {
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -944,7 +944,7 @@ configure_backendai() {
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
     $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   fi
 
   # initialize the DB schema
