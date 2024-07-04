@@ -728,9 +728,6 @@ setup_environment() {
   show_info "Ensuring checkout of LFS files..."
   git lfs pull
 
-  show_info "Ensuring checkout of submodules..."
-  git submodule update --init --checkout --recursive
-
   show_info "Configuring the standard git hooks..."
   install_git_hooks
 
