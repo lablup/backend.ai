@@ -65,6 +65,7 @@ use_rust_parser = true
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+find_links = ["file://%(buildroot)s/wheelhouse"]
 
 [python.resolves]
 python-default = "python.lock"

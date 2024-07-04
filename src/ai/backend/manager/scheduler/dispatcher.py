@@ -66,7 +66,12 @@ from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
+from ..api.exceptions import (
+    GenericBadRequest,
+    GenericForbidden,
+    InstanceNotAvailable,
+    SessionNotFound,
+)
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
@@ -1502,7 +1507,7 @@ class SchedulerDispatcher(aobject):
                     forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
-            except SessionNotFound:
+            except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
         await redis_helper.execute(
