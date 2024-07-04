@@ -4,6 +4,8 @@ import configparser
 import itertools
 import logging
 import os
+import sys
+import zipfile
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
@@ -23,6 +25,7 @@ def scan_entrypoints(
         scan_entrypoint_from_buildscript(group_name),
         scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
+        scan_entrypoint_from_external_sources(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
             continue
@@ -140,6 +143,66 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
                 if entrypoint.name not in entrypoints:
                     entrypoints[entrypoint.name] = entrypoint
         # TODO: implement pyproject.toml scanner
+    yield from entrypoints.values()
+
+
+def extract_entrypoints_from_entry_points_txt(
+    group_name: str,
+    entry_points_txt_path: Path,
+) -> Iterator[EntryPoint]:
+    with entry_points_txt_path.open() as file:
+        current_group = None
+        for line in file:
+            line = line.strip()
+            if line.endswith("]"):
+                current_group = line[1:-1]
+            elif current_group == group_name:
+                if "=" in line:
+                    name, value = [x.strip() for x in line.split("=", 1)]
+                    yield EntryPoint(name=name, value=value, group=group_name)
+
+
+def scan_entrypoint_from_external_sources(
+    group_name: str, directory: Path | None = None
+) -> Iterator[EntryPoint]:
+    if directory is None:
+        # TODO: Implement scanning from the designated directory in local-dev setup.
+        # directory = find_build_root()
+        directory = Path.cwd()
+
+    log.debug(
+        "scan_entrypoint_from_external_sources(%r)",
+        group_name,
+    )
+
+    entrypoints = {}
+
+    for whl_file in directory.glob("*.whl"):
+        with zipfile.ZipFile(whl_file, "r") as z:
+            extracted_path = f"{whl_file}".replace(".whl", "")
+
+            if not os.path.exists(extracted_path):
+                z.extractall(extracted_path)
+
+            sys.path.append(extracted_path)
+            current_pythonpath = os.environ.get("PYTHONPATH", "")
+            new_pythonpath = os.pathsep.join([extracted_path, current_pythonpath])
+            os.environ["PYTHONPATH"] = new_pythonpath
+
+            entry_points_txt_names = [name for name in z.namelist() if "entry_points.txt" in name]
+            for entry_points_txt_name in entry_points_txt_names:
+                with z.open(entry_points_txt_name) as f:
+                    temp_entry_points_txt = Path("/tmp/temp_entry_points.txt")
+                    with temp_entry_points_txt.open("w") as temp_file:
+                        temp_file.write(f.read().decode("utf-8"))
+
+                    for entrypoint in extract_entrypoints_from_entry_points_txt(
+                        group_name, temp_entry_points_txt
+                    ):
+                        entrypoints[entrypoint.name] = entrypoint
+
+                    temp_entry_points_txt.unlink()
+
     yield from entrypoints.values()
 
 
