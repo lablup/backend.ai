@@ -568,6 +568,12 @@ def _destroy_cmd(docs: str = None):
             else:
                 if not has_failure:
                     print_done("Done.")
+                    if forced:
+                        print_warn(
+                            "If you have destroyed a session whose status is one of "
+                            "[`PULLING`, `SCHEDULED`, `PREPARING`, `TERMINATING`, `ERROR`], "
+                            "Manual cleanup of actual containers may be required."
+                        )
                 if stats:
                     stats = ret.get("stats", None) if ret else None
                     if stats:

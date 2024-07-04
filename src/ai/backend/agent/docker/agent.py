@@ -38,6 +38,7 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
@@ -935,7 +936,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
