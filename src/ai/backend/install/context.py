@@ -292,6 +292,23 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            service = self.install_info.service_config
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "name": "default",
+                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
+                                "wsproxy_api_token": service.wsproxy_api_token,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -565,22 +582,6 @@ class Context(metaclass=ABCMeta):
             data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with open(fixture_path, "w") as fw:
-                fw.write(
-                    json.dumps({
-                        "__mode": "update",
-                        "scaling_groups": [
-                            {
-                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
-                                "wsproxy_api_token": service.wsproxy_api_token,
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
