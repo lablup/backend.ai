@@ -17,7 +17,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Sequence
+from typing import Any, AsyncIterator, Final, Iterator, Sequence
 
 import aiofiles
 import aiotools
@@ -63,7 +63,7 @@ from .types import (
 from .widgets import SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
-PASSWD_POOL = (
+PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
     [chr(x) for x in range(ord("a"), ord("z") + 1)]
     + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
     + [chr(x) for x in range(ord("0"), ord("9") + 1)]
@@ -114,7 +114,7 @@ class Context(metaclass=ABCMeta):
         return f"backendai-{name}-{self.os_info.platform}"
 
     def generate_passphrase(self, len=16) -> str:
-        return "".join(random.sample(PASSWD_POOL, len))
+        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
     @contextmanager
