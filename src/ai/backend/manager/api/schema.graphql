@@ -1367,6 +1367,9 @@ This action cannot be undone.
 type PurgeUser {
   ok: Boolean
   msg: String
+
+  """Added in 24.03.7. ID of background task deleting user owned vfolders."""
+  bgtask_id: UUID
 }
 
 input PurgeUserInput {
