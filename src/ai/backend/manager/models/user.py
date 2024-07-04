@@ -47,7 +47,7 @@ from .base import (
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .utils import execute_with_retry
+from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -986,22 +986,23 @@ class PurgeUser(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         delete_query = sa.delete(users).where(users.c.email == email)
 
-        async with graph_ctx.db.begin_readonly() as conn:
-            user_uuid = await conn.scalar(
-                sa.select(users.c.uuid).select_from(users).where(users.c.email == email),
-            )
-            # `keypairs.user_id` is email
-            # Check `src.ai.backend.manager.models.keypair.CreateKeyPair.prepare_new_keypair()`
-            keypair_rows = (
-                await SASession(conn).scalars(
-                    sa.select(KeyPairRow).where(KeyPairRow.user_id == email)
+        async with graph_ctx.db.connect() as db_conn:
+            async with graph_ctx.db.begin_session(db_conn) as db_session:
+                conn = db_session.bind
+                user_uuid = await conn.scalar(
+                    sa.select(users.c.uuid).select_from(users).where(users.c.email == email),
                 )
-            ).all()
-            keypair_rows = cast(list[KeyPairRow], keypair_rows)
+                # `keypairs.user_id` is email
+                # Check `src.ai.backend.manager.models.keypair.CreateKeyPair.prepare_new_keypair()`
+                keypair_rows = (
+                    await SASession(conn).scalars(
+                        sa.select(KeyPairRow).where(KeyPairRow.user_id == email)
+                    )
+                ).all()
+                keypair_rows = cast(list[KeyPairRow], keypair_rows)
 
-        async def _pre_purge() -> list[VFolderRow]:
-            async with graph_ctx.db.begin() as conn:
-                db_session = SASession(conn)
+            async def _pre_purge(db_session: SASession) -> list[VFolderRow]:
+                conn = db_session.bind
                 update_status_query = (
                     sa.update(users)
                     .values(status=UserStatus.DELETED, status_info="admin-requested")
@@ -1044,9 +1045,11 @@ class PurgeUser(graphene.Mutation):
                 alive_vfolders = await cls.get_vfolders_not_deleted(conn, user_uuid)
                 if not alive_vfolders:
                     await cls.delete_vfolders(conn, user_uuid)
-            return alive_vfolders
+                return alive_vfolders
 
-        alive_vfolders = await execute_with_retry(_pre_purge)
+            alive_vfolders = await execute_with_txn_retry(
+                _pre_purge, graph_ctx.db.begin_session, db_conn
+            )
 
         if alive_vfolders:
             # Run bgtask
@@ -1060,7 +1063,7 @@ class PurgeUser(graphene.Mutation):
                     reporter=reporter,
                 )
 
-                async def _delete_records() -> None:
+                async def _delete_records(db_session: SASession) -> None:
                     async with graph_ctx.db.begin_session() as db_session:
                         alive_vfolders = await cls.get_vfolders_not_deleted(
                             db_session.bind, user_uuid
@@ -1076,7 +1079,10 @@ class PurgeUser(graphene.Mutation):
                                 "failed to delete some vfolders. delete them manually and try again."
                             )
 
-                await execute_with_retry(_delete_records)
+                async with graph_ctx.db.connect() as db_conn:
+                    await execute_with_txn_retry(
+                        _delete_records, graph_ctx.db.begin_session, db_conn
+                    )
 
             task_id = await bgtask_manager.start(_delete_vfolders_task)
             return cls(True, "purge ongoing. finish after deleting all vfolders.", task_id)
