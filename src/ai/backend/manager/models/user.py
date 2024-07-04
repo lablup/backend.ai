@@ -959,7 +959,7 @@ class PurgeUser(graphene.Mutation):
     msg = graphene.String()
     bgtask_id = graphene.UUID(
         required=False,
-        description="Added in 24.03.7. ID of backgroun task deleting user owned vfolders.",
+        description="Added in 24.03.7. ID of background task deleting user owned vfolders.",
     )
 
     @classmethod
@@ -976,7 +976,7 @@ class PurgeUser(graphene.Mutation):
             delete_kernels_by_access_key,
             delete_sessions_by_access_key,
         )
-        from .vfolder import VFolderDeletionInfo, delete_vfolders
+        from .vfolder import VFolderDeletionInfo, delete_vfolders_in_bgtask
 
         graph_ctx: GraphQueryContext = info.context
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1048,7 +1048,7 @@ class PurgeUser(graphene.Mutation):
             background_task_manager = graph_ctx.background_task_manager
 
             async def _delete_vfolders_task(reporter: ProgressReporter) -> None:
-                await delete_vfolders(
+                await delete_vfolders_in_bgtask(
                     [VFolderDeletionInfo(row.vfid, row.host) for row in alive_vfolders],
                     storage_manager=graph_ctx.storage_manager,
                     db=graph_ctx.db,

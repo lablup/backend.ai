@@ -1756,7 +1756,7 @@ class VirtualFolderList(graphene.ObjectType):
     items = graphene.List(VirtualFolder, required=True)
 
 
-async def delete_vfolders(
+async def delete_vfolders_in_bgtask(
     requested_vfolders: Sequence[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
