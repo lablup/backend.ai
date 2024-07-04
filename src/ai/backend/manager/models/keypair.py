@@ -743,7 +743,7 @@ async def delete_kernels_by_access_key(
         sa.delete(KernelRow).where(KernelRow.access_key == access_key),
     )
     if result.rowcount > 0:
-        log.info("deleted {0} keypair's kernels ({1})", result.rowcount, access_key)
+        log.info("deleted {0} keypair's kernels (ak:{1})", result.rowcount, access_key)
     return result.rowcount
 
 
@@ -764,7 +764,7 @@ async def delete_sessions_by_access_key(
         sa.delete(SessionRow).where(SessionRow.access_key == access_key)
     )
     if result.rowcount > 0:
-        log.info("deleted {0} user's sessions ({1})", result.rowcount, access_key)
+        log.info("deleted {0} user's sessions (ak:{1})", result.rowcount, access_key)
     return result.rowcount
 
 
