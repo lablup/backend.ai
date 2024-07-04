@@ -957,7 +957,10 @@ class PurgeUser(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    bgtask_id = graphene.UUID(required=False)
+    bgtask_id = graphene.UUID(
+        required=False,
+        description="Added in 24.03.7. ID of backgroun task deleting user owned vfolders.",
+    )
 
     @classmethod
     async def mutate(
