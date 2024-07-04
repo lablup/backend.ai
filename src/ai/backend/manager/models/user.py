@@ -1036,10 +1036,10 @@ class PurgeUser(graphene.Mutation):
                     await delete_sessions_by_access_key(db_session, row.access_key)
                 await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
-                vfolder_rows = await cls.alive_vfolders(conn, user_uuid)
-                if not vfolder_rows:
+                alive_vfolders = await cls.get_vfolders_not_deleted(conn, user_uuid)
+                if not alive_vfolders:
                     await cls.delete_vfolders(conn, user_uuid)
-            return vfolder_rows
+            return alive_vfolders
 
         alive_vfolders = await execute_with_retry(_pre_purge)
 
@@ -1057,7 +1057,9 @@ class PurgeUser(graphene.Mutation):
 
                 async def _delete_records() -> None:
                     async with graph_ctx.db.begin_session() as db_session:
-                        alive_vfolders = await cls.alive_vfolders(db_session.bind, user_uuid)
+                        alive_vfolders = await cls.get_vfolders_not_deleted(
+                            db_session.bind, user_uuid
+                        )
                         if not alive_vfolders:
                             await cls.delete_vfolders(db_session.bind, user_uuid)
                             await db_session.execute(delete_query)
@@ -1250,7 +1252,7 @@ class PurgeUser(graphene.Mutation):
         return active_kernel_count > 0
 
     @classmethod
-    async def alive_vfolders(
+    async def get_vfolders_not_deleted(
         cls,
         conn: SAConnection,
         user_uuid: UUID,
