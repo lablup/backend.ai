@@ -234,6 +234,9 @@ class DummyAgent(
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
+    async def extract_command(self, image_ref: str) -> str | None:
+        return None
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,

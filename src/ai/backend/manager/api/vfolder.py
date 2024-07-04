@@ -571,6 +571,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
+            "domain_name": domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
@@ -2203,9 +2204,10 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        db_conn = db_session.bind
         entries = await query_accessible_vfolders(
-            conn,
+            db_conn,
             user_uuid,
             allow_privileged_access=True,
             user_role=user_role,
@@ -2227,18 +2229,15 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            async with root_ctx.db._begin_session(conn) as sess:
-                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
+            live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+            if (
+                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
+                > 0
+            ):
+                raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
-            conn,
+            db_conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
@@ -2805,6 +2804,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            domain_name,
             target_quota_scope_id,
             params["target_name"],
             target_folder_host,
