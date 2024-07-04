@@ -407,7 +407,7 @@ class User(BaseFunction):
             """\
             mutation($email: String!, $input: PurgeUserInput!) {
                 purge_user(email: $email, props: $input) {
-                    ok msg
+                    ok msg bgtask_id
                 }
             }
         """

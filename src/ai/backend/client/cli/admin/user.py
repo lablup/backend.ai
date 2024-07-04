@@ -548,5 +548,6 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
             data,
             extra_info={
                 "email": email,
+                "bgtask_id": data.get("bgtask_id"),
             },
         )
