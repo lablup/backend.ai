@@ -43,7 +43,7 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
@@ -73,6 +73,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ImageRegistry,
+    KernelId,
     MountPermission,
     MountTypes,
     SessionTypes,
@@ -2109,19 +2110,36 @@ async def list_files(request: web.Request) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+class ContainerLogRequestModel(BaseModel):
+    owner_access_key: str | None = Field(
+        validation_alias=AliasChoices("owner_access_key", "ownerAccessKey"),
+        default=None,
+    )
+    kernel_id: uuid.UUID | None = Field(
+        validation_alias=AliasChoices("kernel_id", "kernelId"),
+        description="Target kernel to get container logs.",
+        default=None,
+    )
+
+
 @server_status_required(READ_ALLOWED)
 @auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    })
-)
-async def get_container_logs(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(ContainerLogRequestModel)
+async def get_container_logs(
+    request: web.Request, params: ContainerLogRequestModel
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    requester_access_key, owner_access_key = await get_access_key_scopes(
+        request, {"owner_access_key": params.owner_access_key}
+    )
+    kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
-        "GET_CONTAINER_LOG (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+        "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
+        requester_access_key,
+        owner_access_key,
+        session_name,
+        kernel_id,
     )
     resp = {"result": {"logs": ""}}
     async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -2130,25 +2148,38 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
             session_name,
             owner_access_key,
             allow_stale=True,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY
+            if kernel_id is None
+            else KernelLoadingStrategy.ALL_KERNELS,
         )
-        if (
-            compute_session.status in DEAD_SESSION_STATUSES
-            and compute_session.main_kernel.container_log is not None
-        ):
-            log.debug("returning log from database record")
-            resp["result"]["logs"] = compute_session.main_kernel.container_log.decode("utf-8")
-            return web.json_response(resp, status=200)
+
+        if compute_session.status in DEAD_SESSION_STATUSES:
+            if kernel_id is not None:
+                # Get logs from the specific kernel
+                kernel_row = compute_session.get_kernel_by_id(kernel_id)
+                kernel_log = kernel_row.container_log
+            else:
+                # Get logs from the main kernel
+                kernel_log = compute_session.main_kernel.container_log
+            if kernel_log is not None:
+                # Get logs from database record
+                log.debug("returning log from database record")
+                resp["result"]["logs"] = kernel_log.decode("utf-8")
+                return web.json_response(resp, status=200)
+
     try:
         registry = root_ctx.registry
         await registry.increment_session_usage(compute_session)
-        resp["result"]["logs"] = await registry.get_logs_from_agent(compute_session)
+        resp["result"]["logs"] = await registry.get_logs_from_agent(
+            session=compute_session, kernel_id=kernel_id
+        )
         log.debug("returning log from agent")
     except BackendError:
         log.exception(
-            "GET_CONTAINER_LOG(ak:{}/{}, s:{}): unexpected error",
+            "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
             requester_access_key,
             owner_access_key,
+            kernel_id,
             session_name,
         )
         raise
