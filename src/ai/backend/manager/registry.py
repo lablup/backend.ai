@@ -2811,14 +2811,20 @@ class AgentRegistry:
     async def get_logs_from_agent(
         self,
         session: SessionRow,
+        kernel_id: KernelId | None = None,
     ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
+            kernel = (
+                session.get_kernel_by_id(kernel_id)
+                if kernel_id is not None
+                else session.main_kernel
+            )
             async with self.agent_cache.rpc_context(
-                session.main_kernel.agent,
+                agent_id=kernel.agent,
                 invoke_timeout=30,
-                order_key=session.main_kernel.id,
+                order_key=kernel.id,
             ) as rpc:
-                reply = await rpc.call.get_logs(str(session.main_kernel.id))
+                reply = await rpc.call.get_logs(str(kernel.id))
                 return reply["logs"]
 
     async def increment_session_usage(

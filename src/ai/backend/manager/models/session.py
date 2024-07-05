@@ -44,6 +44,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
@@ -79,6 +80,7 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "determine_session_status",
@@ -728,6 +730,14 @@ class SessionRow(Base):
     @property
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
+
+    def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
+        if len(kerns) == 0:
+            raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
+        return kerns[0]
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
