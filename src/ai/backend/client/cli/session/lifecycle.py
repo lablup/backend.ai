@@ -748,7 +748,14 @@ def ls(session_id, path):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.option("-k", "--kernel", "--kernel-id", type=str, default=None)
+@click.option(
+    "-k",
+    "--kernel",
+    "--kernel-id",
+    type=str,
+    default=None,
+    help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
+)
 def logs(session_id, kernel: str | None):
     """
     Shows the full console log of a compute session.
