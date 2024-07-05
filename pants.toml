@@ -36,7 +36,6 @@ root_patterns = [
     "/",
     "/src",
     "/stubs",
-    "/tests",
     "/tools/pants-plugins",
 ]
 
