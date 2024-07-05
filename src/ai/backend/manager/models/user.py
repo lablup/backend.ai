@@ -988,7 +988,7 @@ class PurgeUser(graphene.Mutation):
 
         async with graph_ctx.db.connect() as db_conn:
             async with graph_ctx.db.begin_session(db_conn) as db_session:
-                conn = db_session.bind
+                conn = await db_session.connection()
                 user_uuid = await conn.scalar(
                     sa.select(users.c.uuid).select_from(users).where(users.c.email == email),
                 )
@@ -1002,7 +1002,7 @@ class PurgeUser(graphene.Mutation):
                 keypair_rows = cast(list[KeyPairRow], keypair_rows)
 
             async def _pre_purge(db_session: SASession) -> list[VFolderRow]:
-                conn = db_session.bind
+                conn = await db_session.connection()
                 update_status_query = (
                     sa.update(users)
                     .values(status=UserStatus.DELETED, status_info="admin-requested")
@@ -1022,7 +1022,7 @@ class PurgeUser(graphene.Mutation):
                 for row in keypair_rows:
                     if await access_key_has_active_sessions(db_session, row.access_key):
                         raise RuntimeError(
-                            f"One of keypairs the user owns has some active sessions. Terminate them first. (ak:{row.access_key})"
+                            f"One of keypairs owned by the user has some active sessions. Terminate them first. (ak:{row.access_key})"
                         )
 
                 if not props.purge_shared_vfolders:
@@ -1042,7 +1042,7 @@ class PurgeUser(graphene.Mutation):
                     await delete_sessions_by_access_key(db_session, row.access_key)
                 await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
-                alive_vfolders = await cls.get_vfolders_not_deleted(conn, user_uuid)
+                alive_vfolders = await cls.get_vfolders_not_deleted(db_session, user_uuid)
                 if not alive_vfolders:
                     await cls.delete_vfolders(conn, user_uuid)
                 return alive_vfolders
@@ -1065,11 +1065,10 @@ class PurgeUser(graphene.Mutation):
 
                 async def _delete_records(db_session: SASession) -> None:
                     async with graph_ctx.db.begin_session() as db_session:
-                        alive_vfolders = await cls.get_vfolders_not_deleted(
-                            db_session.bind, user_uuid
-                        )
+                        conn = await db_session.connection()
+                        alive_vfolders = await cls.get_vfolders_not_deleted(db_session, user_uuid)
                         if not alive_vfolders:
-                            await cls.delete_vfolders(db_session.bind, user_uuid)
+                            await cls.delete_vfolders(conn, user_uuid)
                             await db_session.execute(delete_query)
                         else:
                             # TODO: Show an explicit error that represents failure of vfolder deletion
@@ -1268,11 +1267,11 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def get_vfolders_not_deleted(
         cls,
-        conn: SAConnection,
+        db_session: SASession,
         user_uuid: UUID,
     ) -> list[VFolderRow]:
         """
-        :param conn: DB connection
+        :param db_session: DB session
         :param user_uuid: user's UUID
 
         :return: not-deleted vfolders the user owns.
@@ -1283,7 +1282,7 @@ class PurgeUser(graphene.Mutation):
             (VFolderRow.user == user_uuid)
             & (VFolderRow.status != VFolderOperationStatus.DELETE_COMPLETE)
         )
-        vfolder_rows = (await SASession(conn).scalars(vfolder_query)).all()
+        vfolder_rows = (await db_session.scalars(vfolder_query)).all()
         return vfolder_rows
 
     @classmethod
