@@ -1088,7 +1088,7 @@ async def convert_session_to_image(
         await reporter.update(message="Commit started")
         try:
             if "/" in base_image_ref.name:
-                new_name = base_image_ref.name.split("/", maxsplit=1)[1]
+                new_name = base_image_ref.name.split("/")[-1]
             else:
                 # for cases where project name is not specified (e.g. redis, nginx, ...)
                 new_name = base_image_ref.name
