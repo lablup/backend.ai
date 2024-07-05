@@ -5,9 +5,11 @@ import enum
 import importlib.resources
 import json
 import os
+import random
 import re
 import secrets
 import shutil
+import tempfile
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
@@ -15,7 +17,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Sequence
+from typing import Any, AsyncIterator, Final, Iterator, Sequence
 
 import aiofiles
 import aiotools
@@ -61,6 +63,12 @@ from .types import (
 from .widgets import SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
+    [chr(x) for x in range(ord("a"), ord("z") + 1)]
+    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
+    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
+    + ["*$./"]
+)
 
 
 class PostGuide(enum.Enum):
@@ -103,10 +111,10 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"[bright_green]:green_circle: {title}"))
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
-        # local-proxy does not have fat variant. (It is always fat.)
-        if fat and name != "local-proxy":
-            return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
+
+    def generate_passphrase(self, len=16) -> str:
+        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
     @contextmanager
@@ -263,6 +271,7 @@ class Context(metaclass=ABCMeta):
         await self.run_shell(
             f"""
         {sudo} docker compose pull && \\
+        {sudo} docker compose up -d --wait backendai-half-db && \\
         {sudo} docker compose up -d && \\
         {sudo} docker compose ps
         """,
@@ -283,6 +292,23 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            service = self.install_info.service_config
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "name": "default",
+                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
+                                "wsproxy_api_token": service.wsproxy_api_token,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -537,6 +563,23 @@ class Context(metaclass=ABCMeta):
             data["session"]["redis"] = redis_table  # type: ignore
             data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
             data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+        with conf_path.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+    async def configure_wsproxy(self) -> None:
+        conf_path = self.copy_config("wsproxy.toml")
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        assert halfstack.redis_addr is not None
+        with conf_path.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["wsproxy"]["bind_host"] = service.local_proxy_addr.bind.host  # type: ignore
+            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
+            data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
+            data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
+            data["wsproxy"]["jwt_encrypt_key"] = service.wsproxy_jwt_key  # type: ignore
+            data["wsproxy"]["permit_hash_key"] = service.wsproxy_hash_key  # type: ignore
+            data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -797,6 +840,9 @@ class DevContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -835,6 +881,8 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
@@ -884,6 +932,9 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -985,7 +1036,7 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("local-proxy", vpane))
+                        tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                     # Verify the checksums of the downloaded packages.
@@ -993,7 +1044,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
-                    await self._verify_package("local-proxy", fat=False)
+                    await self._verify_package("wsproxy", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -1008,9 +1059,7 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package(
-                        "local-proxy", vpane, fat=self.dist_info.use_fat_binary
-                    )
+                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
@@ -1020,7 +1069,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("local-proxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
@@ -1038,6 +1087,8 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")

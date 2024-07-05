@@ -175,6 +175,8 @@ show_guide() {
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run Backend.AI wsproxy:"
+  echo "  > ${WHITE}./py -m ai.backend.wsproxy.server${NC}"
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -193,8 +195,6 @@ show_guide() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
     echo "(Terminal 2)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "(Terminal 3)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
@@ -622,7 +622,6 @@ install_editable_webui() {
   fi
   npm i
   make compile
-  make compile_wsproxy
   cd ../../../..
 }
 
@@ -922,6 +921,9 @@ configure_backendai() {
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+
+  # configure wsproxy
+  cp configs/wsproxy/halfstack.toml ./wsproxy.toml
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf

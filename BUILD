@@ -9,6 +9,7 @@ python_requirements(
         "pycryptodome": ["Crypto"],
         "python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "python-json-logger": ["pythonjsonlogger"],
+        "pyhumps": ["humps"],
         "pyzmq": ["zmq"],
         "PyYAML": ["yaml"],
         "typing-extensions": ["typing_extensions"],
