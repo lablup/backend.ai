@@ -2810,7 +2810,7 @@ class AgentRegistry:
     async def get_logs_from_agent(
         self,
         session: SessionRow,
-        kernel_id: uuid.UUID | None = None,
+        kernel_id: KernelId | None = None,
     ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
             kernel = (

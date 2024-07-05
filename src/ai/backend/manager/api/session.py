@@ -73,6 +73,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ImageRegistry,
+    KernelId,
     MountPermission,
     MountTypes,
     SessionTypes,
@@ -2132,7 +2133,7 @@ async def get_container_logs(
     requester_access_key, owner_access_key = await get_access_key_scopes(
         request, {"owner_access_key": params.owner_access_key}
     )
-    kernel_id = params.kernel_id
+    kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
         "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
         requester_access_key,

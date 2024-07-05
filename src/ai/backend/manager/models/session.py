@@ -732,7 +732,7 @@ class SessionRow(Base):
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
 
-    def get_kernel_by_id(self, kernel_id: UUID) -> KernelRow:
+    def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
         if len(kerns) > 1:
             raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
