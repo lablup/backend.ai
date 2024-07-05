@@ -743,6 +743,7 @@ class AbstractAgent(
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
+            await self.save_last_registry(force=True)
             if stop_signal == signal.SIGTERM:
                 await self.clean_all_kernels(blocking=True)
 
@@ -1285,6 +1286,7 @@ class AbstractAgent(
                 )
                 return None
 
+        log.debug("sync_container_lifecycles(): triggered")
         try:
             _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
             async with self.registry_lock:
@@ -1295,6 +1297,9 @@ class AbstractAgent(
                         for kid, container in _containers
                         if container.status in DEAD_STATUS_SET
                     ]
+                    log.debug(
+                        f"detected dead containers: {[container.id[:12] for _, container in dead_containers]}"
+                    )
                     for kernel_id, container in dead_containers:
                         if kernel_id in self.restarting_kernels:
                             continue
@@ -1318,6 +1323,9 @@ class AbstractAgent(
                         for kid, container in _containers
                         if container.status in ACTIVE_STATUS_SET
                     ]
+                    log.debug(
+                        f"detected active containers: {[container.id[:12] for _, container in active_containers]}"
+                    )
                     for kernel_id, container in active_containers:
                         alive_kernels[kernel_id] = container.id
                         session_id = _get_session_id(container)
@@ -1340,6 +1348,7 @@ class AbstractAgent(
                             or kernel_id in self.terminating_kernels
                         ):
                             continue
+                        log.debug(f"kernel with no container (kid: {kernel_id})")
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1347,10 +1356,11 @@ class AbstractAgent(
                             LifecycleEvent.CLEAN,
                             KernelLifecycleEventReason.SELF_TERMINATED,
                         )
-                    # Check if: there are containers already deleted from my registry or not spawned by me.
+                    # Check if: there are containers already deleted from my registry.
                     for kernel_id in alive_kernels.keys() - known_kernels.keys():
                         if kernel_id in self.restarting_kernels:
                             continue
+                        log.debug(f"kernel not found in registry (kid:{kernel_id})")
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
