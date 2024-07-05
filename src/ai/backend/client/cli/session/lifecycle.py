@@ -748,18 +748,27 @@ def ls(session_id, path):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-def logs(session_id):
+@click.option(
+    "-k",
+    "--kernel",
+    "--kernel-id",
+    type=str,
+    default=None,
+    help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
+)
+def logs(session_id, kernel: str | None):
     """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
+    _kernel_id = uuid.UUID(kernel) if kernel is not None else None
     with Session() as session:
         try:
             print_wait("Retrieving live container logs...")
-            kernel = session.ComputeSession(session_id)
-            result = kernel.get_logs().get("result")
+            _session = session.ComputeSession(session_id)
+            result = _session.get_logs(_kernel_id).get("result")
             logs = result.get("logs") if "logs" in result else ""
             print(logs)
             print_done("End of logs.")

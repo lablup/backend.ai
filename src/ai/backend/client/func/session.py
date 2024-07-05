@@ -699,13 +699,15 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_logs(self):
+    async def get_logs(self, kernel_id: UUID | None = None):
         """
         Retrieves the console log of the compute session container.
         """
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
+        if kernel_id is not None:
+            params["kernel_id"] = str(kernel_id)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
