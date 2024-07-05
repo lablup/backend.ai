@@ -404,6 +404,9 @@ class AgentRPCServer(aobject):
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
         self.debug_server_task.cancel()
+        await asyncio.sleep(0)
+        if not self.debug_server_task.done():
+            await self.debug_server_task
         await self.agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
