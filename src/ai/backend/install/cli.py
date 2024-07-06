@@ -272,21 +272,22 @@ class InstallReport(Static):
                 """
                     )
                 )
-            with TabPane("Local Proxy", id="local-proxy"):
+            with TabPane("Local Proxy", id="wsproxy"):
                 yield Markdown(
                     textwrap.dedent(
                         f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
-                $ ./backendai-local-proxy
+                $ ./backendai-wsproxy wsproxy start-server
                 ```
 
                 It works if the console output ends with something like:
                 ```
                 ...
-                info [manager.js]: Listening on port {service.local_proxy_addr.bind.port}!
-                info [local_proxy.js]: Proxy is ready: http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}/
+                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.proxy.frontend.http.port [2596460] accepting proxy requests from 0.0.0.0:10200~10300
+                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.server [2596460] started handling API requests at 0.0.0.0:{service.local_proxy_addr.bind.port}
+                ...
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
