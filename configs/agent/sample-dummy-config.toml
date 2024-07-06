@@ -1,6 +1,7 @@
 [agent.delay]
 scan-image = 0.1
 pull-image = 0.1
+push-image = 0.1
 destroy-kernel = 0.1
 clean-kernel = 0.1
 create-network = 0.1
