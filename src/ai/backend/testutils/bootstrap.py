@@ -19,8 +19,8 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
-PORT_POOL_BASE: Final = 10000
-PORT_POOL_SIZE: Final = 2000
+PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))
+PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"))
 
 
 def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
@@ -34,8 +34,6 @@ def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
             port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
             port_path.write_text(str(port_no))
         else:
-            # NOTE: We should set sufficiently large multiplier to the number of all spawned
-            #       containers during tests.
             port_no = PORT_POOL_BASE
             port_path.write_text(str(port_no))
             allocated_ports = (port_no,)
