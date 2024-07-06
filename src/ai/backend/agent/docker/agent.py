@@ -10,6 +10,7 @@ import shutil
 import signal
 import struct
 import sys
+from collections.abc import Mapping
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -22,13 +23,13 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    Mapping,
     MutableMapping,
     Optional,
     Sequence,
     Set,
     Tuple,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -38,6 +39,7 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
@@ -827,7 +829,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
@@ -857,7 +861,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     config=container_config, name=kernel_name
                 )
                 assert container is not None
-                cid = container._id
+                cid = cast(str, container._id)
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -893,10 +897,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=cid, message="Container creation cancelled"
+                        container_id=container._id, message="Container creation cancelled"
                     )
                 raise
-            except Exception:
+            except Exception as e:
                 # Oops, we have to restore the allocated resources!
                 scratch_type = self.local_config["container"]["scratch-type"]
                 scratch_root = self.local_config["container"]["scratch-root"]
@@ -914,7 +918,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid, message="unknown")
+                    raise ContainerCreationError(
+                        container_id=container._id, message=f"unknown. {repr(e)}"
+                    )
                 raise
 
             additional_network_names: Set[str] = set()
@@ -933,7 +939,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
@@ -1121,6 +1127,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return await scan_available_resources(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
+
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,

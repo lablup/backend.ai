@@ -3,18 +3,16 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Union,
 )
 from uuid import UUID
@@ -34,11 +32,9 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
     VFolderMount,
 )
 
@@ -48,6 +44,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
@@ -83,6 +80,7 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "determine_session_status",
@@ -510,6 +508,31 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
+
+
+@dataclass
+class ConcurrencyUsed:
+    access_key: AccessKey
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
+
+    @property
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_cnt_map(self) -> Mapping[str, int]:
+        return {
+            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
+            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+        }
+
+
 class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
@@ -708,6 +731,14 @@ class SessionRow(Base):
     @property
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
+
+    def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
+        if len(kerns) == 0:
+            raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
+        return kerns[0]
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -1263,6 +1294,8 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "occupying_slots": row.occupying_slots.to_json(),
+            "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
@@ -1275,23 +1308,6 @@ class ComputeSession(graphene.ObjectType):
         props = cls.parse_row(ctx, row)
         return cls(**props)
 
-    async def resolve_occupying_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
-        """
-        Calculate the sum of occupying resource slots of all sub-kernels,
-        and return the JSON-serializable object from the sum result.
-        """
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        containers = await loader.load(self.session_id)
-        zero = ResourceSlot()
-        return sum(
-            (
-                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
-                for c in containers
-            ),
-            start=zero,
-        ).to_json()
-
     async def resolve_inference_metrics(
         self, info: graphene.ResolveInfo
     ) -> Optional[Mapping[str, Any]]:
@@ -1300,20 +1316,6 @@ class ComputeSession(graphene.ObjectType):
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
         )
         return await loader.load(self.id)
-
-    # legacy
-    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        containers = await loader.load(self.session_id)
-        zero = ResourceSlot()
-        return sum(
-            (
-                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
-                for c in containers
-            ),
-            start=zero,
-        ).to_json()
 
     async def resolve_containers(
         self,

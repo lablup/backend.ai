@@ -99,12 +99,14 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AcceleratorMetadata,
     AgentId,
@@ -123,6 +125,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
+    RuntimeVariant,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -150,7 +153,13 @@ from .resources import (
     known_slot_types,
 )
 from .stats import StatContext, StatModes
-from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
+from .types import (
+    Container,
+    ContainerLifecycleEvent,
+    ContainerStatus,
+    LifecycleEvent,
+    MountInfo,
+)
 from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
@@ -618,12 +627,18 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
+        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+            event_dispatcher_cls = ExperimentalEventDispatcher
+        else:
+            event_dispatcher_cls = EventDispatcher
+
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
-        self.event_dispatcher = await EventDispatcher.new(
+        self.event_dispatcher = await event_dispatcher_cls.new(
             self.local_config["redis"],
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
@@ -728,6 +743,7 @@ class AbstractAgent(
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
+            await self.save_last_registry(force=True)
             if stop_signal == signal.SIGTERM:
                 await self.clean_all_kernels(blocking=True)
 
@@ -1002,7 +1018,9 @@ class AbstractAgent(
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
                     log.warning(
-                        "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
+                        "destroy_kernel(k:{0}, c:{1}) kernel missing (already dead?)",
+                        ev.kernel_id,
+                        ev.container_id,
                     )
                     if ev.container_id is None:
                         await self.reconstruct_resource_usage()
@@ -1030,18 +1048,17 @@ class AbstractAgent(
                         ev.done_future.set_exception(e)
                     raise
                 finally:
-                    if ev.container_id is not None:
-                        await self.container_lifecycle_queue.put(
-                            ContainerLifecycleEvent(
-                                ev.kernel_id,
-                                ev.session_id,
-                                ev.container_id,
-                                LifecycleEvent.CLEAN,
-                                ev.reason,
-                                suppress_events=ev.suppress_events,
-                                done_future=ev.done_future,
-                            ),
-                        )
+                    await self.container_lifecycle_queue.put(
+                        ContainerLifecycleEvent(
+                            ev.kernel_id,
+                            ev.session_id,
+                            ev.container_id,
+                            LifecycleEvent.CLEAN,
+                            ev.reason,
+                            suppress_events=ev.suppress_events,
+                            done_future=ev.done_future,
+                        ),
+                    )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1253,75 +1270,122 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
-        known_kernels: Dict[KernelId, ContainerId] = {}
+        known_kernels: Dict[KernelId, ContainerId | None] = {}
         alive_kernels: Dict[KernelId, ContainerId] = {}
         kernel_session_map: Dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
-        terminated_kernels = {}
+        terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
-        async with self.registry_lock:
+        def _get_session_id(container: Container) -> SessionId | None:
+            _session_id = container.labels.get("ai.backend.session-id")
             try:
-                # Check if: there are dead containers
-                for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
-                    if (
-                        kernel_id in self.restarting_kernels
-                        or kernel_id in self.terminating_kernels
-                    ):
-                        continue
-                    log.info(
-                        "detected dead container during lifeycle sync (k:{}, c:{})",
-                        kernel_id,
-                        container.id,
-                    )
-                    session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
-                    terminated_kernels[kernel_id] = ContainerLifecycleEvent(
-                        kernel_id,
-                        session_id,
-                        known_kernels[kernel_id],
-                        LifecycleEvent.CLEAN,
-                        KernelLifecycleEventReason.SELF_TERMINATED,
-                    )
-                for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
-                    alive_kernels[kernel_id] = container.id
-                    session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
-                    kernel_session_map[kernel_id] = session_id
-                    own_kernels[kernel_id] = container.id
-                for kernel_id, kernel_obj in self.kernel_registry.items():
-                    known_kernels[kernel_id] = kernel_obj["container_id"]
-                    session_id = kernel_obj.session_id
-                    kernel_session_map[kernel_id] = session_id
-                # Check if: kernel_registry has the container but it's gone.
-                for kernel_id in known_kernels.keys() - alive_kernels.keys():
-                    if (
-                        kernel_id in self.restarting_kernels
-                        or kernel_id in self.terminating_kernels
-                    ):
-                        continue
-                    terminated_kernels[kernel_id] = ContainerLifecycleEvent(
-                        kernel_id,
-                        kernel_session_map[kernel_id],
-                        known_kernels[kernel_id],
-                        LifecycleEvent.CLEAN,
-                        KernelLifecycleEventReason.SELF_TERMINATED,
-                    )
-                # Check if: there are containers not spawned by me.
-                for kernel_id in alive_kernels.keys() - known_kernels.keys():
-                    if kernel_id in self.restarting_kernels:
-                        continue
-                    terminated_kernels[kernel_id] = ContainerLifecycleEvent(
-                        kernel_id,
-                        kernel_session_map[kernel_id],
-                        alive_kernels[kernel_id],
-                        LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
-                    )
-            finally:
-                # Enqueue the events.
-                for kernel_id, ev in terminated_kernels.items():
-                    await self.container_lifecycle_queue.put(ev)
+                return SessionId(UUID(_session_id))
+            except ValueError:
+                log.warning(
+                    f"sync_container_lifecycles() invalid session-id (cid: {container.id}, sid:{_session_id})"
+                )
+                return None
 
-                # Set container count
-                await self.set_container_count(len(own_kernels.keys()))
+        log.debug("sync_container_lifecycles(): triggered")
+        try:
+            _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+            async with self.registry_lock:
+                try:
+                    # Check if: there are dead containers
+                    dead_containers = [
+                        (kid, container)
+                        for kid, container in _containers
+                        if container.status in DEAD_STATUS_SET
+                    ]
+                    log.debug(
+                        f"detected dead containers: {[container.id[:12] for _, container in dead_containers]}"
+                    )
+                    for kernel_id, container in dead_containers:
+                        if kernel_id in self.restarting_kernels:
+                            continue
+                        log.info(
+                            "detected dead container during lifeycle sync (k:{}, c:{})",
+                            kernel_id,
+                            container.id,
+                        )
+                        session_id = _get_session_id(container)
+                        if session_id is None:
+                            continue
+                        terminated_kernels[kernel_id] = ContainerLifecycleEvent(
+                            kernel_id,
+                            session_id,
+                            container.id,
+                            LifecycleEvent.CLEAN,
+                            KernelLifecycleEventReason.SELF_TERMINATED,
+                        )
+                    active_containers = [
+                        (kid, container)
+                        for kid, container in _containers
+                        if container.status in ACTIVE_STATUS_SET
+                    ]
+                    log.debug(
+                        f"detected active containers: {[container.id[:12] for _, container in active_containers]}"
+                    )
+                    for kernel_id, container in active_containers:
+                        alive_kernels[kernel_id] = container.id
+                        session_id = _get_session_id(container)
+                        if session_id is None:
+                            continue
+                        kernel_session_map[kernel_id] = session_id
+                        own_kernels[kernel_id] = container.id
+                    for kernel_id, kernel_obj in self.kernel_registry.items():
+                        known_kernels[kernel_id] = (
+                            ContainerId(kernel_obj.container_id)
+                            if kernel_obj.container_id is not None
+                            else None
+                        )
+                        session_id = kernel_obj.session_id
+                        kernel_session_map[kernel_id] = session_id
+                    # Check if: kernel_registry has the container but it's gone.
+                    for kernel_id in known_kernels.keys() - alive_kernels.keys():
+                        if (
+                            kernel_id in self.restarting_kernels
+                            or kernel_id in self.terminating_kernels
+                        ):
+                            continue
+                        log.debug(f"kernel with no container (kid: {kernel_id})")
+                        terminated_kernels[kernel_id] = ContainerLifecycleEvent(
+                            kernel_id,
+                            kernel_session_map[kernel_id],
+                            known_kernels[kernel_id],
+                            LifecycleEvent.CLEAN,
+                            KernelLifecycleEventReason.CONTAINER_NOT_FOUND,
+                        )
+                    # Check if: there are containers already deleted from my registry.
+                    for kernel_id in alive_kernels.keys() - known_kernels.keys():
+                        if kernel_id in self.restarting_kernels:
+                            continue
+                        log.debug(f"kernel not found in registry (kid:{kernel_id})")
+                        terminated_kernels[kernel_id] = ContainerLifecycleEvent(
+                            kernel_id,
+                            kernel_session_map[kernel_id],
+                            alive_kernels[kernel_id],
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
+                        )
+                finally:
+                    # Enqueue the events.
+                    terminated_kernel_ids = ",".join([
+                        str(kid) for kid in terminated_kernels.keys()
+                    ])
+                    log.debug(f"Terminating kernels(ids:[{terminated_kernel_ids}])")
+                    for kernel_id, ev in terminated_kernels.items():
+                        await self.container_lifecycle_queue.put(ev)
+
+                    # Set container count
+                    await self.set_container_count(len(own_kernels.keys()))
+        except asyncio.CancelledError:
+            pass
+        except asyncio.TimeoutError:
+            log.warning("sync_container_lifecycles() timeout, continuing")
+        except Exception as e:
+            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {repr(e)})")
+            await self.produce_error_event()
 
     async def set_container_count(self, container_count: int) -> None:
         await redis_helper.execute(
@@ -1830,74 +1894,16 @@ class AbstractAgent(
                     for folder in vfolder_mounts
                     if folder.usage_mode == VFolderUsageMode.MODEL
                 ]
-                if (
-                    len(model_folders) > 0
-                    and kernel_config["session_type"] == SessionTypes.INFERENCE
-                ):
-                    model_folder = model_folders[0]
-                    if _fname := (kernel_config.get("internal_data") or {}).get(
-                        "model_definition_path"
-                    ):
-                        model_definition_candidates = [_fname]
-                    else:
-                        model_definition_candidates = [
-                            "model-definition.yaml",
-                            "model-definition.yml",
-                        ]
-
-                    model_definition_path = None
-                    for filename in model_definition_candidates:
-                        if (Path(model_folder.host_path) / filename).is_file():
-                            model_definition_path = Path(model_folder.host_path) / filename
-                            break
-
-                    if not model_definition_path:
-                        raise AgentError(
-                            f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
-                            f" {model_folder.name} (ID {model_folder.vfid})",
-                        )
-                    try:
-                        model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                            None, model_definition_path.read_text
-                        )
-                    except FileNotFoundError as e:
-                        raise AgentError(
-                            "Model definition file (model-definition.yml) does not exist under"
-                            f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                        ) from e
-                    try:
-                        model_definition = model_definition_iv.check(
-                            yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                        )
-                        assert model_definition is not None
-                        for model in model_definition["models"]:
-                            environ["BACKEND_MODEL_NAME"] = model["name"]
-                            environ["BACKEND_MODEL_PATH"] = model["model_path"]
-                            if service := model.get("service"):
-                                overlapping_services = [
-                                    s
-                                    for s in service_ports
-                                    if s["container_ports"][0] == service["port"]
-                                ]
-                                if len(overlapping_services) > 0:
-                                    raise AgentError(
-                                        f"Port {service['port']} overlaps with built-in service"
-                                        f" {overlapping_services[0]['name']}"
-                                    )
-                                service_ports.append({
-                                    "name": f"{model['name']}-{service['port']}",
-                                    "protocol": ServicePortProtocols.PREOPEN,
-                                    "container_ports": (service["port"],),
-                                    "host_ports": (None,),
-                                    "is_inference": True,
-                                })
-                    except DataError as e:
-                        raise AgentError(
-                            "Failed to validate model definition from vFolder"
-                            f" {model_folder.name} (ID {model_folder.vfid})",
-                        ) from e
-                    except yaml.error.YAMLError as e:
-                        raise AgentError(f"Invalid YAML syntax: {e}") from e
+                if kernel_config["session_type"] == SessionTypes.INFERENCE:
+                    model_definition = await self.load_model_definition(
+                        RuntimeVariant(
+                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
+                        ),
+                        model_folders,
+                        environ,
+                        service_ports,
+                        kernel_config,
+                    )
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -1995,7 +2001,7 @@ class AbstractAgent(
                     service_ports,
                 )
                 async with self.registry_lock:
-                    self.kernel_registry[ctx.kernel_id] = kernel_obj
+                    self.kernel_registry[kernel_id] = kernel_obj
                 try:
                     container_data = await ctx.start_container(
                         kernel_obj,
@@ -2007,7 +2013,7 @@ class AbstractAgent(
                     msg = e.message or "unknown"
                     log.error(
                         "Kernel failed to create container. Kernel is going to be destroyed."
-                        f" (k:{ctx.kernel_id}, detail:{msg})",
+                        f" (k:{kernel_id}, detail:{msg})",
                     )
                     cid = e.container_id
                     async with self.registry_lock:
@@ -2022,17 +2028,22 @@ class AbstractAgent(
                     raise AgentError(
                         f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
                     )
-                except Exception:
+                except Exception as e:
                     log.warning(
-                        "Kernel failed to create container (k:{}). Kernel is going to be"
-                        " unregistered.",
+                        "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
                         kernel_id,
                     )
-                    async with self.registry_lock:
-                        del self.kernel_registry[kernel_id]
-                    raise
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
+                    )
+                    raise AgentError(
+                        f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
+                    )
                 async with self.registry_lock:
-                    self.kernel_registry[ctx.kernel_id].data.update(container_data)
+                    self.kernel_registry[kernel_id].data.update(container_data)
                 await kernel_obj.init(self.event_producer)
 
                 current_task = asyncio.current_task()
@@ -2151,8 +2162,136 @@ class AbstractAgent(
                 )
             )
 
+    async def load_model_definition(
+        self,
+        runtime_variant: RuntimeVariant,
+        model_folders: list[VFolderMount],
+        environ: MutableMapping[str, Any],
+        service_ports: list[ServicePort],
+        kernel_config: KernelCreationConfig,
+    ) -> Any:
+        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
+        if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
+            raise AgentError(
+                "image should have its own command when runtime variant is set to values other than CUSTOM!"
+            )
+        assert len(model_folders) > 0
+        model_folder: VFolderMount = model_folders[0]
+
+        match runtime_variant:
+            case RuntimeVariant.VLLM:
+                _model = {
+                    "name": "vllm-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.VLLM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.NIM:
+                _model = {
+                    "name": "nim-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.NIM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CMD:
+                _model = {
+                    "name": "image-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": 8000,
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CUSTOM:
+                if _fname := (kernel_config.get("internal_data") or {}).get(
+                    "model_definition_path"
+                ):
+                    model_definition_candidates = [_fname]
+                else:
+                    model_definition_candidates = [
+                        "model-definition.yaml",
+                        "model-definition.yml",
+                    ]
+
+                model_definition_path = None
+                for filename in model_definition_candidates:
+                    if (Path(model_folder.host_path) / filename).is_file():
+                        model_definition_path = Path(model_folder.host_path) / filename
+                        break
+
+                if not model_definition_path:
+                    raise AgentError(
+                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f" {model_folder.name} (ID {model_folder.vfid})",
+                    )
+                try:
+                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                        None, model_definition_path.read_text
+                    )
+                except FileNotFoundError as e:
+                    raise AgentError(
+                        "Model definition file (model-definition.yml) does not exist under"
+                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+                    ) from e
+                try:
+                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+                except yaml.error.YAMLError as e:
+                    raise AgentError(f"Invalid YAML syntax: {e}") from e
+        try:
+            model_definition = model_definition_iv.check(raw_definition)
+            assert model_definition is not None
+            for model in model_definition["models"]:
+                environ["BACKEND_MODEL_NAME"] = model["name"]
+                environ["BACKEND_MODEL_PATH"] = model["model_path"]
+                if service := model.get("service"):
+                    overlapping_services = [
+                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                    ]
+                    if len(overlapping_services) > 0:
+                        raise AgentError(
+                            f"Port {service['port']} overlaps with built-in service"
+                            f" {overlapping_services[0]['name']}"
+                        )
+                    service_ports.append({
+                        "name": f"{model['name']}-{service['port']}",
+                        "protocol": ServicePortProtocols.PREOPEN,
+                        "container_ports": (service["port"],),
+                        "host_ports": (None,),
+                        "is_inference": True,
+                    })
+            return model_definition
+        except DataError as e:
+            raise AgentError(
+                "Failed to validate model definition from vFolder"
+                f" {model_folder.name} (ID {model_folder.vfid})",
+            ) from e
+
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
+
+    @abstractmethod
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        raise NotImplementedError
 
     @abstractmethod
     async def destroy_kernel(

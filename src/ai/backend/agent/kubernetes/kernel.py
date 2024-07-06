@@ -4,8 +4,8 @@ import lzma
 import os
 import shutil
 import textwrap
-from pathlib import Path
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple, override
 
 import pkg_resources
 import zmq
@@ -229,44 +229,53 @@ class KubernetesKernel(AbstractKernel):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def accept_file(self, filename: str, filedata: bytes):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
-        work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        container_home_path = PurePosixPath("/home/work")
         try:
-            # create intermediate directories in the path
-            dest_path = (work_dir / filename).resolve(strict=False)
-            parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+            home_relpath = PurePosixPath(container_path).relative_to(container_home_path)
+        except ValueError:
+            raise PermissionError("Not allowed to upload files outside /home/work")
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        )
+        host_abspath = (host_work_dir / home_relpath).resolve(strict=False)
+        if not host_abspath.is_relative_to(host_work_dir):
+            raise PermissionError("Not allowed to upload files outside /home/work")
 
         def _write_to_disk():
-            parent_path.mkdir(parents=True, exist_ok=True)
-            dest_path.write_bytes(filedata)
+            host_abspath.parent.mkdir(parents=True, exist_ok=True)
+            host_abspath.write_bytes(filedata)
 
         try:
             await loop.run_in_executor(None, _write_to_disk)
-        except FileNotFoundError:
-            log.error(
-                "{0}: writing uploaded file failed: {1} -> {2}", self.kernel_id, filename, dest_path
+        except OSError as e:
+            raise RuntimeError(
+                "{0}: writing uploaded file failed: {1} -> {2} ({3})".format(
+                    self.kernel_id,
+                    container_path,
+                    host_abspath,
+                    repr(e),
+                )
             )
 
-    async def download_file(self, filepath: str):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
-        home_path = Path("/home/work")
-        try:
-            abspath = (home_path / filepath).resolve()
-            abspath.relative_to(home_path)
-        except ValueError:
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot download files outside /home/work")
 
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,
             self.kernel_id,
             "backend-ai",
-            command=["tar", "cf", "-", abspath.resolve()],
+            command=["tar", "cf", "-", container_abspath],
             stderr=True,
             stdin=True,
             stdout=True,
@@ -275,24 +284,25 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
+        return b""
 
-        return None
-
-    async def download_single(self, filepath: str):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement download single file operations with pure Kubernetes API
         log.error("download_single() in the k8s backend is not supported yet.")
         raise NotImplementedError
 
-    async def list_files(self, container_path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work").resolve()
-        resolved_path = (home_path / container_path).resolve()
-
-        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
@@ -336,6 +346,7 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
