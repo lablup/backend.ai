@@ -783,6 +783,22 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
+
+  """Added in 24.03.7."""
+  agent_count_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): Int
+
+  """Added in 24.03.7."""
+  agent_total_resource_slots_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): JSONString
 }
 
 type StorageVolume implements Item {
@@ -1095,6 +1111,9 @@ type ModelCard implements Node {
   id: ID!
   name: String
   vfolder: VirtualFolder
+
+  """Added in 24.09.0."""
+  vfolder_node: VirtualFolderNode
   author: String
 
   """Human readable name of the model."""

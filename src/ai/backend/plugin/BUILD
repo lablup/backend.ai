@@ -32,6 +32,11 @@ python_distribution(
         description="Backend.AI Plugin Subsystem",
         license="MIT",
     ),
+    entry_points={
+        "backendai_cli_v10": {
+            "plugin": "ai.backend.plugin.cli:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )
