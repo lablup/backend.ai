@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import itertools
 import logging
 import os.path
 import uuid
@@ -9,6 +10,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence, cast
 
 import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -1717,13 +1719,16 @@ class VirtualFolderList(graphene.ObjectType):
     items = graphene.List(VirtualFolder, required=True)
 
 
-async def delete_vfolders(
+async def _delete_vfolders(
     requested_vfolders: Sequence[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
     db: ExtendedAsyncSAEngine,
-    reporter: ProgressReporter | None = None,
+    reporter: ProgressReporter | None,
 ) -> None:
+    """
+    Request multiple vfolder deletion one by one.
+    """
     folders_to_be_deleted: list[VFolderDeletionInfo] = []
     folders_failed_to_delete: list[tuple[VFolderDeletionInfo, str]] = []
     for vfolder_info in requested_vfolders:
@@ -1777,6 +1782,35 @@ async def delete_vfolders(
             VFolderOperationStatus.DELETE_ERROR,
             do_log=False,
         )
+
+
+async def delete_vfolders(
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    *,
+    storage_manager: StorageSessionManager,
+    db: ExtendedAsyncSAEngine,
+    reporter: ProgressReporter | None = None,
+) -> None:
+    """
+    Spawn vfolder deletion tasks grouped by a name of storage proxies.
+    """
+
+    def _keyfunc(item: VFolderDeletionInfo) -> str:
+        proxy_name, _ = storage_manager.split_host(item.host)
+        return proxy_name
+
+    async with aiotools.TaskGroup() as tg:
+        for _, vfolder_iterator in itertools.groupby(
+            sorted(requested_vfolders, key=_keyfunc), key=_keyfunc
+        ):
+            tg.create_task(
+                _delete_vfolders(
+                    list(vfolder_iterator),
+                    storage_manager=storage_manager,
+                    db=db,
+                    reporter=reporter,
+                )
+            )
 
 
 class VirtualFolderNode(graphene.ObjectType):
