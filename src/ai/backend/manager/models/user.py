@@ -1084,7 +1084,9 @@ class PurgeUser(graphene.Mutation):
                     )
 
             task_id = await bgtask_manager.start(_delete_vfolders_task)
-            return cls(True, "purge ongoing. finish after deleting all vfolders.", task_id)
+            return cls(
+                True, "purge ongoing. It will finish after all vfolders are deleted.", task_id
+            )
 
         else:
             return await simple_db_mutate(cls, graph_ctx, delete_query)
