@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from typing import AsyncIterator
+from typing import AsyncIterator, cast
 
 import pytest
 
@@ -29,9 +29,20 @@ def check_dns_config() -> None:
 
 
 @pytest.fixture
-async def redis_cluster(test_ns, test_case_ns) -> AsyncIterator[RedisClusterInfo]:
+async def redis_cluster(
+    request: pytest.FixtureRequest,
+    test_ns: str,
+    test_case_ns: str,
+) -> AsyncIterator[RedisClusterInfo]:
     impl = DockerComposeRedisSentinelCluster
-    cluster = impl(test_ns, test_case_ns, password="develove", service_name="mymaster")
+    verbosity = cast(int, request.config.getoption("--verbose"))
+    cluster = impl(
+        test_ns,
+        test_case_ns,
+        password="develove",
+        service_name="mymaster",
+        verbose=verbosity > 0,
+    )
     async with cluster.make_cluster() as info:
         async with asyncio.TaskGroup() as tg:
             for host, port in info.node_addrs:
