@@ -159,3 +159,6 @@ class ServiceConfig:
     storage_agent_var_base_path: str
     storage_watcher_addr: ServerAddr
     vfolder_relpath: str
+    wsproxy_hash_key: str
+    wsproxy_jwt_key: str
+    wsproxy_api_token: str

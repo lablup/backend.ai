@@ -10,7 +10,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Iterator
+from typing import Final, Iterator
 
 import pytest
 
@@ -19,24 +19,25 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
-
-def get_free_port():
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
+PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))
+PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"))
 
 
-def check_if_port_is_clear(host, port):
-    while True:
-        try:
-            s = socket.create_connection((host, port), timeout=0.3)
-        except (ConnectionRefusedError, TimeoutError):
-            break
+def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
+    lock_path = Path("~/.cache/bai/testing/port.lock").expanduser()
+    port_path = Path("~/.cache/bai/testing/port.txt").expanduser()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with sync_file_lock(lock_path):
+        if port_path.exists():
+            port_no = int(port_path.read_text())
         else:
-            time.sleep(0.1)
-            s.close()
-            continue
+            port_no = PORT_POOL_BASE
+        allocated_ports = tuple(
+            PORT_POOL_BASE + (port_no + i) % PORT_POOL_SIZE for i in range(num_alloc)
+        )
+        port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
+        port_path.write_text(str(port_no))
+    return allocated_ports
 
 
 @contextlib.contextmanager
@@ -91,9 +92,8 @@ def wait_health_check(container_id):
 @pytest.fixture(scope="session", autouse=False)
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    etcd_allocated_port = 9600 + get_parallel_slot() * 8 + 0
     random_id = secrets.token_hex(8)
-    check_if_port_is_clear("127.0.0.1", etcd_allocated_port)
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
@@ -104,9 +104,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
             "--name",
             f"test--etcd-slot-{get_parallel_slot()}-{random_id}",
             "-p",
-            f"0.0.0.0:{etcd_allocated_port}:2379",
-            "-p",
-            "0.0.0.0::4001",
+            f"127.0.0.1:{published_port}:2379",
             "--health-cmd",
             "etcdctl endpoint health",
             "--health-interval",
@@ -125,9 +123,9 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     container_id = proc.stdout.decode().strip()
     if not container_id:
         raise RuntimeError("etcd_container: failed to create container", proc.stderr.decode())
-    log.info("spawning etcd container on port %d", etcd_allocated_port)
+    log.info("spawning etcd container (parallel slot: %d)", get_parallel_slot())
     wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", etcd_allocated_port)
+    yield container_id, HostPortPair("127.0.0.1", published_port)
     subprocess.run(
         [
             "docker",
@@ -143,9 +141,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session", autouse=False)
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    redis_allocated_port = 9600 + get_parallel_slot() * 8 + 1
-    check_if_port_is_clear("127.0.0.1", redis_allocated_port)
     random_id = secrets.token_hex(8)
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
@@ -158,7 +155,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             "--name",
             f"test--redis-slot-{get_parallel_slot()}-{random_id}",
             "-p",
-            f"0.0.0.0:{redis_allocated_port}:6379",
+            f"127.0.0.1:{published_port}:6379",
             # IMPORTANT: We have intentionally omitted the healthcheck here
             # to avoid intermittent failures when pausing/unpausing containers.
             "redis:7-alpine",
@@ -168,11 +165,11 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     container_id = proc.stdout.decode().strip()
     if not container_id:
         raise RuntimeError("redis_container: failed to create container", proc.stderr.decode())
-    log.info("spawning redis container on port %d", redis_allocated_port)
+    log.info("spawning redis container (parallel slot: %d)", get_parallel_slot())
     while True:
         try:
             with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-                s.connect(("127.0.0.1", redis_allocated_port))
+                s.connect(("127.0.0.1", published_port))
                 s.send(b"*2\r\n$4\r\nPING\r\n$5\r\nhello\r\n")
                 reply = s.recv(128, 0)
                 if not reply.startswith(b"$5\r\nhello\r\n"):
@@ -183,7 +180,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             time.sleep(0.1)
             continue
     time.sleep(0.5)
-    yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
+    yield container_id, HostPortPair("127.0.0.1", published_port)
     subprocess.run(
         [
             "docker",
@@ -199,9 +196,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session", autouse=False)
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    postgres_allocated_port = 9600 + get_parallel_slot() * 8 + 2
-    check_if_port_is_clear("127.0.0.1", postgres_allocated_port)
     random_id = secrets.token_hex(8)
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
@@ -212,7 +208,7 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
             "--name",
             f"test--postgres-slot-{get_parallel_slot()}-{random_id}",
             "-p",
-            f"0.0.0.0:{postgres_allocated_port}:5432",
+            f"127.0.0.1:{published_port}:5432",
             "-e",
             "POSTGRES_PASSWORD=develove",
             "-e",
@@ -230,9 +226,9 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     container_id = proc.stdout.decode().strip()
     if not container_id:
         raise RuntimeError("postgres_container: failed to create container", proc.stderr.decode())
-    log.info("spawning postgres container on port %d", postgres_allocated_port)
+    log.info("spawning postgres container (parallel slot: %d)", get_parallel_slot())
     wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", postgres_allocated_port)
+    yield container_id, HostPortPair("127.0.0.1", published_port)
     subprocess.run(
         [
             "docker",
