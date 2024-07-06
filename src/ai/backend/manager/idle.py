@@ -823,8 +823,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return timedelta(seconds=idle_timeout)
         return self.time_window
 
-    def get_last_collected_key(self, session_id: SessionId) -> str:
+    def _get_last_collected_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.util_last_collected"
+
+    def _get_first_collected_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.util_first_collected"
 
     async def check_idleness(
         self,
@@ -848,7 +851,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
-        util_last_collected_key = self.get_last_collected_key(session_id)
+        util_first_collected_key = self._get_first_collected_key(session_id)
+        util_last_collected_key = self._get_last_collected_key(session_id)
 
         # window_size: the length of utilization reports.
         window_size = int(time_window.total_seconds() / interval)
@@ -858,15 +862,38 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Wait until the time "interval" is passed after the last udpated time.
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         util_now: float = t[0] + (t[1] / (10**6))
-        raw_util_last_collected = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(util_last_collected_key),
+        raw_util_last_collected = cast(
+            bytes | None,
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.get(util_last_collected_key),
+            ),
         )
         util_last_collected: float = (
             float(raw_util_last_collected) if raw_util_last_collected else 0.0
         )
         if util_now - util_last_collected < interval:
             return True
+
+        raw_util_first_collected = cast(
+            bytes | None,
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.get(util_first_collected_key),
+            ),
+        )
+        if raw_util_first_collected is None:
+            util_first_collected = util_now
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.set(
+                    util_first_collected_key,
+                    f"{util_now:.06f}",
+                    ex=max(86400, int(self.time_window.total_seconds() * 2)),
+                ),
+            )
+        else:
+            util_first_collected = float(raw_util_first_collected)
 
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await get_db_now(dbconn)
@@ -923,14 +950,19 @@ class UtilizationIdleChecker(BaseIdleChecker):
         except TypeError:
             util_series = {k: [] for k in self.resource_thresholds.keys()}
 
-        not_enough_data = False
+        do_idle_check: bool = True
 
         for k in util_series:
             util_series[k].append(current_utilizations[k])
             if len(util_series[k]) > window_size:
                 util_series[k].pop(0)
             else:
-                not_enough_data = True
+                do_idle_check = False
+
+        # Do not skip idleness-check if the current time passed the time window
+        if util_now - util_first_collected >= time_window.total_seconds():
+            do_idle_check = True
+
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
@@ -972,7 +1004,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ),
         )
 
-        if not_enough_data:
+        if not do_idle_check:
             return True
 
         # Check over-utilized (not to be collected) resources.

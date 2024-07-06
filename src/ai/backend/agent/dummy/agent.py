@@ -260,6 +260,10 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        delay = self.dummy_agent_cfg["delay"]["push-image"]
+        await asyncio.sleep(delay)
+
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
