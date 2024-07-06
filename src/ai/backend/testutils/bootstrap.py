@@ -10,7 +10,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Iterator
+from typing import Final, Iterator
 
 import pytest
 
@@ -19,23 +19,25 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
+PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))
+PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"))
 
-def get_next_tcp_port() -> int:
-    parallel_slot = get_parallel_slot()
-    lock_path = Path(f"~/.cache/bai/testing/port-{parallel_slot}.lock").expanduser()
-    port_path = Path(f"~/.cache/bai/testing/port-{parallel_slot}.txt").expanduser()
+
+def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
+    lock_path = Path("~/.cache/bai/testing/port.lock").expanduser()
+    port_path = Path("~/.cache/bai/testing/port.txt").expanduser()
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with sync_file_lock(lock_path):
         if port_path.exists():
             port_no = int(port_path.read_text())
-            port_no += 1
+            allocated_ports = tuple(range(port_no, port_no + num_alloc))
+            port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
             port_path.write_text(str(port_no))
         else:
-            # NOTE: We should set sufficiently large multiplier to the number of all spawned
-            #       containers during tests.
-            port_no = 9200 + parallel_slot * 250
+            port_no = PORT_POOL_BASE
             port_path.write_text(str(port_no))
-    return port_no
+            allocated_ports = (port_no,)
+    return allocated_ports
 
 
 @contextlib.contextmanager
@@ -91,7 +93,7 @@ def wait_health_check(container_id):
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
@@ -140,7 +142,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
@@ -195,7 +197,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()
+    published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
         [
             "docker",
