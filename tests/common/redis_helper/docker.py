@@ -148,13 +148,14 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         compose_cfg_dir = (
             Path.home() / ".cache" / "bai" / "testing" / f"bai-redis-test-{get_parallel_slot()}"
         )
+        allocated_ports = get_next_tcp_port(6)
         ports = {
-            "REDIS_MASTER_PORT": get_next_tcp_port(),
-            "REDIS_SLAVE1_PORT": get_next_tcp_port(),
-            "REDIS_SLAVE2_PORT": get_next_tcp_port(),
-            "REDIS_SENTINEL1_PORT": get_next_tcp_port(),
-            "REDIS_SENTINEL2_PORT": get_next_tcp_port(),
-            "REDIS_SENTINEL3_PORT": get_next_tcp_port(),
+            "REDIS_MASTER_PORT": allocated_ports[0],
+            "REDIS_SLAVE1_PORT": allocated_ports[1],
+            "REDIS_SLAVE2_PORT": allocated_ports[2],
+            "REDIS_SENTINEL1_PORT": allocated_ports[3],
+            "REDIS_SENTINEL2_PORT": allocated_ports[4],
+            "REDIS_SENTINEL3_PORT": allocated_ports[5],
         }
         async with asyncio.TaskGroup() as tg:
             for port in ports.values():
