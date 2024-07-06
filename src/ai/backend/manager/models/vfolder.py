@@ -1764,6 +1764,9 @@ async def _delete_vfolders(
     db: ExtendedAsyncSAEngine,
     reporter: ProgressReporter | None,
 ) -> None:
+    """
+    Request multiple vfolder deletion one by one.
+    """
     folders_to_be_deleted: list[VFolderDeletionInfo] = []
     folders_failed_to_delete: list[tuple[VFolderDeletionInfo, str]] = []
 
@@ -1824,6 +1827,10 @@ async def delete_vfolders(
     db: ExtendedAsyncSAEngine,
     reporter: ProgressReporter | None = None,
 ) -> None:
+    """
+    Spawn vfolder deletion tasks grouped by a name of storage proxies.
+    """
+
     def _keyfunc(item: VFolderDeletionInfo) -> str:
         proxy_name, _ = storage_manager.split_host(item.host)
         return proxy_name
