@@ -728,18 +728,22 @@ async def fetch_exposed_volume_fields(
                 },
             ) as (_, storage_resp):
                 storage_reply = await storage_resp.json()
+                storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
+                storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
                 if show_used:
-                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+                    volume_usage["used"] = storage_used_bytes
 
                 if show_total:
-                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    volume_usage["total"] = storage_capacity_bytes
 
                 if show_percentage:
-                    volume_usage["percentage"] = (
-                        storage_reply[ExposedVolumeInfoField.used_bytes]
-                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
-                    ) * 100
+                    try:
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0
 
             await redis_helper.execute(
                 redis_connection,
@@ -2209,9 +2213,10 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        db_conn = db_session.bind
         entries = await query_accessible_vfolders(
-            conn,
+            db_conn,
             user_uuid,
             allow_privileged_access=True,
             user_role=user_role,
@@ -2233,18 +2238,15 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            async with root_ctx.db._begin_session(conn) as sess:
-                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
+            live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+            if (
+                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
+                > 0
+            ):
+                raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
-            conn,
+            db_conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
