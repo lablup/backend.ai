@@ -140,7 +140,7 @@ class SuccessResponseModel(BaseResponseModel):
 
 class BackgroundTaskResponseModel(BaseResponseModel):
     task_id: uuid.UUID | None = Field(
-        description="Background task id. `None` when there is no vfolders to delete."
+        description="ID of background task. 'null' means there is no background task spawned."
     )
 
 
