@@ -10,13 +10,13 @@ jobs:
     name: Add issue to project
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/add-to-project@v1.0.1
+      - uses: actions/add-to-project@v1.0.2
         with:
           # You can target a repository in a different organization
           # to the issue
           project-url: https://github.com/orgs/lablup/projects/11
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-      - uses: actions/add-to-project@v1.0.1
+      - uses: actions/add-to-project@v1.0.2
         with:
           project-url: https://github.com/orgs/lablup/projects/20
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
