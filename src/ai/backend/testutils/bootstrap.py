@@ -30,13 +30,13 @@ def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
     with sync_file_lock(lock_path):
         if port_path.exists():
             port_no = int(port_path.read_text())
-            allocated_ports = tuple(range(port_no, port_no + num_alloc))
-            port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
-            port_path.write_text(str(port_no))
         else:
             port_no = PORT_POOL_BASE
-            port_path.write_text(str(port_no))
-            allocated_ports = (port_no,)
+        allocated_ports = tuple(
+            PORT_POOL_BASE + (port_no + i) % PORT_POOL_SIZE for i in range(num_alloc)
+        )
+        port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
+        port_path.write_text(str(port_no))
     return allocated_ports
 
 
