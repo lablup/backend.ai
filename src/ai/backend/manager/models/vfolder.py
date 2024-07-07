@@ -5,9 +5,10 @@ import itertools
 import logging
 import os.path
 import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Final, List, NamedTuple, Optional, cast
 
 import aiohttp
 import aiotools
@@ -1758,7 +1759,7 @@ class VirtualFolderList(graphene.ObjectType):
 
 
 async def _delete_vfolders_one_by_one(
-    requested_vfolders: Sequence[VFolderDeletionInfo],
+    requested_vfolders: Iterable[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
     db: ExtendedAsyncSAEngine,
@@ -1821,7 +1822,7 @@ async def _delete_vfolders_one_by_one(
 
 
 async def delete_vfolders(
-    requested_vfolders: Sequence[VFolderDeletionInfo],
+    requested_vfolders: Iterable[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
     db: ExtendedAsyncSAEngine,
