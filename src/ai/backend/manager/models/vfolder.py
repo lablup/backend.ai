@@ -1757,7 +1757,7 @@ class VirtualFolderList(graphene.ObjectType):
     items = graphene.List(VirtualFolder, required=True)
 
 
-async def _delete_vfolders(
+async def _delete_vfolders_one_by_one(
     requested_vfolders: Sequence[VFolderDeletionInfo],
     *,
     storage_manager: StorageSessionManager,
@@ -1765,7 +1765,7 @@ async def _delete_vfolders(
     reporter: ProgressReporter | None,
 ) -> None:
     """
-    Request multiple vfolder deletion one by one.
+    Request to delete multiple vfolders one by one.
     """
     folders_to_be_deleted: list[VFolderDeletionInfo] = []
     folders_failed_to_delete: list[tuple[VFolderDeletionInfo, str]] = []
@@ -1801,13 +1801,13 @@ async def _delete_vfolders(
             progress_msg = f"Delete succeeded (id: {folder_id})"
         if reporter is not None:
             await reporter.update(1, message=progress_msg)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in folders_to_be_deleted)
-    log.debug("Successfully deleted vfolders {}", [str(x) for x in vfolder_ids])
+    vfolder_ids_to_delete = tuple(vf_id.folder_id for vf_id, _ in folders_to_be_deleted)
+    log.debug("Successfully deleted vfolders {}", [str(x) for x in vfolder_ids_to_delete])
 
-    if folders_to_be_deleted:
+    if vfolder_ids_to_delete:
         await update_vfolder_status(
             db,
-            vfolder_ids,
+            vfolder_ids_to_delete,
             VFolderOperationStatus.DELETE_COMPLETE,
             do_log=False,
         )
@@ -1840,7 +1840,7 @@ async def delete_vfolders(
             sorted(requested_vfolders, key=_keyfunc), key=_keyfunc
         ):
             tg.create_task(
-                _delete_vfolders(
+                _delete_vfolders_one_by_one(
                     list(vfolder_iterator),
                     storage_manager=storage_manager,
                     db=db,

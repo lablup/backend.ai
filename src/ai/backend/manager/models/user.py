@@ -1055,7 +1055,7 @@ class PurgeUser(graphene.Mutation):
             # Run bgtask
             bgtask_manager = graph_ctx.background_task_manager
 
-            async def _delete_vfolders_task(reporter: ProgressReporter | None) -> None:
+            async def _delete_vfolder_content_and_record(reporter: ProgressReporter | None) -> None:
                 await delete_vfolders(
                     [VFolderDeletionInfo(row.vfid, row.host) for row in alive_vfolders],
                     storage_manager=graph_ctx.storage_manager,
@@ -1083,7 +1083,7 @@ class PurgeUser(graphene.Mutation):
                         _delete_records, graph_ctx.db.begin_session, db_conn
                     )
 
-            task_id = await bgtask_manager.start(_delete_vfolders_task)
+            task_id = await bgtask_manager.start(_delete_vfolder_content_and_record)
             return cls(
                 True, "purge ongoing. It will finish after all vfolders are deleted.", task_id
             )
