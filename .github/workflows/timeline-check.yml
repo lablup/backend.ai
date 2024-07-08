@@ -12,7 +12,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.number != null && github.event.pull_request.merged == false }}
     uses: ./.github/workflows/assign-pr-number.yml
     secrets:
-      WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT }}
+      WORKFLOW_PAT: ${{ secrets.OCTODOG }}
 
   towncrier:
     needs: [assign-pr-number]
