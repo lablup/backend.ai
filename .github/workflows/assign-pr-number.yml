@@ -2,7 +2,7 @@ name: assign-pr-number
 on:
   workflow_call:
     secrets:
-      WORKFLOW_PAT:
+      OCTODOG:
         required: true
 permissions:
   contents: write
