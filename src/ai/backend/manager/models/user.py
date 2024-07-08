@@ -5,7 +5,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence, cast
 from uuid import UUID, uuid4
 
-import aiotools
 import bcrypt
 import graphene
 import sqlalchemy as sa
@@ -24,9 +23,8 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import RedisConnectionInfo
 
-from ..api.exceptions import VFolderOperationFailed
 from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
@@ -48,8 +46,6 @@ from .base import (
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .storage import StorageSessionManager
-from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1003,7 +999,7 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1029,7 +1025,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolder_invitations, vfolder_permissions, vfolders
+        from .vfolder import vfolder_invitations, vfolder_permissions, vfolders
 
         # Gather target user's virtual folders' names.
         query = (
@@ -1098,46 +1094,49 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        engine: ExtendedAsyncSAEngine,
+        conn: SAConnection,
         user_uuid: UUID,
-        storage_manager: StorageSessionManager,
     ) -> int:
         """
-        Delete user's all virtual folders as well as their physical data.
+        Move the user's all vfolders into the trash bin for deferred deletion.
 
         :param conn: DB connection
         :param user_uuid: user's UUID to delete virtual folders
 
-        :return: number of deleted rows
+        :return: number of vfolders moved to the trash bin
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
+        from .vfolder import VFolderOperationStatus, vfolder_permissions, vfolders
 
-        async with engine.begin_session() as conn:
-            await conn.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-            )
-            result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
-                .select_from(vfolders)
-                .where(vfolders.c.user == user_uuid),
-            )
-            target_vfs = result.fetchall()
+        # The check for active sessions using the vfolders is done separately
+        # in user_vfolder_mounted_to_active_kernels().
 
-        storage_ptask_group = aiotools.PersistentTaskGroup()
-        try:
-            await initiate_vfolder_deletion(
-                engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
-                storage_manager,
-                storage_ptask_group,
+        result = await conn.execute(
+            vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
+        )
+        removed_sharing_count = result.rowcount
+        if removed_sharing_count > 0:
+            log.info(
+                "Removed all {0} vfolder sharings with others of user {1}.",
+                removed_sharing_count,
+                user_uuid,
             )
-        except VFolderOperationFailed as e:
-            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
-            raise
-        deleted_count = len(target_vfs)
-        if deleted_count > 0:
-            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
-        return deleted_count
+
+        result = await conn.execute(
+            sa.update(vfolders)
+            .values(
+                user=None,
+                status=VFolderOperationStatus.DELETE_PENDING,
+            )
+            .where(vfolders.c.user == user_uuid)
+        )
+        trashed_count = result.rowcount
+        if trashed_count > 0:
+            log.info(
+                "Moved all {0} vfolders of user {1} to the trash bin.",
+                trashed_count,
+                user_uuid,
+            )
+        return trashed_count
 
     @classmethod
     async def user_vfolder_mounted_to_active_kernels(
@@ -1153,7 +1152,8 @@ class PurgeUser(graphene.Mutation):
 
         :return: True if a virtual folder is mounted to active kernels.
         """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
+        from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+        from .vfolder import vfolders
 
         result = await conn.execute(
             sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
@@ -1189,7 +1189,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: True if the user has some active kernels.
         """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+        from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 
         active_kernel_count = await conn.scalar(
             sa.select([sa.func.count()])
