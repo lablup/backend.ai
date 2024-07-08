@@ -148,18 +148,17 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
 
 def extract_entrypoints_from_entry_points_txt(
     group_name: str,
-    entry_points_txt_path: Path,
+    entry_points_txt: str,
 ) -> Iterator[EntryPoint]:
-    with entry_points_txt_path.open() as file:
-        current_group = None
-        for line in file:
-            line = line.strip()
-            if line.endswith("]"):
-                current_group = line[1:-1]
-            elif current_group == group_name:
-                if "=" in line:
-                    name, value = [x.strip() for x in line.split("=", 1)]
-                    yield EntryPoint(name=name, value=value, group=group_name)
+    current_group = None
+    for line in entry_points_txt:
+        line = line.strip()
+        if line.endswith("]"):
+            current_group = line[1:-1]
+        elif current_group == group_name:
+            if "=" in line:
+                name, value = [x.strip() for x in line.split("=", 1)]
+                yield EntryPoint(name=name, value=value, group=group_name)
 
 
 def scan_entrypoint_from_external_sources(
@@ -192,16 +191,12 @@ def scan_entrypoint_from_external_sources(
             entry_points_txt_names = [name for name in z.namelist() if "entry_points.txt" in name]
             for entry_points_txt_name in entry_points_txt_names:
                 with z.open(entry_points_txt_name) as f:
-                    temp_entry_points_txt = Path("/tmp/temp_entry_points.txt")
-                    with temp_entry_points_txt.open("w") as temp_file:
-                        temp_file.write(f.read().decode("utf-8"))
+                    temp_entry_points = f.read().decode("utf-8")
 
                     for entrypoint in extract_entrypoints_from_entry_points_txt(
-                        group_name, temp_entry_points_txt
+                        group_name, temp_entry_points
                     ):
                         entrypoints[entrypoint.name] = entrypoint
-
-                    temp_entry_points_txt.unlink()
 
     yield from entrypoints.values()
 
