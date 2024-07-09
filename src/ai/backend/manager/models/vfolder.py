@@ -73,7 +73,8 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .user import UserRole
+from .session import DEAD_SESSION_STATUSES, SessionRow
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
@@ -322,8 +323,8 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
+    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -342,15 +343,6 @@ vfolders = sa.Table(
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-    sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
-    ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -417,17 +409,25 @@ class VFolderRow(Base):
     __table__ = vfolders
 
     endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship("UserRow", back_populates="vfolder_row")
-    group_row = relationship("GroupRow", back_populates="vfolder_row")
+    user_row = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
+    group_row = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
     @classmethod
     async def get(
         cls,
         session: SASession,
         id: uuid.UUID,
-        load_user=False,
-        load_group=False,
-    ) -> "VFolderRow":
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
         query = sa.select(VFolderRow).where(VFolderRow.id == id)
         if load_user:
             query = query.options(selectinload(VFolderRow.user_row))
@@ -1198,7 +1198,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
     from ai.backend.manager.models import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
@@ -2046,8 +2045,6 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
         try:
