@@ -186,7 +186,11 @@ class UserRow(Base):
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
-    vfolder_row = relationship("VFolderRow", back_populates="user_row")
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="user_row",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
 
 
 class UserGroup(graphene.ObjectType):
@@ -1400,7 +1404,7 @@ class UserNode(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", enum_field_getter(UserRole)),
-        "resource_policy": ("domain_name", None),
+        "resource_policy": ("resource_policy", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
