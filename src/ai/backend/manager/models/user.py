@@ -46,6 +46,12 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .keypair import (
+    KeyPairRow,
+    access_key_has_active_sessions,
+    delete_kernels_by_access_key,
+    delete_sessions_by_access_key,
+)
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
@@ -979,9 +985,16 @@ class PurgeUser(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         async def _pre_func(conn: SAConnection) -> None:
+            db_session = SASession(conn)
             user_uuid = await conn.scalar(
                 sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
             )
+            # `keypairs.user_id` is email
+            # Check `src.ai.backend.manager.models.keypair.CreateKeyPair.prepare_new_keypair()`
+            keypair_rows = (
+                await db_session.scalars(sa.select(KeyPairRow).where(KeyPairRow.user_id == email))
+            ).all()
+            keypair_rows = cast(list[KeyPairRow], keypair_rows)
             log.info("Purging all records of the user {0}...", email)
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
@@ -991,6 +1004,11 @@ class PurgeUser(graphene.Mutation):
                 )
             if await cls.user_has_active_kernels(conn, user_uuid):
                 raise RuntimeError("User has some active kernels. Terminate them first.")
+            for row in keypair_rows:
+                if await access_key_has_active_sessions(db_session, row.access_key):
+                    raise RuntimeError(
+                        f"One of keypairs owned by the user has some active sessions. Terminate them first. (ak:{row.access_key})"
+                    )
 
             if not props.purge_shared_vfolders:
                 await cls.migrate_shared_vfolders(
@@ -1001,7 +1019,11 @@ class PurgeUser(graphene.Mutation):
                 )
             await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_endpoint(conn, user_uuid)
+            for row in keypair_rows:
+                await delete_kernels_by_access_key(db_session, row.access_key)
             await cls.delete_kernels(conn, user_uuid)
+            for row in keypair_rows:
+                await delete_sessions_by_access_key(db_session, row.access_key)
             await cls.delete_sessions(conn, user_uuid)
             await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)

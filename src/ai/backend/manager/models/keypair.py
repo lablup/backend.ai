@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 import uuid
 from datetime import datetime
@@ -15,10 +16,12 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
@@ -42,6 +45,8 @@ from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import ModifyUserInput, UserRole
 from .utils import agg_to_array
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -718,3 +723,66 @@ def verify_dotfile_name(dotfile: str) -> bool:
     if dotfile in RESERVED_DOTFILES:
         return False
     return True
+
+
+async def delete_kernels_by_access_key(
+    db_session: SASession,
+    access_key: AccessKey,
+) -> int:
+    """
+    Delete keypair's all kernels.
+    :param conn: DB connection
+    :param access_key: access key to delete kernels
+    :return: number of deleted rows
+    """
+    from . import KernelRow
+
+    result = await db_session.execute(
+        sa.delete(KernelRow).where(KernelRow.access_key == access_key),
+    )
+    if result.rowcount > 0:
+        log.info("deleted {0} keypair's kernels (ak:{1})", result.rowcount, access_key)
+    return result.rowcount
+
+
+async def delete_sessions_by_access_key(
+    db_session: SASession,
+    access_key: AccessKey,
+) -> int:
+    """
+    Delete keypair's all sessions.
+    :param db_session: SQLAlchemy session
+    :param access_key: access key to delete sessions
+    :return: number of deleted rows
+    """
+    from .session import SessionRow
+
+    result = await db_session.execute(
+        sa.delete(SessionRow).where(SessionRow.access_key == access_key)
+    )
+    if result.rowcount > 0:
+        log.info("deleted {0} user's sessions (ak:{1})", result.rowcount, access_key)
+    return result.rowcount
+
+
+async def access_key_has_active_sessions(
+    db_session: SASession,
+    access_key: AccessKey,
+) -> bool:
+    """
+    Check if the keypair does not have active sessions.
+    :param db_session: SQLAlchemy session
+    :param access_key: access key
+    :return: True if the access key has some active sessions.
+    """
+    from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+
+    active_kernel_count = await db_session.scalar(
+        sa.select(sa.func.count())
+        .select_from(KernelRow)
+        .where(
+            (KernelRow.access_key == access_key)
+            & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+        ),
+    )
+    return active_kernel_count > 0
