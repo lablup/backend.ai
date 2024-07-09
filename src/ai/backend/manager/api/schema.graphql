@@ -311,6 +311,9 @@ type Domain {
 type GroupNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.7. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   description: String
   is_active: Boolean
