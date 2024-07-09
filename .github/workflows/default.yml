@@ -357,6 +357,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
   build-sbom:
+    if: ${{ github.event.pull_request.merged == true || (github.event_name == 'push' && contains(github.ref, 'refs/tags/')) }}
     uses: ./.github/workflows/sbom.yml
 
   make-final-release:
