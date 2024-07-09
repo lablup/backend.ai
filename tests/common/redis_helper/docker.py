@@ -9,11 +9,11 @@ from pprint import pprint
 from typing import AsyncIterator, Tuple
 
 import aiohttp
-import async_timeout
 import pytest
 from packaging.version import Version
 from packaging.version import parse as parse_version
 
+from ai.backend.testutils.bootstrap import get_next_tcp_port
 from ai.backend.testutils.pants import get_parallel_slot
 
 from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
@@ -35,10 +35,22 @@ async def check_if_port_is_clear(host, port):
 
 
 class DockerRedisNode(AbstractRedisNode):
-    def __init__(self, node_type: str, port: int, container_id: str) -> None:
+    def __init__(
+        self,
+        node_type: str,
+        port: int,
+        container_id: str,
+        *,
+        verbose: bool = False,
+    ) -> None:
         self.node_type = node_type
         self.port = port
         self.container_id = container_id
+        self.verbose = verbose
+        self._cmd_opts = {}
+        if not self.verbose:
+            self._cmd_opts["stdout"] = asyncio.subprocess.DEVNULL
+            self._cmd_opts["stderr"] = asyncio.subprocess.DEVNULL
 
     @property
     def addr(self) -> Tuple[str, int]:
@@ -50,50 +62,30 @@ class DockerRedisNode(AbstractRedisNode):
     async def pause(self) -> None:
         assert self.container_id is not None
         print(f"Docker container {self.container_id[:12]} is being paused...")
-        p = await simple_run_cmd(
-            ["docker", "pause", self.container_id],
-            # stdout=asyncio.subprocess.DEVNULL,
-            # stderr=asyncio.subprocess.DEVNULL,
-        )
+        p = await simple_run_cmd(["docker", "pause", self.container_id], **self._cmd_opts)
         await p.wait()
         print(f"Docker container {self.container_id[:12]} is paused")
 
     async def unpause(self) -> None:
         assert self.container_id is not None
-        p = await simple_run_cmd(
-            ["docker", "unpause", self.container_id],
-            # stdout=asyncio.subprocess.DEVNULL,
-            # stderr=asyncio.subprocess.DEVNULL,
-        )
+        p = await simple_run_cmd(["docker", "unpause", self.container_id], **self._cmd_opts)
         await p.wait()
         print(f"Docker container {self.container_id[:12]} is unpaused")
 
     async def stop(self, force_kill: bool = False) -> None:
         assert self.container_id is not None
         if force_kill:
-            p = await simple_run_cmd(
-                ["docker", "kill", self.container_id],
-                # stdout=asyncio.subprocess.DEVNULL,
-                # stderr=asyncio.subprocess.DEVNULL,
-            )
+            p = await simple_run_cmd(["docker", "kill", self.container_id], **self._cmd_opts)
             await p.wait()
             print(f"Docker container {self.container_id[:12]} is killed")
         else:
-            p = await simple_run_cmd(
-                ["docker", "stop", self.container_id],
-                # stdout=asyncio.subprocess.DEVNULL,
-                # stderr=asyncio.subprocess.DEVNULL,
-            )
+            p = await simple_run_cmd(["docker", "stop", self.container_id], **self._cmd_opts)
             await p.wait()
             print(f"Docker container {self.container_id[:12]} is terminated")
 
     async def start(self) -> None:
         assert self.container_id is not None
-        p = await simple_run_cmd(
-            ["docker", "start", self.container_id],
-            # stdout=asyncio.subprocess.DEVNULL,
-            # stderr=asyncio.subprocess.DEVNULL,
-        )
+        p = await simple_run_cmd(["docker", "start", self.container_id], **self._cmd_opts)
         await p.wait()
         print(f"Docker container {self.container_id[:12]} started")
 
@@ -156,14 +148,14 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         compose_cfg_dir = (
             Path.home() / ".cache" / "bai" / "testing" / f"bai-redis-test-{get_parallel_slot()}"
         )
-        base_port = 9200 + get_parallel_slot() * 8
+        allocated_ports = get_next_tcp_port(6)
         ports = {
-            "REDIS_MASTER_PORT": base_port,
-            "REDIS_SLAVE1_PORT": base_port + 1,
-            "REDIS_SLAVE2_PORT": base_port + 2,
-            "REDIS_SENTINEL1_PORT": base_port + 3,
-            "REDIS_SENTINEL2_PORT": base_port + 4,
-            "REDIS_SENTINEL3_PORT": base_port + 5,
+            "REDIS_MASTER_PORT": allocated_ports[0],
+            "REDIS_SLAVE1_PORT": allocated_ports[1],
+            "REDIS_SLAVE2_PORT": allocated_ports[2],
+            "REDIS_SENTINEL1_PORT": allocated_ports[3],
+            "REDIS_SENTINEL2_PORT": allocated_ports[4],
+            "REDIS_SENTINEL3_PORT": allocated_ports[5],
         }
         async with asyncio.TaskGroup() as tg:
             for port in ports.values():
@@ -171,25 +163,26 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         os.environ.update({k: str(v) for k, v in ports.items()})
         os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
         os.environ["DOCKER_USER"] = f"{os.getuid()}:{os.getgid()}"
+        os.environ["NETWORK_NAME"] = f"testnet-{get_parallel_slot()}-{self.test_case_ns}"
 
         if compose_cfg_dir.exists():
             shutil.rmtree(compose_cfg_dir)
         compose_cfg_dir.mkdir(parents=True)
         for file in template_cfg_files:
             shutil.copy(template_cfg_dir / file, compose_cfg_dir)
-        compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
-        compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
-        compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
-        compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
-        sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
+        sentinel_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
+        sentinel_tpl = sentinel_tpl.replace("REDIS_PASSWORD", "develove")
+        sentinel_tpl = sentinel_tpl.replace("REDIS_MASTER_HOST", "node01")
+        sentinel_tpl = sentinel_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
+        sentinel01_cfg = sentinel_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
         sentinel01_cfg = sentinel01_cfg.replace(
             "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL1_PORT"])
         )
-        sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
+        sentinel02_cfg = sentinel_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
         sentinel02_cfg = sentinel02_cfg.replace(
             "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL2_PORT"])
         )
-        sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
+        sentinel03_cfg = sentinel_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
         sentinel03_cfg = sentinel03_cfg.replace(
             "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL3_PORT"])
         )
@@ -199,7 +192,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         compose_file = compose_cfg_dir / "redis-cluster.yml"
 
-        async with async_timeout.timeout(30.0):
+        async with asyncio.timeout(30.0):
             cmdargs = [
                 *compose_cmd,
                 "-p",
@@ -213,8 +206,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cmdargs,
                 env=os.environ,
                 cwd=compose_cfg_dir,
-                # stdout=asyncio.subprocess.DEVNULL,
-                # stderr=asyncio.subprocess.DEVNULL,
             )
             await p.wait()
             assert p.returncode == 0, "Compose cluster creation has failed."
@@ -297,12 +288,13 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
                     container["Id"]
                 )
-                print(f"--- logs of {container['Id']} ---")
-                try:
-                    p = await simple_run_cmd(["docker", "logs", container["Id"]])
-                finally:
-                    await p.wait()
-                print("--- end of logs ---")
+                if self.verbose:
+                    print(f"--- logs of {container['Id']} ---")
+                    try:
+                        p = await simple_run_cmd(["docker", "logs", container["Id"]])
+                    finally:
+                        await p.wait()
+                    print("--- end of logs ---")
             print(f"{cids=}")
             print(f"{cid_mapping=}")
 
@@ -317,16 +309,19 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "node",
                         ports["REDIS_MASTER_PORT"],
                         cid_mapping["backendai-half-redis-node01"],
+                        verbose=self.verbose,
                     ),
                     DockerRedisNode(
                         "node",
                         ports["REDIS_SLAVE1_PORT"],
                         cid_mapping["backendai-half-redis-node02"],
+                        verbose=self.verbose,
                     ),
                     DockerRedisNode(
                         "node",
                         ports["REDIS_SLAVE2_PORT"],
                         cid_mapping["backendai-half-redis-node03"],
+                        verbose=self.verbose,
                     ),
                 ],
                 sentinel_addrs=[
@@ -339,22 +334,25 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "sentinel",
                         ports["REDIS_SENTINEL1_PORT"],
                         cid_mapping["backendai-half-redis-sentinel01"],
+                        verbose=self.verbose,
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports["REDIS_SENTINEL2_PORT"],
                         cid_mapping["backendai-half-redis-sentinel02"],
+                        verbose=self.verbose,
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports["REDIS_SENTINEL3_PORT"],
                         cid_mapping["backendai-half-redis-sentinel03"],
+                        verbose=self.verbose,
                     ),
                 ],
             )
         finally:
             await asyncio.sleep(0.2)
-            async with async_timeout.timeout(30.0):
+            async with asyncio.timeout(30.0):
                 p = await simple_run_cmd(
                     [
                         *compose_cmd,
@@ -370,7 +368,9 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     stderr=asyncio.subprocess.DEVNULL,
                 )
                 await p.wait()
-            await asyncio.sleep(0.2)
+            async with asyncio.TaskGroup() as tg:
+                for port in ports.values():
+                    tg.create_task(check_if_port_is_clear("127.0.0.1", port))
 
 
 async def main():

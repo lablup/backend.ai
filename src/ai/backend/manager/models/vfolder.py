@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -75,7 +75,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .user import UserRole
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
@@ -279,6 +279,7 @@ class VFolderDeletionInfo(NamedTuple):
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
+    domain_name: str
 
     # Target Vfolder infos
     target_quota_scope_id: str
@@ -297,6 +298,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
+    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -324,8 +326,8 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
+    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -344,15 +346,6 @@ vfolders = sa.Table(
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-    sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
-    ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -404,6 +397,7 @@ vfolder_invitations = sa.Table(
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
+    IDColumn(),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column(
         "vfolder",
@@ -415,21 +409,33 @@ vfolder_permissions = sa.Table(
 )
 
 
+class VFolderPermissionRow(Base):
+    __table__ = vfolder_permissions
+
+
 class VFolderRow(Base):
     __table__ = vfolders
 
     endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship("UserRow", back_populates="vfolder_row")
-    group_row = relationship("GroupRow", back_populates="vfolder_row")
+    user_row = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
+    group_row = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
     @classmethod
     async def get(
         cls,
         session: SASession,
         id: uuid.UUID,
-        load_user=False,
-        load_group=False,
-    ) -> "VFolderRow":
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
         query = sa.select(VFolderRow).where(VFolderRow.id == id)
         if load_user:
             query = query.options(selectinload(VFolderRow.user_row))
@@ -1088,6 +1094,7 @@ async def initiate_vfolder_clone(
                 insert_values = {
                     "id": target_folder_id.folder_id,
                     "name": vfolder_info.target_vfolder_name,
+                    "domain_name": vfolder_info.domain_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
                     "last_used": None,
@@ -1214,7 +1221,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
     from ai.backend.manager.models import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
@@ -1337,6 +1343,31 @@ class VirtualFolder(graphene.ObjectType):
             cloneable=row["cloneable"],
             status=row["status"],
             cur_size=row["cur_size"],
+        )
+
+    @classmethod
+    def from_orm_row(cls, row: VFolderRow) -> VirtualFolder:
+        return cls(
+            id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user,
+            user_email=row.user_row.email if row.user_row is not None else None,
+            group=row.group,
+            group_name=row.group_row.name if row.group_row is not None else None,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -1904,6 +1935,10 @@ class VirtualFolderNode(graphene.ObjectType):
             last=last,
         )
 
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(cls.from_row(info, vf)) for vf in vfolder_rows]
@@ -2051,8 +2086,6 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
         try:
@@ -2214,6 +2247,7 @@ class ModelCard(graphene.ObjectType):
 
     name = graphene.String()
     vfolder = graphene.Field(VirtualFolder)
+    vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -2296,7 +2330,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.created_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.created_at
 
     def resolve_modified_at(
@@ -2305,7 +2339,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.modified_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.modified_at
 
     @classmethod
@@ -2330,6 +2364,8 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
+            vfolder=VirtualFolder.from_orm_row(vfolder_row),
+            vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
             author=metadata.get("author") or vfolder_row.creator or "",
             title=metadata.get("title") or vfolder_row.name,
@@ -2443,7 +2479,9 @@ class ModelCard(graphene.ObjectType):
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(db_session, uuid.UUID(vfolder_row_id))
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
@@ -2514,7 +2552,10 @@ class ModelCard(graphene.ObjectType):
             VFolderRow.group.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
-        cnt_query = cnt_query.where(additional_cond)
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
