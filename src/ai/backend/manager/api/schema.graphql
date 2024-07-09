@@ -321,6 +321,12 @@ type GroupNode implements Node {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added in 24.03.7."""
+  type: String
+
+  """Added in 24.03.7."""
+  container_registry: JSONString
   scaling_groups: [String]
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
