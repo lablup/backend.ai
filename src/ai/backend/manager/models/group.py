@@ -811,6 +811,7 @@ class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID(description="Added in 24.03.7. The undecoded id value stored in DB.")
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
@@ -821,6 +822,8 @@ class GroupNode(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
+    type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
+    container_registry = graphene.JSONString(description="Added in 24.03.7.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
     )
@@ -833,16 +836,19 @@ class GroupNode(graphene.ObjectType):
     def from_row(cls, row: GroupRow) -> GroupNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.name,
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
             modified_at=row.modified_at,
             domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts or {},
+            total_resource_slots=row.total_resource_slots.to_json() or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
+            type=row.type.name,
+            container_registry=row.container_registry,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
