@@ -2691,6 +2691,9 @@ class AgentRegistry:
             SessionStartedEvent(session.id, session.creation_id),
         )
 
+        if session.session_type == SessionTypes.BATCH:
+            await self.trigger_batch_execution(session)
+
     async def execute(
         self,
         session: SessionRow,
