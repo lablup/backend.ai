@@ -822,7 +822,7 @@ class GroupNode(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added in 24.03.7.")
+    type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
     container_registry = graphene.JSONString(description="Added in 24.03.7.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
