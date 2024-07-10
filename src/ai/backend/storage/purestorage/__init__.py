@@ -17,17 +17,22 @@ from .rapidfiles import RapidFileToolsFSOpModel
 from .rapidfiles_v2 import RapidFileToolsv2FSOpModel
 
 FLASHBLADE_TOOLKIT_V2_VERSION_RE = re.compile(r"version p[a-zA-Z\d]+ \(RapidFile\) (2\..+)")
-FLASHBLADE_TOOLKIT_V1_VERSION_RE = re.compile(r"p[a-zA-Z\d]+ (RapidFile Toolkit) (1\..+)")
+FLASHBLADE_TOOLKIT_V1_VERSION_RE = re.compile(r"p[a-zA-Z\d]+ \(RapidFile Toolkit\) (1\..+)")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class FlashBladeVolume(BaseVolume):
     name = "purestorage"
-    toolkit_version: int
+    _toolkit_version: int | None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._toolkit_version = None
 
     async def create_fsop_model(self) -> AbstractFSOpModel:
-        if self.toolkit_version == 2:
+        if (await self.get_toolkit_version()) == 2:
             return RapidFileToolsv2FSOpModel(
                 self.mount_path,
                 self.local_config["storage-proxy"]["scandir-limit"],
@@ -38,8 +43,9 @@ class FlashBladeVolume(BaseVolume):
                 self.local_config["storage-proxy"]["scandir-limit"],
             )
 
-    async def init(self) -> None:
-        available = True
+    async def get_toolkit_version(self) -> int:
+        if self._toolkit_version is not None:
+            return self._toolkit_version
         try:
             proc = await asyncio.create_subprocess_exec(
                 b"pdu",
@@ -48,23 +54,29 @@ class FlashBladeVolume(BaseVolume):
                 stderr=asyncio.subprocess.STDOUT,
             )
         except FileNotFoundError:
-            available = False
-        else:
-            try:
-                stdout, stderr = await proc.communicate()
-                if proc.returncode != 0:
-                    available = False
+            self._toolkit_version = -1
+        try:
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                self._toolkit_version = -1
+            else:
+                version_line = stdout.decode().splitlines()[0]
+                if FLASHBLADE_TOOLKIT_V2_VERSION_RE.match(version_line):
+                    self._toolkit_version = 2
+                    log.info("FlashBlade Toolkit 2 detected")
+                elif FLASHBLADE_TOOLKIT_V1_VERSION_RE.match(version_line):
+                    self._toolkit_version = 1
+                    log.info("FlashBlade Toolkit 1 detected")
                 else:
-                    version_line = stdout.decode().splitlines()[0]
-                    if FLASHBLADE_TOOLKIT_V2_VERSION_RE.match(version_line):
-                        self.toolkit_version = 2
-                    elif FLASHBLADE_TOOLKIT_V1_VERSION_RE.match(version_line):
-                        self.toolkit_version = 1
-                    else:
-                        log.warn("Unrecogized FlashBlade Toolkit version: {}", version_line)
-            finally:
-                await proc.wait()
-        if not available:
+                    log.warn("Unrecogized FlashBlade Toolkit version: {}", version_line)
+                    self._toolkit_version = -1
+        finally:
+            await proc.wait()
+            return -1
+
+    async def init(self) -> None:
+        toolkit_version = await self.get_toolkit_version()
+        if not toolkit_version:
             raise RuntimeError(
                 "PureStorage RapidFile Toolkit is not installed. "
                 "You cannot use the PureStorage backend for the stroage proxy.",
