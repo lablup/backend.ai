@@ -568,6 +568,12 @@ def _destroy_cmd(docs: str = None):
             else:
                 if not has_failure:
                     print_done("Done.")
+                    if forced:
+                        print_warn(
+                            "If you have destroyed a session whose status is one of "
+                            "[`PULLING`, `SCHEDULED`, `PREPARING`, `TERMINATING`, `ERROR`], "
+                            "Manual cleanup of actual containers may be required."
+                        )
                 if stats:
                     stats = ret.get("stats", None) if ret else None
                     if stats:
@@ -742,18 +748,27 @@ def ls(session_id, path):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-def logs(session_id):
+@click.option(
+    "-k",
+    "--kernel",
+    "--kernel-id",
+    type=str,
+    default=None,
+    help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
+)
+def logs(session_id, kernel: str | None):
     """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
+    _kernel_id = uuid.UUID(kernel) if kernel is not None else None
     with Session() as session:
         try:
             print_wait("Retrieving live container logs...")
-            kernel = session.ComputeSession(session_id)
-            result = kernel.get_logs().get("result")
+            _session = session.ComputeSession(session_id)
+            result = _session.get_logs(_kernel_id).get("result")
             logs = result.get("logs") if "logs" in result else ""
             print(logs)
             print_done("End of logs.")

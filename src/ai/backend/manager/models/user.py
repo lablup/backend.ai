@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -186,7 +186,11 @@ class UserRow(Base):
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
-    vfolder_row = relationship("VFolderRow", back_populates="user_row")
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="user_row",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
 
 
 class UserGroup(graphene.ObjectType):
@@ -662,8 +666,13 @@ class CreateUser(graphene.Mutation):
             model_store_query = sa.select([groups.c.id]).where(
                 groups.c.type == ProjectType.MODEL_STORE
             )
-            model_store_gid = (await conn.execute(model_store_query)).first()["id"]
-            gids_to_join = [*group_ids, model_store_gid]
+            model_store_project = cast(
+                dict[str, Any] | None, (await conn.execute(model_store_query)).first()
+            )
+            if model_store_project is not None:
+                gids_to_join = [*group_ids, model_store_project["id"]]
+            else:
+                gids_to_join = group_ids
 
             # Add user to groups if group_ids parameter is provided.
             if gids_to_join:
@@ -1395,7 +1404,7 @@ class UserNode(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", enum_field_getter(UserRole)),
-        "resource_policy": ("domain_name", None),
+        "resource_policy": ("resource_policy", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
