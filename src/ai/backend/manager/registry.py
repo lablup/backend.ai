@@ -20,6 +20,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -150,6 +151,7 @@ from .models import (
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
+    UserRole,
     UserRow,
     agents,
     domains,
@@ -163,6 +165,12 @@ from .models import (
     recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
+)
+from .models.session import (
+    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
+    SESSION_KERNEL_STATUS_MAPPING,
+    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
+    ConcurrencyUsed,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1972,17 +1980,11 @@ class AgentRegistry:
                 await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
-            set
-        )  # key: access_key, value: set of session_id
-        sftp_concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
-            set
-        )  # key: access_key, value: set of session_id
-
-        async def _recalc() -> None:
+        async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
+            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
 
             async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
@@ -2013,12 +2015,19 @@ class AgentRegistry:
                                 kernel.occupied_slots
                             )
                         if session_status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                            access_key = cast(AccessKey, session_row.access_key)
+                            if access_key not in access_key_to_concurrency_used:
+                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
+                                    access_key
+                                )
                             if kernel.role in PRIVATE_KERNEL_ROLES:
-                                sftp_concurrency_used_per_key[session_row.access_key].add(
+                                access_key_to_concurrency_used[access_key].system_session_ids.add(
                                     session_row.id
                                 )
                             else:
-                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
+                                access_key_to_concurrency_used[access_key].compute_session_ids.add(
+                                    session_row.id
+                                )
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -2048,54 +2057,54 @@ class AgentRegistry:
                         .where(AgentRow.status == AgentStatus.ALIVE)
                     )
                     await db_sess.execute(query)
+            return access_key_to_concurrency_used
 
-        await execute_with_retry(_recalc)
+        access_key_to_concurrency_used = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
-        kp_key = "keypair.concurrency_used"
-        sftp_kp_key = "keypair.sftp_concurrency_used"
-
         async def _update(r: Redis):
-            updates = {
-                f"{kp_key}.{ak}": len(session_ids)
-                for ak, session_ids in concurrency_used_per_key.items()
-            } | {
-                f"{sftp_kp_key}.{ak}": len(session_ids)
-                for ak, session_ids in sftp_concurrency_used_per_key.items()
-            }
+            updates: dict[str, int] = {}
+            for concurrency in access_key_to_concurrency_used.values():
+                updates |= concurrency.to_cnt_map()
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
-            keys = await r.keys(f"{kp_key}.*")
+            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
-                    _stat_key = stat_key
-                ak = _stat_key.replace(f"{kp_key}.", "")
-                session_concurrency = concurrency_used_per_key.get(ak)
-                usage = len(session_concurrency) if session_concurrency is not None else 0
+                    _stat_key = cast(str, stat_key)
+                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
+                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+                usage = (
+                    len(concurrent_sessions.compute_session_ids)
+                    if concurrent_sessions is not None
+                    else 0
+                )
                 updates[_stat_key] = usage
-            keys = await r.keys(f"{sftp_kp_key}.*")
+            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
             for stat_key in keys:
                 if isinstance(stat_key, bytes):
                     _stat_key = stat_key.decode("utf-8")
                 else:
-                    _stat_key = stat_key
-                ak = _stat_key.replace(f"{sftp_kp_key}.", "")
-                session_concurrency = sftp_concurrency_used_per_key.get(ak)
-                usage = len(session_concurrency) if session_concurrency is not None else 0
+                    _stat_key = cast(str, stat_key)
+                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
+                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+                usage = (
+                    len(concurrent_sessions.system_concurrency_used_key)
+                    if concurrent_sessions is not None
+                    else 0
+                )
                 updates[_stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or (
-            not concurrency_used_per_key and not sftp_concurrency_used_per_key
-        )
+        _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
             await redis_helper.execute(
                 self.redis_stat,
@@ -2153,6 +2162,7 @@ class AgentRegistry:
         *,
         forced: bool = False,
         reason: Optional[KernelLifecycleEventReason] = None,
+        user_role: UserRole | None = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -2176,6 +2186,50 @@ class AgentRegistry:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
+
+        async def _force_destroy_for_suadmin(
+            target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
+        ) -> None:
+            current_time = datetime.now(tzutc())
+            destroy_reason = str(KernelLifecycleEventReason.FORCE_TERMINATED)
+
+            async def _destroy(db_session: AsyncSession) -> SessionRow:
+                _stmt = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                if session_row is None:
+                    raise SessionNotFound(f"Session not found (id: {session_id})")
+                kernel_rows = cast(list[KernelRow], session_row.kernels)
+                kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
+                for kern in kernel_rows:
+                    kern.status = kernel_target_status
+                    kern.terminated_at = current_time
+                    kern.status_info = destroy_reason
+                    kern.status_history = sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {
+                            kernel_target_status.name: current_time.isoformat(),
+                        },
+                    )
+                session_row.status = target_status
+                session_row.terminated_at = current_time
+                session_row.status_info = destroy_reason
+                session_row.status_history = sql_json_merge(
+                    SessionRow.status_history,
+                    (),
+                    {
+                        target_status.name: current_time.isoformat(),
+                    },
+                )
+                return session_row
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
+            await self.recalc_resource_usage()
 
         async with handle_session_exception(
             self.db,
@@ -2215,6 +2269,17 @@ class AgentRegistry:
                         self.db, session_id, SessionStatus.CANCELLED
                     )
                 case SessionStatus.PULLING:
+                    # Exceptionally allow superadmins to destroy PULLING sessions.
+                    # Clients should be informed that they have to handle the containers destroyed here.
+                    # TODO: detach image-pull process from kernel-start process and allow all users to destroy PULLING sessions.
+                    if forced and user_role == UserRole.SUPERADMIN:
+                        log.warning(
+                            "force-terminating session (s:{}, status:{})",
+                            session_id,
+                            target_session.status,
+                        )
+                        await _force_destroy_for_suadmin(SessionStatus.CANCELLED)
+                        return {}
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
@@ -2232,12 +2297,18 @@ class AgentRegistry:
                         session_id,
                         target_session.status,
                     )
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
-                    await self.event_producer.produce_event(
-                        SessionTerminatingEvent(session_id, reason),
-                    )
+                    if user_role == UserRole.SUPERADMIN:
+                        # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
+                        # TODO: refactor Session/Kernel status management and remove this.
+                        await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
+                        return {}
+                    else:
+                        await SessionRow.set_session_status(
+                            self.db, session_id, SessionStatus.TERMINATING
+                        )
+                        await self.event_producer.produce_event(
+                            SessionTerminatingEvent(session_id, reason),
+                        )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
                         "Cannot destroy sessions that has already been already terminated"
@@ -2770,14 +2841,20 @@ class AgentRegistry:
     async def get_logs_from_agent(
         self,
         session: SessionRow,
+        kernel_id: KernelId | None = None,
     ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
+            kernel = (
+                session.get_kernel_by_id(kernel_id)
+                if kernel_id is not None
+                else session.main_kernel
+            )
             async with self.agent_cache.rpc_context(
-                session.main_kernel.agent,
+                agent_id=kernel.agent,
                 invoke_timeout=30,
-                order_key=session.main_kernel.id,
+                order_key=kernel.id,
             ) as rpc:
-                reply = await rpc.call.get_logs(str(session.main_kernel.id))
+                reply = await rpc.call.get_logs(str(kernel.id))
                 return reply["logs"]
 
     async def increment_session_usage(

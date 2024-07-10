@@ -3,17 +3,16 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Union,
 )
 from uuid import UUID
@@ -45,6 +44,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
@@ -80,6 +80,7 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "determine_session_status",
@@ -508,6 +509,31 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
+
+
+@dataclass
+class ConcurrencyUsed:
+    access_key: AccessKey
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
+
+    @property
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_cnt_map(self) -> Mapping[str, int]:
+        return {
+            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
+            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+        }
+
+
 class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
@@ -706,6 +732,14 @@ class SessionRow(Base):
     @property
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
+
+    def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
+        if len(kerns) == 0:
+            raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
+        return kerns[0]
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)

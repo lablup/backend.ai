@@ -311,6 +311,9 @@ type Domain {
 type GroupNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.7. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   description: String
   is_active: Boolean
@@ -321,6 +324,12 @@ type GroupNode implements Node {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  type: String
+
+  """Added in 24.03.7."""
+  container_registry: JSONString
   scaling_groups: [String]
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
@@ -693,6 +702,22 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
+
+  """Added in 24.03.7."""
+  agent_count_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): Int
+
+  """Added in 24.03.7."""
+  agent_total_resource_slots_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): JSONString
 }
 
 type StorageVolume implements Item {
@@ -1005,6 +1030,9 @@ type ModelCard implements Node {
   id: ID!
   name: String
   vfolder: VirtualFolder
+
+  """Added in 24.09.0."""
+  vfolder_node: VirtualFolderNode
   author: String
 
   """Human readable name of the model."""
