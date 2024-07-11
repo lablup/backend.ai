@@ -18,7 +18,9 @@ visibility_private_component(
         "//src/ai/backend/testutils/**",
         "//src/ai/backend/install/**",
     ],
-    allowed_dependencies=[],
+    allowed_dependencies=[
+        "//src/ai/backend/cli/**",
+    ],
 )
 
 python_distribution(
@@ -52,3 +54,29 @@ resources(
         "**/py.typed",
     ],
 )
+
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
+
+scie_binary(
+    name="backendai-plugin",
+    fat=False,
+    dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-plugin-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+resource(name="buildscript", source="BUILD")
