@@ -93,14 +93,12 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
         match ret:
-            case list():
-                if not ret:
-                    # The API may return an empty result upon container termination.
-                    return None
+            case list() if ret:
                 entry = ret[0]
-            case dict():
+            case dict() if ret:
                 entry = ret
             case _:
+                # The API may return an empty result upon container termination.
                 log.warning(
                     "cannot read stats (cid:{}): got an empty result: {}",
                     short_cid,
