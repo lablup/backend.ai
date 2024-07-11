@@ -235,6 +235,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
+    CONTAINER_NOT_FOUND = "container-not-found"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
