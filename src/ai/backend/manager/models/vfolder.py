@@ -230,8 +230,9 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     VFolderStatusSet.DELETABLE: {
         VFolderOperationStatus.READY,
     },
-    # if DELETABLE access status is requested, only DELETE_COMPLETE operation status is accepted.
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
     VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
         VFolderOperationStatus.DELETE_COMPLETE,
     },
     VFolderStatusSet.RECOVERABLE: {
