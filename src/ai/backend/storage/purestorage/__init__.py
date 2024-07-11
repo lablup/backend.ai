@@ -55,6 +55,7 @@ class FlashBladeVolume(BaseVolume):
             )
         except FileNotFoundError:
             self._toolkit_version = -1
+            return -1
         try:
             stdout, stderr = await proc.communicate()
             if proc.returncode != 0:
@@ -72,11 +73,12 @@ class FlashBladeVolume(BaseVolume):
                     self._toolkit_version = -1
         finally:
             await proc.wait()
-            return -1
+            assert self._toolkit_version
+            return self._toolkit_version
 
     async def init(self) -> None:
         toolkit_version = await self.get_toolkit_version()
-        if not toolkit_version:
+        if toolkit_version == -1:
             raise RuntimeError(
                 "PureStorage RapidFile Toolkit is not installed. "
                 "You cannot use the PureStorage backend for the stroage proxy.",
