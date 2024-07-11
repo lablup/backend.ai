@@ -148,21 +148,6 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     yield from entrypoints.values()
 
 
-def extract_entrypoints_from_entry_points_txt(
-    group_name: str,
-    entry_points_txt: str,
-) -> Iterator[EntryPoint]:
-    current_group = None
-    for line in entry_points_txt.splitlines():
-        line = line.strip()
-        if line.endswith("]"):
-            current_group = line[1:-1]
-        elif current_group == group_name:
-            if "=" in line:
-                name, value = [x.strip() for x in line.split("=", 1)]
-                yield EntryPoint(name=name, value=value, group=group_name)
-
-
 def prepare_external_package_entrypoints(group_name: str, directory: Path | None = None) -> None:
     if directory is None:
         # TODO: Implement scanning from the designated directory in local-dev setup.
