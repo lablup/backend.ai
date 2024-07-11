@@ -87,7 +87,7 @@ class VFolder(BaseFunction):
     @classmethod
     async def delete_by_id(cls, oid):
         rqst = Request("DELETE", "/folders")
-        rqst.set_json({"id": oid})
+        rqst.set_json({"vfolder_id": oid})
         async with rqst.fetch():
             return {}
 
@@ -259,7 +259,7 @@ class VFolder(BaseFunction):
             self.id = vfolder_id
         rqst = Request("POST", "/folders/purge")
         rqst.set_json({
-            "id": self.id.hex,
+            "vfolder_id": self.id.hex,
         })
         async with rqst.fetch():
             return {}
@@ -270,7 +270,7 @@ class VFolder(BaseFunction):
             self.id = vfolder_id
         rqst = Request("POST", "/folders/restore-from-trash-bin")
         rqst.set_json({
-            "id": self.id.hex,
+            "vfolder_id": self.id.hex,
         })
         async with rqst.fetch():
             return {}
@@ -290,7 +290,7 @@ class VFolder(BaseFunction):
             self.id = vfolder_id
         rqst = Request("POST", "/folders/delete-from-trash-bin")
         rqst.set_json({
-            "id": self.id.hex,
+            "vfolder_id": self.id.hex,
         })
         async with rqst.fetch():
             return {}
