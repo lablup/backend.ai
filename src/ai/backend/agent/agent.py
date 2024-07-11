@@ -705,7 +705,7 @@ class AbstractAgent(
 
         # Prepare auto-cleaning of idle kernels.
         sync_container_lifecycles_config = self.local_config["agent"]["sync-container-lifecycles"]
-        if sync_container_lifecycles_config["run-task"]:
+        if sync_container_lifecycles_config["enabled"]:
             self.timer_tasks.append(
                 aiotools.create_timer(
                     self.sync_container_lifecycles, sync_container_lifecycles_config["interval"]

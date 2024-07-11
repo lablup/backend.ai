@@ -128,7 +128,7 @@ default_container_logs_config = {
 }
 
 default_sync_container_lifecycles_config = {
-    "run-task": True,
+    "enabled": True,
     "interval": 10.0,
 }
 
@@ -138,7 +138,7 @@ agent_etcd_config_iv = t.Dict({
         t.Key("chunk-size", default=default_container_logs_config["chunk-size"]): tx.BinarySize(),
     }).allow_extra("*"),
     t.Key("sync-container-lifecycles", default=default_sync_container_lifecycles_config): t.Dict({
-        t.Key("run-task", default=default_sync_container_lifecycles_config["run-task"]): t.ToBool,
+        t.Key("enabled", default=default_sync_container_lifecycles_config["enabled"]): t.ToBool,
         t.Key("interval", default=default_sync_container_lifecycles_config["interval"]): t.ToFloat[
             0:
         ],
