@@ -55,7 +55,7 @@ from ai.backend.common.types import (
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData, KernelStatus
+from .types import AgentEventData, KernelLifeCycleStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -177,7 +177,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    status: KernelStatus
+    status: KernelLifeCycleStatus
 
     _tasks: Set[asyncio.Task]
 
@@ -214,7 +214,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.environ = environ
         self.runner = None
         self.container_id = None
-        self.status = KernelStatus.PREPARING
+        self.state = KernelLifeCycleStatus.PREPARING
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -237,7 +237,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     def __setstate__(self, props) -> None:
         if "status" not in props:
             # We pickle "running" kernels, not "preparing" or "terminating" ones
-            props["status"] = KernelStatus.RUNNING
+            props["status"] = KernelLifeCycleStatus.RUNNING
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None

@@ -157,7 +157,7 @@ from .types import (
     Container,
     ContainerLifecycleEvent,
     ContainerStatus,
-    KernelStatus,
+    KernelLifeCycleStatus,
     LifecycleEvent,
     MountInfo,
 )
@@ -968,7 +968,10 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
+                    if (
+                        not kernel_obj.stats_enabled
+                        or kernel_obj.state != KernelLifeCycleStatus.RUNNING
+                    ):
                         continue
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
@@ -986,7 +989,10 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled or kernel_obj.status != KernelStatus.RUNNING:
+                    if (
+                        not kernel_obj.stats_enabled
+                        or kernel_obj.state != KernelLifeCycleStatus.RUNNING
+                    ):
                         continue
                     updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
@@ -1011,7 +1017,7 @@ class AbstractAgent(
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.stats_enabled = True
-                kernel_obj.status = KernelStatus.RUNNING
+                kernel_obj.state = KernelLifeCycleStatus.RUNNING
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
@@ -1041,7 +1047,7 @@ class AbstractAgent(
                             ev.done_future.set_result(None)
                         return
                 else:
-                    kernel_obj.status = KernelStatus.TERMINATING
+                    kernel_obj.state = KernelLifeCycleStatus.TERMINATING
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
@@ -1351,7 +1357,7 @@ class AbstractAgent(
                         kernel_obj = self.kernel_registry[kernel_id]
                         if (
                             kernel_id in self.restarting_kernels
-                            or kernel_obj.status == KernelStatus.PREPARING
+                            or kernel_obj.state == KernelLifeCycleStatus.PREPARING
                         ):
                             continue
                         log.debug(f"kernel with no container (kid: {kernel_id})")
@@ -2129,7 +2135,7 @@ class AbstractAgent(
                         },
                     ),
                 )
-                kernel_obj.status = KernelStatus.RUNNING
+                kernel_obj.state = KernelLifeCycleStatus.RUNNING
 
                 if (
                     kernel_config["session_type"] == "batch"
@@ -2571,7 +2577,7 @@ class AbstractAgent(
         running_kernel_registry = {
             kid: kernel_obj
             for kid, kernel_obj in self.kernel_registry.items()
-            if kernel_obj.status == KernelStatus.RUNNING
+            if kernel_obj.state == KernelLifeCycleStatus.RUNNING
         }
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
