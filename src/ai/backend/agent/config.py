@@ -16,6 +16,11 @@ coredump_defaults = {
     "size-limit": "64M",
 }
 
+default_sync_container_lifecycles_config = {
+    "enabled": True,
+    "interval": 10.0,
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
@@ -59,6 +64,16 @@ agent_local_config_iv = (
             t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
             t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
+            t.Key(
+                "sync-container-lifecycles", default=default_sync_container_lifecycles_config
+            ): t.Dict({
+                t.Key(
+                    "enabled", default=default_sync_container_lifecycles_config["enabled"]
+                ): t.ToBool,
+                t.Key(
+                    "interval", default=default_sync_container_lifecycles_config["interval"]
+                ): t.ToFloat[0:],
+            }).allow_extra("*"),
         }).allow_extra("*"),
         t.Key("container"): t.Dict({
             t.Key("kernel-uid", default=-1): tx.UserID,
@@ -127,21 +142,10 @@ default_container_logs_config = {
     "chunk-size": "64K",  # used when storing logs to Redis as a side-channel to the event bus
 }
 
-default_sync_container_lifecycles_config = {
-    "enabled": True,
-    "interval": 10.0,
-}
-
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
         t.Key("max-length", default=default_container_logs_config["max-length"]): tx.BinarySize(),
         t.Key("chunk-size", default=default_container_logs_config["chunk-size"]): tx.BinarySize(),
-    }).allow_extra("*"),
-    t.Key("sync-container-lifecycles", default=default_sync_container_lifecycles_config): t.Dict({
-        t.Key("enabled", default=default_sync_container_lifecycles_config["enabled"]): t.ToBool,
-        t.Key("interval", default=default_sync_container_lifecycles_config["interval"]): t.ToFloat[
-            0:
-        ],
     }).allow_extra("*"),
 }).allow_extra("*")
 
