@@ -7,13 +7,12 @@ import itertools
 import logging
 import re
 import secrets
-import textwrap
 import time
 import typing
 import uuid
 import zlib
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -23,9 +22,7 @@ from typing import (
     Dict,
     List,
     Literal,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     TypeAlias,
     Union,
@@ -36,7 +33,6 @@ from urllib.parse import urlparse
 import aiodocker
 import aiohttp
 import aiotools
-import redis.exceptions
 import sqlalchemy as sa
 import yarl
 from async_timeout import timeout as _timeout
@@ -173,6 +169,7 @@ from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
     SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyUsed,
+    SessionLifecycleManager,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -260,6 +257,13 @@ class AgentRegistry:
         )
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
+        self.session_lifecycle_mgr = SessionLifecycleManager(
+            db,
+            redis_stat,
+            event_dispatcher,
+            event_producer,
+            hook_plugin_ctx,
+        )
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -3094,12 +3098,12 @@ class AgentRegistry:
 
         async def _set_status(db_session: AsyncSession) -> None:
             kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
-            kernel_row.set_status(
+            kernel_row.transit_status(
                 KernelStatus.PREPARING, reason, status_data={}, status_changed_at=now
             )
 
         await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)
-        await self.set_status_updatable_session(session_id)
+        await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_pulling(
         self,
@@ -3121,7 +3125,7 @@ class AgentRegistry:
 
         transited = await execute_with_txn_retry(_transit_status, self.db.begin_session, db_conn)
         if transited:
-            await self.set_status_updatable_session(session_id)
+            await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_running(
         self,
@@ -3157,21 +3161,9 @@ class AgentRegistry:
 
         transited = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
 
-        async def _update_session(db_session: AsyncSession) -> None:
-            _stmt = sa.select(SessionRow).where(SessionRow.id == session_id).with_for_update()
-            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
-            if session_row is None:
-                return
-            session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
-            session_occupying_slots.sync_keys(actual_allocs)
-            for key, val in session_occupying_slots.items():
-                session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
-            session_row.occupying_slots = session_occupying_slots
-
         if transited:
-            await execute_with_txn_retry(_update_session, self.db.begin_session, db_conn)
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            await self.set_status_updatable_session(session_id)
+            await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_terminated(
         self,
@@ -3186,11 +3178,14 @@ class AgentRegistry:
         the resource slots occupied by it.
         """
 
-        kern_stat = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(str(kernel_id)),
+        kern_stat = cast(
+            bytes | None,
+            await redis_helper.execute(
+                self.redis_stat,
+                lambda r: r.get(str(kernel_id)),
+            ),
         )
-        if kern_stat:
+        if kern_stat is not None:
             last_stat = msgpack.unpackb(kern_stat)
         else:
             last_stat = None
@@ -3199,7 +3194,7 @@ class AgentRegistry:
 
         async def _get_and_transit(
             db_session: AsyncSession,
-        ) -> tuple[AccessKey, AgentId] | None:
+        ) -> KernelRow | None:
             kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
             is_terminated = kernel_row.transit_status(
                 KernelStatus.TERMINATED,
@@ -3215,14 +3210,15 @@ class AgentRegistry:
                 return None
             if last_stat is not None:
                 kernel_row.last_stat = last_stat
-            return kernel_row.access_key, kernel_row.agent
+            return kernel_row
 
         result = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
 
         if result is None:
             return
 
-        access_key, agent = result
+        access_key = cast(AccessKey, result.access_key)
+        agent = cast(AgentId, result.agent)
 
         async def _recalc(db_session: AsyncSession) -> None:
             log.debug(
@@ -3237,94 +3233,7 @@ class AgentRegistry:
             await recalc_agent_resource_occupancy(db_session, agent)
 
         await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
-
-        # Perform statistics sync in a separate transaction block, since
-        # it may take a while to fetch stats from Redis.
-
-        # await self.sync_kernel_stats([kernel_id])
-        await self.set_status_updatable_session(session_id)
-
-    async def transit_session_status(
-        self,
-        db_conn: SAConnection,
-        session_id: SessionId,
-        status_changed_at: datetime | None = None,
-    ) -> tuple[SessionRow, bool]:
-        now = status_changed_at or datetime.now(tzutc())
-
-        async def _get_and_transit(
-            db_session: AsyncSession,
-        ) -> tuple[SessionRow, bool]:
-            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
-            transited = session_row.determine_and_set_status(status_changed_at=now)
-            return session_row, transited
-
-        return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
-
-    async def post_status_transition(
-        self,
-        session_row: SessionRow,
-    ) -> None:
-        match session_row.status:
-            case SessionStatus.RUNNING:
-                log.debug(
-                    "Producing SessionStartedEvent({}, {})",
-                    session_row.id,
-                    session_row.creation_id,
-                )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
-                await self.hook_plugin_ctx.notify(
-                    "POST_START_SESSION",
-                    (
-                        session_row.id,
-                        session_row.name,
-                        session_row.access_key,
-                    ),
-                )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
-            case SessionStatus.TERMINATED:
-                await self.event_producer.produce_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
-                )
-            case _:
-                pass
-
-    async def set_status_updatable_session(self, session_id: SessionId) -> None:
-        try:
-            await redis_helper.execute(
-                self.redis_stat,
-                lambda r: r.sadd("session_status_update", msgpack.packb(session_id)),
-            )
-        except redis.exceptions.ResponseError:
-            log.warning("Failed to update session status to redis, skip.")
-
-    async def get_status_updatable_sessions(self) -> list[SessionId]:
-        pop_all_session_id_script = textwrap.dedent("""
-        local key = KEYS[1]
-        local count = redis.call('SCARD', key)
-        return redis.call('SPOP', key, count)
-        """)
-        try:
-            raw_result = await redis_helper.execute_script(
-                self.redis_stat,
-                "pop_all_session_id_to_update_status",
-                pop_all_session_id_script,
-                ["session_status_update"],
-                [],
-            )
-        except redis.exceptions.ResponseError:
-            log.warning("Failed to fetch session data from redis, skip.")
-            return []
-        raw_result = cast(list[bytes], raw_result)
-
-        result: list[SessionId] = []
-        for raw_session_id in raw_result:
-            result.append(SessionId(msgpack.unpackb(raw_session_id)))
-        return result
+        await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def _get_user_email(
         self,

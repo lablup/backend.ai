@@ -1599,17 +1599,8 @@ class SchedulerDispatcher(aobject):
         event: DoUpdateSessionStatusEvent,
     ) -> None:
         log.debug("update_session_status(): triggered")
-        candidates = await self.registry.get_status_updatable_sessions()
-
-        async def _transit(session_id: SessionId):
-            async with self.db.connect() as db_conn:
-                row, is_transited = await self.registry.transit_session_status(db_conn, session_id)
-            if is_transited:
-                await self.registry.post_status_transition(row)
-
-        async with aiotools.TaskGroup() as tg:
-            for session_id in candidates:
-                tg.create_task(_transit(session_id))
+        candidates = await self.registry.session_lifecycle_mgr.get_status_updatable_sessions()
+        await self.registry.session_lifecycle_mgr.transit_session_status(candidates)
 
     async def start_session(
         self,
