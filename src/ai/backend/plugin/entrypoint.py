@@ -21,11 +21,13 @@ def scan_entrypoints(
     if blocklist is None:
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
+
+    prepare_external_package_entrypoints(group_name)
+
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
         scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
-        scan_entrypoint_from_external_sources(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
             continue
@@ -161,20 +163,16 @@ def extract_entrypoints_from_entry_points_txt(
                 yield EntryPoint(name=name, value=value, group=group_name)
 
 
-def scan_entrypoint_from_external_sources(
-    group_name: str, directory: Path | None = None
-) -> Iterator[EntryPoint]:
+def prepare_external_package_entrypoints(group_name: str, directory: Path | None = None) -> None:
     if directory is None:
         # TODO: Implement scanning from the designated directory in local-dev setup.
         # directory = find_build_root()
         directory = Path.cwd()
 
     log.debug(
-        "scan_entrypoint_from_external_sources(%r)",
+        "prepare_external_package_entrypoints(%r)",
         group_name,
     )
-
-    entrypoints = {}
 
     for whl_file in directory.glob("*.whl"):
         with zipfile.ZipFile(whl_file, "r") as z:
@@ -187,18 +185,6 @@ def scan_entrypoint_from_external_sources(
             current_pythonpath = os.environ.get("PYTHONPATH", "")
             new_pythonpath = os.pathsep.join([extracted_path, current_pythonpath])
             os.environ["PYTHONPATH"] = new_pythonpath
-
-            entry_points_txt_names = [name for name in z.namelist() if "entry_points.txt" in name]
-            for entry_points_txt_name in entry_points_txt_names:
-                with z.open(entry_points_txt_name) as f:
-                    temp_entry_points = f.read().decode("utf-8")
-
-                    for entrypoint in extract_entrypoints_from_entry_points_txt(
-                        group_name, temp_entry_points
-                    ):
-                        entrypoints[entrypoint.name] = entrypoint
-
-    yield from entrypoints.values()
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:
