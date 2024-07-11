@@ -778,7 +778,12 @@ class SessionRow(Base):
             .where(SessionRow.id == session_id)
             .options(
                 selectinload(SessionRow.kernels).options(
-                    load_only(KernelRow.status, KernelRow.cluster_role, KernelRow.status_info)
+                    load_only(
+                        KernelRow.status,
+                        KernelRow.cluster_role,
+                        KernelRow.status_info,
+                        KernelRow.occupied_slots,
+                    )
                 ),
             )
         )

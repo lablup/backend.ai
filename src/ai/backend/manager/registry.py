@@ -3157,19 +3157,7 @@ class AgentRegistry:
 
         transited = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
 
-        async def _update_session(db_session: AsyncSession) -> None:
-            _stmt = sa.select(SessionRow).where(SessionRow.id == session_id).with_for_update()
-            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
-            if session_row is None:
-                return
-            session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
-            session_occupying_slots.sync_keys(actual_allocs)
-            for key, val in session_occupying_slots.items():
-                session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
-            session_row.occupying_slots = session_occupying_slots
-
         if transited:
-            await execute_with_txn_retry(_update_session, self.db.begin_session, db_conn)
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
             await self.set_status_updatable_session(session_id)
 
@@ -3244,7 +3232,7 @@ class AgentRegistry:
         # await self.sync_kernel_stats([kernel_id])
         await self.set_status_updatable_session(session_id)
 
-    async def transit_session_status(
+    async def _transit_session_status(
         self,
         db_conn: SAConnection,
         session_id: SessionId,
@@ -3257,11 +3245,29 @@ class AgentRegistry:
         ) -> tuple[SessionRow, bool]:
             session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
             transited = session_row.determine_and_set_status(status_changed_at=now)
+
+            def _calculate_session_occupied_slots(session_row: SessionRow):
+                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                for row in session_row.kernels:
+                    kernel_row = cast(KernelRow, row)
+                    kernel_allocs = kernel_row.occupied_slots
+                    session_occupying_slots.sync_keys(kernel_allocs)
+                    for key, val in session_occupying_slots.items():
+                        session_occupying_slots[key] = str(
+                            Decimal(val) + Decimal(kernel_allocs[key])
+                        )
+                session_row.occupying_slots = session_occupying_slots
+
+            match session_row.status:
+                case SessionStatus.PREPARING:
+                    _calculate_session_occupied_slots(session_row)
+                case SessionStatus.RUNNING if transited:
+                    _calculate_session_occupied_slots(session_row)
             return session_row, transited
 
         return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
 
-    async def post_status_transition(
+    async def _post_status_transition(
         self,
         session_row: SessionRow,
     ) -> None:
@@ -3292,6 +3298,17 @@ class AgentRegistry:
                 )
             case _:
                 pass
+
+    async def transit_session_status(
+        self,
+        session_id: SessionId,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        now = status_changed_at or datetime.now(tzutc())
+        async with self.db.connect() as db_conn:
+            row, is_transited = await self._transit_session_status(db_conn, session_id, now)
+        if is_transited:
+            await self._post_status_transition(row)
 
     async def set_status_updatable_session(self, session_id: SessionId) -> None:
         try:
