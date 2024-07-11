@@ -151,7 +151,7 @@ def extract_entrypoints_from_entry_points_txt(
     entry_points_txt: str,
 ) -> Iterator[EntryPoint]:
     current_group = None
-    for line in entry_points_txt:
+    for line in entry_points_txt.splitlines():
         line = line.strip()
         if line.endswith("]"):
             current_group = line[1:-1]

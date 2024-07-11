@@ -10,6 +10,7 @@ from colorama import Fore, Style
 
 from .entrypoint import (
     scan_entrypoint_from_buildscript,
+    scan_entrypoint_from_external_sources,
     scan_entrypoint_from_package_metadata,
     scan_entrypoint_from_plugin_checkouts,
 )
@@ -42,6 +43,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
         (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
         (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
+        (("python-package", item) for item in scan_entrypoint_from_external_sources(group_name)),
     ):
         duplicate_count[entrypoint.name] += 1
         rows.append((source, entrypoint.name, entrypoint.module))
