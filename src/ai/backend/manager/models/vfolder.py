@@ -230,9 +230,9 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     VFolderStatusSet.DELETABLE: {
         VFolderOperationStatus.READY,
     },
-    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    # if DELETABLE access status is requested, only DELETE_COMPLETE operation status is accepted.
     VFolderStatusSet.PURGABLE: {
-        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
     },
     VFolderStatusSet.RECOVERABLE: {
         VFolderOperationStatus.DELETE_PENDING,
@@ -475,6 +475,7 @@ async def query_accessible_vfolders(
     extra_invited_vf_conds=None,
     extra_vf_user_conds=None,
     extra_vf_group_conds=None,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
@@ -546,11 +547,15 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -576,9 +581,14 @@ async def query_accessible_vfolders(
             .where(
                 (vfolder_permissions.c.user == user_uuid)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_invited_vf_conds is not None:
             query = query.where(extra_invited_vf_conds)
         await _append_entries(query, _is_owner=False)
@@ -622,12 +632,14 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
-            .where(
-                (vfolders.c.group.in_(group_ids))
-                & (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
-            )
+            .where((vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid))
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_vf_conds is not None:
             query = query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:
