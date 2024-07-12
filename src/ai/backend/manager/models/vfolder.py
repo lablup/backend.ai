@@ -75,7 +75,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .user import UserRole
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
@@ -232,9 +232,10 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     VFolderStatusSet.DELETABLE: {
         VFolderOperationStatus.READY,
     },
-    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
     VFolderStatusSet.PURGABLE: {
         VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
     },
     VFolderStatusSet.RECOVERABLE: {
         VFolderOperationStatus.DELETE_PENDING,
@@ -326,8 +327,8 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
+    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -346,15 +347,6 @@ vfolders = sa.Table(
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-    sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
-    ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -426,17 +418,25 @@ class VFolderRow(Base):
     __table__ = vfolders
 
     endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship("UserRow", back_populates="vfolder_row")
-    group_row = relationship("GroupRow", back_populates="vfolder_row")
+    user_row = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
+    group_row = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
     @classmethod
     async def get(
         cls,
         session: SASession,
         id: uuid.UUID,
-        load_user=False,
-        load_group=False,
-    ) -> "VFolderRow":
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
         query = sa.select(VFolderRow).where(VFolderRow.id == id)
         if load_user:
             query = query.options(selectinload(VFolderRow.user_row))
@@ -484,6 +484,7 @@ async def query_accessible_vfolders(
     extra_invited_vf_conds=None,
     extra_vf_user_conds=None,
     extra_vf_group_conds=None,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
@@ -555,11 +556,15 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -585,9 +590,14 @@ async def query_accessible_vfolders(
             .where(
                 (vfolder_permissions.c.user == user_uuid)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_invited_vf_conds is not None:
             query = query.where(extra_invited_vf_conds)
         await _append_entries(query, _is_owner=False)
@@ -631,12 +641,14 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
-            .where(
-                (vfolders.c.group.in_(group_ids))
-                & (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
-            )
+            .where((vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid))
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_vf_conds is not None:
             query = query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:
@@ -1222,7 +1234,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
     from ai.backend.manager.models import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
@@ -2088,8 +2099,6 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
         try:
