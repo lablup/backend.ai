@@ -235,9 +235,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         return props
 
     def __setstate__(self, props) -> None:
-        if "status" not in props:
-            # We pickle "running" kernels, not "preparing" or "terminating" ones
-            props["status"] = KernelLifecycleStatus.RUNNING
+        if "state" not in props:
+            # This method is used when a `Kernel` object is dumped as a pickle data.
+            # When we shutdown an agent, `kernel_registry` is dumped as a pickle file
+            # and the agent loads the pickle file when it restarts.
+            # When we update an agent and restart it, old `Kernel` objects that are dumped before update
+            # do not have `state` field.
+            # We need to insert the `state` value to the old `Kernel` objects.
+            props["state"] = KernelLifecycleStatus.RUNNING
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
