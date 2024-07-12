@@ -77,6 +77,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ImageRegistry,
     KernelId,
+    KernelStatusCollection,
     MountPermission,
     MountTypes,
     SessionTypes,
@@ -86,6 +87,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ..exceptions import MultiAgentError
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
@@ -994,13 +996,20 @@ async def sync_agent_resource(
         "SYNC_AGENT_RESOURCE (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
     )
 
-    async with root_ctx.db.begin() as db_conn:
-        try:
-            await root_ctx.registry.sync_agent_resource(db_conn, [agent_id])
-        except BackendError:
-            log.exception("SYNC_AGENT_RESOURCE: exception")
-            raise
-        return web.Response(status=204)
+    try:
+        result = await root_ctx.registry.sync_agent_resource(root_ctx.db, [agent_id])
+    except BackendError:
+        log.exception("SYNC_AGENT_RESOURCE: exception")
+        raise
+    val = result.get(agent_id)
+    match val:
+        case KernelStatusCollection():
+            pass
+        case MultiAgentError():
+            return web.Response(status=500)
+        case _:
+            pass
+    return web.Response(status=204)
 
 
 @server_status_required(ALL_ALLOWED)

@@ -129,7 +129,7 @@ from .api.exceptions import (
 )
 from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import ErrorStatusInfo, MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -1794,6 +1794,9 @@ class AgentRegistry:
             ex = e
             err_info = convert_to_status_data(ex, self.debug)
 
+            def _is_insufficient_resource_err(err_info: ErrorStatusInfo) -> bool:
+                return err_info["error"]["name"] == "InsufficientResource"
+
             # The agent has already cancelled or issued the destruction lifecycle event
             # for this batch of kernels.
             for binding in items:
@@ -1825,6 +1828,18 @@ class AgentRegistry:
                         await db_sess.execute(query)
 
                 await execute_with_retry(_update_failure)
+                if (
+                    AgentResourceSyncTrigger.ON_CREATION_FAILURE in agent_resource_sync_trigger
+                    and _is_insufficient_resource_err(err_info)
+                ):
+                    await self.sync_agent_resource(
+                        self.db,
+                        [
+                            binding.agent_alloc_ctx.agent_id
+                            for binding in items
+                            if binding.agent_alloc_ctx.agent_id is not None
+                        ],
+                    )
             raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
