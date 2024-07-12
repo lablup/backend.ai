@@ -64,9 +64,13 @@ class Container:
     backend_obj: Any  # used to keep the backend-specific data
 
 
-class KernelLifeCycleStatus(enum.StrEnum):
+class KernelLifecycleStatus(enum.StrEnum):
     """
-    The lifecycle state of `AbstractKernel` objects.
+    The lifecycle status of `AbstractKernel` object.
+
+    By default, the state of a newly created kernel is `PREPARING`.
+    The state of a kernel changes from `PREPARING` to `RUNNING` after the kernel starts a container successfully.
+    It changes from `RUNNING` to `TERMINATING` before destroy kernel.
     """
 
     PREPARING = enum.auto()
