@@ -4,31 +4,23 @@ on: [workflow_dispatch, workflow_call]
 
 jobs:
   sbom:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 2
-    - name: Extract Python version from pants.toml
+    - name: Calculate the fetch depth
       run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v5
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - name: Checkout the source tree
+      uses: actions/checkout@v4
       with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
-      with:
-        gha-cache-key: pants-cache-main-1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - uses: CycloneDX/gh-python-generate-sbom@v2
-    - name: Upload SBOM report
+        lfs: false
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+    - name: Generate the SBOM report
+      uses: CycloneDX/gh-python-generate-sbom@v2
+    - name: Upload the SBOM report
       uses: actions/upload-artifact@v4
       with:
         name: SBOM report
