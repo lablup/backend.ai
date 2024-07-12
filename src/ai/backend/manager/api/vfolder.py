@@ -199,6 +199,8 @@ async def resolve_vfolder_rows(
     request: web.Request,
     perm: VFolderPermissionSetAlias | VFolderPermission | str,
     folder_id_or_name: str | uuid.UUID,
+    *,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -252,6 +254,7 @@ async def resolve_vfolder_rows(
             extra_invited_vf_conds=invited_perm_cond,
             extra_vf_user_conds=vf_user_cond,
             extra_vf_group_conds=vf_group_cond,
+            allowed_status_set=allowed_status_set,
         )
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=folder_id_or_name)
@@ -2493,10 +2496,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     root_ctx: RootContext = request.app["_root.context"]
     folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2509,33 +2508,19 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request,
+            VFolderPermission.OWNER_PERM,
+            folder_id,
+            allowed_status_set=VFolderStatusSet.PURGABLE,
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.PURGE(folder id:{}, hosts:{}",
-                folder_id,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same id.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
-        entry = entries[0]
+        entry = row
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
