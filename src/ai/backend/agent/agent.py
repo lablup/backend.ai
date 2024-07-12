@@ -1355,9 +1355,9 @@ class AbstractAgent(
                     # Check if: kernel_registry has the container but it's gone.
                     for kernel_id in known_kernels.keys() - alive_kernels.keys():
                         kernel_obj = self.kernel_registry[kernel_id]
-                        if (
-                            kernel_id in self.restarting_kernels
-                            or kernel_obj.state == KernelLifeCycleStatus.PREPARING
+                        if kernel_id in self.restarting_kernels or kernel_obj.state in (
+                            KernelLifeCycleStatus.PREPARING,
+                            KernelLifeCycleStatus.TERMINATING,
                         ):
                             continue
                         log.debug(f"kernel with no container (kid: {kernel_id})")
