@@ -1385,7 +1385,8 @@ class AbstractAgent(
                     terminated_kernel_ids = ",".join([
                         str(kid) for kid in terminated_kernels.keys()
                     ])
-                    log.debug(f"Terminating kernels(ids:[{terminated_kernel_ids}])")
+                    if terminated_kernel_ids:
+                        log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
                     for kernel_id, ev in terminated_kernels.items():
                         await self.container_lifecycle_queue.put(ev)
 
