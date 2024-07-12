@@ -691,6 +691,26 @@ eval "$(pyenv virtualenv-init -)"
 EOS
 
 setup_environment() {
+  # Wait for Docker to start
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  until docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
     if [ -d "$HOME/.pyenv" ]; then
@@ -845,7 +865,6 @@ configure_backendai() {
       exit 1
   fi
 
-  # Docker Daemon이 시작될 때까지 기다립니다.
   until docker info >/dev/null 2>&1
   do
       count=$((count+1))
