@@ -836,6 +836,26 @@ setup_environment() {
 }
 
 configure_backendai() {
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  # Docker Daemon이 시작될 때까지 기다립니다.
+  until docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
