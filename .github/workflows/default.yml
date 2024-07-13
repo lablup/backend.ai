@@ -79,7 +79,7 @@ jobs:
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -142,7 +142,7 @@ jobs:
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -256,46 +256,8 @@ jobs:
         cache: "pip"
       # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
 
-    - name: Unpack local-proxy binaries
-      run: |
-        OS_TYPE=$(uname -s)
-        CPU_ARCH=$(uname -m)
-        SYSTEM="$OS_TYPE $CPU_ARCH"
-        case "$SYSTEM" in
-          "Linux x86_64" )
-            SRC_PLATFORM="linux-x64"
-            DST_PLATFORM="linux-x86_64"
-            CHECKSUM_CMD="sha256sum"
-            ;;
-          "Linux aarch64" )
-            SRC_PLATFORM="linux-arm64"
-            DST_PLATFORM="linux-aarch64"
-            CHECKSUM_CMD="sha256sum"
-            ;;
-          "Darwin x86_64" )
-            SRC_PLATFORM="macos-x64"
-            DST_PLATFORM="macos-x86_64"
-            CHECKSUM_CMD="shasum -a 256"
-            ;;
-          "Darwin arm64" )
-            SRC_PLATFORM="macos-arm64"
-            DST_PLATFORM="macos-aarch64"
-            CHECKSUM_CMD="shasum -a 256"
-            ;;
-        esac
-        mkdir dist-local-proxy
-        # Normalize the package naming
-        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
-        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$DST_PLATFORM"
-        cd dist-local-proxy
-        ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
-    - name: Upload local-proxy binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: local-proxy-${{ matrix.os }}
-        path: dist-local-proxy/*
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -353,7 +315,7 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -395,12 +357,16 @@ jobs:
       if: always()  # We want the log even on failures.
 
   build-sbom:
+    needs: [lint, typecheck, test]
+    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/sbom.yml
 
   make-final-release:
     needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
@@ -420,7 +386,7 @@ jobs:
         pip install -U -r tools/towncrier-requirements.txt
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
+        pip install -U 'twine~=5.0' 'packaging>=21.3'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -436,19 +402,13 @@ jobs:
         pattern: scies-*
         path: dist
         merge-multiple: true
-    - name: Download local-proxy
-      uses: actions/download-artifact@v4
-      with:
-        pattern: local-proxy-*
-        path: dist
-        merge-multiple: true
     - name: Download SBOM report
       uses: actions/download-artifact@v4
       with:
         name: SBOM report
         path: dist
     - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}

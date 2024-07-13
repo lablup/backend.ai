@@ -665,7 +665,7 @@ class Queries(graphene.ObjectType):
         # filters
         domain_name=graphene.String(),
         group_id=graphene.String(),
-        access_key=graphene.String(),
+        user_uuid=graphene.String(),
         project=graphene.UUID(),
     )
 
@@ -1130,7 +1130,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        is_installed=None,
+        is_installed: bool | None = None,
         is_operation=False,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
@@ -1173,7 +1173,7 @@ class Queries(graphene.ObjectType):
         else:
             raise InvalidAPIParameters("Unknown client role")
         if is_installed is not None:
-            items = [item for item in items if item.installed]
+            items = [item for item in items if item.installed == is_installed]
         return items
 
     @staticmethod

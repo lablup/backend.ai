@@ -1151,7 +1151,7 @@
     "Scaling": "Ridimensionamento",
     "AllowAgentSideRegistration": "Consenti registrazione lato agente",
     "DescAllowAgentSideRegistration": "Consenti all'agente di registrarsi al gestore. <br/> Utilizzare solo se il cluster Backend.AI è gestito in una posizione sicura.",
-    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di backend.AI.",
+    "DescCUDAGPUsupport": "Supporto per GPU NVIDIA CUDA. <br/> Richiede il plug-in CUDA di Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Disabilitato perché il sistema utilizza il plug-in Fractional GPU",
     "ROCMGPUsupport": "Supporto GPU ROCm",
     "DescROCMGPUsupport": "Supporto per GPU AMD ROCm. <br/> Richiede il plug-in ROCm Backend.AI.",
@@ -1508,7 +1508,11 @@
     "ModelMountDestination": "Destinazione di montaggio per la cartella del modello",
     "AdditionalMounts": "Supporti aggiuntivi",
     "ModelDefinitionPath": "Percorso del file di definizione del modello",
-    "NoExtraMounts": "Nessun supporto aggiuntivo"
+    "NoExtraMounts": "Nessun supporto aggiuntivo",
+    "SyncRoutes": "Sincronizzazione dei percorsi",
+    "SyncRoutesFailed": "La richiesta di sincronizzazione del percorso non è riuscita.",
+    "SyncRoutesSuccess": "La richiesta di sincronizzazione del percorso è andata a buon fine.",
+    "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",

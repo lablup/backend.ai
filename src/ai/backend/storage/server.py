@@ -25,6 +25,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -100,13 +101,19 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
 
+        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+            event_dispatcher_cls = ExperimentalEventDispatcher
+        else:
+            event_dispatcher_cls = EventDispatcher
+
         event_producer = await EventProducer.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
         log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
-        event_dispatcher = await EventDispatcher.new(
+        event_dispatcher = await event_dispatcher_cls.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
