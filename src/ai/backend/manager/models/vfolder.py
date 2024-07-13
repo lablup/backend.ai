@@ -96,11 +96,9 @@ from .rbac import (
 )
 from .rbac.exceptions import NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import (
-    StorageHostACLPermission,
-    StorageHostPermissionMap,
-    get_client_accessible_storage_hosts,
-)
+from .storage import PermissionContext as StorageHostPermissionContext
+from .storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
+from .storage import StorageHostRBACPermission
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -719,35 +717,35 @@ class VFolderRBACPermission(BasePermission):
 
 
 _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
-    VFolderRBACPermission, StorageHostACLPermission
+    VFolderRBACPermission, StorageHostRBACPermission
 ] = {
-    VFolderRBACPermission.CLONE: StorageHostACLPermission.CLONE,
-    VFolderRBACPermission.OVERRIDE_PERMISSION_TO_OTHERS: StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS,
-    VFolderRBACPermission.READ_ATTRIBUTE: StorageHostACLPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE: StorageHostACLPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER: StorageHostACLPermission.DELETE_VFOLDER,
-    VFolderRBACPermission.READ_CONTENT: StorageHostACLPermission.READ_CONTENT,
-    VFolderRBACPermission.WRITE_CONTENT: StorageHostACLPermission.WRITE_CONTENT,
-    VFolderRBACPermission.DELETE_CONTENT: StorageHostACLPermission.DELETE_CONTENT,
-    VFolderRBACPermission.MOUNT_RO: StorageHostACLPermission.MOUNT_RO,
-    VFolderRBACPermission.MOUNT_RW: StorageHostACLPermission.MOUNT_RW,
-    VFolderRBACPermission.MOUNT_WD: StorageHostACLPermission.MOUNT_WD,
+    VFolderRBACPermission.CLONE: StorageHostRBACPermission.CLONE,
+    VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS: StorageHostRBACPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    VFolderRBACPermission.READ_ATTRIBUTE: StorageHostRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE: StorageHostRBACPermission.UPDATE_ATTRIBUTE,
+    VFolderRBACPermission.DELETE_VFOLDER: StorageHostRBACPermission.DELETE_VFOLDER,
+    VFolderRBACPermission.READ_CONTENT: StorageHostRBACPermission.READ_CONTENT,
+    VFolderRBACPermission.WRITE_CONTENT: StorageHostRBACPermission.WRITE_CONTENT,
+    VFolderRBACPermission.DELETE_CONTENT: StorageHostRBACPermission.DELETE_CONTENT,
+    VFolderRBACPermission.MOUNT_RO: StorageHostRBACPermission.MOUNT_RO,
+    VFolderRBACPermission.MOUNT_RW: StorageHostRBACPermission.MOUNT_RW,
+    VFolderRBACPermission.MOUNT_WD: StorageHostRBACPermission.MOUNT_WD,
 }
 
 _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
-    StorageHostACLPermission, VFolderRBACPermission
+    StorageHostRBACPermission, VFolderRBACPermission
 ] = {
-    StorageHostACLPermission.CLONE: VFolderRBACPermission.CLONE,
-    StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS: VFolderRBACPermission.OVERRIDE_PERMISSION_TO_OTHERS,
-    StorageHostACLPermission.READ_ATTRIBUTE: VFolderRBACPermission.READ_ATTRIBUTE,
-    StorageHostACLPermission.UPDATE_ATTRIBUTE: VFolderRBACPermission.UPDATE_ATTRIBUTE,
-    StorageHostACLPermission.DELETE_VFOLDER: VFolderRBACPermission.DELETE_VFOLDER,
-    StorageHostACLPermission.READ_CONTENT: VFolderRBACPermission.READ_CONTENT,
-    StorageHostACLPermission.WRITE_CONTENT: VFolderRBACPermission.WRITE_CONTENT,
-    StorageHostACLPermission.DELETE_CONTENT: VFolderRBACPermission.DELETE_CONTENT,
-    StorageHostACLPermission.MOUNT_RO: VFolderRBACPermission.MOUNT_RO,
-    StorageHostACLPermission.MOUNT_RW: VFolderRBACPermission.MOUNT_RW,
-    StorageHostACLPermission.MOUNT_WD: VFolderRBACPermission.MOUNT_WD,
+    StorageHostRBACPermission.CLONE: VFolderRBACPermission.CLONE,
+    StorageHostRBACPermission.ASSIGN_PERMISSION_TO_OTHERS: VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    StorageHostRBACPermission.READ_ATTRIBUTE: VFolderRBACPermission.READ_ATTRIBUTE,
+    StorageHostRBACPermission.UPDATE_ATTRIBUTE: VFolderRBACPermission.UPDATE_ATTRIBUTE,
+    StorageHostRBACPermission.DELETE_VFOLDER: VFolderRBACPermission.DELETE_VFOLDER,
+    StorageHostRBACPermission.READ_CONTENT: VFolderRBACPermission.READ_CONTENT,
+    StorageHostRBACPermission.WRITE_CONTENT: VFolderRBACPermission.WRITE_CONTENT,
+    StorageHostRBACPermission.DELETE_CONTENT: VFolderRBACPermission.DELETE_CONTENT,
+    StorageHostRBACPermission.MOUNT_RO: VFolderRBACPermission.MOUNT_RO,
+    StorageHostRBACPermission.MOUNT_RW: VFolderRBACPermission.MOUNT_RW,
+    StorageHostRBACPermission.MOUNT_WD: VFolderRBACPermission.MOUNT_WD,
 }
 
 
@@ -819,8 +817,8 @@ PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderR
 class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]):
     host_permission_context: StorageHostPermissionContext | None = None
 
-    def apply_host_perms(self, host_perm: StorageHostPermissionMap) -> None:
-        self.host_permission_map = host_perm
+    def apply_host_perms(self, host_perm: StorageHostPermissionContext) -> None:
+        self.host_permission_context = host_perm
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -857,11 +855,13 @@ class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolder
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
 
-        if self.host_permission_map is not None:
-            host_names = {*self.host_permission_map.keys()}
-            if host_names:
+        if self.host_permission_context is not None:
+            host_permission_map = self.host_permission_context.host_to_permissions_map
+            if host_permission_map:
+                host_names = list(host_permission_map.keys())
                 cond = _AND_coalesce(cond, VFolderRow.host.in_(host_names))
             else:
+                # No storage host is allowed
                 return None
 
         return cond
@@ -887,8 +887,9 @@ class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolder
         permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
         permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
-        if self.host_permission_map is not None:
-            host_permissions: frozenset[StorageHostACLPermission] = self.host_permission_map.get(
+        if self.host_permission_context is not None:
+            host_permission_map = self.host_permission_context.host_to_permissions_map
+            host_permissions: frozenset[StorageHostRBACPermission] = host_permission_map.get(
                 vfolder_row.host, frozenset()
             )
             permissions &= {
@@ -1199,17 +1200,17 @@ async def get_vfolders(
             if requested_permission is not None
             else None
         )
-        host_permission_ctx = await StorageHostPermissionContextBuilder.build(
-            db_session, ctx, target_scope, permission=host_permission
+        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+            ctx, target_scope, permission=host_permission
         )
         if extra_scope is not None and host_permission is not None:
-            perms = await host_permission_ctx.determine_permission(extra_scope.name)
+            perms = await host_permission_ctx.calculate_final_permission(extra_scope.name)
             if host_permission not in perms:
                 return []
 
         ctx_builder = PermissionContextBuilder(db_session)
         permission_ctx = await ctx_builder.build(ctx, target_scope, permission=requested_permission)
-        permission_ctx.apply_host_perm_ctx(host_permission_ctx)
+        permission_ctx.apply_host_perms(host_permission_ctx)
 
         query_stmt = await permission_ctx.build_query()
         if query_stmt is None:

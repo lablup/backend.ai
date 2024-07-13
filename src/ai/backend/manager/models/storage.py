@@ -42,20 +42,16 @@ from ai.backend.common.types import (
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
-from .acl import (
-    AbstractACLPermissionContext,
-    AbstractACLPermissionContextBuilder,
-    BaseACLPermission,
-    BaseACLScope,
-    ClientContext,
-    DomainScope,
-    ProjectScope,
-    UserScope,
-)
 from .base import Item, PaginatedList
 from .domain import DomainRow
-from .group import GroupRow
+from .group import GroupRow, UserRoleInProject
 from .keypair import KeyPairRow
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    BasePermission,
+    ClientContext,
+)
 from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRole, UserRow
 
@@ -86,100 +82,105 @@ AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 _ctx_volumes_cache: ContextVar[List[Tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
 
 
-class StorageHostACLPermission(BaseACLPermission):
-    from .vfolder import VFolderACLPermission
+class StorageHostRBACPermission(BasePermission):
+    from .vfolder import VFolderRBACPermission
 
     CREATE_FOLDER = enum.auto()
 
-    CLONE = VFolderACLPermission.CLONE
-    OVERRIDE_PERMISSION_TO_OTHERS = VFolderACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+    CLONE = VFolderRBACPermission.CLONE
+    ASSIGN_PERMISSION_TO_OTHERS = VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS
 
-    READ_ATTRIBUTE = VFolderACLPermission.READ_ATTRIBUTE
-    UPDATE_ATTRIBUTE = VFolderACLPermission.UPDATE_ATTRIBUTE
-    DELETE_VFOLDER = VFolderACLPermission.DELETE_VFOLDER
+    READ_ATTRIBUTE = VFolderRBACPermission.READ_ATTRIBUTE
+    UPDATE_ATTRIBUTE = VFolderRBACPermission.UPDATE_ATTRIBUTE
+    DELETE_VFOLDER = VFolderRBACPermission.DELETE_VFOLDER
 
-    READ_CONTENT = VFolderACLPermission.READ_CONTENT
-    WRITE_CONTENT = VFolderACLPermission.WRITE_CONTENT
-    DELETE_CONTENT = VFolderACLPermission.DELETE_CONTENT
+    READ_CONTENT = VFolderRBACPermission.READ_CONTENT
+    WRITE_CONTENT = VFolderRBACPermission.WRITE_CONTENT
+    DELETE_CONTENT = VFolderRBACPermission.DELETE_CONTENT
 
-    MOUNT_RO = VFolderACLPermission.MOUNT_RO
-    MOUNT_RW = VFolderACLPermission.MOUNT_RW
-    MOUNT_WD = VFolderACLPermission.MOUNT_WD
-
-
-ALL_STORAGE_HOST_PERMISSIONS = frozenset([perm for perm in StorageHostACLPermission])
+    MOUNT_RO = VFolderRBACPermission.MOUNT_RO
+    MOUNT_RW = VFolderRBACPermission.MOUNT_RW
+    MOUNT_WD = VFolderRBACPermission.MOUNT_WD
 
 
-LEGACY_VFHOST_PERMISSION_TO_HOST_ACL_PERMISSION_MAP: Mapping[
-    VFolderHostPermission, frozenset[StorageHostACLPermission]
+ALL_STORAGE_HOST_PERMISSIONS = frozenset([perm for perm in StorageHostRBACPermission])
+
+
+LEGACY_VFHOST_PERMISSION_TO_HOST__PERMISSION_MAP: Mapping[
+    VFolderHostPermission, frozenset[StorageHostRBACPermission]
 ] = {
-    VFolderHostPermission.CREATE: frozenset([StorageHostACLPermission.CREATE_FOLDER]),
-    VFolderHostPermission.MODIFY: frozenset([StorageHostACLPermission.UPDATE_ATTRIBUTE]),
+    VFolderHostPermission.CREATE: frozenset([StorageHostRBACPermission.CREATE_FOLDER]),
+    VFolderHostPermission.MODIFY: frozenset([StorageHostRBACPermission.UPDATE_ATTRIBUTE]),
     VFolderHostPermission.DELETE: frozenset([
-        StorageHostACLPermission.DELETE_VFOLDER,
-        StorageHostACLPermission.DELETE_CONTENT,
+        StorageHostRBACPermission.DELETE_VFOLDER,
+        StorageHostRBACPermission.DELETE_CONTENT,
     ]),
     VFolderHostPermission.MOUNT_IN_SESSION: frozenset([
-        StorageHostACLPermission.MOUNT_RO,
-        StorageHostACLPermission.MOUNT_RW,
-        StorageHostACLPermission.MOUNT_WD,
+        StorageHostRBACPermission.MOUNT_RO,
+        StorageHostRBACPermission.MOUNT_RW,
+        StorageHostRBACPermission.MOUNT_WD,
     ]),
     VFolderHostPermission.UPLOAD_FILE: frozenset([
-        StorageHostACLPermission.READ_ATTRIBUTE,
-        StorageHostACLPermission.WRITE_CONTENT,
-        StorageHostACLPermission.DELETE_CONTENT,
+        StorageHostRBACPermission.READ_ATTRIBUTE,
+        StorageHostRBACPermission.WRITE_CONTENT,
+        StorageHostRBACPermission.DELETE_CONTENT,
     ]),
     VFolderHostPermission.DOWNLOAD_FILE: frozenset([
-        StorageHostACLPermission.READ_ATTRIBUTE,
-        StorageHostACLPermission.WRITE_CONTENT,
-        StorageHostACLPermission.DELETE_CONTENT,
+        StorageHostRBACPermission.READ_ATTRIBUTE,
+        StorageHostRBACPermission.WRITE_CONTENT,
+        StorageHostRBACPermission.DELETE_CONTENT,
     ]),
     VFolderHostPermission.INVITE_OTHERS: frozenset([
-        StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+        StorageHostRBACPermission.ASSIGN_PERMISSION_TO_OTHERS
     ]),
     VFolderHostPermission.SET_USER_PERM: frozenset([
-        StorageHostACLPermission.OVERRIDE_PERMISSION_TO_OTHERS
+        StorageHostRBACPermission.ASSIGN_PERMISSION_TO_OTHERS
     ]),
 }
 
 ALL_LEGACY_VFHOST_PERMISSIONS = {perm for perm in VFolderHostPermission}
 
 
-def _legacy_vf_perms_to_host_acl_perms(
+def _legacy_vf_perms_to_host_rbac_perms(
     perms: list[VFolderHostPermission],
-) -> frozenset[StorageHostACLPermission]:
+) -> frozenset[StorageHostRBACPermission]:
     if set(perms) == ALL_LEGACY_VFHOST_PERMISSIONS:
         return ALL_STORAGE_HOST_PERMISSIONS
-    result: frozenset[StorageHostACLPermission] = frozenset()
+    result: frozenset[StorageHostRBACPermission] = frozenset()
     for perm in perms:
-        result |= LEGACY_VFHOST_PERMISSION_TO_HOST_ACL_PERMISSION_MAP[perm]
+        result |= LEGACY_VFHOST_PERMISSION_TO_HOST__PERMISSION_MAP[perm]
     return result
 
 
 @dataclass
-class ACLPermissionContext(AbstractACLPermissionContext[StorageHostACLPermission, str, str]):
+class PermissionContext(AbstractPermissionContext[StorageHostRBACPermission, str, str]):
     @property
-    def host_to_permissions_map(self) -> Mapping[str, frozenset[StorageHostACLPermission]]:
+    def host_to_permissions_map(self) -> Mapping[str, frozenset[StorageHostRBACPermission]]:
         return self.object_id_to_additional_permission_map
 
     async def build_query(self) -> sa.sql.Select | None:
         return None
 
-    async def determine_permission(self, acl_obj: str) -> frozenset[StorageHostACLPermission]:
+    async def calculate_final_permission(
+        self, acl_obj: str
+    ) -> frozenset[StorageHostRBACPermission]:
         host_name = acl_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())
 
 
-class ACLPermissionContextBuilder(
-    AbstractACLPermissionContextBuilder[StorageHostACLPermission, ACLPermissionContext]
+class PermissionContextBuilder(
+    AbstractPermissionContextBuilder[StorageHostRBACPermission, PermissionContext]
 ):
-    @classmethod
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
     async def _build_in_user_scope(
-        cls,
-        db_session: SASession,
+        self,
         ctx: ClientContext,
         user_id: uuid.UUID,
-    ) -> ACLPermissionContext:
+    ) -> PermissionContext:
         match ctx.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 stmt = (
@@ -191,9 +192,9 @@ class ACLPermissionContextBuilder(
                         )
                     )
                 )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
                 if user_row is None:
-                    return ACLPermissionContext()
+                    return PermissionContext()
             case UserRole.ADMIN:
                 stmt = (
                     sa.select(UserRow)
@@ -204,14 +205,14 @@ class ACLPermissionContextBuilder(
                         )
                     )
                 )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
                 if user_row is None:
-                    return ACLPermissionContext()
+                    return PermissionContext()
                 if ctx.domain_name != user_row.domain_name:
-                    return ACLPermissionContext()
+                    return PermissionContext()
             case UserRole.USER:
                 if ctx.user_id != user_id:
-                    return ACLPermissionContext()
+                    return PermissionContext()
                 stmt = (
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_id)
@@ -222,12 +223,12 @@ class ACLPermissionContextBuilder(
                         joinedload(UserRow.domain),
                     )
                 )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
                 if user_row is None:
-                    return ACLPermissionContext()
+                    return PermissionContext()
 
         object_id_to_additional_permission_map: defaultdict[
-            str, frozenset[StorageHostACLPermission]
+            str, frozenset[StorageHostRBACPermission]
         ] = defaultdict(frozenset)
 
         for keypair in user_row.keypairs:
@@ -236,65 +237,60 @@ class ACLPermissionContextBuilder(
                 continue
             host_permissions = cast(VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts)
             for host, perms in host_permissions.items():
-                object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
+                object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_rbac_perms(
                     perms
                 )
 
-        return ACLPermissionContext(
+        return PermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
 
-    @classmethod
     async def _build_in_project_scope(
-        cls,
-        db_session: SASession,
+        self,
         ctx: ClientContext,
         project_id: uuid.UUID,
-    ) -> ACLPermissionContext:
-        role_in_project = await ctx.get_user_role_in_project(project_id)
-        if role_in_project is None:
-            return ACLPermissionContext()
-        stmt = sa.select(GroupRow).where(GroupRow.id == project_id)
-        project_row = cast(GroupRow, await db_session.scalar(stmt))
-        host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
+    ) -> PermissionContext:
+        role_in_project = await ctx.get_user_role_in_project(self.db_session, project_id)
+        match role_in_project:
+            case UserRoleInProject.NONE:
+                return PermissionContext()
+            case _:
+                stmt = sa.select(GroupRow).where(GroupRow.id == project_id)
+                project_row = cast(GroupRow, await self.db_session.scalar(stmt))
+                host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
 
-        object_id_to_additional_permission_map: defaultdict[
-            str, frozenset[StorageHostACLPermission]
-        ] = defaultdict(frozenset)
-        for host, perms in host_permissions.items():
-            object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_acl_perms(
-                perms
-            )
+                object_id_to_additional_permission_map: defaultdict[
+                    str, frozenset[StorageHostRBACPermission]
+                ] = defaultdict(frozenset)
+                for host, perms in host_permissions.items():
+                    object_id_to_additional_permission_map[host] |= (
+                        _legacy_vf_perms_to_host_rbac_perms(perms)
+                    )
 
-        return ACLPermissionContext(
-            object_id_to_additional_permission_map=object_id_to_additional_permission_map
-        )
+                return PermissionContext(
+                    object_id_to_additional_permission_map=object_id_to_additional_permission_map
+                )
 
-    @classmethod
     async def _build_in_domain_scope(
-        cls,
-        db_session: SASession,
+        self,
         ctx: ClientContext,
         domain_name: str,
-    ) -> ACLPermissionContext:
+    ) -> PermissionContext:
         match ctx.user_role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 pass
-            case UserRole.ADMIN:
+            case UserRole.ADMIN | UserRole.USER:
                 if ctx.domain_name != domain_name:
-                    return ACLPermissionContext()
-            case UserRole.USER:
-                if ctx.domain_name != domain_name:
-                    return ACLPermissionContext()
+                    return PermissionContext()
 
         stmt = sa.select(DomainRow).where(DomainRow.name == domain_name)
-        domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
+        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
         if domain_row is None:
-            return ACLPermissionContext()
+            return PermissionContext()
         vfolder_host_permission = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
-        return ACLPermissionContext(
+        return PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_acl_perms(perms)
+                host: _legacy_vf_perms_to_host_rbac_perms(perms)
                 for host, perms in vfolder_host_permission.items()
             }
         )
@@ -308,53 +304,53 @@ class VolumeInfo(TypedDict):
     capabilities: List[str]
 
 
-StorageHostPermissionMap = Mapping[str, frozenset[StorageHostACLPermission]]
+StorageHostPermissionMap = Mapping[str, frozenset[StorageHostRBACPermission]]
 
 
-async def get_storage_hosts(
-    ctx: ClientContext,
-    target_scope: BaseACLScope,
-    requested_permission: StorageHostACLPermission | None = None,
-) -> StorageHostPermissionMap:
-    async with SASession(ctx.db_conn) as db_session:
-        permission_ctx = await ACLPermissionContextBuilder.build(
-            db_session, ctx, target_scope, permission=requested_permission
-        )
-        return {**permission_ctx.host_to_permissions_map}
+# async def get_storage_hosts(
+#     ctx: ClientContext,
+#     target_scope: BaseScope,
+#     requested_permission: StorageHostRBACPermission | None = None,
+# ) -> StorageHostPermissionMap:
+#     async with SASession(ctx.db_conn) as db_session:
+#         permission_ctx = await PermissionContextBuilder.build(
+#             db_session, ctx, target_scope, permission=requested_permission
+#         )
+#         return {**permission_ctx.host_to_permissions_map}
 
 
-def merge_host_permissions(
-    left: StorageHostPermissionMap, right: StorageHostPermissionMap
-) -> StorageHostPermissionMap:
-    result: dict[str, frozenset[StorageHostACLPermission]] = {}
-    for host_name in {*left.keys(), *right.keys()}:
-        result[host_name] = left.get(host_name, frozenset()) | right.get(host_name, frozenset())
-    return result
+# def merge_host_permissions(
+#     left: StorageHostPermissionMap, right: StorageHostPermissionMap
+# ) -> StorageHostPermissionMap:
+#     result: dict[str, frozenset[StorageHostRBACPermission]] = {}
+#     for host_name in {*left.keys(), *right.keys()}:
+#         result[host_name] = left.get(host_name, frozenset()) | right.get(host_name, frozenset())
+#     return result
 
 
-async def get_client_accessible_storage_hosts(
-    ctx: ClientContext,
-    requested_permission: StorageHostACLPermission | None = None,
-) -> StorageHostPermissionMap:
-    kp_scoped_host_permissions = await get_storage_hosts(
-        ctx, UserScope(ctx.user_id), requested_permission
-    )
-    domain_scoped_host_permissions = await get_storage_hosts(
-        ctx, DomainScope(ctx.domain_name), requested_permission
-    )
-    host_permissions = merge_host_permissions(
-        kp_scoped_host_permissions, domain_scoped_host_permissions
-    )
-    project_ctx = await ctx.get_or_init_project_ctx_in_domain(ctx.domain_name)
-    if project_ctx is not None:
-        for project_id in project_ctx.keys():
-            project_scoped_host_permissions = await get_storage_hosts(
-                ctx, ProjectScope(project_id), requested_permission
-            )
-            host_permissions = merge_host_permissions(
-                host_permissions, project_scoped_host_permissions
-            )
-    return host_permissions
+# async def get_client_accessible_storage_hosts(
+#     ctx: ClientContext,
+#     requested_permission: StorageHostRBACPermission | None = None,
+# ) -> StorageHostPermissionMap:
+#     kp_scoped_host_permissions = await get_storage_hosts(
+#         ctx, UserScope(ctx.user_id), requested_permission
+#     )
+#     domain_scoped_host_permissions = await get_storage_hosts(
+#         ctx, DomainScope(ctx.domain_name), requested_permission
+#     )
+#     host_permissions = merge_host_permissions(
+#         kp_scoped_host_permissions, domain_scoped_host_permissions
+#     )
+#     project_ctx = await ctx.get_or_init_project_ctx_in_domain(ctx.domain_name)
+#     if project_ctx is not None:
+#         for project_id in project_ctx.keys():
+#             project_scoped_host_permissions = await get_storage_hosts(
+#                 ctx, ProjectScope(project_id), requested_permission
+#             )
+#             host_permissions = merge_host_permissions(
+#                 host_permissions, project_scoped_host_permissions
+#             )
+#     return host_permissions
 
 
 class StorageSessionManager:
