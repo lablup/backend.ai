@@ -14,6 +14,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
@@ -35,13 +36,16 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
 @pytest.mark.asyncio
-async def test_dispatch(redis_container) -> None:
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+async def test_dispatch(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
+) -> None:
     app = object()
 
     redis_config = EtcdRedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await EventDispatcher.new(
+    dispatcher = await dispatcher_cls.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
@@ -81,7 +85,10 @@ async def test_dispatch(redis_container) -> None:
 
 
 @pytest.mark.asyncio
-async def test_error_on_dispatch(redis_container) -> None:
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+async def test_error_on_dispatch(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
+) -> None:
     app = object()
     exception_log: list[str] = []
 
@@ -95,7 +102,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await EventDispatcher.new(
+    dispatcher = await dispatcher_cls.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         consumer_exception_handler=handle_exception,

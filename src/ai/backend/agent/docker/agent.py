@@ -10,6 +10,7 @@ import shutil
 import signal
 import struct
 import sys
+from collections.abc import Mapping
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -22,13 +23,13 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    Mapping,
     MutableMapping,
     Optional,
     Sequence,
     Set,
     Tuple,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -38,6 +39,7 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
@@ -118,6 +120,30 @@ def container_from_docker_container(src: DockerContainer) -> Container:
         ports=ports,
         backend_obj=src,
     )
+
+
+async def _clean_scratch(
+    loop: asyncio.AbstractEventLoop,
+    scratch_type: str,
+    scratch_root: Path,
+    kernel_id: KernelId,
+) -> None:
+    scratch_dir = scratch_root / str(kernel_id)
+    tmp_dir = scratch_root / f"{kernel_id}_tmp"
+    try:
+        if sys.platform.startswith("linux") and scratch_type == "memory":
+            await destroy_scratch_filesystem(scratch_dir)
+            await destroy_scratch_filesystem(tmp_dir)
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+            await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
+        elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+            await destroy_loop_filesystem(scratch_root, kernel_id)
+        else:
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+    except CalledProcessError:
+        pass
+    except FileNotFoundError:
+        pass
 
 
 def _DockerError_reduce(self):
@@ -827,7 +853,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
@@ -849,6 +877,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if self.local_config["debug"]["log-kernel-config"]:
             log.debug("full container config: {!r}", pretty(container_config))
 
+        async def _rollback_container_creation() -> None:
+            await _clean_scratch(
+                loop,
+                self.local_config["container"]["scratch-type"],
+                self.local_config["container"]["scratch-root"],
+                self.kernel_id,
+            )
+            self.port_pool.update(host_ports)
+            async with self.resource_lock:
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    self.computers[dev_name].alloc_map.free(device_alloc)
+
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
             container: Optional[DockerContainer] = None
@@ -857,7 +897,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     config=container_config, name=kernel_name
                 )
                 assert container is not None
-                cid = container._id
+                cid = cast(str, container._id)
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -872,33 +912,47 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         for k, v in kvpairs.items():
                             await writer.write(f"{k}={v}\n")
 
-                await container.start()
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=cid, message="Container creation cancelled"
+                        container_id=container._id, message="Container creation cancelled"
                     )
                 raise
-            except Exception:
+            except Exception as e:
                 # Oops, we have to restore the allocated resources!
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                if sys.platform.startswith("linux") and scratch_type == "memory":
-                    await destroy_scratch_filesystem(self.scratch_dir)
-                    await destroy_scratch_filesystem(self.tmp_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-                elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                    await destroy_loop_filesystem(scratch_root, self.kernel_id)
-                else:
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                self.port_pool.update(host_ports)
-                async with self.resource_lock:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        self.computers[dev_name].alloc_map.free(device_alloc)
+                await _rollback_container_creation()
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid, message="unknown")
+                    raise ContainerCreationError(
+                        container_id=container._id, message=f"unknown. {repr(e)}"
+                    )
                 raise
+
+            try:
+                await container.start()
+            except asyncio.CancelledError:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message="Container start cancelled")
+            except Exception as e:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message=f"unknown. {repr(e)}")
+
+            if self.internal_data.get("sudo_session_enabled", False):
+                exec = await container.exec(
+                    [
+                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                        "sh",
+                        "-c",
+                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                    ],
+                    user="root",
+                )
+                shell_response = await exec.start(detach=True)
+                if shell_response:
+                    await _rollback_container_creation()
+                    raise ContainerCreationError(
+                        container_id=cid,
+                        message=f"sudoers provision failed: {shell_response.decode()}",
+                    )
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
@@ -916,7 +970,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
@@ -1104,6 +1158,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return await scan_available_resources(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
+
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,
@@ -1476,24 +1535,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                scratch_dir = scratch_root / str(kernel_id)
-                tmp_dir = scratch_root / f"{kernel_id}_tmp"
-                try:
-                    if sys.platform.startswith("linux") and scratch_type == "memory":
-                        await destroy_scratch_filesystem(scratch_dir)
-                        await destroy_scratch_filesystem(tmp_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
-                    elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                        await destroy_loop_filesystem(scratch_root, kernel_id)
-                    else:
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                except CalledProcessError:
-                    pass
-                except FileNotFoundError:
-                    pass
+                await _clean_scratch(
+                    loop,
+                    self.local_config["container"]["scratch-type"],
+                    self.local_config["container"]["scratch-root"],
+                    kernel_id,
+                )
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
