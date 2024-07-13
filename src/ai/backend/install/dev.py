@@ -107,7 +107,7 @@ async def install_editable_webui(ctx: Context) -> None:
       echo "PROXYBASEHOST=localhost" >> .env
       echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
     fi
-    npm i
+    pnpm i
     make compile
     make compile_wsproxy
     cd ../../../..
