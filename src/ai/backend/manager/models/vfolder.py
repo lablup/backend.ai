@@ -73,7 +73,6 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .session import DEAD_SESSION_STATUSES, SessionRow
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
