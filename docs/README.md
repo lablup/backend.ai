@@ -7,7 +7,7 @@ Developer guide for Backend.AI documentation
 
 ### Installing pyenv and pyenv-virtualenv
 
-* Please refer the official docs:
+* Please refer to the official docs:
   - https://github.com/pyenv/pyenv#installation
   - https://github.com/pyenv/pyenv-virtualenv#installation
 
@@ -92,7 +92,7 @@ Building PDF requires following libraries to be present on your system.
 ### Installing dependencies on macOS
 1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
 2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
-3. Exceute following command to install missing dependencies.
+3. Execute following command to install missing dependencies.
 ```console
 sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
 ```
@@ -158,7 +158,7 @@ to interact and inspect the Backend.AI Manager's GraphQL API.
    The manager's *etcd* configuration should say `config/api/allow-openapi-schema-introspection` is true.
 2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
    Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
-3. From your web browser, avigate to `/spec/openapi` under proxy server set up at step 2. 
+3. From your web browser, navigate to `/spec/openapi` under proxy server set up at step 2. 
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
 ### Interactive GraphQL browser
@@ -170,7 +170,7 @@ to interact and inspect the Backend.AI Manager's GraphQL API.
    The manager's *etcd* configuration should say `config/api/allow-graphql-schema-introspection` is true.
 2. Run `backend.ai proxy` command of the client SDK.  Depending on your setup, adjust `--bind` and `--port` options.  
    Use the client SDK version 21.03.7+ or 20.09.9+ at least to avoid unexpected CORS issues.
-3. From your web browser, avigate to `/spec/graphiql` under proxy server set up at step 2. 
+3. From your web browser, navigate to `/spec/graphiql` under proxy server set up at step 2. 
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
 
