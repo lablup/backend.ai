@@ -175,6 +175,8 @@ show_guide() {
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run Backend.AI wsproxy:"
+  echo "  > ${WHITE}./py -m ai.backend.wsproxy.server${NC}"
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -193,8 +195,6 @@ show_guide() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
     echo "(Terminal 2)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "(Terminal 3)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
@@ -620,9 +620,8 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
-  npm i
+  pnpm i
   make compile
-  make compile_wsproxy
   cd ../../../..
 }
 
@@ -641,7 +640,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' aiohttp
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $docker_sudo $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
@@ -728,9 +727,6 @@ setup_environment() {
 
   show_info "Ensuring checkout of LFS files..."
   git lfs pull
-
-  show_info "Ensuring checkout of submodules..."
-  git submodule update --init --checkout --recursive
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks
@@ -923,6 +919,9 @@ configure_backendai() {
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
+  # configure wsproxy
+  cp configs/wsproxy/halfstack.toml ./wsproxy.toml
+
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
     sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
@@ -1014,8 +1013,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
   CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
@@ -1041,8 +1040,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
   CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
@@ -1076,8 +1075,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
   show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."
