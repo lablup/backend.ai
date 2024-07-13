@@ -9,30 +9,30 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-13 15:33+0900\n"
+"POT-Creation-Date: 2023-12-08 16:08+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.3\n"
+"Generated-By: Babel 2.13.1\n"
 
-#: ../../client/cli/sessions.rst:2 8b94c9d2206446c98cdeca60fe9fe6a7
+#: ../../client/cli/sessions.rst:2 0d3b3b3f08144e5baf7c334b98da9a6f
 msgid "Compute Sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:6 6354094300d04ea48159e2f14ee27016
+#: ../../client/cli/sessions.rst:6 49f60dda559f405a87741309445a865d
 msgid ""
 "Please consult the detailed usage in the help of each command (use ``-h``"
 " or ``--help`` argument to display the manual)."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:11 e2c8ae78830147bc84202448934c60bb
+#: ../../client/cli/sessions.rst:11 d4a291e1e9dc49d7883178e83c63d07a
 msgid "Listing sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:13 2aa70201885e4bf7aae726e195f54f89
+#: ../../client/cli/sessions.rst:13 7c136cc77ea94c56bac6fae559772dd9
 msgid ""
 "List the session owned by you with various status filters. The most "
 "recently status-changed sessions are listed first. To prevent overloading"
@@ -40,136 +40,148 @@ msgid ""
 "provides a separate ``--all`` option to paginate further sessions."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:23 a7114abd28ce4bfe93fc2b367e48d709
+#: ../../client/cli/sessions.rst:23 c025dd9e06844d83b5ef350d92946eac
 msgid ""
 "The ``ps`` command is an alias of the following ``admin session list`` "
 "command. If you have the administrator privilege, you can list sessions "
 "owned by other users by adding ``--access-key`` option here."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:31 53a84222431941eda35c8f917e471825
+#: ../../client/cli/sessions.rst:31 afca9c9403a846d7bd0314159db04085
 msgid ""
 "Both commands offer options to set the status filter as follows. For "
 "other options, please consult the output of ``--help``."
 msgstr ""
 
 #: ../../client/cli/sessions.rst:38 ../../client/cli/sessions.rst:57
-#: 66fdd9eec297403695d0e8ffb5da2639 f81324af7fcc434e8d975ce560fcc595
+#: 65522864c3ba4df7b1665e044b587673 e658dbaea9194c38934a1a626bb68931
 msgid "Option"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:39 b518d00f8cb7443eadc7a4b368ccc030
+#: ../../client/cli/sessions.rst:39 7d7cff3608e34000af5a715153351358
 msgid "Included Session Status"
 msgstr ""
 
 #: ../../client/cli/sessions.rst:41 ../../client/cli/sessions.rst:60
-#: 052e5e56458643d8aab1b574c62e9c20 c8d0b3a5ee4c4d92b2136312dc0d568b
+#: 52df0477313641018ee573338c4b1a77 fcbac03b588a455f9c468e0e515f201e
 msgid "(no option)"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:42 23b48f189a53428d9002fb9c65ea2b8c
+#: ../../client/cli/sessions.rst:42 4f067c02b259464f84aeade4874f054f
 msgid ""
 "``PENDING``, ``PREPARING``, ``RUNNING``, ``RESTARTING``, ``TERMINATING``,"
 " ``RESIZING``, ``SUSPENDED``, and ``ERROR``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:45 2deaa247a04143f9b25357d4fcf10ee5
+#: ../../client/cli/sessions.rst:45 c9e8de9d1c1d4d82b76690b8b3fa6cc5
 msgid "``--running``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:46 0c767ea8dc964938ba8937ac71424335
+#: ../../client/cli/sessions.rst:46 e9096ba3896544348e2c88ac765dc5c6
 msgid "``PREPARING``, ``PULLING``, and ``RUNNING``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:48 f8e31c45e3cd4e79a0dbe41b58e73fb5
+#: ../../client/cli/sessions.rst:48 7675c8771d0d4d20984e45e995ae38de
 msgid "``--dead``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:49 da4888d0d457404692ce3d6a35df81da
+#: ../../client/cli/sessions.rst:49 b3c97dfaf97b4cfaa846d1f6a8f129ef
 msgid "``CANCELLED`` and ``TERMINATED``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:51 15522207a1fa434d91ea5722870e932d
+#: ../../client/cli/sessions.rst:51 34d2a4d9e1064f1b8553a73b219f140f
 msgid ""
 "Both commands offer options to specify which fields of sessions should be"
 " printed as follows."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:58 5d741fc8ecf04d4cbad1d8cc9900204c
+#: ../../client/cli/sessions.rst:58 1e01d99c903641cda06118798da44f2d
 msgid "Included Session Fields"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:61 ../../client/cli/sessions.rst:69
-#: 9e8791f4c5bf4726bc23cd134e66a41c fb853a68197b4affb8e14d517943c4b3
-msgid "``Session ID``, ``Owner``, ``Image``, ``Type``,"
+#: ../../client/cli/sessions.rst:61 51ecd7ba4b9649a69beb647405ecedf4
+msgid ""
+"``Name``, ``Owner Access Key (admin only)``, ``Session ID``, "
+"``Project/Group``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:63 5e5b048958324b898cdde1a8d2ac3909
-msgid "``Status``, ``Status Info``, ``Last updated``, and ``Result``."
+#: ../../client/cli/sessions.rst:63 ../../client/cli/sessions.rst:74
+#: dad921c7e2b54b2fa138634a068f4304
+msgid "``Main Kernel ID``, ``Image``, ``Type``, ``Status``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:65 2aaceafa8fd24db2b5a1034b5ea51065
-msgid "``--id-only``"
+#: ../../client/cli/sessions.rst:65 b257f3a20b3d4c4ead0749134af9c1d6
+msgid "``Status Info``, ``Last Updated``, and ``Result``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:66 5d18c5723cf04c3db0386830d68ba93d
-msgid "``Session ID``."
+#: ../../client/cli/sessions.rst:68 aa78e7b2f53a4e63bc8520dbc4071827
+msgid "``--name-only``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:68 06627842b7a44859a7ff4da1e914c6e2
+#: ../../client/cli/sessions.rst:69 9727079cfaed45babffeda98fcbb09c2
+msgid "``Name``."
+msgstr ""
+
+#: ../../client/cli/sessions.rst:71 5d191c27630b4d5c8cb2a8b824ed8572
 msgid "``--detail``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:71 3db52e5c03e34722afbc2f628043face
-msgid "``Status``, ``Status Info``, ``Last updated``, ``Result``,"
+#: ../../client/cli/sessions.rst:72 204d52a45d004d749ee7de1b242b047b
+msgid "``Name``, ``Session ID``, ``Project/Group``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:73 7473e6c28a494a14801d61b818428d1a
-msgid "``Tag``, ``Created At``, ``Occupied Resource``, ``Used Memory (MiB)``,"
+#: ../../client/cli/sessions.rst:76 fad1369498c2442a9d271f4d30898da9
+msgid "``Status Info``, ``Last Updated``, ``Result``, ``Tag``,"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:75 11674d926ecb4fada2f2dae2ae37422f
-msgid "``Max Used Memory (MiB)``, and ``CPU Using (%)``."
+#: ../../client/cli/sessions.rst:78 7480e1bdf5d04d1a8b8924debf4bac7c
+msgid "``Created At``, and ``Occupying Slots``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:77 18dd0bf53a9c4ce1bbec0941b56bef41
+#: ../../client/cli/sessions.rst:80 b5a57bc94cb7452ba8f10c4ddf4525e6
 msgid "``-f``, ``--format``"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:78 790ae9fc16f94f65b74b60f9c3496e12
+#: ../../client/cli/sessions.rst:81 4fb6ba0f9011472784989ba0a3102104
 msgid "Specified fields by user."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:81 5fe233638b744781b9967916b5137999
+#: ../../client/cli/sessions.rst:84 5f9d9cf84442408b9c4573201d624ecb
 msgid ""
 "Fields for ``-f/--format`` option can be displayed by specifying comma-"
 "separated parameters."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:83 01cd9760982e45b78a2dad128cb909c5
+#: ../../client/cli/sessions.rst:86 9672c105dff24506ad2a9149bf742538
 msgid ""
-"Available parameters for this option are: ``id``, ``status``, "
-"``status_info``, ``created_at``, ``last_updated``, ``result``, ``image``,"
-" ``type``, ``task_id``, ``tag``, ``occupied_slots``, ``used_memory``, "
-"``max_used_memory``, ``cpu_using``."
+"Available parameters for this option are: ``id (session_id)``, "
+"``main_kernel_id``, ``tag``, ``name``, ``type``, ``image``, ``registry``,"
+" ``cluster_template (reserved for future release)``, ``cluster_mode``, "
+"``cluster_size``, ``domain_name``, ``group_name``, ``group_id``, "
+"``agent_ids``, ``user_email``, ``user_id``, ``access_key``, ``status``, "
+"``status_info``, ``status_changed``, ``created_at``, ``terminated_at``, "
+"``starts_at``, ``scheduled_at``, ``startup_command``, ``result``, "
+"``resource_opts``, ``scaling_group``, ``service_ports``, ``mounts``, "
+"``occupying_slots``, ``dependencies``, ``abusing_reports``, "
+"``idle_checks``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:85 8ecaacac4365447fb8dd24f34a6cf2f1
+#: ../../client/cli/sessions.rst:88 4a7fdc7e2798496eaa135e2bcb3a4d8d
 msgid "For example:"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:94 55048cb7320f4b0e94674ce5681065f9
+#: ../../client/cli/sessions.rst:97 2380cf3a412842bd8f3d62aff2c256ae
 msgid "Running simple sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:96 ee2a4128e0d2493fb9382ea83359e73d
+#: ../../client/cli/sessions.rst:99 ccc28a81d72e4e51a94dd5d63aec9cef
 msgid ""
 "The following command spawns a Python session and executes the code "
 "passed as ``-c`` argument immediately. ``--rm`` option states that the "
 "client automatically terminates the session after execution finishes."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:107 79fc18a3a4f9421f9f1aae8a24c2d3e7
+#: ../../client/cli/sessions.rst:110 c83fc90146144906b508cf3bd7644051
 msgid ""
 "By default, you need to specify language with full version tag like "
 "``python:3.6-ubuntu18.04``. Depending on the Backend.AI admin's language "
@@ -177,33 +189,33 @@ msgid ""
 "know defined language aliases, contact the admin of Backend.AI server."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:113 288298de245e4189962ca4ab2b2044ca
+#: ../../client/cli/sessions.rst:116 8be0c6fd03fc470dbc2fb14d6174f207
 msgid ""
 "The following command spawns a Python session and executes the code "
 "passed as ``./myscript.py`` file, using the shell command specified in "
 "the ``--exec`` option."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:123 c7977eda32564f7d89c590b425beca38
+#: ../../client/cli/sessions.rst:126 4a021c9ab0984eda8dd51b7c93cab8e1
 msgid ""
 "Please note that your ``run`` command may hang up for a very long time "
 "due to queueing when the cluster resource is not sufficiently available."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:126 0852a3db1996474c98767891ca6e8bce
+#: ../../client/cli/sessions.rst:129 a4d71a7a4c2e461588db57173edd11e3
 msgid ""
 "To avoid indefinite waiting, you may add ``--enqueue-only`` to return "
 "immediately after posting the session creation request."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:131 169685c4fc09496d80f394696272a3d1
+#: ../../client/cli/sessions.rst:134 3a6f11c09f1244ff9a10c0968afa158f
 msgid ""
 "When using ``--enqueue-only``, the codes are *NOT* executed and relevant "
 "options are ignored. This makes the ``run`` command to the same of the "
 "``start`` command."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:135 1c584c400b4e48829965cb488388085e
+#: ../../client/cli/sessions.rst:138 fb67913dd523450aa0e8766f2c379a92
 msgid ""
 "Or, you may use ``--max-wait`` option to limit the maximum waiting time. "
 "If the session starts within the given ``--max-wait`` seconds, it works "
@@ -211,35 +223,35 @@ msgid ""
 "``--enqueue-only``."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:140 c10fad6e09264f4cae3443788b77d746
+#: ../../client/cli/sessions.rst:143 1b47da4f14d84360bfc3280ab5c601e2
 msgid ""
 "To watch what is happening behind the scene until the session starts, try"
 " ``backend.ai events <sessionID>`` to receive the lifecycle events such "
 "as its scheduling and preparation steps."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:146 5f52a05c05de467695d05007c70df4df
+#: ../../client/cli/sessions.rst:149 114d64c15f1f43409534d0c91ba21795
 msgid "Running sessions with accelerators"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:148 c26fbf52a2ea4b12ade0454b48595909
+#: ../../client/cli/sessions.rst:151 5f6cc6de93234c4d839369c9185f316e
 msgid ""
 "Use one or more ``-r`` options to specify resource requirements when "
 "using ``backend.ai run`` and ``backend.ai start`` commands."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:151 4b3208770b51410c973fa4e4427dfb3e
+#: ../../client/cli/sessions.rst:154 526b569b28424f85b77a91c9e7151927
 msgid ""
 "For instance, the following command spawns a Python TensorFlow session "
 "using a half of virtual GPU device, 4 CPU cores, and 8 GiB of the main "
 "memory to execute ``./mygpucode.py`` file inside it."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:163 8906c5399b744d479170cefc044a9325
+#: ../../client/cli/sessions.rst:166 21d0d6c1d14b44bdb228b3611f34308f
 msgid "Terminating or cancelling sessions"
 msgstr ""
 
-#: ../../client/cli/sessions.rst:165 34bbde283dfe49b5878d0db1bd7d6827
+#: ../../client/cli/sessions.rst:168 84c719d55671456aa9df08bad8c173ef
 msgid ""
 "Without ``--rm`` option, your session remains alive for a configured "
 "amount of idle timeout (default is 30 minutes). You can see such sessions"
@@ -248,7 +260,7 @@ msgid ""
 " session IDs to terminate them at once."
 msgstr ""
 
-#: ../../client/cli/sessions.rst:175 8d284f48a5574b239370ceda82c26482
+#: ../../client/cli/sessions.rst:178 b679923c49934d188858c608ff806499
 msgid ""
 "If you terminate ``PENDING`` sessions which are not scheduled yet, they "
 "are cancelled."
@@ -261,5 +273,42 @@ msgstr ""
 #~ "privilege, you can list sessions owned"
 #~ " by other users by adding "
 #~ "``--access-key`` option here."
+#~ msgstr ""
+
+#~ msgid "``Session ID``, ``Owner``, ``Image``, ``Type``,"
+#~ msgstr ""
+
+#~ msgid "``Status``, ``Status Info``, ``Last updated``, and ``Result``."
+#~ msgstr ""
+
+#~ msgid "``--id-only``"
+#~ msgstr ""
+
+#~ msgid "``Session ID``."
+#~ msgstr ""
+
+#~ msgid "``Status``, ``Status Info``, ``Last updated``, ``Result``,"
+#~ msgstr ""
+
+#~ msgid "``Tag``, ``Created At``, ``Occupied Resource``, ``Used Memory (MiB)``,"
+#~ msgstr ""
+
+#~ msgid "``Max Used Memory (MiB)``, and ``CPU Using (%)``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available parameters for this option "
+#~ "are: ``id``, ``status``, ``status_info``, "
+#~ "``created_at``, ``last_updated``, ``result``, "
+#~ "``image``, ``type``, ``task_id``, ``tag``, "
+#~ "``occupied_slots``, ``used_memory``, ``max_used_memory``,"
+#~ " ``cpu_using``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available parameters for this option "
+#~ "are: ``id``, ``status``, ``status_info``, "
+#~ "``created_at``, ``status_changed``, ``result``, "
+#~ "``image``, ``type``, ``tag``, ``occupying_slots``."
 #~ msgstr ""
 
