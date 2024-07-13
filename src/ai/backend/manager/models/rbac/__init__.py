@@ -250,9 +250,9 @@ class AbstractPermissionContext(
         pass
 
     @abstractmethod
-    async def calculate_final_permission(self, acl_obj: ObjectType) -> frozenset[PermissionType]:
+    async def calculate_final_permission(self, rbac_obj: ObjectType) -> frozenset[PermissionType]:
         """
-        Calculate the final permissions applied to the given  object based on the fields in this class.
+        Calculate the final permissions applied to the given object based on the fields in this class.
         """
         pass
 

@@ -162,9 +162,9 @@ class PermissionContext(AbstractPermissionContext[StorageHostRBACPermission, str
         return None
 
     async def calculate_final_permission(
-        self, acl_obj: str
+        self, rbac_obj: str
     ) -> frozenset[StorageHostRBACPermission]:
-        host_name = acl_obj
+        host_name = rbac_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())
 
 

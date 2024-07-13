@@ -873,9 +873,9 @@ class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolder
         return sa.select(VFolderRow).where(cond)
 
     async def calculate_final_permission(
-        self, acl_obj: VFolderRow
+        self, rbac_obj: VFolderRow
     ) -> frozenset[VFolderRBACPermission]:
-        vfolder_row = acl_obj
+        vfolder_row = rbac_obj
         vfolder_id = cast(uuid.UUID, vfolder_row.id)
         if (
             overriding_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
