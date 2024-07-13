@@ -70,13 +70,13 @@ jobs:
     name: Check Schema
     runs-on: ubuntu-latest
     permissions:
-      contents: read 
+      contents: read
       pull-requests: write
       checks: write
     steps:
       - uses: actions/checkout@v4
       - uses: kamilkisiela/graphql-inspector@release-1717403590269
         with:
-          schema: 'main:src/ai/backend/manager/api/schema.graphql'
+          schema: '${{ github.base_ref }}:src/ai/backend/manager/api/schema.graphql'
           rules: |
             gql-inspector-checker.js
