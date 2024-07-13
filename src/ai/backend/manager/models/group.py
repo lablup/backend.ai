@@ -197,7 +197,11 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
-    vfolder_row = relationship("VFolderRow", back_populates="group_row")
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="group_row",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
