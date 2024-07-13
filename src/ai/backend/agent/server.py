@@ -404,7 +404,9 @@ class AgentRPCServer(aobject):
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
         self.debug_server_task.cancel()
-        await self.debug_server_task
+        await asyncio.sleep(0)
+        if not self.debug_server_task.done():
+            await self.debug_server_task
         await self.agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
@@ -623,6 +625,21 @@ class AgentRPCServer(aobject):
             flush_timeout=flush_timeout,
         )
         return result
+
+    @rpc_function
+    @collect_error
+    async def trigger_batch_execution(
+        self,
+        session_id: str,
+        kernel_id: str,
+        code: str,
+    ) -> None:
+        log.info(
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+        )
+        await self.agent.create_batch_execution_task(
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+        )
 
     @rpc_function
     @collect_error

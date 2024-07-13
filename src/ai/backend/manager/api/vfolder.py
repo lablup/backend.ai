@@ -199,6 +199,8 @@ async def resolve_vfolder_rows(
     request: web.Request,
     perm: VFolderPermissionSetAlias | VFolderPermission | str,
     folder_id_or_name: str | uuid.UUID,
+    *,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -252,6 +254,7 @@ async def resolve_vfolder_rows(
             extra_invited_vf_conds=invited_perm_cond,
             extra_vf_user_conds=vf_user_cond,
             extra_vf_group_conds=vf_group_cond,
+            allowed_status_set=allowed_status_set,
         )
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=folder_id_or_name)
@@ -723,18 +726,22 @@ async def fetch_exposed_volume_fields(
                 },
             ) as (_, storage_resp):
                 storage_reply = await storage_resp.json()
+                storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
+                storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
                 if show_used:
-                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+                    volume_usage["used"] = storage_used_bytes
 
                 if show_total:
-                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    volume_usage["total"] = storage_capacity_bytes
 
                 if show_percentage:
-                    volume_usage["percentage"] = (
-                        storage_reply[ExposedVolumeInfoField.used_bytes]
-                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
-                    ) * 100
+                    try:
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0
 
             await redis_helper.execute(
                 redis_connection,
@@ -2204,9 +2211,10 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        db_conn = db_session.bind
         entries = await query_accessible_vfolders(
-            conn,
+            db_conn,
             user_uuid,
             allow_privileged_access=True,
             user_role=user_role,
@@ -2228,18 +2236,15 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            async with root_ctx.db._begin_session(conn) as sess:
-                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
+            live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+            if (
+                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
+                > 0
+            ):
+                raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
-            conn,
+            db_conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
@@ -2491,10 +2496,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     root_ctx: RootContext = request.app["_root.context"]
     folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2507,33 +2508,19 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request,
+            VFolderPermission.OWNER_PERM,
+            folder_id,
+            allowed_status_set=VFolderStatusSet.PURGABLE,
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.PURGE(folder id:{}, hosts:{}",
-                folder_id,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same id.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
-        entry = entries[0]
+        entry = row
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
@@ -2806,6 +2793,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            domain_name,
             target_quota_scope_id,
             params["target_name"],
             target_folder_host,

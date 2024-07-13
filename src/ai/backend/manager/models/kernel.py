@@ -4,18 +4,19 @@ import asyncio
 import enum
 import logging
 import uuid
+from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Mapping,
     Optional,
     Sequence,
     Type,
     TypedDict,
     TypeVar,
+    cast,
 )
 
 import graphene
@@ -51,6 +52,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     SessionNotFound,
 )
@@ -77,7 +79,7 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -642,6 +644,62 @@ class KernelRow(Base):
                 return cand[0]
 
         return await execute_with_retry(_query)
+
+    @classmethod
+    async def get_kernel_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_id: KernelId,
+    ) -> KernelRow:
+        _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
+        if kernel_row is None:
+            raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
+        return kernel_row
+
+    def transit_status(
+        self,
+        status: KernelStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> bool:
+        """
+        Check whether the transition from a current status to the given status is valid or not.
+        Set the status if it is valid and return True.
+        Else, return False.
+        """
+        if status not in KERNEL_STATUS_TRANSITION_MAP[self.status]:
+            return False
+        self.set_status(status, status_info, status_data, status_changed_at)
+        return True
+
+    def set_status(
+        self,
+        status: KernelStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        """
+        Set the status of the kernel.
+        """
+        now = status_changed_at or datetime.now(tzutc())
+        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+            self.terminated_at = now
+        self.status_changed = now
+        self.status = status
+        self.status_history = sql_json_merge(
+            KernelRow.status_history,
+            (),
+            {
+                status.name: now.isoformat(),
+            },
+        )
+        if status_info is not None:
+            self.status_info = status_info
+        if status_data is not None:
+            self.status_data = status_data
 
     @classmethod
     async def set_kernel_status(
