@@ -46,7 +46,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload, with_loader_criteria
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
@@ -1626,11 +1626,23 @@ class AgentRegistry:
                         SessionRow.name,
                         SessionRow.creation_id,
                         SessionRow.access_key,
+                        SessionRow.session_type,
                     ),
+                    selectinload(
+                        SessionRow.kernels,
+                    ).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.agent,
+                            KernelRow.cluster_role,
+                            KernelRow.startup_command,
+                        )
+                    ),
+                    with_loader_criteria(KernelRow, KernelRow.cluster_role == DEFAULT_ROLE),
                 )
             )
             async with self.db.begin_readonly_session() as db_session:
-                updated_session = (await db_session.scalars(query)).first()
+                updated_session = cast(SessionRow, await db_session.scalar(query))
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -1648,6 +1660,9 @@ class AgentRegistry:
                     updated_session.access_key,
                 ),
             )
+
+            if updated_session.session_type == SessionTypes.BATCH:
+                await self.trigger_batch_execution(updated_session)
         except Exception:
             log.exception("error while executing _finalize_running")
             raise
@@ -2676,6 +2691,9 @@ class AgentRegistry:
             SessionStartedEvent(session.id, session.creation_id),
         )
 
+        if session.session_type == SessionTypes.BATCH:
+            await self.trigger_batch_execution(session)
+
     async def execute(
         self,
         session: SessionRow,
@@ -2707,6 +2725,22 @@ class AgentRegistry:
                     code,
                     opts,
                     flush_timeout,
+                )
+
+    async def trigger_batch_execution(
+        self,
+        session: SessionRow,
+    ) -> None:
+        async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
+            async with self.agent_cache.rpc_context(
+                session.main_kernel.agent,
+                invoke_timeout=30,
+                order_key=session.main_kernel.id,
+            ) as rpc:
+                return await rpc.call.trigger_batch_execution(
+                    str(session.id),
+                    str(session.main_kernel.id),
+                    session.main_kernel.startup_command or "",
                 )
 
     async def interrupt_session(

@@ -628,6 +628,21 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def trigger_batch_execution(
+        self,
+        session_id: str,
+        kernel_id: str,
+        code: str,
+    ) -> None:
+        log.info(
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+        )
+        await self.agent.create_batch_execution_task(
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+        )
+
+    @rpc_function
+    @collect_error
     async def start_service(
         self,
         kernel_id: str,
