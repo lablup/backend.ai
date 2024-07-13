@@ -65,6 +65,7 @@ local_config_iv = (
                     t.Key("watcher-outsock-path-prefix", default=None): t.Null
                     | t.String(allow_blank=False),
                     t.Key("use-watcher", default=False): t.Bool(),
+                    t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
                 },
             ),
             t.Key("logging"): logging_config_iv,

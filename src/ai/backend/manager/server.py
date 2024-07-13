@@ -45,6 +45,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -400,11 +401,17 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
+        event_dispatcher_cls = ExperimentalEventDispatcher
+    else:
+        event_dispatcher_cls = EventDispatcher
+
     root_ctx.event_producer = await EventProducer.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
     )
-    root_ctx.event_dispatcher = await EventDispatcher.new(
+    root_ctx.event_dispatcher = await event_dispatcher_cls.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],

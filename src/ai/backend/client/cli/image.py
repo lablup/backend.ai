@@ -2,7 +2,6 @@ import sys
 
 import click
 
-# from ai.backend.client.output.fields import image_fields
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.exceptions import BackendAPIError

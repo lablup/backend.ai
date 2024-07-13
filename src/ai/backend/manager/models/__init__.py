@@ -8,6 +8,7 @@ from . import group as _group
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
+from . import rbac as _rbac
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import resource_usage as _rusage
@@ -33,6 +34,7 @@ __all__ = (
     *_user.__all__,
     *_vfolder.__all__,
     *_dotfile.__all__,
+    *_rbac.__all__,
     *_rusage.__all__,
     *_rpolicy.__all__,
     *_rpreset.__all__,
@@ -54,6 +56,7 @@ from .group import *  # noqa
 from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
+from .rbac import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa

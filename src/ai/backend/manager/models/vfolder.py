@@ -4,9 +4,21 @@ import enum
 import logging
 import os.path
 import uuid
+from collections.abc import Container, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    TypeAlias,
+    cast,
+)
 
 import aiohttp
 import aiotools
@@ -23,7 +35,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -32,6 +44,7 @@ from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
+    SessionId,
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
@@ -41,6 +54,7 @@ from ai.backend.common.types import (
 
 from ..api.exceptions import (
     InvalidAPIParameters,
+    ObjectNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -69,10 +83,20 @@ from .base import (
     metadata,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from .group import GroupRow, ProjectType
+from .group import GroupRow, ProjectType, UserRoleInProject
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .user import UserRole
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    BasePermission,
+    BaseScope,
+    ClientContext,
+    StorageHost,
+)
+from .rbac.exceptions import NotEnoughPermission
+from .session import DEAD_SESSION_STATUSES, SessionRow
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
@@ -85,6 +109,7 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
+    "VFolderRBACPermission",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
@@ -113,6 +138,11 @@ __all__: Sequence[str] = (
     "SOFT_DELETED_VFOLDER_STATUSES",
     "HARD_DELETED_VFOLDER_STATUSES",
     "VFolderPermissionSetAlias",
+    "get_vfolders",
+    "VFolderWithPermissionSet",
+    "OWNER_PERMISSIONS",
+    "PermissionContext",
+    "PermissionContextBuilder",
 )
 
 
@@ -229,9 +259,10 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     VFolderStatusSet.DELETABLE: {
         VFolderOperationStatus.READY,
     },
-    # if DELETABLE access status is requested, only DELETE_PENDING operation status is accepted.
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
     VFolderStatusSet.PURGABLE: {
         VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
     },
     VFolderStatusSet.RECOVERABLE: {
         VFolderOperationStatus.DELETE_PENDING,
@@ -276,6 +307,7 @@ class VFolderDeletionInfo(NamedTuple):
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
+    domain_name: str
 
     # Target Vfolder infos
     target_quota_scope_id: str
@@ -294,6 +326,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
+    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
@@ -303,7 +336,9 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
+    sa.Column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    ),  # legacy
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
     sa.Column("num_files", sa.Integer(), default=0),
@@ -321,8 +356,8 @@ vfolders = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
+    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -341,15 +376,6 @@ vfolders = sa.Table(
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-    sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
-    ),
-    sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
-    ),
 )
 
 
@@ -401,6 +427,7 @@ vfolder_invitations = sa.Table(
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
+    IDColumn(),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column(
         "vfolder",
@@ -412,8 +439,43 @@ vfolder_permissions = sa.Table(
 )
 
 
+class VFolderPermissionRow(Base):
+    __table__ = vfolder_permissions
+
+
 class VFolderRow(Base):
     __table__ = vfolders
+
+    endpoints = relationship("EndpointRow", back_populates="model_row")
+    user_row = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    )
+    group_row = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
+
+    @classmethod
+    async def get(
+        cls,
+        session: SASession,
+        id: uuid.UUID,
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
+        query = sa.select(VFolderRow).where(VFolderRow.id == id)
+        if load_user:
+            query = query.options(selectinload(VFolderRow.user_row))
+        if load_group:
+            query = query.options(selectinload(VFolderRow.group_row))
+
+        result = await session.scalar(query)
+        if not result:
+            raise ObjectNotFound(object_name="VFolder")
+        return result
 
     def __contains__(self, key):
         return key in self.__dir__()
@@ -423,6 +485,10 @@ class VFolderRow(Base):
             return getattr(self, item)
         except AttributeError:
             raise KeyError(item)
+
+    @property
+    def vfid(self) -> VFolderID:
+        return VFolderID(self.quota_scope_id, self.id)
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -447,6 +513,7 @@ async def query_accessible_vfolders(
     extra_invited_vf_conds=None,
     extra_vf_user_conds=None,
     extra_vf_group_conds=None,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
@@ -518,11 +585,15 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-            .where(vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
@@ -548,9 +619,14 @@ async def query_accessible_vfolders(
             .where(
                 (vfolder_permissions.c.user == user_uuid)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
             )
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_invited_vf_conds is not None:
             query = query.where(extra_invited_vf_conds)
         await _append_entries(query, _is_owner=False)
@@ -594,12 +670,14 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
-            .where(
-                (vfolders.c.group.in_(group_ids))
-                & (vfolder_permissions.c.user == user_uuid)
-                & (vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])),
-            )
+            .where((vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid))
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if extra_vf_conds is not None:
             query = query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:
@@ -614,6 +692,497 @@ async def query_accessible_vfolders(
                 entry["permission"] = overriding_permissions[entry["id"]]
 
     return entries
+
+
+class VFolderRBACPermission(BasePermission):
+    # Only owners can do
+    CLONE = enum.auto()
+    ASSIGN_PERMISSION_TO_OTHERS = enum.auto()  # Invite, share
+
+    # `create_vfolder` action should be in {Domain, Project, or User} permissions, not here
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_VFOLDER = enum.auto()
+
+    READ_CONTENT = enum.auto()
+    WRITE_CONTENT = enum.auto()
+    DELETE_CONTENT = enum.auto()
+
+    MOUNT_RO = enum.auto()
+    MOUNT_RW = enum.auto()
+    MOUNT_WD = enum.auto()
+
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+# TypeAlias is deprecated since 3.12
+
+OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    perm for perm in VFolderRBACPermission
+])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE,
+    VFolderRBACPermission.DELETE_VFOLDER,
+])
+ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+])  # Admins are allowed to READ folders that other users are invited to.
+USER_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.READ_CONTENT,
+    VFolderRBACPermission.WRITE_CONTENT,
+    VFolderRBACPermission.DELETE_CONTENT,
+    VFolderRBACPermission.MOUNT_RO,
+    VFolderRBACPermission.MOUNT_RW,
+    VFolderRBACPermission.MOUNT_WD,
+])
+# `ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS == OWNER_PERMISSIONS` is true
+# but it doesn't mean that admins are the owner of the project folders.
+ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = (
+    ADMIN_PERMISSIONS
+    | USER_PERMISSIONS_ON_PROJECT_FOLDERS
+    | {VFolderRBACPermission.CLONE, VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS}
+)
+
+# TODO: Change type of `vfolder_permissions.permission` to VFolderRBACPermission
+PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderRBACPermission]] = {
+    VFolderPermission.READ_ONLY: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.READ_CONTENT,
+    ]),
+    VFolderPermission.READ_WRITE: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.UPDATE_ATTRIBUTE,
+        VFolderRBACPermission.DELETE_VFOLDER,
+        VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.WRITE_CONTENT,
+        VFolderRBACPermission.DELETE_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
+        VFolderRBACPermission.MOUNT_RW,
+    ]),
+    VFolderPermission.RW_DELETE: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.UPDATE_ATTRIBUTE,
+        VFolderRBACPermission.DELETE_VFOLDER,
+        VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.WRITE_CONTENT,
+        VFolderRBACPermission.DELETE_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
+        VFolderRBACPermission.MOUNT_RW,
+        VFolderRBACPermission.MOUNT_WD,
+    ]),
+    VFolderPermission.OWNER_PERM: OWNER_PERMISSIONS,
+}
+
+
+@dataclass
+class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]):
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        def _AND_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond & _cond if base_cond is not None else _cond
+
+        if self.user_id_to_permission_map:
+            cond = _OR_coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
+        if self.project_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys())
+            )
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+
+        return cond
+
+    async def build_query(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(VFolderRow).where(cond)
+
+    async def calculate_final_permission(
+        self, acl_obj: VFolderRow
+    ) -> frozenset[VFolderRBACPermission]:
+        vfolder_row = acl_obj
+        vfolder_id = cast(uuid.UUID, vfolder_row.id)
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
+        ) is not None:
+            return overriding_perm
+        permissions: set[VFolderRBACPermission] = set()
+        permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
+        permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
+        permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
+        permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
+        return frozenset(permissions)
+
+
+class PermissionContextBuilder(
+    AbstractPermissionContextBuilder[VFolderRBACPermission, PermissionContext]
+):
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
+    async def _build_in_user_scope(
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+    ) -> PermissionContext:
+        match ctx.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                if ctx.user_id == user_id:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    object_id_to_additional_permission_map = {
+                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                        for row in await self.db_session.scalars(additional_stmt)
+                    }
+                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                    )
+                else:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    object_id_to_additional_permission_map = {
+                        row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
+                        for row in await self.db_session.scalars(additional_stmt)
+                    }
+                    user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                    )
+            case UserRole.ADMIN:
+                if ctx.user_id == user_id:
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    object_id_to_additional_permission_map = {
+                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                        for row in await self.db_session.scalars(additional_stmt)
+                    }
+
+                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                    )
+                else:
+                    # domain admins cannot access to users in another domain
+                    user_domain_stmt = (
+                        sa.select(UserRow)
+                        .where(UserRow.uuid == user_id)
+                        .options(load_only(UserRow.domain_name))
+                    )
+                    user_row = cast(UserRow | None, await self.db_session.scalar(user_domain_stmt))
+                    if user_row is None:
+                        return PermissionContext()
+                    if user_row.domain_name != ctx.domain_name:
+                        return PermissionContext()
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    object_id_to_additional_permission_map = {
+                        row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
+                        for row in await self.db_session.scalars(additional_stmt)
+                    }
+                    user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                    )
+            case UserRole.USER:
+                if ctx.user_id == user_id:
+                    overriding_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (
+                                VFolderRow.ownership_type == VFolderOwnershipType.USER
+                            )  # filter out project vfolders
+                        )
+                    )
+                    object_id_to_overriding_permission_map = {
+                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                        for row in await self.db_session.scalars(overriding_stmt)
+                    }
+
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
+                    )
+                else:
+                    return PermissionContext()
+
+    async def _build_in_project_scope(
+        self,
+        ctx: ClientContext,
+        project_id: uuid.UUID,
+    ) -> PermissionContext:
+        role_in_project = await ctx.get_user_role_in_project(self.db_session, project_id)
+        match role_in_project:
+            case UserRoleInProject.ADMIN:
+                project_id_to_permission_map = {project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS}
+                return PermissionContext(project_id_to_permission_map=project_id_to_permission_map)
+            case UserRoleInProject.USER:
+                project_id_to_permission_map = {project_id: USER_PERMISSIONS_ON_PROJECT_FOLDERS}
+                overriding_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.group == project_id)
+                    )
+                )
+                object_id_to_overriding_permission_map = {
+                    row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                    for row in await self.db_session.scalars(overriding_stmt)
+                }
+                return PermissionContext(
+                    project_id_to_permission_map=project_id_to_permission_map,
+                    object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
+                )
+            case UserRoleInProject.NONE:
+                return PermissionContext()
+
+    async def _build_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> PermissionContext:
+        match ctx.user_role:
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
+
+                project_ctx = await ctx.get_accessible_projects_in_domain(
+                    self.db_session, domain_name
+                )
+                if project_ctx is not None:
+                    project_id_to_permission_map = {
+                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                        for project_id, _ in project_ctx.items()
+                    }
+                else:
+                    project_id_to_permission_map = {}
+                additional_stmt = (
+                    sa.select(VFolderPermissionRow)
+                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                    .where(
+                        (VFolderPermissionRow.user == ctx.user_id)
+                        & (VFolderRow.domain_name == domain_name)
+                    )
+                )
+                object_id_to_additional_permission_map = {
+                    row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                    for row in await self.db_session.scalars(additional_stmt)
+                }
+
+                user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
+                return PermissionContext(
+                    user_id_to_permission_map,
+                    project_id_to_permission_map,
+                    domain_name_to_permission_map,
+                    object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                )
+            case UserRole.ADMIN:
+                if ctx.domain_name == domain_name:
+                    domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
+                    project_ctx = await ctx.get_accessible_projects_in_domain(
+                        self.db_session, domain_name
+                    )
+                    if project_ctx is not None:
+                        project_id_to_permission_map = {
+                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                            for project_id, _ in project_ctx.items()
+                        }
+                    else:
+                        project_id_to_permission_map = {}
+                    additional_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (VFolderRow.domain_name == domain_name)
+                        )
+                    )
+                    object_id_to_additional_permission_map = {
+                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                        for row in await self.db_session.scalars(additional_stmt)
+                    }
+
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        project_id_to_permission_map,
+                        domain_name_to_permission_map,
+                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
+                    )
+                else:
+                    # Only superadmin can access to another domains
+                    return PermissionContext()
+            case UserRole.USER:
+                if ctx.domain_name == domain_name:
+                    project_ctx = await ctx.get_accessible_projects_in_domain(
+                        self.db_session, domain_name
+                    )
+                    if project_ctx is not None:
+                        project_id_to_permission_map = {
+                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
+                            if role == UserRoleInProject.ADMIN
+                            else USER_PERMISSIONS_ON_PROJECT_FOLDERS
+                            for project_id, role in project_ctx.items()
+                        }
+                    else:
+                        project_id_to_permission_map = {}
+                    overriding_stmt = (
+                        sa.select(VFolderPermissionRow)
+                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+                        .where(
+                            (VFolderPermissionRow.user == ctx.user_id)
+                            & (VFolderRow.domain_name == domain_name)
+                        )
+                    )
+                    object_id_to_overriding_permission_map = {
+                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+                        for row in await self.db_session.scalars(overriding_stmt)
+                    }
+
+                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
+                    return PermissionContext(
+                        user_id_to_permission_map,
+                        project_id_to_permission_map,
+                        object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
+                    )
+                else:
+                    # Only superadmin can access to another domains
+                    return PermissionContext()
+
+
+class VFolderWithPermissionSet(NamedTuple):
+    vfolder_row: VFolderRow
+    permissions: frozenset[VFolderRBACPermission]
+
+
+async def get_vfolders(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: BaseScope,
+    extra_scope: StorageHost | None = None,
+    requested_permission: VFolderRBACPermission | None = None,
+    *,
+    vfolder_id: uuid.UUID | None = None,
+    vfolder_name: str | None = None,
+    usage_mode: VFolderUsageMode | None = None,
+    allowed_status: Container[VFolderOperationStatus] | None = None,
+    blocked_status: Container[VFolderOperationStatus] | None = None,
+) -> list[VFolderWithPermissionSet]:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        ctx_builder = PermissionContextBuilder(db_session)
+        permission_ctx = await ctx_builder.build(ctx, target_scope, permission=requested_permission)
+        query_stmt = await permission_ctx.build_query()
+        if query_stmt is None:
+            return []
+        if vfolder_id is not None:
+            query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
+        if vfolder_name is not None:
+            query_stmt = query_stmt.where(VFolderRow.name == vfolder_name)
+        if usage_mode is not None:
+            query_stmt = query_stmt.where(VFolderRow.usage_mode == usage_mode)
+        if allowed_status is not None:
+            query_stmt = query_stmt.where(VFolderRow.status.in_(allowed_status))
+        if blocked_status is not None:
+            query_stmt = query_stmt.where(VFolderRow.status.not_in(blocked_status))
+
+        result: list[VFolderWithPermissionSet] = []
+        for row in await db_session.scalars(query_stmt):
+            row = cast(VFolderRow, row)
+            permissions = await permission_ctx.calculate_final_permission(row)
+            result.append(VFolderWithPermissionSet(row, permissions))
+        return result
+
+
+async def validate_permission(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: BaseScope,
+    extra_scope: StorageHost | None = None,
+    *,
+    permission: VFolderRBACPermission,
+    vfolder_id: uuid.UUID,
+) -> None:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        ctx_builder = PermissionContextBuilder(db_session)
+        permission_ctx = await ctx_builder.build(ctx, target_scope, permission=permission)
+        query_stmt = await permission_ctx.build_query()
+        if query_stmt is None:
+            raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
+        query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
+        vfolder_row = cast(VFolderRow | None, await db_session.scalar(query_stmt))
+        if vfolder_row is None:
+            raise VFolderNotFound(
+                f"VFolder not found (id:{vfolder_id}, permission:{permission.name})"
+            )
+        final_perms = await permission_ctx.calculate_final_permission(vfolder_row)
+        if permission not in final_perms:
+            raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
 
 
 async def get_allowed_vfolder_hosts_by_group(
@@ -935,6 +1504,20 @@ async def update_vfolder_status(
 
     now = datetime.now(tzutc())
 
+    if update_status == VFolderOperationStatus.DELETE_PENDING:
+        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+        async with engine.begin_readonly_session() as db_session:
+            for vf_row in await db_session.scalars(select_stmt):
+                vf_row = cast(VFolderRow, vf_row)
+                mount_sessions = await get_sessions_by_mounted_folder(
+                    db_session, VFolderID.from_row(vf_row)
+                )
+                if mount_sessions:
+                    session_ids = [str(s) for s in mount_sessions]
+                    raise InvalidAPIParameters(
+                        f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
+                    )
+
     async def _update() -> None:
         async with engine.begin_session() as db_session:
             query = (
@@ -1044,6 +1627,7 @@ async def initiate_vfolder_clone(
                 insert_values = {
                     "id": target_folder_id.folder_id,
                     "name": vfolder_info.target_vfolder_name,
+                    "domain_name": vfolder_info.domain_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
                     "last_used": None,
@@ -1170,7 +1754,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
     from ai.backend.manager.models import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
@@ -1213,6 +1796,26 @@ async def ensure_quota_scope_accessible_by_user(
     raise InvalidAPIParameters
 
 
+async def get_sessions_by_mounted_folder(
+    db_session: SASession, vfolder_id: VFolderID
+) -> tuple[SessionId]:
+    """
+    Return a tuple of sessions.id that the give folder is mounted on.
+    """
+
+    select_stmt = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.status.not_in(DEAD_SESSION_STATUSES))
+            & SessionRow.vfolder_mounts.contains([{"vfid": str(vfolder_id)}])
+        )
+        .options(load_only(SessionRow.id))
+    )
+
+    session_rows = (await db_session.scalars(select_stmt)).all()
+    return tuple([session.id for session in session_rows])
+
+
 class VirtualFolder(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -1225,6 +1828,7 @@ class VirtualFolder(graphene.ObjectType):
     group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
     group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
     creator = graphene.String()  # User.email (always set)
+    domain_name = graphene.String(description="Added in 24.09.0.")
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
     permission = graphene.String()
@@ -1261,6 +1865,7 @@ class VirtualFolder(graphene.ObjectType):
             group=row["group"],
             group_name=_get_field("groups_name"),
             creator=row["creator"],
+            domain_name=row["domain_name"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
             permission=row["permission"],
@@ -1273,6 +1878,31 @@ class VirtualFolder(graphene.ObjectType):
             cloneable=row["cloneable"],
             status=row["status"],
             cur_size=row["cur_size"],
+        )
+
+    @classmethod
+    def from_orm_row(cls, row: VFolderRow) -> VirtualFolder:
+        return cls(
+            id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user,
+            user_email=row.user_row.email if row.user_row is not None else None,
+            group=row.group,
+            group_name=row.group_row.name if row.group_row is not None else None,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -1289,6 +1919,7 @@ class VirtualFolder(graphene.ObjectType):
         "user": ("vfolders_user", uuid.UUID),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
+        "domain_name": ("vfolders_domain_name", None),
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
@@ -1320,6 +1951,7 @@ class VirtualFolder(graphene.ObjectType):
         "name": ("vfolders_name", None),
         "group": ("vfolders_group", None),
         "group_name": ("groups_name", None),
+        "domain_name": ("domain_name", None),
         "user": ("vfolders_user", None),
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
@@ -1659,6 +2291,204 @@ class VirtualFolderList(graphene.ObjectType):
     items = graphene.List(VirtualFolder, required=True)
 
 
+class VirtualFolderNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+        description = "Added in 24.03.4."
+
+    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
+    host = graphene.String()
+    quota_scope_id = graphene.String()
+    name = graphene.String()
+    user = graphene.UUID()  # User.id (current owner, null in project vfolders)
+    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
+    group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
+    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
+    creator = graphene.String()  # User.email (always set)
+    unmanaged_path = graphene.String()
+    usage_mode = graphene.String()
+    permission = graphene.String()
+    ownership_type = graphene.String()
+    max_files = graphene.Int()
+    max_size = BigInt()  # in MiB
+    created_at = GQLDateTime()
+    last_used = GQLDateTime()
+
+    num_files = graphene.Int()
+    cur_size = BigInt()
+    # num_attached = graphene.Int()
+    cloneable = graphene.Boolean()
+    status = graphene.String()
+
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("vfolders_id", uuid.UUID),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", uuid.UUID),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", uuid.UUID),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "unmanaged_path": ("vfolders_unmanaged_path", None),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            enum_field_getter(VFolderUsageMode),
+        ),
+        "permission": (
+            "vfolders_permission",
+            enum_field_getter(VFolderPermission),
+        ),
+        "ownership_type": (
+            "vfolders_ownership_type",
+            enum_field_getter(VFolderOwnershipType),
+        ),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", dtparse),
+        "last_used": ("vfolders_last_used", dtparse),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": (
+            "vfolders_status",
+            enum_field_getter(VFolderOperationStatus),
+        ),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("vfolders_id", None),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", None),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", None),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "usage_mode": ("vfolders_usage_mode", None),
+        "permission": ("vfolders_permission", None),
+        "ownership_type": ("vfolders_ownership_type", None),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", None),
+        "last_used": ("vfolders_last_used", None),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
+    }
+
+    def resolve_created_at(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime:
+        if isinstance(self.created_at, datetime):
+            return self.created_at
+
+        try:
+            return dtparse(self.created_at)
+        except ParserError:
+            return self.created_at
+
+    @classmethod
+    def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
+        return cls(
+            id=row.id,
+            row_id=row.id,
+            host=row.host,
+            quota_scope_id=row.quota_scope_id,
+            name=row.name,
+            user=row.user,
+            user_email=row.user_row.email if row.user_row else None,
+            group=row.group_row.id if row.group_row else None,
+            group_name=row.group_row.name if row.group_row else None,
+            creator=row.creator,
+            unmanaged_path=row.unmanaged_path,
+            usage_mode=row.usage_mode,
+            permission=row.permission,
+            ownership_type=row.ownership_type,
+            max_files=row.max_files,
+            max_size=row.max_size,  # in B
+            created_at=row.created_at,
+            last_used=row.last_used,
+            cloneable=row.cloneable,
+            status=row.status,
+            cur_size=row.cur_size,
+        )
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VirtualFolderNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
+            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+                raise ValueError(
+                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+                )
+            return cls.from_row(info, vfolder_row)
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            cnt_query,
+            _,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            VFolderRow,
+            VFolderRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            result = [(cls.from_row(info, vf)) for vf in vfolder_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class VirtualFolderConnection(Connection):
+    class Meta:
+        node = VirtualFolderNode
+
+
 class VirtualFolderPermission(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -1793,8 +2623,6 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
         try:
@@ -1956,6 +2784,7 @@ class ModelCard(graphene.ObjectType):
 
     name = graphene.String()
     vfolder = graphene.Field(VirtualFolder)
+    vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
     title = graphene.String(description="Human readable name of the model.")
     version = graphene.String()
@@ -2038,7 +2867,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.created_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.created_at
 
     def resolve_modified_at(
@@ -2047,7 +2876,7 @@ class ModelCard(graphene.ObjectType):
     ) -> datetime:
         try:
             return dtparse(self.modified_at)
-        except ParserError:
+        except (TypeError, ParserError):
             return self.modified_at
 
     @classmethod
@@ -2072,6 +2901,8 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
+            vfolder=VirtualFolder.from_orm_row(vfolder_row),
+            vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
             author=metadata.get("author") or vfolder_row.creator or "",
             title=metadata.get("title") or vfolder_row.name,
@@ -2184,9 +3015,10 @@ class ModelCard(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_row_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = (await db_session.scalars(query)).first()
+            vfolder_row = await VFolderRow.get(
+                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+            )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
@@ -2223,7 +3055,8 @@ class ModelCard(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -2239,9 +3072,6 @@ class ModelCard(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(VFolderRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             model_store_project_gids = (
                 (
@@ -2259,7 +3089,10 @@ class ModelCard(graphene.ObjectType):
             VFolderRow.group.in_(model_store_project_gids)
         )
         query = query.where(additional_cond)
-        cnt_query = cnt_query.where(additional_cond)
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]

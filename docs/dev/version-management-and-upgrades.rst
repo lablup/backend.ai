@@ -34,7 +34,7 @@ Version Numbering
 
   * Generally ``backend.ai-manager 1.2.p`` is compatible with ``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)
 
-    * As of 22.09, this won't be guaranteed any more.  All server-side core component versions should **exactly match** with others, as we release them at once from the mono-repo, even for those who do not have any code changes.
+    * As of 22.09, this won't be guaranteed anymore.  All server-side core component versions should **exactly match** with others, as we release them at once from the mono-repo, even for those who do not have any code changes.
 
   * The client is guaranteed to be backward-compatible with the server they share the same API specification version.
 
