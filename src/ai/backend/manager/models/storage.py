@@ -152,10 +152,13 @@ def _legacy_vf_perms_to_host_rbac_perms(
     return result
 
 
+StorageHostToPermissionMap = Mapping[str, frozenset[StorageHostRBACPermission]]
+
+
 @dataclass
 class PermissionContext(AbstractPermissionContext[StorageHostRBACPermission, str, str]):
     @property
-    def host_to_permissions_map(self) -> Mapping[str, frozenset[StorageHostRBACPermission]]:
+    def host_to_permissions_map(self) -> StorageHostToPermissionMap:
         return self.object_id_to_additional_permission_map
 
     async def build_query(self) -> sa.sql.Select | None:
@@ -302,55 +305,6 @@ class VolumeInfo(TypedDict):
     path: str
     fsprefix: str
     capabilities: List[str]
-
-
-StorageHostPermissionMap = Mapping[str, frozenset[StorageHostRBACPermission]]
-
-
-# async def get_storage_hosts(
-#     ctx: ClientContext,
-#     target_scope: BaseScope,
-#     requested_permission: StorageHostRBACPermission | None = None,
-# ) -> StorageHostPermissionMap:
-#     async with SASession(ctx.db_conn) as db_session:
-#         permission_ctx = await PermissionContextBuilder.build(
-#             db_session, ctx, target_scope, permission=requested_permission
-#         )
-#         return {**permission_ctx.host_to_permissions_map}
-
-
-# def merge_host_permissions(
-#     left: StorageHostPermissionMap, right: StorageHostPermissionMap
-# ) -> StorageHostPermissionMap:
-#     result: dict[str, frozenset[StorageHostRBACPermission]] = {}
-#     for host_name in {*left.keys(), *right.keys()}:
-#         result[host_name] = left.get(host_name, frozenset()) | right.get(host_name, frozenset())
-#     return result
-
-
-# async def get_client_accessible_storage_hosts(
-#     ctx: ClientContext,
-#     requested_permission: StorageHostRBACPermission | None = None,
-# ) -> StorageHostPermissionMap:
-#     kp_scoped_host_permissions = await get_storage_hosts(
-#         ctx, UserScope(ctx.user_id), requested_permission
-#     )
-#     domain_scoped_host_permissions = await get_storage_hosts(
-#         ctx, DomainScope(ctx.domain_name), requested_permission
-#     )
-#     host_permissions = merge_host_permissions(
-#         kp_scoped_host_permissions, domain_scoped_host_permissions
-#     )
-#     project_ctx = await ctx.get_or_init_project_ctx_in_domain(ctx.domain_name)
-#     if project_ctx is not None:
-#         for project_id in project_ctx.keys():
-#             project_scoped_host_permissions = await get_storage_hosts(
-#                 ctx, ProjectScope(project_id), requested_permission
-#             )
-#             host_permissions = merge_host_permissions(
-#                 host_permissions, project_scoped_host_permissions
-#             )
-#     return host_permissions
 
 
 class StorageSessionManager:
