@@ -746,3 +746,19 @@ Backporting to legacy per-pkg repositories
 
 * When referring the PR/issue numbers in the commit for per-pkg repositories,
   update them like ``lablup/backend.ai#NNN`` instead of ``#NNN``.
+
+Writing down new REST API
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Be advised that starting from 24.03, every new and updated REST APIs should adapt pydantic as its request and response validator. For starters our `service` API implementations can be a good boilerplate.
+
+.. note::
+   Do not adapt legacy trafaret-based approach for fresh new REST APIs! This approach is deprecated.
+
+Use ``ai.backend.manager.api.utils.pydantic_response_api_handler()``` as a function decorator for API handlers without request body or queryparam to consume. Otherwise adapt ``ai.backend.manager.utils.pydantic_params_api_handler()``.
+Every response data model should inherit ``ai.backend.manager.api.utils.BaseResponseModel`` as its parent class. To use arbitrary HTTP response status code other than 200, fill in ``status`` value of ``BaseResponseModel``.
+
+Here are some examples:
+
+* `list_serve() <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L147-L152>`_
+* `get_info() <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/api/service.py#L221-L224>`_
