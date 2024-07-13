@@ -1740,6 +1740,18 @@ class AbstractAgent(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
             )
 
+    async def create_batch_execution_task(
+        self,
+        session_id: SessionId,
+        kernel_id: KernelId,
+        code_to_execute: str,
+    ) -> None:
+        self._ongoing_exec_batch_tasks.add(
+            asyncio.create_task(
+                self.execute_batch(session_id, kernel_id, code_to_execute),
+            ),
+        )
+
     async def create_kernel(
         self,
         session_id: SessionId,
@@ -2129,18 +2141,6 @@ class AbstractAgent(
                         },
                     ),
                 )
-
-                if (
-                    kernel_config["session_type"] == "batch"
-                    and kernel_config["cluster_role"] == "main"
-                ):
-                    self._ongoing_exec_batch_tasks.add(
-                        asyncio.create_task(
-                            self.execute_batch(
-                                session_id, kernel_id, kernel_config["startup_command"] or ""
-                            ),
-                        ),
-                    )
 
                 # The startup command for the batch-type sessions will be executed by the manager
                 # upon firing of the "session_started" event.
