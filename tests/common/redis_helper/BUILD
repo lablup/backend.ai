@@ -7,7 +7,6 @@ resources(
 )
 
 python_test_utils(
-    name="test_utils",
     dependencies=[
         ":redis-cluster-compose",
     ],

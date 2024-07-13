@@ -16,6 +16,11 @@ coredump_defaults = {
     "size-limit": "64M",
 }
 
+default_sync_container_lifecycles_config = {
+    "enabled": True,
+    "interval": 10.0,
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
@@ -58,6 +63,17 @@ agent_local_config_iv = (
             | tx.Path(type="dir", allow_nonexisting=True),
             t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
             t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
+            t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
+            t.Key(
+                "sync-container-lifecycles", default=default_sync_container_lifecycles_config
+            ): t.Dict({
+                t.Key(
+                    "enabled", default=default_sync_container_lifecycles_config["enabled"]
+                ): t.ToBool,
+                t.Key(
+                    "interval", default=default_sync_container_lifecycles_config["interval"]
+                ): t.ToFloat[0:],
+            }).allow_extra("*"),
         }).allow_extra("*"),
         t.Key("container"): t.Dict({
             t.Key("kernel-uid", default=-1): tx.UserID,

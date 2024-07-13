@@ -13,6 +13,7 @@ from typing import (
     Awaitable,
     Callable,
     ClassVar,
+    Coroutine,
     Dict,
     Generic,
     Iterable,
@@ -40,7 +41,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
-from graphql.language import ast  # pants: no-infer-dep
+from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
@@ -79,6 +80,8 @@ from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql.selectable import ScalarSelect
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -734,7 +737,7 @@ class BigInt(Scalar):
 
     @staticmethod
     def parse_literal(node):
-        if isinstance(node, ast.IntValue):
+        if isinstance(node, IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
                 raise ValueError("Cannot parse integer out of the safe range.")
@@ -1029,6 +1032,27 @@ ResultType = TypeVar("ResultType", bound=graphene.ObjectType)
 ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
 
 
+async def gql_mutation_wrapper(
+    result_cls: Type[ResultType], _do_mutate: Callable[[], Coroutine[Any, Any, ResultType]]
+) -> ResultType:
+    try:
+        return await execute_with_retry(_do_mutate)
+    except sa.exc.IntegrityError as e:
+        log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
+        return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        log.warning(
+            "gql_mutation_wrapper(): statement error ({})\n{}", repr(e), e.statement or "(unknown)"
+        )
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        raise
+    except Exception as e:
+        log.exception("gql_mutation_wrapper(): other error")
+        return result_cls(False, f"unexpected error: {e}")
+
+
 async def simple_db_mutate(
     result_cls: Type[ResultType],
     graph_ctx: GraphQueryContext,
@@ -1046,15 +1070,12 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
-    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
-        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
-            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -1063,20 +1084,7 @@ async def simple_db_mutate(
         else:
             return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}")
-    except sa.exc.StatementError as e:
-        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate(): other error")
-        return result_cls(False, f"unexpected error: {e}")
+    return await gql_mutation_wrapper(result_cls, _do_mutate)
 
 
 async def simple_db_mutate_returning_item(
@@ -1111,16 +1119,13 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
-    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
-        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
-            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -1131,22 +1136,7 @@ async def simple_db_mutate_returning_item(
             else:
                 return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}", None)
-    except sa.exc.StatementError as e:
-        log.warning(
-            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
-        )
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate_returning_item(): other error")
-        return result_cls(False, f"unexpected error: {e}", None)
+    return await gql_mutation_wrapper(result_cls, _do_mutate)
 
 
 def set_if_set(
@@ -1335,14 +1325,13 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     cursor_id, pagination_order, requested_page_size = connection_args
 
-    # Default ordering by id column
-    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
         parser = order_expr.parser
@@ -1351,10 +1340,14 @@ def _build_sql_stmt_from_connection_args(
     # Apply SQL order_by
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
             set_ordering = lambda col, direction: (
                 col.asc() if direction == OrderDirection.ASC else col.desc()
             )
         case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
             set_ordering = lambda col, direction: (
                 col.desc() if direction == OrderDirection.ASC else col.asc()
             )
@@ -1364,21 +1357,39 @@ def _build_sql_stmt_from_connection_args(
 
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
-        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
-                conditions.append(id_column > _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
-                )
-            case ConnectionPaginationOrder.BACKWARD:
-                conditions.append(id_column < _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
-                )
+        _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
+
+        def subq_to_condition(
+            column_to_be_compared: InstrumentedAttribute,
+            subquery: ScalarSelect,
+            direction: OrderDirection,
+        ) -> WhereClauseType:
+            match pagination_order:
+                case ConnectionPaginationOrder.FORWARD | None:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared > subquery
+                    else:
+                        cond = column_to_be_compared < subquery
+
+                    # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
+                    # because the ordering direction of ID field is always determined by `pagination_order` only.
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column > cursor_row_id
+                    )
+                case ConnectionPaginationOrder.BACKWARD:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared < subquery
+                    else:
+                        cond = column_to_be_compared > subquery
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column < cursor_row_id
+                    )
+
+            return cond | condition_when_same_with_subq
+
         for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            stmt = stmt.where(set_subquery(col, subq, direction))
+            subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
+            conditions.append(subq_to_condition(col, subq, direction))
 
     if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
@@ -1390,7 +1401,8 @@ def _build_sql_stmt_from_connection_args(
 
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 def _build_sql_stmt_from_sql_arg(
@@ -1402,8 +1414,9 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int | None = None,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
@@ -1424,11 +1437,13 @@ def _build_sql_stmt_from_sql_arg(
         stmt = stmt.offset(offset)
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
     sql_stmt: sa.sql.Select
+    sql_count_stmt: sa.sql.Select
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
@@ -1467,7 +1482,7 @@ def generate_sql_info_for_gql_connection(
         connection_args = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt, conditions = _build_sql_stmt_from_connection_args(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
             orm_class,
             id_column,
@@ -1477,6 +1492,7 @@ def generate_sql_info_for_gql_connection(
         )
         return GraphQLConnectionSQLInfo(
             stmt,
+            count_stmt,
             conditions,
             connection_args.cursor,
             connection_args.pagination_order,
@@ -1484,7 +1500,7 @@ def generate_sql_info_for_gql_connection(
         )
     else:
         page_size = first
-        stmt, conditions = _build_sql_stmt_from_sql_arg(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
             id_column,
@@ -1493,4 +1509,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
+        return GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
