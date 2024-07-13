@@ -1,7 +1,7 @@
 """Remove foreign key constraint from vfolders to users and projects
 
 Revision ID: 59a622c31820
-Revises: fdb2dcdb8811
+Revises: 5d92c9cc930c
 Create Date: 2024-07-08 22:54:20.762521
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "59a622c31820"
-down_revision = "fdb2dcdb8811"
+down_revision = "5d92c9cc930c"
 branch_labels = None
 depends_on = None
 
