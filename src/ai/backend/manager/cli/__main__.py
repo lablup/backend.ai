@@ -5,8 +5,10 @@ import logging
 import pathlib
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from functools import partial
+from typing import cast
 
 import click
 from more_itertools import chunked
@@ -131,7 +133,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
             ),
             *psql_args,
         ]
-        subprocess.call(cmd)
+        subprocess.run(cmd)
         return
     # Use the container to start the psql client command
     log.info(f"using the db container {container_name} ...")
@@ -148,7 +150,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         local_config["db"]["name"],
         *psql_args,
     ]
-    subprocess.call(cmd)
+    subprocess.run(cmd)
 
 
 @main.command()
@@ -230,7 +232,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
-    from ai.backend.manager.models import kernels
+    from ai.backend.manager.models import SessionRow, kernels
     from ai.backend.manager.models.utils import connect_database
 
     today = datetime.now()
@@ -302,21 +304,28 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
-                result = await conn.execute(
-                    sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
-                )
-                deleted_count = result.rowcount
+                result = (
+                    await conn.scalars(
+                        sa.select(SessionRow.id).where(SessionRow.terminated_at < expiration_date)
+                    )
+                ).all()
+                session_ids = cast(list[uuid.UUID], result)
+                if session_ids:
+                    await conn.execute(
+                        sa.delete(kernels).where(kernels.c.session_id.in_(session_ids))
+                    )
+                    await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
 
-                curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                curs = await conn.execute(sa.select([sa.func.count()]).select_from(SessionRow))
                 if ret := curs.fetchone():
                     table_size = ret[0]
                     log.info(
-                        "The number of rows of the `kernels` tables after cleanup: {}",
+                        "The number of rows of the `sessions` tables after cleanup: {}",
                         table_size,
                     )
         log.info(
             "Cleaned up {:,} database records older than {}.",
-            deleted_count,
+            len(session_ids),
             expiration_date,
         )
 

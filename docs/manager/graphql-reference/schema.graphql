@@ -34,7 +34,7 @@ type Queries {
     domain_name: String
     is_active: Boolean
 
-    """Added in 24.03.0."""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(
@@ -43,7 +43,18 @@ type Queries {
     reference: String
     architecture: String = "x86_64"
   ): Image
-  images(is_installed: Boolean, is_operation: Boolean): [Image]
+  images(
+    """
+    Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
+    """
+    is_installed: Boolean
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+
+    """
+    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    """
+    image_filters: [String] = null
+  ): [Image]
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
@@ -76,6 +87,12 @@ type Queries {
   storage_volume(id: String): StorageVolume
   storage_volume_list(limit: Int!, offset: Int!, filter: String, order: String): StorageVolumeList
   vfolder(id: String): VirtualFolder
+
+  """Added in 24.03.4."""
+  vfolder_node(id: String!): VirtualFolderNode
+
+  """Added in 24.03.4."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
@@ -90,7 +107,7 @@ type Queries {
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
   vfolder_host_permissions: PredefinedAtomicPermission
   endpoint(endpoint_id: UUID!): Endpoint
-  endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, project: UUID): EndpointList
+  endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
   routing(routing_id: UUID!): Routing
   routing_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): RoutingList
   endpoint_token(token: String!): EndpointToken
@@ -184,7 +201,7 @@ type ComputeContainer implements Item {
   """Deprecated since 24.03.0; use image_object.name"""
   image: String
 
-  """Added since 24.03.0"""
+  """Added in 24.03.0."""
   image_object: ImageNode
   architecture: String
   registry: String
@@ -216,6 +233,9 @@ scalar UUID
 type ImageNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.4. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   humanized_name: String
   tag: String
@@ -227,6 +247,9 @@ type ImageNode implements Node {
   size_bytes: BigInt
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
+
+  """Added in 24.03.4. The array of image aliases."""
+  aliases: [String]
 }
 
 type KVPair {
@@ -288,6 +311,9 @@ type Domain {
 type GroupNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.7. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   description: String
   is_active: Boolean
@@ -298,6 +324,12 @@ type GroupNode implements Node {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  type: String
+
+  """Added in 24.03.7."""
+  container_registry: JSONString
   scaling_groups: [String]
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
@@ -406,10 +438,10 @@ type Group {
   integration_id: String
   resource_policy: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   type: String
 
-  """Added since 24.03.0."""
+  """Added in 24.03.0."""
   container_registry: JSONString
   scaling_groups: [String]
 }
@@ -484,6 +516,9 @@ type KeyPair implements Item {
   last_used: DateTime
   rate_limit: Int
   num_queries: Int
+
+  """Added in 24.09.0."""
+  rolling_count: Int
   user: UUID
   projects: [String]
   ssh_public_key: String
@@ -504,6 +539,9 @@ type VirtualFolder implements Item {
   group: UUID
   group_name: String
   creator: String
+
+  """Added in 24.09.0."""
+  domain_name: String
   unmanaged_path: String
   usage_mode: String
   permission: String
@@ -565,7 +603,7 @@ type ComputeSession implements Item {
   occupying_slots: JSONString
   occupied_slots: JSONString
 
-  """Added in 24.03.0"""
+  """Added in 24.03.0."""
   requested_slots: JSONString
   num_queries: BigInt
   containers: [ComputeContainer]
@@ -593,9 +631,12 @@ type KeyPairResourcePolicy {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
+
+  """Added in 23.03.3."""
+  max_concurrent_sftp_sessions: Int
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -609,20 +650,24 @@ type UserResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -632,12 +677,16 @@ type ProjectResourcePolicy {
   name: String!
   created_at: DateTime!
 
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
   max_quota_scope_size: BigInt
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.1")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ResourcePreset {
@@ -659,6 +708,22 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
+
+  """Added in 24.03.7."""
+  agent_count_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): Int
+
+  """Added in 24.03.7."""
+  agent_total_resource_slots_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): JSONString
 }
 
 type StorageVolume implements Item {
@@ -671,16 +736,65 @@ type StorageVolume implements Item {
   performance_metric: JSONString
   usage: JSONString
 
-  """Added since 24.03.0. Name of the proxy which this volume belongs to."""
+  """Added in 24.03.0. Name of the proxy which this volume belongs to."""
   proxy: String
 
-  """Added since 24.03.0. Name of the storage."""
+  """Added in 24.03.0. Name of the storage."""
   name: String
 }
 
 type StorageVolumeList implements PaginatedList {
   items: [StorageVolume]!
   total_count: Int!
+}
+
+"""Added in 24.03.4."""
+type VirtualFolderNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  row_id: UUID
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  user_email: String
+  group: UUID
+  group_name: String
+  creator: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type VirtualFolderConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [VirtualFolderEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `VirtualFolder` and its cursor."""
+type VirtualFolderEdge {
+  """The item at the end of the edge"""
+  node: VirtualFolderNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type VirtualFolderList implements PaginatedList {
@@ -777,9 +891,9 @@ type PredefinedAtomicPermission {
 type Endpoint implements Item {
   id: ID
   endpoint_id: UUID
-  image: String @deprecated(reason: "Deprecated since 23.09.9; use `image_object`")
+  image: String @deprecated(reason: "Deprecated since 23.09.9. use `image_object`")
 
-  """Added at 23.09.9"""
+  """Added in 23.09.9."""
   image_object: ImageNode
   domain: String
   project: String
@@ -787,20 +901,29 @@ type Endpoint implements Item {
   resource_slots: JSONString
   url: String
   model: UUID
-  model_mount_destiation: String
-  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8; use `created_user_id`")
 
-  """Added at 23.09.8"""
+  """Added in 24.03.4."""
+  model_definition_path: String
+  model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
+
+  """Added in 24.03.4."""
+  model_mount_destination: String
+
+  """Added in 24.03.4."""
+  extra_mounts: [VirtualFolderNode]
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
+
+  """Added in 23.09.8."""
   created_user_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   created_user_id: UUID
-  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8; use `session_owner_id`")
+  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8. use `session_owner_id`")
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_email: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   session_owner_id: UUID
   tag: String
   startup_command: String
@@ -813,6 +936,9 @@ type Endpoint implements Item {
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
+
+  """Added in 24.03.5."""
+  runtime_variant: RuntimeVariantInfo
   created_at: DateTime!
   destroyed_at: DateTime
   routings: [Routing]
@@ -820,6 +946,12 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+}
+
+"""Added in 24.03.5."""
+type RuntimeVariantInfo {
+  name: String
+  human_readable_name: String
 }
 
 type Routing implements Item {
@@ -904,6 +1036,9 @@ type ModelCard implements Node {
   id: ID!
   name: String
   vfolder: VirtualFolder
+
+  """Added in 24.09.0."""
+  vfolder_node: VirtualFolderNode
   author: String
 
   """Human readable name of the model."""
@@ -1119,7 +1254,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added in 24.03.0."""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -1334,7 +1469,7 @@ input ResourceLimitInput {
   max: String
 }
 
-"""Added since 24.03.0."""
+"""Added in 24.03.0."""
 type ForgetImageById {
   ok: Boolean
   msg: String
@@ -1390,9 +1525,9 @@ input CreateKeyPairResourcePolicyInput {
   max_containers_per_session: Int!
   idle_timeout: BigInt!
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -1415,9 +1550,9 @@ input ModifyKeyPairResourcePolicyInput {
   max_containers_per_session: Int
   idle_timeout: BigInt
   allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.4")
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
 
   """Added in 24.03.4."""
   max_pending_session_count: Int
@@ -1438,19 +1573,24 @@ type CreateUserResourcePolicy {
 }
 
 input CreateUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -1461,19 +1601,23 @@ type ModifyUserResourcePolicy {
 }
 
 input ModifyUserResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of user vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
   max_quota_scope_size: BigInt
 
   """
-  Added since 24.03.1. Maximum available number of sessions per single model service which the user is in charge of.
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
   """
   max_session_count_per_model_session: Int
 
   """
-  Added since 24.03.0. Maximum available number of customized images one can publish to.
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
 }
@@ -1490,11 +1634,16 @@ type CreateProjectResourcePolicy {
 }
 
 input CreateProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type ModifyProjectResourcePolicy {
@@ -1503,11 +1652,16 @@ type ModifyProjectResourcePolicy {
 }
 
 input ModifyProjectResourcePolicyInput {
-  """Added since 24.03.1. Limitation of the number of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
   max_vfolder_count: Int
 
-  """Added since 24.03.1. Limitation of the quota size of project vfolders."""
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
   max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
 }
 
 type DeleteProjectResourcePolicy {
@@ -1669,7 +1823,7 @@ type ModifyEndpoint {
   ok: Boolean
   msg: String
 
-  """Added at 23.09.8"""
+  """Added in 23.09.8."""
   endpoint: Endpoint
 }
 
@@ -1682,11 +1836,43 @@ input ModifyEndpointInput {
   image: ImageRefType
   name: String
   resource_group: String
+
+  """
+  Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`.
+  """
+  model_definition_path: String
   open_to_public: Boolean
+
+  """
+  Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.
+  """
+  extra_mounts: [ExtraMountInput]
+
+  """Added in 24.03.5."""
+  environ: JSONString
+
+  """Added in 24.03.5."""
+  runtime_variant: String
 }
 
 input ImageRefType {
   name: String!
   registry: String
   architecture: String
+}
+
+"""Added in 24.03.4."""
+input ExtraMountInput {
+  vfolder_id: String
+  mount_destination: String
+
+  """
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  """
+  type: String
+
+  """
+  Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
+  """
+  permission: String
 }

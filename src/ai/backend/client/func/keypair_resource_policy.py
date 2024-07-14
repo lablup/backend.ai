@@ -17,6 +17,10 @@ _default_list_fields = (
     keypair_resource_policy_fields["idle_timeout"],
     keypair_resource_policy_fields["max_containers_per_session"],
     keypair_resource_policy_fields["allowed_vfolder_hosts"],
+    keypair_resource_policy_fields["max_session_lifetime"],
+    keypair_resource_policy_fields["max_pending_session_count"],
+    keypair_resource_policy_fields["max_pending_session_resource_slots"],
+    keypair_resource_policy_fields["max_concurrent_sftp_sessions"],
 )
 
 _default_detail_fields = (
@@ -27,6 +31,10 @@ _default_detail_fields = (
     keypair_resource_policy_fields["idle_timeout"],
     keypair_resource_policy_fields["max_containers_per_session"],
     keypair_resource_policy_fields["allowed_vfolder_hosts"],
+    keypair_resource_policy_fields["max_session_lifetime"],
+    keypair_resource_policy_fields["max_pending_session_count"],
+    keypair_resource_policy_fields["max_pending_session_resource_slots"],
+    keypair_resource_policy_fields["max_concurrent_sftp_sessions"],
 )
 
 
@@ -52,6 +60,8 @@ class KeypairResourcePolicy(BaseFunction):
         max_containers_per_session: int,
         idle_timeout: int,
         vfolder_host_perms: str | Undefined = undefined,
+        max_pending_session_count: int | Undefined = undefined,
+        max_pending_session_resource_slots: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -78,6 +88,8 @@ class KeypairResourcePolicy(BaseFunction):
             "max_containers_per_session": max_containers_per_session,
             "idle_timeout": idle_timeout,
             "allowed_vfolder_hosts": vfolder_host_perms,
+            "max_pending_session_count": max_pending_session_count,
+            "max_pending_session_resource_slots": max_pending_session_resource_slots,
         }
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         variables = {
@@ -101,6 +113,8 @@ class KeypairResourcePolicy(BaseFunction):
         idle_timeout: int | Undefined = undefined,
         total_resource_slots: str | Undefined = undefined,
         vfolder_host_perms: str | Undefined = undefined,
+        max_pending_session_count: int | Undefined = undefined,
+        max_pending_session_resource_slots: str | Undefined = undefined,
     ) -> dict:
         """
         Updates an existing keypair resource policy with the given options.
@@ -119,6 +133,8 @@ class KeypairResourcePolicy(BaseFunction):
         set_if_set(inputs, "max_containers_per_session", max_containers_per_session)
         set_if_set(inputs, "idle_timeout", idle_timeout)
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
+        set_if_set(inputs, "max_pending_session_count", max_pending_session_count)
+        set_if_set(inputs, "max_pending_session_resource_slots", max_pending_session_resource_slots)
         variables = {
             "name": name,
             "input": inputs,

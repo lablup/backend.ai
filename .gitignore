@@ -115,6 +115,7 @@ ENV/
 /dev.etcd.installed.json
 /env-*.sh
 /agent.dummy.toml
+/wsproxy.toml
 
 # Local temp and installer-generated directories
 /.tmp/
