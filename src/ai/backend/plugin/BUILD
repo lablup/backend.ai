@@ -20,7 +20,6 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/cli/**",
-        "//src/ai/backend/accelerator/**",
     ],
 )
 
@@ -62,11 +61,6 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
-        # Bundle cuda-open and mock accelerator plugins
-        "//src/ai/backend/accelerator/cuda_open:lib",
-        "//src/ai/backend/accelerator/cuda_open:buildscript",
-        "//src/ai/backend/accelerator/mock:lib",
-        "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
     ],
 )
