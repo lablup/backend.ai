@@ -34,7 +34,7 @@ graphene~=3.3.0
 graypy==2.1.0
 humanize>=3.1.0
 ifaddr~=0.2
-inquirer~=2.9.2
+inquirer~=3.3.0
 janus~=1.0.0
 Jinja2~=3.1.2
 jupyter-client>=6.0
