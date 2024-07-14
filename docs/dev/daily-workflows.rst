@@ -209,7 +209,7 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.12.4/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -259,7 +259,7 @@ Set the workspace settings for the Python extension for code navigation and auto
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.12.2/lib/python3.12/site-packages"]``
+     - ``["dist/export/python/virtualenvs/python-default/3.12.4/lib/python3.12/site-packages"]``
    * - ``python.analysis.importFormat``
      - ``"relative"``
    * - ``editor.formatOnSave``
@@ -275,11 +275,11 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["dist/export/python/virtualenvs/mypy/3.12.2/bin/python"]``
+     - ``["dist/export/python/virtualenvs/mypy/3.12.4/bin/python"]``
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.12.2/bin/python"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.12.4/bin/python"]``
    * - ``ruff.importStrategy``
      - ``"fromEnvironment"``
 
@@ -309,8 +309,8 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.12.4/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.12.4/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -328,11 +328,11 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.12.2/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.12.2/bin/python",
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.12.4/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.12.4/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.12.4/bin/python",
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.12.2/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.12.4/bin/mypy",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
