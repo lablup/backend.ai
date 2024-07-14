@@ -9,9 +9,9 @@ import tabulate
 from colorama import Fore, Style
 
 from .entrypoint import (
+    prepare_external_package_entrypoints,
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_package_metadata,
-    scan_entrypoint_from_plugin_checkouts,
 )
 
 
@@ -38,9 +38,11 @@ def main():
 def scan(group_name: str, format: FormatOptions) -> None:
     duplicate_count: dict[str, int] = defaultdict(int)
     rows = []
+
+    prepare_external_package_entrypoints(group_name)
+
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
-        (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
         (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
     ):
         duplicate_count[entrypoint.name] += 1
