@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.12.2"
+//     "CPython==3.12.4"
 //   ],
 //   "generated_with_requirements": [
 //     "ruff-lsp~=0.0.49",
@@ -123,19 +123,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5",
-              "url": "https://files.pythonhosted.org/packages/49/df/1fceb2f8900f8639e278b056416d49134fb8d84c5942ffaa01ad34782422/packaging-24.0-py3-none-any.whl"
+              "hash": "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124",
+              "url": "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9",
-              "url": "https://files.pythonhosted.org/packages/ee/b5/b43a27ac7472e1818c4bafd44430e69605baefe1f34440593e0332ec8b4d/packaging-24.0.tar.gz"
+              "hash": "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002",
+              "url": "https://files.pythonhosted.org/packages/51/65/50db4dda066951078f0a96cf12f4b9ada6e4b811516bf0262c0f4f7064d4/packaging-24.1.tar.gz"
             }
           ],
           "project_name": "packaging",
           "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "24.0"
+          "requires_python": ">=3.8",
+          "version": "24.1"
         },
         {
           "artifacts": [
@@ -241,13 +241,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5ea39968510d046b3c62dc5a7e3b52e867c2de14af34a406883fe05d55bab2b0",
-              "url": "https://files.pythonhosted.org/packages/d5/7f/56faa24dd96deea5831bfe48558bd2c501f9c44a9b00a14839eff19b84a3/ruff_lsp-0.0.53-py3-none-any.whl"
+              "hash": "1cc7d2f1cb69cbea1dfeba0f2d7dd5832bc68b0b052c7166530bcce63aa75f57",
+              "url": "https://files.pythonhosted.org/packages/b0/84/fdf5ea32fb3bedb784f5c45d1888c905a71031b65b016a33c828bfc6a131/ruff_lsp-0.0.54-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "de38eccd06020350630ac3518fe04a9640c8f66908758d8a623b5ea021bf84b0",
-              "url": "https://files.pythonhosted.org/packages/4e/18/04110904e240a2bb1a95f3f63b49374961d752b30e3f6726b4d6fa6aa9fc/ruff_lsp-0.0.53.tar.gz"
+              "hash": "33e1d4dd20ca481fc6a811afcfdd451798c22fc39f2104df23c2855e322a0582",
+              "url": "https://files.pythonhosted.org/packages/aa/ff/68b1dd0bf5bce5d4bfbad6fcfddc7fc46ea070e0d191aa9a2972acb51f8a/ruff_lsp-0.0.54.tar.gz"
             }
           ],
           "project_name": "ruff-lsp",
@@ -257,32 +257,32 @@
             "packaging>=23.1",
             "pip-tools<7.0.0,>=6.13.0; extra == \"dev\"",
             "pygls>=1.1.0",
-            "pytest-asyncio==0.21.1; extra == \"dev\"",
+            "pytest-asyncio==0.21.2; extra == \"dev\"",
             "pytest<8.0.0,>=7.3.1; extra == \"dev\"",
             "python-lsp-jsonrpc==1.0.0; extra == \"dev\"",
             "ruff>=0.0.274",
             "typing-extensions"
           ],
           "requires_python": ">=3.7",
-          "version": "0.0.53"
+          "version": "0.0.54"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "69b1a937c3a517342112fb4c6df7e72fc39a38e7891a5730ed4985b5214b5475",
-              "url": "https://files.pythonhosted.org/packages/f9/de/dc04a3ea60b22624b51c703a84bbe0184abcd1d0b9bc8074b5d6b7ab90bb/typing_extensions-4.10.0-py3-none-any.whl"
+              "hash": "04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d",
+              "url": "https://files.pythonhosted.org/packages/26/9f/ad63fc0248c5379346306f8668cda6e2e2e9c95e01216d2b8ffd9ff037d0/typing_extensions-4.12.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b0abd7c89e8fb96f98db18d86106ff1d90ab692004eb746cf6eda2682f91b3cb",
-              "url": "https://files.pythonhosted.org/packages/16/3a/0d26ce356c7465a19c9ea8814b960f8a36c3b0d07c323176620b7b483e44/typing_extensions-4.10.0.tar.gz"
+              "hash": "1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8",
+              "url": "https://files.pythonhosted.org/packages/df/db/f35a00659bc03fec321ba8bce9420de607a1d37f8342eee1863174c69557/typing_extensions-4.12.2.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "4.10.0"
+          "version": "4.12.2"
         }
       ],
       "platform_tag": null
@@ -291,7 +291,7 @@
   "only_builds": [],
   "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.3.0",
+  "pex_version": "2.3.1",
   "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
@@ -299,7 +299,7 @@
     "ruff~=0.1.11"
   ],
   "requires_python": [
-    "==3.12.2"
+    "==3.12.4"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
