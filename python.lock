@@ -53,7 +53,7 @@
 //     "hiredis>=2.2.3",
 //     "humanize>=3.1.0",
 //     "ifaddr~=0.2",
-//     "inquirer~=2.9.2",
+//     "inquirer~=3.3.0",
 //     "janus~=1.0.0",
 //     "jupyter-client>=6.0",
 //     "kubernetes-asyncio~=9.1.0",
@@ -116,6 +116,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -1493,6 +1494,27 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "e818e6913f26c2a81eadef503a2741d7cca7f235d20e217274a009ecd5a74abf",
+              "url": "https://files.pythonhosted.org/packages/1b/c2/4bc8cd09b14e28ce3f406a8b05761bed0d785d1ca8c2a5c6684d884c66a2/editor-1.6.6-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "bb6989e872638cd119db9a4fce284cd8e13c553886a1c044c6b8d8a160c871f8",
+              "url": "https://files.pythonhosted.org/packages/2a/92/734a4ab345914259cb6146fd36512608ea42be16195375c379046f33283d/editor-1.6.6.tar.gz"
+            }
+          ],
+          "project_name": "editor",
+          "requires_dists": [
+            "runs",
+            "xmod"
+          ],
+          "requires_python": ">=3.8",
+          "version": "1.6.6"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "bdb463d17b6a2e8f437f5caff32eecc02f5b975df70a55bf11c9d8dc8c264b73",
               "url": "https://files.pythonhosted.org/packages/48/b9/7d1898803f42db81f57f38d0ef6872a95c39b6ea3787c9b5b63d3d61ef45/etcd_client_py-0.3.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
@@ -2133,23 +2155,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ea44fe074e878e74af05b6902314d7d7b8ff5d2db5259bcb37d6c5ec9b75afa6",
-              "url": "https://files.pythonhosted.org/packages/c7/cf/9c3a415723c9fe6e876d37054a95a17e1a3cbb279ab4e6f7770b11b422af/inquirer-2.9.2-py3-none-any.whl"
+              "hash": "c4be527e8c4e7a1b2c909aa064ef6f1a4466be42224290f21f07f6d5947171f4",
+              "url": "https://files.pythonhosted.org/packages/b5/b7/f6be6ffc9d07b95339ea5b3269eafcf6539db15b5f7b910323994ecff8a5/inquirer-3.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4a53cb9386601476e9f3241adace469ae6d1143ace2ee82f2768149e85861ab8",
-              "url": "https://files.pythonhosted.org/packages/4a/3a/8028f3f48e314c89d2153d05e7a2e6e79a31bdf0f5332af3af8df9f306cc/inquirer-2.9.2.tar.gz"
+              "hash": "2722cec4460b289aab21fc35a3b03c932780ff4e8004163955a8215e20cfd35e",
+              "url": "https://files.pythonhosted.org/packages/f2/33/d495a92c48203f33d2f4556a0a662dab1bd511a7458910c866f1d7a6a1a3/inquirer-3.3.0.tar.gz"
             }
           ],
           "project_name": "inquirer",
           "requires_dists": [
             "blessed>=1.19.0",
-            "python-editor>=1.0.4",
-            "readchar>=2.0.1"
+            "editor>=1.6.0",
+            "readchar>=3.0.6"
           ],
-          "requires_python": ">=3.7",
-          "version": "2.9.2"
+          "requires_python": ">=3.8.1",
+          "version": "3.3.0"
         },
         {
           "artifacts": [
@@ -3463,24 +3485,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1bf6e860a8ad52a14c3ee1252d5dc25b2030618ed80c022598f00176adc8367d",
-              "url": "https://files.pythonhosted.org/packages/c6/d3/201fc3abe391bbae6606e6f1d598c15d367033332bd54352b12f35513717/python_editor-1.0.4-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "51fda6bcc5ddbbb7063b2af7509e43bd84bfc32a4ff71349ec7847713882327b",
-              "url": "https://files.pythonhosted.org/packages/0a/85/78f4a216d28343a67b7397c99825cff336330893f00601443f7c7b2f2234/python-editor-1.0.4.tar.gz"
-            }
-          ],
-          "project_name": "python-editor",
-          "requires_dists": [],
-          "requires_python": null,
-          "version": "1.0.4"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "f380b826a991ebbe3de4d897aeec42760035ac760345e57b812938dc8b35e2bd",
               "url": "https://files.pythonhosted.org/packages/35/a6/145655273568ee78a581e734cf35beb9e33a370b29c5d3c8fee3744de29f/python_json_logger-2.0.7-py3-none-any.whl"
             },
@@ -3726,6 +3730,26 @@
           ],
           "requires_python": "<4,>=3.6",
           "version": "4.9"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "0980dcbc25aba1505f307ac4f0e9e92cbd0be2a15a1e983ee86c24c87b839dfd",
+              "url": "https://files.pythonhosted.org/packages/86/d6/17caf2e4af1dec288477a0cbbe4a96fbc9b8a28457dce3f1f452630ce216/runs-1.2.2-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9dc1815e2895cfb3a48317b173b9f1eac9ba5549b36a847b5cc60c3bf82ecef1",
+              "url": "https://files.pythonhosted.org/packages/26/6d/b9aace390f62db5d7d2c77eafce3d42774f27f1829d24fa9b6f598b3ef71/runs-1.2.2.tar.gz"
+            }
+          ],
+          "project_name": "runs",
+          "requires_dists": [
+            "xmod"
+          ],
+          "requires_python": ">=3.8",
+          "version": "1.2.2"
         },
         {
           "artifacts": [
@@ -4673,6 +4697,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "a24e9458a4853489042522bdca9e50ee2eac5ab75c809a91150a8a7f40670d48",
+              "url": "https://files.pythonhosted.org/packages/33/6b/0dc75b64a764ea1cb8e4c32d1fb273c147304d4e5483cd58be482dc62e45/xmod-1.8.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "38c76486b9d672c546d57d8035df0beb7f4a9b088bc3fb2de5431ae821444377",
+              "url": "https://files.pythonhosted.org/packages/72/b2/e3edc608823348e628a919e1d7129e641997afadd946febdd704aecc5881/xmod-1.8.1.tar.gz"
+            }
+          ],
+          "project_name": "xmod",
+          "requires_dists": [],
+          "requires_python": ">=3.8",
+          "version": "1.8.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "928cecb0ef9d5a7946eb6ff58417ad2fe9375762382f1bf5c55e61645f2c43ad",
               "url": "https://files.pythonhosted.org/packages/4d/05/4d79198ae568a92159de0f89e710a8d19e3fa267b719a236582eee921f4a/yarl-1.9.4-py3-none-any.whl"
             },
@@ -4780,9 +4822,10 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.3.1",
-  "pip_version": "24.0",
+  "pex_version": "2.10.0",
+  "pip_version": "24.1.2",
   "prefer_older_binary": false,
   "requirements": [
     "Jinja2~=3.1.2",
@@ -4829,7 +4872,7 @@
     "hiredis>=2.2.3",
     "humanize>=3.1.0",
     "ifaddr~=0.2",
-    "inquirer~=2.9.2",
+    "inquirer~=3.3.0",
     "janus~=1.0.0",
     "jupyter-client>=6.0",
     "kubernetes-asyncio~=9.1.0",
