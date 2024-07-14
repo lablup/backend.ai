@@ -90,7 +90,7 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.12.2"
+STANDALONE_PYTHON_VERSION="3.12.4"
 STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 if [ $(has_python "$bpython") -ne 0 ]; then
