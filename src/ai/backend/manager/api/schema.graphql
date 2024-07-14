@@ -516,6 +516,9 @@ type KeyPair implements Item {
   last_used: DateTime
   rate_limit: Int
   num_queries: Int
+
+  """Added in 24.09.0."""
+  rolling_count: Int
   user: UUID
   projects: [String]
   ssh_public_key: String
@@ -536,6 +539,9 @@ type VirtualFolder implements Item {
   group: UUID
   group_name: String
   creator: String
+
+  """Added in 24.09.0."""
+  domain_name: String
   unmanaged_path: String
   usage_mode: String
   permission: String

@@ -14,6 +14,7 @@ from typing import (
     List,
     Optional,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -73,7 +74,13 @@ from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    agg_to_array,
+    execute_with_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -177,6 +184,8 @@ OP_EXC = {
     "get_logs_from_agent": KernelExecutionFailed,
     "refresh_session": KernelExecutionFailed,
     "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
+    "trigger_batch_execution": KernelExecutionFailed,
 }
 
 
@@ -815,6 +824,76 @@ class SessionRow(Base):
             return determined_status
 
         return await execute_with_retry(_check_and_update)
+
+    @classmethod
+    async def get_session_to_determine_status(
+        cls, db_session: SASession, session_id: SessionId
+    ) -> SessionRow:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(KernelRow.status, KernelRow.cluster_role, KernelRow.status_info)
+                ),
+            )
+        )
+        session_row = cast(SessionRow | None, await db_session.scalar(stmt))
+        if session_row is None:
+            raise SessionNotFound(f"Session not found (id:{session_id})")
+        return session_row
+
+    def determine_and_set_status(
+        self,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> bool:
+        """
+        Determine the current status of a session based on its sibling kernels.
+        If it is possible to transit from the current status to the determined status, set status.
+        Else, do nothing.
+        Return True if a transition happened, else return False.
+        """
+
+        determined_status = determine_session_status(self.kernels)
+        if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
+            return False
+
+        self.set_status(determined_status, status_info, status_data, status_changed_at)
+        return True
+
+    def set_status(
+        self,
+        status: SessionStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        """
+        Set the status of the session.
+        """
+        now = status_changed_at or datetime.now(tzutc())
+        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+            self.terminated_at = now
+        self.status = status
+        self.status_history = sql_json_merge(
+            SessionRow.status_history,
+            (),
+            {
+                status.name: now.isoformat(),
+            },
+        )
+        if status_data is not None:
+            self.status_data = status_data
+
+        _status_info: str | None = None
+        if status_info is None:
+            _status_info = self.main_kernel.status_info
+        else:
+            _status_info = status_info
+        if _status_info is not None:
+            self.status_info = _status_info
 
     @staticmethod
     async def set_session_status(
