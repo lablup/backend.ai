@@ -52,7 +52,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.12.2"]
+interpreter_constraints = ["CPython==3.12.4"]
 tailor_pex_binary_targets = false
 pip_version = "24.0"
 
