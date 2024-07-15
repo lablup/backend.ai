@@ -5,4 +5,3 @@ src/ai/backend/runner/*.ttf filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.so filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.tar.xz filter=lfs diff=lfs merge=lfs -text
-src/ai/backend/web/assets/*.zip filter=lfs diff=lfs merge=lfs -text
