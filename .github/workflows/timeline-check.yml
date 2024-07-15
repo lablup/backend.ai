@@ -18,9 +18,11 @@ jobs:
     steps:
     - name: Get PR's fetch depth
       run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.head.sha }}
+        lfs: false
         fetch-depth: ${{ env.PR_FETCH_DEPTH }}
         sparse-checkout: changes
     - name: Set up Python
