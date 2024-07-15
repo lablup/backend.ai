@@ -122,23 +122,12 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
 
 def prepare_external_package_entrypoints(group_name: str, directory: Path | None = None) -> None:
     if directory is None:
-        # TODO: Implement scanning from the designated directory in local-dev setup.
-        # directory = find_build_root()
         directory = Path.cwd()
 
     log.debug(
         "prepare_external_package_entrypoints(%r)",
         group_name,
     )
-
-    plugins_path = directory / "plugins"
-
-    for subdirectory in plugins_path.iterdir():
-        if subdirectory.is_dir():
-            sys.path.append(str(subdirectory))
-            current_pythonpath = os.environ.get("PYTHONPATH", "")
-            new_pythonpath = os.pathsep.join([str(subdirectory), current_pythonpath])
-            os.environ["PYTHONPATH"] = new_pythonpath
 
     for whl_file in directory.glob("*.whl"):
         with zipfile.ZipFile(whl_file, "r") as z:
@@ -148,9 +137,6 @@ def prepare_external_package_entrypoints(group_name: str, directory: Path | None
                 z.extractall(extracted_path)
 
             sys.path.append(extracted_path)
-            current_pythonpath = os.environ.get("PYTHONPATH", "")
-            new_pythonpath = os.pathsep.join([extracted_path, current_pythonpath])
-            os.environ["PYTHONPATH"] = new_pythonpath
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:
