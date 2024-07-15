@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.12.2"
+//     "CPython==3.12.4"
 //   ],
 //   "generated_with_requirements": [
 //     "coverage[toml]<7.0,>=6.4"
@@ -54,14 +54,14 @@
   "only_builds": [],
   "only_wheels": [],
   "path_mappings": {},
-  "pex_version": "2.3.0",
+  "pex_version": "2.3.1",
   "pip_version": "24.0",
   "prefer_older_binary": false,
   "requirements": [
     "coverage[toml]<7.0,>=6.4"
   ],
   "requires_python": [
-    "==3.12.2"
+    "==3.12.4"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

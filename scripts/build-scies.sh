@@ -28,9 +28,4 @@ case "$SYSTEM" in
     CHECKSUM_CMD="shasum -a 256"
     ;;
 esac
-mkdir -p dist
-# Normalize the package naming
-unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
-mv "backend.ai-local-proxy" "dist/backendai-local-proxy-$DST_PLATFORM"
-cd dist
-ls backendai-local-proxy-* | grep -v '.sha256' | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
+

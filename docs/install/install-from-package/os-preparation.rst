@@ -133,10 +133,10 @@ For example,
 
 .. code-block:: console
 
-   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.12.2+20240224-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.12.2+20240224-x86_64-unknown-linux-gnu-install_only.tar.gz
-   $ tar -xf "cpython-3.12.2+20240224-x86_64-unknown-linux-gnu-install_only.tar.gz"
+   $ curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20240713/cpython-3.12.4+20240713-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.12.4+20240713-x86_64-unknown-linux-gnu-install_only.tar.gz
+   $ tar -xf "cpython-3.12.4+20240713-x86_64-unknown-linux-gnu-install_only.tar.gz"
    $ mkdir -p "/home/bai/.static-python/versions"
-   $ mv python "/home/bai/.static-python/versions/3.12.2"
+   $ mv python "/home/bai/.static-python/versions/3.12.4"
 
 Then, you can create multiple virtual environments per service. To create a
 virtual environment for Backend.AI Manager and activate it, for example, you may run:
@@ -145,7 +145,7 @@ virtual environment for Backend.AI Manager and activate it, for example, you may
 
    $ mkdir "${HOME}/manager"
    $ cd "${HOME}/manager"
-   $ ~/.static-python/versions/3.12.2/bin/python3 -m venv .venv
+   $ ~/.static-python/versions/3.12.4/bin/python3 -m venv .venv
    $ source .venv/bin/activate
    $ pip install -U pip setuptools wheel
 

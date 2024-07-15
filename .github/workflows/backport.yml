@@ -60,7 +60,7 @@ jobs:
           echo "${milestones[@]}"
 
           for i in "${!milestones[@]}"; do
-            if ! git branch -r | grep -q "origin/${milestones[$i]}\$"; then
+            if ! git ls-remote --heads | grep -q "refs/heads/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
@@ -84,6 +84,8 @@ jobs:
     needs: backport-target-branch
     strategy:
       matrix: ${{ fromJson(needs.backport-target-branch.outputs.matrix) }}
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,7 +94,7 @@ jobs:
         run: |
           git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
           git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
-          git fetch origin main --depth=2
+          git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
             --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \

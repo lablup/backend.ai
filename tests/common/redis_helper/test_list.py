@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import traceback
 from typing import List, Tuple
 
-import aiotools
 import pytest
 from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -30,7 +30,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
 
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
-            async with aiotools.aclosing(
+            async with contextlib.aclosing(
                 redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:
@@ -114,7 +114,7 @@ async def test_blist_with_retrying_rpush(
 
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
-            async with aiotools.aclosing(
+            async with contextlib.aclosing(
                 redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:

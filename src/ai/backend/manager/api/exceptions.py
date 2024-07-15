@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Union, cast
 
 from aiohttp import web
 
+from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
@@ -48,7 +49,7 @@ class BackendError(web.HTTPError):
             body["msg"] = extra_msg
         if extra_data is not None:
             body["data"] = extra_data
-        self.body = json.dumps(body).encode()
+        self.body = json.dumps(body, cls=ExtendedJSONEncoder).encode()
 
     def __str__(self):
         lines = []
@@ -214,6 +215,10 @@ class SessionNotFound(ObjectNotFound):
 
 class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
+
+
+class KernelNotFound(ObjectNotFound):
+    object_name = "kernel"
 
 
 class EndpointNotFound(ObjectNotFound):

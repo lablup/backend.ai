@@ -234,6 +234,9 @@ class DummyAgent(
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
+    async def extract_command(self, image_ref: str) -> str | None:
+        return None
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -255,6 +258,10 @@ class DummyAgent(
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
+        await asyncio.sleep(delay)
+
+    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
 
     async def check_image(

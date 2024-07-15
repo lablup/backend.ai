@@ -58,21 +58,24 @@ Both commands offer options to specify which fields of sessions should be printe
      - Included Session Fields
 
    * - (no option)
-     - ``Session ID``, ``Owner``, ``Image``, ``Type``,
+     - ``Name``, ``Owner Access Key (admin only)``, ``Session ID``, ``Project/Group``,
 
-       ``Status``, ``Status Info``, ``Last updated``, and ``Result``.
+       ``Main Kernel ID``, ``Image``, ``Type``, ``Status``,
 
-   * - ``--id-only``
-     - ``Session ID``.
+       ``Status Info``, ``Last Updated``, and ``Result``.
+
+
+   * - ``--name-only``
+     - ``Name``.
 
    * - ``--detail``
-     - ``Session ID``, ``Owner``, ``Image``, ``Type``,
+     - ``Name``, ``Session ID``, ``Project/Group``,
 
-       ``Status``, ``Status Info``, ``Last updated``, ``Result``,
+       ``Main Kernel ID``, ``Image``, ``Type``, ``Status``,
 
-       ``Tag``, ``Created At``, ``Occupied Resource``, ``Used Memory (MiB)``,
+       ``Status Info``, ``Last Updated``, ``Result``, ``Tag``,
 
-       ``Max Used Memory (MiB)``, and ``CPU Using (%)``.
+       ``Created At``, and ``Occupying Slots``.
 
    * - ``-f``, ``--format``
      - Specified fields by user.
@@ -80,13 +83,13 @@ Both commands offer options to specify which fields of sessions should be printe
 .. note::
     Fields for ``-f/--format`` option can be displayed by specifying comma-separated parameters.
 
-    Available parameters for this option are: ``id``, ``status``, ``status_info``, ``created_at``, ``last_updated``, ``result``, ``image``, ``type``, ``task_id``, ``tag``, ``occupied_slots``, ``used_memory``, ``max_used_memory``, ``cpu_using``.
+    Available parameters for this option are: ``id (session_id)``, ``main_kernel_id``, ``tag``, ``name``, ``type``, ``image``, ``registry``, ``cluster_template (reserved for future release)``, ``cluster_mode``, ``cluster_size``, ``domain_name``, ``group_name``, ``group_id``, ``agent_ids``, ``user_email``, ``user_id``, ``access_key``, ``status``, ``status_info``, ``status_changed``, ``created_at``, ``terminated_at``, ``starts_at``, ``scheduled_at``, ``startup_command``, ``result``, ``resource_opts``, ``scaling_group``, ``service_ports``, ``mounts``, ``occupying_slots``, ``dependencies``, ``abusing_reports``, ``idle_checks``.
 
     For example:
 
     .. code-block:: shell
 
-        backend.ai admin session --format id,status,cpu_using
+        backend.ai admin session list --format id,status,occupying_slots
 
 .. _simple-execution:
 

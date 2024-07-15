@@ -90,23 +90,24 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         )
         return None
     else:
+        entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
-        if isinstance(ret, list):
-            if not ret:
+        match ret:
+            case list() if ret:
+                entry = ret[0]
+            case dict() if ret:
+                entry = ret
+            case _:
                 # The API may return an empty result upon container termination.
+                log.warning(
+                    "cannot read stats (cid:{}): got an empty result: {}",
+                    short_cid,
+                    ret,
+                )
                 return None
-            ret = ret[0]
-        # The API may return an invalid or empty result upon container termination.
-        if ret is None or not isinstance(ret, dict):
-            log.warning(
-                "cannot read stats (cid:{}): got an empty result: {}",
-                short_cid,
-                ret,
-            )
+        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
-        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
-            return None
-        return ret
+        return entry
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -578,6 +579,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
@@ -604,6 +606,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                 io_write_bytes += int(nbytes)
                     case "2":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.max", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
@@ -644,6 +647,7 @@ class MemoryPlugin(AbstractComputePlugin):
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
                 mem_cur_bytes,
+                mem_max_bytes,
                 io_read_bytes,
                 io_write_bytes,
                 net_rx_bytes,
@@ -662,6 +666,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 if ret is None:
                     return None
                 mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
+                mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
                 io_read_bytes = 0
                 io_write_bytes = 0
                 for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
@@ -678,6 +683,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
                 return (
                     mem_cur_bytes,
+                    mem_total_bytes,
                     io_read_bytes,
                     io_write_bytes,
                     net_rx_bytes,
@@ -705,12 +711,14 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid, result in zip(container_ids, results):
             if result is None:
                 continue
-            per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
-            per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
-            per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
-            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
+            per_container_mem_used_bytes[cid] = Measurement(
+                Decimal(result[0]), capacity=Decimal(result[1])
+            )
+            per_container_io_read_bytes[cid] = Measurement(Decimal(result[2]))
+            per_container_io_write_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[5]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[6]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
