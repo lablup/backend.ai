@@ -1,4 +1,5 @@
-import platform
+from __future__ import annotations
+
 import secrets
 import signal
 from pickle import PickleError
