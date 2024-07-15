@@ -174,6 +174,7 @@ def prepare_images():
 def socket_relay_image():
     # Since pulling all LFS files takes too much GitHub storage bandwidth in CI,
     # we fetch the only required image for tests on demand.
+    build_root = os.environ.get("BACKEND_BUILD_ROOT", os.getcwd())
     image_path = (
         f"src/ai/backend/agent/docker/backendai-socket-relay.img.{DEFAULT_IMAGE_ARCH}.tar.gz"
     )
@@ -183,7 +184,8 @@ def socket_relay_image():
         if not head.startswith(b"version https://git-lfs.github.com/spec/v1\n"):
             already_fetched = True
     if not already_fetched:
-        subprocess.run(["git", "lfs", "pull", "--include", image_path], check=True)
+        subprocess.run(["git", "lfs", "pull", "--include", image_path], check=True, cwd=build_root)
+        pytest.fail("Intentionally failing the test to rerun with the updated LFS files!")
 
 
 @pytest.fixture
