@@ -11,7 +11,7 @@ Manager and Webserver
 ^^^^^^^^^^^^^^^^^^^^^
 :raw-html-m2r:`<span style="background-color:#fafafa;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 
-Backend.AI manager is the central governor of  the cluster.
+Backend.AI manager is the central governor of the cluster.
 It accepts user requests, creates/destroys the sessions, and routes code execution requests to appropriate agents and sessions.
 It also collects the output of sessions and responds to the users with them.
 
