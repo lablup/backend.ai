@@ -223,7 +223,7 @@ class DockerKernel(AbstractKernel):
                     else:
                         repo, tag = None, None
                     response: Mapping[str, Any] = await container.commit(
-                        changes=changes,
+                        changes=changes or None,
                         repository=repo,
                         tag=tag,
                         config=config,
