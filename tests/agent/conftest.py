@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import shutil
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -11,9 +12,14 @@ import pytest
 from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
-from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
+from ai.backend.testutils.bootstrap import (  # noqa: F401
+    etcd_container,
+    redis_container,
+    sync_file_lock,
+)
 from ai.backend.testutils.pants import get_parallel_slot
 
 
@@ -166,6 +172,34 @@ def prepare_images():
         asyncio.run(pull())
     finally:
         asyncio.set_event_loop(old_loop)
+
+
+@pytest.fixture(scope="session")
+def socket_relay_image():
+    # Since pulling all LFS files takes too much GitHub storage bandwidth in CI,
+    # we fetch the only required image for tests on demand.
+    build_root = os.environ.get("BACKEND_BUILD_ROOT", os.getcwd())
+    lock_path = Path("~/.cache/bai/testing/lfs-pull.lock").expanduser()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path = (
+        f"src/ai/backend/agent/docker/backendai-socket-relay.img.{DEFAULT_IMAGE_ARCH}.tar.gz"
+    )
+    already_fetched = False
+    with sync_file_lock(lock_path):
+        with open(image_path, "rb") as f:
+            head = f.read(256)
+            if not head.startswith(b"version https://git-lfs.github.com/spec/v1\n"):
+                already_fetched = True
+        if not already_fetched:
+            proc = subprocess.Popen(["git", "lfs", "pull", "--include", image_path], cwd=build_root)
+            try:
+                proc.wait()
+            except (KeyboardInterrupt, SystemExit):
+                # This will trigger 'Filesystem changed during run' in pants and let it retry the test
+                # after interrupting the test via SIGINT.
+                # We need to wait until the git command to complete anyway.
+                proc.wait()
+                raise
 
 
 @pytest.fixture

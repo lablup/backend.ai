@@ -12,8 +12,11 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Concatenate,
     Mapping,
+    ParamSpec,
     Tuple,
+    TypeAlias,
     TypeVar,
     overload,
 )
@@ -229,11 +232,17 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
 
 
+P = ParamSpec("P")
+TQueryResult = TypeVar("TQueryResult")
+
+
 @overload
 async def execute_with_txn_retry(
-    txn_func: Callable[[SASession], Awaitable[TQueryResult]],
+    txn_func: Callable[Concatenate[SASession, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]],
     connection: SAConnection,
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> TQueryResult: ...
 
 
@@ -241,19 +250,23 @@ async def execute_with_txn_retry(
 # including `SASession` and `SAConnection`.
 @overload
 async def execute_with_txn_retry(  # type: ignore[misc]
-    txn_func: Callable[[SAConnection], Awaitable[TQueryResult]],
+    txn_func: Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> TQueryResult: ...
 
 
 # TODO: Allow `SASession` parameter only, remove type overloading and remove `begin_trx` after migrating Core APIs to ORM APIs.
 async def execute_with_txn_retry(
-    txn_func: Callable[[SASession], Awaitable[TQueryResult]]
-    | Callable[[SAConnection], Awaitable[TQueryResult]],
+    txn_func: Callable[Concatenate[SASession, P], Awaitable[TQueryResult]]
+    | Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]]
     | Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> TQueryResult:
     """
     Execute DB related function by retrying transaction in a given connection.
@@ -273,7 +286,7 @@ async def execute_with_txn_retry(
             with attempt:
                 try:
                     async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn)
+                        result = await txn_func(session_or_conn, *args, **kwargs)
                 except DBAPIError as e:
                     if is_db_retry_error(e):
                         raise TryAgain
@@ -378,9 +391,6 @@ async def reenter_txn_session(
             yield sess
 
 
-TQueryResult = TypeVar("TQueryResult")
-
-
 async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
     max_attempts = 20
     result: TQueryResult | Sentinel = Sentinel.token
@@ -403,13 +413,16 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
     return result
 
 
+JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
+
+
 def sql_json_merge(
     col,
     key: Tuple[str, ...],
     obj: Mapping[str, Any],
     *,
     _depth: int = 0,
-):
+) -> JSONCoalesceExpr:
     """
     Generate an SQLAlchemy column update expression that merges the given object with
     the existing object at a specific (nested) key of the given JSONB column,
@@ -445,7 +458,7 @@ def sql_json_increment(
     *,
     parent_updates: Mapping[str, Any] = None,
     _depth: int = 0,
-):
+) -> JSONCoalesceExpr:
     """
     Generate an SQLAlchemy column update expression that increments the value at a specific
     (nested) key of the given JSONB column,

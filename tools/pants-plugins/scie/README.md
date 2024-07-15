@@ -105,8 +105,8 @@ description = "An example FastAPI Lift application including using an external u
 [[lift.interpreters]]
 id = "cpython"
 provider = "PythonBuildStandalone"
-release = "20240224"
-version = "3.12.2"
+release = "20240713"
+version = "3.12.4"
 
 [[lift.files]]
 # Note the leading colon, which is required to reference the pex_binary dependency

@@ -1370,6 +1370,7 @@ class Queries(graphene.ObjectType):
     ):
         return await UserNode.get_node(info, id)
 
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_user_nodes(
         root: Any,
         info: graphene.ResolveInfo,

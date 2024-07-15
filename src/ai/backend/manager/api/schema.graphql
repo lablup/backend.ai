@@ -333,6 +333,9 @@ type Domain {
 type GroupNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """Added in 24.03.7. The undecoded id value stored in DB."""
+  row_id: UUID
   name: String
   description: String
   is_active: Boolean
@@ -343,6 +346,12 @@ type GroupNode implements Node {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  type: String
+
+  """Added in 24.03.7."""
+  container_registry: JSONString
   scaling_groups: [String]
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
@@ -529,6 +538,9 @@ type KeyPair implements Item {
   last_used: DateTime
   rate_limit: Int
   num_queries: Int
+
+  """Added in 24.09.0."""
+  rolling_count: Int
   user: UUID
   projects: [String]
   ssh_public_key: String
@@ -549,6 +561,9 @@ type VirtualFolder implements Item {
   group: UUID
   group_name: String
   creator: String
+
+  """Added in 24.09.0."""
+  domain_name: String
   unmanaged_path: String
   usage_mode: String
   permission: String
