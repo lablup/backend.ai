@@ -56,7 +56,7 @@ Auto-mount vfolders
 ^^^^^^^^^^^^^^^^^^^
 
 If a user-owned vfolder's name starts with a dot, it is automatically mounted at ``/home/work`` for all sessions created by the user.
-A good usecase is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
+A good use case is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
 
 
 Quota scopes
@@ -76,7 +76,7 @@ Storage with per-directory quota
    :width: 80%
    :align: center
 
-   Quota scopes and vfolders with storage solutions supporting per-directry quota
+   Quota scopes and vfolders with storage solutions supporting per-directory quota
 
 For each storage volume, each user and project has their own dedicated quota scope directories as shown in :numref:`vfolder-dir-quota`.
 The storage solution must support per-directory quota, at least for a single-level (like NetApp's QTree).

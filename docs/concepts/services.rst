@@ -11,9 +11,9 @@ Manager and Webserver
 ^^^^^^^^^^^^^^^^^^^^^
 :raw-html-m2r:`<span style="background-color:#fafafa;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 
-Backend.AI manager is the central governor of the cluster.
+Backend.AI manager is the central governor of  the cluster.
 It accepts user requests, creates/destroys the sessions, and routes code execution requests to appropriate agents and sessions.
-It also collects the output of sessions and responds the users with them.
+It also collects the output of sessions and responds to the users with them.
 
 Backend.AI agent is a small daemon installed onto individual worker servers to control them.
 It manages and monitors the lifecycle of kernel containers, and also mediates the input/output of sessions.
@@ -37,7 +37,7 @@ It provides the central place to set the networking and firewall policy for the 
 It has two operation modes:
 
 * Port mapping: Individual app instances are mapped with a TCP port taken from a pre-configured range of TCP port range.
-* Wildecard subdomain: Individual app instances are mapped with a system-generated subdomain under the given top-level domain.
+* Wildcard subdomain: Individual app instances are mapped with a system-generated subdomain under the given top-level domain.
 
 Depending on the session type and application launch configurations, it may require an authenticated HTTP session for HTTP-based applications.
 For instance, you may enforce authentication for interactive development apps like Jupyter while allow anonymous access for AI model service APIs.
@@ -53,7 +53,7 @@ FastTrack (Enterprise only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Backend.AI FastTrack is an add-on service running on top of the manager that features a slick GUI to design and run pipelines of computation tasks.
-It makes it easier to monitor the progress of various MLOps pipelines running concurrently, and allows sharing of such pielines in portable ways.
+It makes it easier to monitor the progress of various MLOps pipelines running concurrently, and allows sharing of such pipelines in portable ways.
 
 Resource Management
 ~~~~~~~~~~~~~~~~~~~

@@ -27,7 +27,7 @@ Kernel roles in a cluster session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In a cluster session with multiple kernels, each kernel has a role.
-By default, the first container takes the "main" role while others takes the "sub" role.
+By default, the first container takes the "main" role while others take the "sub" role.
 All kernels are given unique hostnames like "main1", "sub1", "sub2", ..., and "subN" (the cluster size is N+1 in this case).
 A non-cluster session has one "main1" kernel only.
 
@@ -91,7 +91,7 @@ Interactive compute session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Interactive compute sessions are used to run various interactive applications and development tools,
-such as Jupyter Notebooks, web-based terminals, and etc.
+such as Jupyter Notebooks, web-based terminals, etc.
 It is expected that the users control their lifecycles (e.g., terminating them)
 while Backend.AI offers configuration knobs for the administrators to set idle timeouts with various criteria.
 
