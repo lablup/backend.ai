@@ -1208,11 +1208,29 @@ type Mutations {
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
   associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain
+
+  """Added in 24.03.7"""
+  associate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): AssociateScalingGroupsWithDomain
   associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup
+
+  """Added in 24.03.7"""
+  associate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup
   associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair
+
+  """Added in 24.03.7"""
+  associate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): AssociateScalingGroupsWithKeyPair
   disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain
+
+  """Added in 24.03.7"""
+  disassociate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithDomain
   disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup
+
+  """Added in 24.03.7"""
+  disassociate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
+
+  """Added in 24.03.7"""
+  disassociate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
@@ -1776,7 +1794,19 @@ type AssociateScalingGroupWithDomain {
   msg: String
 }
 
+"""Added in 24.03.7."""
+type AssociateScalingGroupsWithDomain {
+  ok: Boolean
+  msg: String
+}
+
 type AssociateScalingGroupWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.7."""
+type AssociateScalingGroupsWithUserGroup {
   ok: Boolean
   msg: String
 }
@@ -1786,7 +1816,19 @@ type AssociateScalingGroupWithKeyPair {
   msg: String
 }
 
+"""Added in 24.03.7."""
+type AssociateScalingGroupsWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.7."""
+type DisassociateScalingGroupsWithDomain {
   ok: Boolean
   msg: String
 }
@@ -1796,7 +1838,19 @@ type DisassociateScalingGroupWithUserGroup {
   msg: String
 }
 
+"""Added in 24.03.7."""
+type DisassociateScalingGroupsWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.7."""
+type DisassociateScalingGroupsWithKeyPair {
   ok: Boolean
   msg: String
 }
