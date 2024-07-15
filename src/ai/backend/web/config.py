@@ -131,6 +131,7 @@ config_iv = t.Dict({
             ): config.redis_helper_config_iv,
         }),
         t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
+        t.Key("login_session_extend_time", default=3600): t.ToInt,  # seconds (default: 1 hr)
         t.Key("flush_on_startup", default=False): t.ToBool,
         t.Key("login_block_time", default=1200): t.ToInt,  # seconds (default: 20 min)
         t.Key("login_allowed_fail_count", default=10): t.ToInt,

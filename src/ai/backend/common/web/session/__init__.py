@@ -4,6 +4,7 @@ import logging
 import logging.config
 import sys
 import time
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
 
 import trafaret as t
@@ -35,7 +36,7 @@ class _CookieParams(TypedDict, total=False):
     secure: Optional[bool]
     httponly: bool
     samesite: Optional[str]
-    expires: str
+    expires: Optional[str]
 
 
 class SessionData(TypedDict, total=False):
@@ -53,12 +54,14 @@ class Session(MutableMapping[str, Any]):
         data: Optional[SessionData],
         new: bool,
         max_age: Optional[int] = None,
+        expires: Optional[int] = None,
     ) -> None:
         self._changed: bool = False
         self._mapping: Dict[str, Any] = {}
         self._identity = identity if data != {} else None
         self._new = new if data != {} else True
         self._max_age = max_age
+        self._expires = expires
         created = data.get("created", None) if data else None
         session_data = data.get("session", None) if data else None
         now = int(time.time())
@@ -97,6 +100,15 @@ class Session(MutableMapping[str, Any]):
     @property
     def empty(self) -> bool:
         return not bool(self._mapping)
+
+    @property
+    def expires(self) -> Optional[int]:
+        return self._expires
+
+    @expires.setter
+    def expires(self, value: Optional[int]) -> None:
+        self._expires = value
+        self._changed = True
 
     @property
     def max_age(self) -> Optional[int]:
@@ -144,6 +156,15 @@ class Session(MutableMapping[str, Any]):
 
 SESSION_KEY = "aiohttp_session"
 STORAGE_KEY = "aiohttp_session_storage"
+
+
+async def update_expires(request: web.Request) -> int:
+    storage = request.get(STORAGE_KEY)
+    if storage is None:
+        raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
+    session: Session = await get_session(request)
+    session.expires = int(storage.expires)
+    return storage.login_session_extend_time
 
 
 async def get_session(request: web.Request) -> Session:
@@ -204,7 +225,7 @@ def session_middleware(storage: "AbstractStorage") -> Middleware:
         session = request.get(SESSION_KEY)
         if session is not None:
             if session._changed:
-                await storage.save_session(request, response, session)
+                await storage.save_session(request=request, response=response, session=session)
         if raise_response:
             raise cast(web.HTTPException, response)
         return response
@@ -244,6 +265,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         self._max_age = max_age
         self._encoder = encoder
         self._decoder = decoder
+        self._expires: Optional[int] = None
 
     @property
     def cookie_name(self) -> str:
@@ -257,14 +279,21 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     def cookie_params(self) -> _CookieParams:
         return self._cookie_params
 
+    @property
+    def expires(self) -> Optional[int]:
+        return self._expires
+
+    @expires.setter
+    def expires(self, value: Optional[int]) -> None:
+        self._expires = value
+
     def _get_session_data(self, session: Session) -> SessionData:
         if session.empty:
             return {}
-
         return {"created": session.created, "session": session._mapping}
 
     async def new_session(self) -> Session:
-        return Session(None, data=None, new=True, max_age=self.max_age)
+        return Session(None, data=None, new=True, expires=self.expires)  # max_age=self.max_age
 
     @abc.abstractmethod
     async def load_session(self, request: web.Request) -> Session:
@@ -286,18 +315,21 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         response: web.StreamResponse,
         cookie_data: str,
         *,
+        expires: Optional[int] = None,
         max_age: Optional[int] = None,
     ) -> None:
         params = self._cookie_params.copy()
         if max_age is not None:
             params["max_age"] = max_age
-            t = time.gmtime(time.time() + max_age)
-            params["expires"] = time.strftime("%a, %d-%b-%Y %T GMT", t)
+        if expires is not None:
+            params["expires"] = datetime.fromtimestamp(expires, tz=timezone.utc).isoformat()
         if not cookie_data:
-            response.del_cookie(self._cookie_name, domain=params["domain"], path=params["path"])
-        else:
             # Ignoring type for params until aiohttp#4238 is released
-            response.set_cookie(self._cookie_name, cookie_data, **params)
+            response.del_cookie(
+                name=self._cookie_name, domain=params["domain"], path=params["path"]
+            )
+        else:
+            response.set_cookie(name=self._cookie_name, value=cookie_data, **params)
 
 
 class SimpleCookieStorage(AbstractStorage):
@@ -321,7 +353,7 @@ class SimpleCookieStorage(AbstractStorage):
         super().__init__(
             cookie_name=cookie_name,
             domain=domain,
-            max_age=max_age,
+            # max_age=max_age,
             path=path,
             secure=secure,
             httponly=httponly,
@@ -333,13 +365,13 @@ class SimpleCookieStorage(AbstractStorage):
     async def load_session(self, request: web.Request) -> Session:
         cookie = self.load_cookie(request)
         if cookie is None:
-            return Session(None, data=None, new=True, max_age=self.max_age)
+            return Session(None, data=None, new=True)  # max_age=self.max_age)
 
         data = self._decoder(cookie)
-        return Session(None, data=data, new=False, max_age=self.max_age)
+        return Session(None, data=data, new=False)  # max_age=self.max_age)
 
     async def save_session(
         self, request: web.Request, response: web.StreamResponse, session: Session
     ) -> None:
         cookie_data = self._encoder(self._get_session_data(session))
-        self.save_cookie(response, cookie_data, max_age=session.max_age)
+        self.save_cookie(response, cookie_data)  # max_age=session.max_age)
