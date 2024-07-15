@@ -108,6 +108,9 @@ from .resource_preset import (
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
     AssociateScalingGroupWithDomain,
     AssociateScalingGroupWithKeyPair,
     AssociateScalingGroupWithUserGroup,
@@ -115,6 +118,9 @@ from .scaling_group import (
     DeleteScalingGroup,
     DisassociateAllScalingGroupsWithDomain,
     DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
     DisassociateScalingGroupWithDomain,
     DisassociateScalingGroupWithKeyPair,
     DisassociateScalingGroupWithUserGroup,
@@ -240,11 +246,29 @@ class Mutations(graphene.ObjectType):
     modify_scaling_group = ModifyScalingGroup.Field()
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
+    associate_scaling_groups_with_domain = AssociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.7"
+    )
     associate_scaling_group_with_user_group = AssociateScalingGroupWithUserGroup.Field()
+    associate_scaling_groups_with_user_group = AssociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.7"
+    )
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
+    associate_scaling_groups_with_keypair = AssociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.7"
+    )
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
+    disassociate_scaling_groups_with_domain = DisassociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.7"
+    )
     disassociate_scaling_group_with_user_group = DisassociateScalingGroupWithUserGroup.Field()
+    disassociate_scaling_groups_with_user_group = DisassociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.7"
+    )
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
+    disassociate_scaling_groups_with_keypair = DisassociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.7"
+    )
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
