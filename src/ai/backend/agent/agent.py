@@ -2148,7 +2148,8 @@ class AbstractAgent(
                         },
                     ),
                 )
-                kernel_obj.state = KernelLifecycleStatus.RUNNING
+                async with self.registry_lock:
+                    kernel_obj.state = KernelLifecycleStatus.RUNNING
 
                 # The startup command for the batch-type sessions will be executed by the manager
                 # upon firing of the "session_started" event.
