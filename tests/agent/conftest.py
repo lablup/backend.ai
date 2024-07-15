@@ -184,9 +184,15 @@ def socket_relay_image():
         if not head.startswith(b"version https://git-lfs.github.com/spec/v1\n"):
             already_fetched = True
     if not already_fetched:
-        subprocess.run(["git", "lfs", "pull", "--include", image_path], check=True, cwd=build_root)
-        # This will trigger 'Filesystem changed during run' in pants and let it retry the test after
-        # interrupting the test via SIGINT.
+        proc = subprocess.Popen(["git", "lfs", "pull", "--include", image_path], cwd=build_root)
+        try:
+            proc.wait()
+        except (KeyboardInterrupt, SystemExit):
+            # This will trigger 'Filesystem changed during run' in pants and let it retry the test
+            # after interrupting the test via SIGINT.
+            # We need to wait until the git command to complete anyway.
+            proc.wait()
+            raise
 
 
 @pytest.fixture
