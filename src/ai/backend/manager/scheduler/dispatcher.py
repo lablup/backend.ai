@@ -741,19 +741,21 @@ class SchedulerDispatcher(aobject):
         """
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
-        requested_architectures = set(k.architecture for k in sess_ctx.kernels)
-        if len(requested_architectures) > 1:
-            raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architectures' single node session",
-            )
-        if not sess_ctx.kernels:
-            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
-        requested_architecture = requested_architectures.pop()
-        compatible_candidate_agents = [
-            ag for ag in candidate_agents if ag.architecture == requested_architecture
-        ]
 
         try:
+            requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+            if len(requested_architectures) > 1:
+                raise GenericBadRequest(
+                    "Cannot assign multiple kernels with different architectures' single node session",
+                )
+            if not sess_ctx.kernels:
+                raise GenericBadRequest(
+                    f"The session {sess_ctx.id!r} does not have any child kernel."
+                )
+            requested_architecture = requested_architectures.pop()
+            compatible_candidate_agents = [
+                ag for ag in candidate_agents if ag.architecture == requested_architecture
+            ]
             if not candidate_agents:
                 raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
