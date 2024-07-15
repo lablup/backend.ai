@@ -15,14 +15,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class GitLabRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
-        access_token, gitlab_project = (
+        name, access_token, gitlab_project = (
+            self.registry_info["username"],
             self.registry_info["password"],
             self.registry_info["gitlab_project"],
         )
 
-        encoded_project = urllib.parse.quote(gitlab_project, safe="")
+        encoded_project_id = urllib.parse.quote(f"{name}/{gitlab_project}", safe="")
         repo_list_url = (
-            f"https://gitlab.com/api/v4/projects/{encoded_project}/registry/repositories"
+            f"https://gitlab.com/api/v4/projects/{encoded_project_id}/registry/repositories"
         )
 
         headers = {
