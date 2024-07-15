@@ -84,6 +84,8 @@ jobs:
     needs: backport-target-branch
     strategy:
       matrix: ${{ fromJson(needs.backport-target-branch.outputs.matrix) }}
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
