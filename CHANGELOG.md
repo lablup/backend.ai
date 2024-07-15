@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7b1 (2024-07-15)
+
+### Features
+* Add `row_id`, `type` and `container_registry` fields to the `GroupNode` GQL schema. ([#2409](https://github.com/lablup/backend.ai/issues/2409))
+* Add support for PureStorage RapidFiles Toolkit v2 ([#2419](https://github.com/lablup/backend.ai/issues/2419))
+
+### Improvements
+* Remove database-level foreign key constraints in `vfolders.{user,group}` columns to decouple the timing of vfolder deletion and user/group deletion. ([#2404](https://github.com/lablup/backend.ai/issues/2404))
+
+### Fixes
+* Add missing `commit_session_to_file` to `OP_EXC` ([#2127](https://github.com/lablup/backend.ai/issues/2127))
+* Pass ImageRef.canonical in `commit_session_to_file` ([#2134](https://github.com/lablup/backend.ai/issues/2134))
+* Omit to clean containerless kernels which are still creating its container. ([#2317](https://github.com/lablup/backend.ai/issues/2317))
+* Run batch execution after the batch session starts. ([#2327](https://github.com/lablup/backend.ai/issues/2327))
+* Add support for configuring `sync_container_lifecycles()` task. ([#2338](https://github.com/lablup/backend.ai/issues/2338))
+* Restrict GraphQL query to `user_nodes` field to require `superadmin` privilege ([#2401](https://github.com/lablup/backend.ai/issues/2401))
+* Utilize `ExtendedJSONEncoder` for error logging to handle `UUID` objects in `extra_data` ([#2415](https://github.com/lablup/backend.ai/issues/2415))
+* Change outdated references in event module from `kernels` to `sessions`. ([#2421](https://github.com/lablup/backend.ai/issues/2421))
+* Upgrade `inquirer` to remove dependency on deprecated `distutils`, which breaks up execution of the scie builds ([#2424](https://github.com/lablup/backend.ai/issues/2424))
+* Allow specific status of vfolders to query to purge. ([#2429](https://github.com/lablup/backend.ai/issues/2429))
+* Update the install-dev scripts to use `pnpm` instead of `npm` to speed up installation and resolve some peculiar version resolution issues related to esbuild. ([#2436](https://github.com/lablup/backend.ai/issues/2436))
+* Fix a packaging issue in the `backendai-webserver` scie executable due to missing explicit requirement of setuptools ([#2454](https://github.com/lablup/backend.ai/issues/2454))
+* Improve pruning of non-physical filesystems when measuring disk usage in agents ([#2460](https://github.com/lablup/backend.ai/issues/2460))
+
+### External Dependency Updates
+* Upgrade aiodocker to 0.22.1 to fix error handling when trying to extract the log of non-existing containers ([#2402](https://github.com/lablup/backend.ai/issues/2402))
+* Upgrade the base CPython from 3.12.2 to 3.12.4 ([#2449](https://github.com/lablup/backend.ai/issues/2449))
+
+### Miscellaneous
+* Handle container creation exception and start exception in separate try-except contexts. ([#2316](https://github.com/lablup/backend.ai/issues/2316))
+
+
 ## 24.03.7a2 (2024-07-08)
 
 ### Features
