@@ -22,9 +22,11 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v4
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -89,9 +91,11 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v4
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -152,19 +156,11 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v4
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v4
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
-    - name: Git LFS Pull
-      run: git lfs pull
+        lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -220,24 +216,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-latest: intel
-        # linux-aarch64: aarch64 (self-hosted)
+        # ubuntu-latest: x86-64
+        # ubuntu-22.04-arm64: aarch64
         # macos-12: intel
         # macos-13: apple silicon
-        os: [ubuntu-latest, linux-aarch64, macos-13-xlarge, macos-12-large]
+        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13-xlarge, macos-12-large]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out the revision
+      uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v4
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
@@ -245,17 +234,14 @@ jobs:
         PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-
     - name: Install coreutils for macOS
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: brew install coreutils
-    - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
-      # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
-
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v8
       with:
@@ -288,17 +274,10 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out the revision
+      uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v4
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
@@ -511,15 +490,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v4
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Check out the revision
+      uses: actions/checkout@v4
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml

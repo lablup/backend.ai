@@ -2,170 +2,50 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
-import os
-from pathlib import Path
-from subprocess import CalledProcessError
-from typing import AsyncIterator, FrozenSet
+import logging
+import re
+from typing import FrozenSet
 
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.common.types import HardwareMetadata
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
-from ..subproc import run
-from ..types import CapacityUsage, DirEntry, DirEntryType, FSPerfMetric, Stat, TreeUsage
-from ..utils import fstime2datetime
-from ..vfs import BaseFSOpModel, BaseVolume
+from ..types import CapacityUsage, FSPerfMetric
+from ..vfs import BaseVolume
 from .purity import PurityClient
+from .rapidfiles import RapidFileToolsFSOpModel
+from .rapidfiles_v2 import RapidFileToolsv2FSOpModel
 
+FLASHBLADE_TOOLKIT_V2_VERSION_RE = re.compile(r"version p[a-zA-Z\d]+ \(RapidFile\) (2\..+)")
+FLASHBLADE_TOOLKIT_V1_VERSION_RE = re.compile(r"p[a-zA-Z\d]+ \(RapidFile Toolkit\) (1\..+)")
 
-class RapidFileToolsFSOpModel(BaseFSOpModel):
-    async def copy_tree(
-        self,
-        src_path: Path,
-        dst_path: Path,
-    ) -> None:
-        extra_opts: list[bytes] = []
-        if src_path.is_dir():
-            extra_opts.append(b"-r")
-        try:
-            await run([
-                b"pcp",
-                *extra_opts,
-                b"-p",
-                # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
-                os.fsencode(src_path),
-                os.fsencode(dst_path),
-            ])
-        except CalledProcessError as e:
-            raise RuntimeError(f'"pcp" command failed: {e.stderr}')
-
-    async def delete_tree(
-        self,
-        path: Path,
-    ) -> None:
-        try:
-            await run([
-                b"prm",
-                b"-r",
-                os.fsencode(path),
-            ])
-        except CalledProcessError as e:
-            raise RuntimeError(f"'prm' command failed: {e.stderr}")
-
-    def scan_tree(
-        self,
-        path: Path,
-        *,
-        recursive: bool = True,
-    ) -> AsyncIterator[DirEntry]:
-        raw_target_path = os.fsencode(path)
-
-        async def _aiter() -> AsyncIterator[DirEntry]:
-            proc = await asyncio.create_subprocess_exec(
-                b"pls",
-                b"--json",
-                raw_target_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            assert proc.stdout is not None
-            try:
-                while True:
-                    line = await proc.stdout.readline()
-                    if not line:
-                        break
-                    line = line.rstrip(b"\n")
-                    item = json.loads(line)
-                    item_path = Path(item["path"])
-                    entry_type = DirEntryType.FILE
-                    if item["filetype"] == 40000:
-                        entry_type = DirEntryType.DIRECTORY
-                    if item["filetype"] == 120000:
-                        entry_type = DirEntryType.SYMLINK
-                    yield DirEntry(
-                        name=item_path.name,
-                        path=item_path,
-                        type=entry_type,
-                        stat=Stat(
-                            size=item["size"],
-                            owner=str(item["uid"]),
-                            # The integer represents the octal number in decimal
-                            # (e.g., 644 which actually means 0o644)
-                            mode=int(str(item["mode"]), 8),
-                            modified=fstime2datetime(item["mtime"]),
-                            created=fstime2datetime(item["ctime"]),
-                        ),
-                        symlink_target="",  # TODO: should be tested on PureStorage
-                    )
-            finally:
-                await proc.wait()
-
-        return _aiter()
-
-    async def scan_tree_usage(
-        self,
-        path: Path,
-    ) -> TreeUsage:
-        total_size = 0
-        total_count = 0
-        raw_target_path = os.fsencode(path)
-        # Measure the exact file sizes and bytes
-        proc = await asyncio.create_subprocess_exec(
-            b"pdu",
-            b"-0",
-            b"-b",
-            b"-a",
-            b"-s",
-            raw_target_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        assert proc.stdout is not None
-        try:
-            # TODO: check slowdowns when there are millions of files
-            while True:
-                try:
-                    line = await proc.stdout.readuntil(b"\0")
-                    line = line.rstrip(b"\0")
-                except asyncio.IncompleteReadError:
-                    break
-                size, name = line.split(maxsplit=1)
-                if len(name) != len(raw_target_path) and name != raw_target_path:
-                    total_size += int(size)
-                    total_count += 1
-        finally:
-            await proc.wait()
-        return TreeUsage(file_count=total_count, used_bytes=total_size)
-
-    async def scan_tree_size(
-        self,
-        path: Path,
-    ) -> BinarySize:
-        proc = await asyncio.create_subprocess_exec(
-            b"pdu",
-            b"-hs",
-            bytes(path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f"pdu command failed: {stderr.decode()}")
-        used_bytes, _ = stdout.decode().split()
-        return BinarySize.finite_from_str(used_bytes)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class FlashBladeVolume(BaseVolume):
     name = "purestorage"
+    _toolkit_version: int | None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._toolkit_version = None
 
     async def create_fsop_model(self) -> AbstractFSOpModel:
-        return RapidFileToolsFSOpModel(
-            self.mount_path,
-            self.local_config["storage-proxy"]["scandir-limit"],
-        )
+        if (await self.get_toolkit_version()) == 2:
+            return RapidFileToolsv2FSOpModel(
+                self.mount_path,
+                self.local_config["storage-proxy"]["scandir-limit"],
+            )
+        else:
+            return RapidFileToolsFSOpModel(
+                self.mount_path,
+                self.local_config["storage-proxy"]["scandir-limit"],
+            )
 
-    async def init(self) -> None:
-        available = True
+    async def get_toolkit_version(self) -> int:
+        if self._toolkit_version is not None:
+            return self._toolkit_version
         try:
             proc = await asyncio.create_subprocess_exec(
                 b"pdu",
@@ -174,15 +54,31 @@ class FlashBladeVolume(BaseVolume):
                 stderr=asyncio.subprocess.STDOUT,
             )
         except FileNotFoundError:
-            available = False
-        else:
-            try:
-                stdout, stderr = await proc.communicate()
-                if b"RapidFile Toolkit" not in stdout or proc.returncode != 0:
-                    available = False
-            finally:
-                await proc.wait()
-        if not available:
+            self._toolkit_version = -1
+            return -1
+        try:
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                self._toolkit_version = -1
+            else:
+                version_line = stdout.decode().splitlines()[0]
+                if FLASHBLADE_TOOLKIT_V2_VERSION_RE.match(version_line):
+                    self._toolkit_version = 2
+                    log.info("FlashBlade Toolkit 2 detected")
+                elif FLASHBLADE_TOOLKIT_V1_VERSION_RE.match(version_line):
+                    self._toolkit_version = 1
+                    log.info("FlashBlade Toolkit 1 detected")
+                else:
+                    log.warn("Unrecogized FlashBlade Toolkit version: {}", version_line)
+                    self._toolkit_version = -1
+        finally:
+            await proc.wait()
+            assert self._toolkit_version
+            return self._toolkit_version
+
+    async def init(self) -> None:
+        toolkit_version = await self.get_toolkit_version()
+        if toolkit_version == -1:
             raise RuntimeError(
                 "PureStorage RapidFile Toolkit is not installed. "
                 "You cannot use the PureStorage backend for the stroage proxy.",

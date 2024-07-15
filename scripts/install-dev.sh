@@ -620,7 +620,7 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
-  npm i
+  pnpm i
   make compile
   cd ../../../..
 }
@@ -747,9 +747,6 @@ setup_environment() {
 
   show_info "Ensuring checkout of LFS files..."
   git lfs pull
-
-  show_info "Ensuring checkout of submodules..."
-  git submodule update --init --checkout --recursive
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks

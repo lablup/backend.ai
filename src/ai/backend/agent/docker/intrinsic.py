@@ -53,6 +53,19 @@ from .resources import get_resource_spec_from_container
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+# The list of pruned fstype when checking the filesystem usage statistics.
+# Note that psutil's linux implementation automatically filters out "non-device" filesystems by
+# checking /proc/filesystems so we don't have to put all the details virtual filesystems like
+# "sockfs", "debugfs", etc.
+pruned_disk_types = frozenset([
+    "vfat",
+    "lxcfs",
+    "squashfs",
+    "tmpfs",
+    "iso9660",  # cdrom
+])
+
+
 def netstat_ns_work(ns_path: Path):
     with nsenter(ns_path):
         result = psutil.net_io_counters(pernic=True)
@@ -92,19 +105,19 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
     else:
         entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
-        if isinstance(ret, list):
-            if not ret:
+        match ret:
+            case list() if ret:
+                entry = ret[0]
+            case dict() if ret:
+                entry = ret
+            case _:
                 # The API may return an empty result upon container termination.
+                log.warning(
+                    "cannot read stats (cid:{}): got an empty result: {}",
+                    short_cid,
+                    ret,
+                )
                 return None
-            entry = ret[0]
-        # The API may return an invalid or empty result upon container termination.
-        if ret is None or not isinstance(ret, dict):
-            log.warning(
-                "cannot read stats (cid:{}): got an empty result: {}",
-                short_cid,
-                ret,
-            )
-            return None
         if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
         return entry
@@ -490,20 +503,25 @@ class MemoryPlugin(AbstractComputePlugin):
         net_tx_bytes = _nstat.bytes_sent
 
         def get_disk_stat():
-            pruned_disk_types = frozenset(["squashfs", "vfat", "tmpfs"])
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
             per_disk_stat = {}
             for disk_info in psutil.disk_partitions():
-                if disk_info.fstype not in pruned_disk_types:
-                    if "/var/lib/docker/btrfs" == disk_info.mountpoint:
-                        continue
-                    dstat = os.statvfs(disk_info.mountpoint)
-                    disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
-                    disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
-                    per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
-                    total_disk_usage += disk_usage
-                    total_disk_capacity += disk_capacity
+                # Skip additional filesystem types not filtered by psutil, like squashfs.
+                if disk_info.fstype in pruned_disk_types:
+                    continue
+                # Skip transient filesystems created/destroyed by Docker.
+                if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+                    continue
+                # Skip btrfs subvolumes used by Docker if configured.
+                if disk_info.mountpoint == "/var/lib/docker/btrfs":
+                    continue
+                dstat = os.statvfs(disk_info.mountpoint)
+                disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
+                disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
+                per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                total_disk_usage += disk_usage
+                total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
 
         loop = current_loop()

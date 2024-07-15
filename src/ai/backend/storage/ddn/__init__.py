@@ -141,9 +141,6 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             if quota_usage is not None:
                 raise QuotaScopeAlreadyExists
 
-        if options is None:
-            return
-
         # Set projectID to the directory
         try:
             await run([
@@ -159,7 +156,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         except CalledProcessError as e:
             raise RuntimeError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
 
-        await self._set_quota_by_project(project_id, qspath, options)
+        if options is not None:
+            await self._set_quota_by_project(project_id, qspath, options)
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         """
