@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import itertools
 import logging
 import os.path
 import uuid
@@ -39,6 +40,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import BackgroundTaskLogLevel as LogLevel
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
@@ -1685,68 +1687,29 @@ async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
-    storage_ptask_group: aiotools.PersistentTaskGroup,
-) -> int:
+    background_task_manager: BackgroundTaskManager,
+) -> uuid.UUID | None:
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
-        return 0
+        return None
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
         db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
-    row_deletion_infos: list[VFolderDeletionInfo] = []
-    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+    async def _delete_task(reporter: ProgressReporter) -> None:
+        await delete_vfolders(
+            requested_vfolders, db=db_engine, storage_manager=storage_manager, reporter=reporter
+        )
 
-    async def _delete():
-        for vfolder_info in requested_vfolders:
-            folder_id, host_name = vfolder_info
-            proxy_name, volume_name = storage_manager.split_host(host_name)
-            try:
-                async with storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": volume_name,
-                        "vfid": str(folder_id),
-                    },
-                ) as (_, resp):
-                    pass
-            except (VFolderOperationFailed, InvalidAPIParameters) as e:
-                if e.status == 404:
-                    row_deletion_infos.append(vfolder_info)
-                else:
-                    failed_deletion.append((vfolder_info, repr(e)))
-            except Exception as e:
-                failed_deletion.append((vfolder_info, repr(e)))
-            else:
-                row_deletion_infos.append(vfolder_info)
-        if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+    task_id = await background_task_manager.start(_delete_task, total_progress=vfolder_info_len)
+    log.debug("Started deleting vfolders {}", [str(x) for x in vfolder_ids])
 
-            await update_vfolder_status(
-                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
-            )
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
-        if failed_deletion:
-            await update_vfolder_status(
-                db_engine,
-                [vfid.vfolder_id for vfid, _ in failed_deletion],
-                VFolderOperationStatus.DELETE_ERROR,
-                do_log=False,
-            )
-            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
-            raise VFolderOperationFailed(extra_data=extra_data)
-
-    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
-    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
-
-    return vfolder_info_len
+    return task_id
 
 
 async def ensure_quota_scope_accessible_by_user(
@@ -2289,6 +2252,100 @@ class VirtualFolderList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolder, required=True)
+
+
+async def _delete_vfolders(
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    *,
+    storage_manager: StorageSessionManager,
+    db: ExtendedAsyncSAEngine,
+    reporter: ProgressReporter | None,
+) -> None:
+    """
+    Request multiple vfolder deletion one by one.
+    """
+    folders_to_be_deleted: list[VFolderDeletionInfo] = []
+    folders_failed_to_delete: list[tuple[VFolderDeletionInfo, str]] = []
+    for vfolder_info in requested_vfolders:
+        folder_id, host_name = vfolder_info
+        proxy_name, volume_name = storage_manager.split_host(host_name)
+        log_level = LogLevel.INFO
+        try:
+            async with storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/delete",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ) as (_, resp):
+                pass
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if e.status == 404:
+                folders_to_be_deleted.append(vfolder_info)
+                progress_msg = f"VFolder not found in storage, transit status to `DELETE_COMPLETE` (id: {folder_id})"
+            else:
+                err_str = repr(e)
+                folders_failed_to_delete.append((vfolder_info, err_str))
+                progress_msg = f"Delete failed (id: {folder_id}, storage response status: {e.status}, e: {err_str})"
+                log_level = LogLevel.ERROR
+        except Exception as e:
+            err_str = repr(e)
+            folders_failed_to_delete.append((vfolder_info, err_str))
+            progress_msg = f"Delete failed (id: {folder_id}, e: {err_str})"
+            log_level = LogLevel.ERROR
+        else:
+            folders_to_be_deleted.append(vfolder_info)
+            progress_msg = f"Delete succeeded (id: {folder_id})"
+        if reporter is not None:
+            await reporter.update(1, message=progress_msg, log_level=log_level)
+    vfolder_ids_to_delete = tuple(vf_id.folder_id for vf_id, _ in folders_to_be_deleted)
+    log.debug("Successfully deleted vfolders {}", [str(x) for x in vfolder_ids_to_delete])
+
+    if folders_to_be_deleted:
+        await update_vfolder_status(
+            db,
+            vfolder_ids_to_delete,
+            VFolderOperationStatus.DELETE_COMPLETE,
+            do_log=False,
+        )
+    if folders_failed_to_delete:
+        await update_vfolder_status(
+            db,
+            [vfid.vfolder_id.folder_id for vfid, _ in folders_failed_to_delete],
+            VFolderOperationStatus.DELETE_ERROR,
+            do_log=False,
+        )
+
+
+async def delete_vfolders(
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    *,
+    storage_manager: StorageSessionManager,
+    db: ExtendedAsyncSAEngine,
+    reporter: ProgressReporter | None = None,
+) -> None:
+    """
+    Spawn vfolder deletion tasks grouped by a name of storage proxies.
+    """
+
+    def _keyfunc(item: VFolderDeletionInfo) -> str:
+        proxy_name, _ = storage_manager.split_host(item.host)
+        return proxy_name
+
+    async with aiotools.TaskGroup() as tg:
+        for _, vfolder_iterator in itertools.groupby(
+            sorted(requested_vfolders, key=_keyfunc), key=_keyfunc
+        ):
+            tg.create_task(
+                _delete_vfolders(
+                    list(vfolder_iterator),
+                    storage_manager=storage_manager,
+                    db=db,
+                    reporter=reporter,
+                )
+            )
 
 
 class VirtualFolderNode(graphene.ObjectType):

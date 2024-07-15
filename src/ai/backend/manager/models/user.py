@@ -5,7 +5,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence, cast
 from uuid import UUID, uuid4
 
-import aiotools
 import bcrypt
 import graphene
 import sqlalchemy as sa
@@ -52,6 +51,8 @@ from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
+    from ai.backend.common.bgtask import BackgroundTaskManager
+
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -1003,7 +1004,12 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(
+                graph_ctx.db,
+                user_uuid,
+                graph_ctx.storage_manager,
+                graph_ctx.background_task_manager,
+            )
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1101,6 +1107,7 @@ class PurgeUser(graphene.Mutation):
         engine: ExtendedAsyncSAEngine,
         user_uuid: UUID,
         storage_manager: StorageSessionManager,
+        background_task_manager: BackgroundTaskManager,
     ) -> int:
         """
         Delete user's all virtual folders as well as their physical data.
@@ -1123,13 +1130,12 @@ class PurgeUser(graphene.Mutation):
             )
             target_vfs = result.fetchall()
 
-        storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
-                storage_ptask_group,
+                background_task_manager,
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)

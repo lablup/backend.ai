@@ -222,6 +222,27 @@ def test_delete_vfolder(run_user: ClientRunnerFunc):
         assert "Deleted" in p.before.decode(), "Test folder 3 not deleted successfully."
 
 
+@pytest.mark.dependency(depends=["test_delete_vfolder"])
+def test_delete_forever_vfolder(run_user: ClientRunnerFunc):
+    """
+    Test delete-forever vfolder function.
+    !! Make sure you execute this test after test_delete_vfolder !!
+    Otherwise, it will raise an error.
+    """
+    print("[ Delete-forever vfolder ]")
+    with closing(run_user(["vfolder", "delete-forever", "test_folder2"])) as p:
+        p.expect(EOF)
+        assert (
+            "Delete task started" in p.before.decode()
+        ), "Test folder 2 not deleted-completely successfully."
+
+    with closing(run_user(["vfolder", "delete-forever", "test_folder3"])) as p:
+        p.expect(EOF)
+        assert (
+            "Delete task started" in p.before.decode()
+        ), "Test folder 3 not deleted-completely successfully."
+
+
 def test_delete_vfolder_the_same_vfolder_name(
     run_user: ClientRunnerFunc, run_user2: ClientRunnerFunc
 ):
@@ -247,7 +268,7 @@ def test_delete_vfolder_the_same_vfolder_name(
         p.expect(EOF)
         assert (
             "Deleted" in p.before.decode()
-        ), "Test folder created by user2 not deleted successfully."
+        ), "Test folder created by user not deleted successfully."
 
 
 def test_list_vfolder(run_user: ClientRunnerFunc):

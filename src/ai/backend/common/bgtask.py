@@ -27,6 +27,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 from . import redis_helper
+from .defs import BackgroundTaskLogLevel as LogLevel
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -70,6 +71,7 @@ class ProgressReporter:
         self,
         increment: Union[int, float] = 0,
         message: str | None = None,
+        log_level: LogLevel = LogLevel.INFO,
     ) -> None:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
@@ -86,6 +88,7 @@ class ProgressReporter:
                     "current": str(current),
                     "total": str(total),
                     "msg": message or "",
+                    "log_level": str(log_level),
                     "last_update": str(time.time()),
                 },
             )
@@ -99,6 +102,7 @@ class ProgressReporter:
                 message=message,
                 current_progress=current,
                 total_progress=total,
+                log_level=log_level,
             ),
         )
 
@@ -154,10 +158,16 @@ class BackgroundTaskManager:
                         "message": event.message,
                     }
                     match event:
-                        case BgtaskUpdatedEvent():
-                            body["current_progress"] = event.current_progress
-                            body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
+                        case BgtaskUpdatedEvent(
+                            name=name,
+                            current_progress=current_progress,
+                            total_progress=total_progress,
+                            log_level=log_level,
+                        ):
+                            body["current_progress"] = current_progress
+                            body["total_progress"] = total_progress
+                            body["log_level"] = str(log_level)
+                            await resp.send(json.dumps(body), event=name, retry=5)
                         case BgtaskDoneEvent():
                             if extra_data:
                                 body.update(extra_data)
@@ -232,6 +242,7 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         name: str | None = None,
+        total_progress: int = 0,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -246,7 +257,7 @@ class BackgroundTaskManager:
                 mapping={
                     "status": "started",
                     "current": "0",
-                    "total": "0",
+                    "total": total_progress,
                     "msg": "",
                     "started_at": now,
                     "last_update": now,
@@ -257,7 +268,9 @@ class BackgroundTaskManager:
 
         await redis_helper.execute(redis_producer, _pipe_builder)
 
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
+        task = asyncio.create_task(
+            self._wrapper_task(func, task_id, name, total_progress, **kwargs)
+        )
         self.ongoing_tasks.add(task)
         return task_id
 
@@ -266,24 +279,30 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: str | None,
+        task_total_progress: int = 0,
         **kwargs,
     ) -> None:
         task_status: TaskStatus = "bgtask_started"
-        reporter = ProgressReporter(self.event_producer, task_id)
+        reporter = ProgressReporter(
+            self.event_producer, task_id, total_progress=task_total_progress
+        )
         message = ""
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
             BgtaskDoneEvent
         )
+        log_level = LogLevel.INFO
         try:
             message = await func(reporter, **kwargs) or ""
             task_status = "bgtask_done"
         except asyncio.CancelledError:
             task_status = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
+            log_level = LogLevel.WARNING
         except Exception as e:
             task_status = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
+            log_level = LogLevel.ERROR
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
         finally:
             redis_producer = self.event_producer.redis_client
@@ -297,6 +316,7 @@ class BackgroundTaskManager:
                         "status": task_status.removeprefix("bgtask_"),
                         "msg": message,
                         "last_update": str(time.time()),
+                        "log_level": str(log_level),
                     },
                 )
                 await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
