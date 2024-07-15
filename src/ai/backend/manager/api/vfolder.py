@@ -25,6 +25,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeAlias,
+    cast,
 )
 
 import aiohttp
@@ -199,6 +200,8 @@ async def resolve_vfolder_rows(
     request: web.Request,
     perm: VFolderPermissionSetAlias | VFolderPermission | str,
     folder_id_or_name: str | uuid.UUID,
+    *,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -252,6 +255,7 @@ async def resolve_vfolder_rows(
             extra_invited_vf_conds=invited_perm_cond,
             extra_vf_user_conds=vf_user_cond,
             extra_vf_group_conds=vf_group_cond,
+            allowed_status_set=allowed_status_set,
         )
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=folder_id_or_name)
@@ -388,6 +392,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     group_uuid: uuid.UUID | None = None
     group_type: ProjectType | None = None
+    max_vfolder_count: int
+    max_quota_scope_size: int
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -402,16 +408,18 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
-                    group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(uuid.UUID | None, group_row.id),
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
-                group_type = group_row.type
+                group_type = cast(ProjectType, group_row.type)
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 log.debug("group_id_or_name(uuid):{}", group_id_or_name)
@@ -423,16 +431,18 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
-                group_type = group_row.type
+                group_type = cast(ProjectType, group_row.type)
             case None:
                 query = (
                     sa.select(UserRow)
@@ -442,8 +452,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 result = await sess.execute(query)
                 user_row = result.scalar()
                 max_vfolder_count, max_quota_scope_size = (
-                    user_row.resource_policy_row.max_vfolder_count,
-                    user_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, user_row.resource_policy_row.max_vfolder_count),
+                    cast(int, user_row.resource_policy_row.max_quota_scope_size),
                 )
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
@@ -491,16 +501,27 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
-            query = (
-                sa.select([sa.func.count()])
-                .select_from(vfolders)
-                .where(
-                    (vfolders.c.user == user_uuid)
-                    & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
+            if ownership_type == "user":
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.user == user_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
                 )
-            )
-            result = await conn.scalar(query)
-            if result >= max_vfolder_count and ownership_type == "user":
+            else:
+                assert group_uuid is not None
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.group == group_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
+                )
+            result = cast(int, await conn.scalar(query))
+            if result >= max_vfolder_count:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -2493,10 +2514,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     root_ctx: RootContext = request.app["_root.context"]
     folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2509,33 +2526,19 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request,
+            VFolderPermission.OWNER_PERM,
+            folder_id,
+            allowed_status_set=VFolderStatusSet.PURGABLE,
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.PURGE(folder id:{}, hosts:{}",
-                folder_id,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same id.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
-        entry = entries[0]
+        entry = row
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
