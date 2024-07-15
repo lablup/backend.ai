@@ -18,8 +18,8 @@ If you want to install a specific version:
 
    $ pip install -U backend.ai-manager==${BACKEND_PKG_VERSION}
 
-You may need to generate an RPC keypair for the first setup. This key pair is used for authentication and encryption in our manager-to-agent RPC connections.
-Even if you don't intend to encrypt the RPC channel, the key pair should still be present.
+You may need to generate an RPC keypair for the first setup. This keypair is used for authentication and encryption in our manager-to-agent RPC connections.
+Even if you don't want to encrypt the RPC channel, you still need to have a keypair.
 
 
 .. code-block:: console
@@ -32,7 +32,7 @@ Even if you don't intend to encrypt the RPC channel, the key pair should still b
     Public Key: >B-mF}N{WygT92d&=Kceix$7cWzg!dT])rIc39=S (stored at fixtures/manager.key)
     Secret Key: g.4&?*b&0#oRRC9?DMO[SUXikjKZ7nYj!bzFJN92 (stored at fixtures/manager.key_secret)
 
-You generated an RPC keypair for the manager. The public key is stored in ``fixtures/manager.key`` and the secret key is stored in ``fixtures/manager.key_secret``.
+You have generated an RPC keypair for the manager. The public key is stored in ``fixtures/manager.key`` and the secret key is stored in ``fixtures/manager.key_secret``.
 
 Local configuration
 -------------------
