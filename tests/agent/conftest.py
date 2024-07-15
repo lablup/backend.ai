@@ -185,7 +185,8 @@ def socket_relay_image():
             already_fetched = True
     if not already_fetched:
         subprocess.run(["git", "lfs", "pull", "--include", image_path], check=True, cwd=build_root)
-        pytest.fail("Intentionally failing the test to rerun with the updated LFS files!")
+        # This will trigger 'Filesystem changed during run' in pants and let it retry the test after
+        # interrupting the test via SIGINT.
 
 
 @pytest.fixture
