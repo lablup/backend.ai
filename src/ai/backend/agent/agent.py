@@ -157,6 +157,7 @@ from .types import (
     Container,
     ContainerLifecycleEvent,
     ContainerStatus,
+    KernelLifecycleStatus,
     LifecycleEvent,
     MountInfo,
 )
@@ -560,7 +561,6 @@ class AbstractAgent(
     redis: Redis
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    terminating_kernels: Set[KernelId]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -600,7 +600,6 @@ class AbstractAgent(
         self.computers = {}
         self.images = {}  # repoTag -> digest
         self.restarting_kernels = {}
-        self.terminating_kernels = set()
         self.stat_ctx = StatContext(
             self,
             mode=StatModes(local_config["container"]["stats-type"]),
@@ -704,7 +703,13 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
-        self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
+        sync_container_lifecycles_config = self.local_config["agent"]["sync-container-lifecycles"]
+        if sync_container_lifecycles_config["enabled"]:
+            self.timer_tasks.append(
+                aiotools.create_timer(
+                    self.sync_container_lifecycles, sync_container_lifecycles_config["interval"]
+                )
+            )
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
@@ -963,7 +968,10 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled:
+                    if (
+                        not kernel_obj.stats_enabled
+                        or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                    ):
                         continue
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
@@ -981,7 +989,10 @@ class AbstractAgent(
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if not kernel_obj.stats_enabled:
+                    if (
+                        not kernel_obj.stats_enabled
+                        or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                    ):
                         continue
                     updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
@@ -1006,6 +1017,7 @@ class AbstractAgent(
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.stats_enabled = True
+                kernel_obj.state = KernelLifecycleStatus.RUNNING
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
@@ -1013,7 +1025,6 @@ class AbstractAgent(
             assert current_task is not None
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
-            self.terminating_kernels.add(ev.kernel_id)
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
@@ -1036,6 +1047,7 @@ class AbstractAgent(
                             ev.done_future.set_result(None)
                         return
                 else:
+                    kernel_obj.state = KernelLifecycleStatus.TERMINATING
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
@@ -1109,7 +1121,6 @@ class AbstractAgent(
                             self.port_pool.update(restored_ports)
                         await kernel_obj.close()
                 finally:
-                    self.terminating_kernels.discard(ev.kernel_id)
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
@@ -1343,9 +1354,10 @@ class AbstractAgent(
                         kernel_session_map[kernel_id] = session_id
                     # Check if: kernel_registry has the container but it's gone.
                     for kernel_id in known_kernels.keys() - alive_kernels.keys():
+                        kernel_obj = self.kernel_registry[kernel_id]
                         if (
                             kernel_id in self.restarting_kernels
-                            or kernel_id in self.terminating_kernels
+                            or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
                         log.debug(f"kernel with no container (kid: {kernel_id})")
@@ -1373,7 +1385,8 @@ class AbstractAgent(
                     terminated_kernel_ids = ",".join([
                         str(kid) for kid in terminated_kernels.keys()
                     ])
-                    log.debug(f"Terminating kernels(ids:[{terminated_kernel_ids}])")
+                    if terminated_kernel_ids:
+                        log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
                     for kernel_id, ev in terminated_kernels.items():
                         await self.container_lifecycle_queue.put(ev)
 
@@ -1733,6 +1746,18 @@ class AbstractAgent(
             await self.produce_event(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
             )
+
+    async def create_batch_execution_task(
+        self,
+        session_id: SessionId,
+        kernel_id: KernelId,
+        code_to_execute: str,
+    ) -> None:
+        self._ongoing_exec_batch_tasks.add(
+            asyncio.create_task(
+                self.execute_batch(session_id, kernel_id, code_to_execute),
+            ),
+        )
 
     async def create_kernel(
         self,
@@ -2123,18 +2148,8 @@ class AbstractAgent(
                         },
                     ),
                 )
-
-                if (
-                    kernel_config["session_type"] == "batch"
-                    and kernel_config["cluster_role"] == "main"
-                ):
-                    self._ongoing_exec_batch_tasks.add(
-                        asyncio.create_task(
-                            self.execute_batch(
-                                session_id, kernel_id, kernel_config["startup_command"] or ""
-                            ),
-                        ),
-                    )
+                async with self.registry_lock:
+                    kernel_obj.state = KernelLifecycleStatus.RUNNING
 
                 # The startup command for the batch-type sessions will be executed by the manager
                 # upon firing of the "session_started" event.

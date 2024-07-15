@@ -19,7 +19,7 @@ First, install the textual-dev package in the `python-default` venv.
 Open two terminal sessions.
 In the first one, run:
 ```shell
-dist/export/python/virtualenvs/python-default/3.12.2/bin/textual console
+dist/export/python/virtualenvs/python-default/3.12.4/bin/textual console
 ```
 
 > **Warning**

@@ -40,12 +40,12 @@ into the `src/ai/backend/web/static` directory.
 To download and deploy web UI from pre-built source, do the following:
 
 ```console
-git submodule init
-git submodule update
-cd src/ai/backend/web/static
-git checkout main  # or target branch
-git fetch
-git pull
+cd src/ai/backend/web
+curl --fail -sL https://github.com/lablup/backend.ai-webui/releases/download/v$TARGET_VERSION/backend.ai-webui-bundle-$TARGET_VERSION.zip > /tmp/bai-webui.zip
+rm -rf static
+mkdir static
+cd static
+unzip /tmp/bai-webui.zip
 ```
 ### Setup configuration for webserver
 
