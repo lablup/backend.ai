@@ -57,7 +57,6 @@ def scan(group_name: str, format: FormatOptions) -> None:
             ITALIC = colorama.ansi.code_to_chars(3)
             src_style = {
                 "buildscript": Fore.LIGHTYELLOW_EX,
-                "plugin-checkout": Fore.LIGHTGREEN_EX,
                 "python-package": Fore.LIGHTBLUE_EX,
             }
             display_headers = (
