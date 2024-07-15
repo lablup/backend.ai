@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import shutil
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -11,6 +12,7 @@ import pytest
 from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
@@ -166,6 +168,22 @@ def prepare_images():
         asyncio.run(pull())
     finally:
         asyncio.set_event_loop(old_loop)
+
+
+@pytest.fixture(scope="session")
+def socket_relay_image():
+    # Since pulling all LFS files takes too much GitHub storage bandwidth in CI,
+    # we fetch the only required image for tests on demand.
+    image_path = (
+        f"src/ai/backend/agent/docker/backendai-socket-relay.img.{DEFAULT_IMAGE_ARCH}.tar.gz"
+    )
+    already_fetched = False
+    with open(image_path, "rb") as f:
+        head = f.read(256)
+        if not head.startswith(b"version https://git-lfs.github.com/spec/v1\n"):
+            already_fetched = True
+    if not already_fetched:
+        subprocess.run(["git", "lfs", "pull", "--include", image_path], check=True)
 
 
 @pytest.fixture
