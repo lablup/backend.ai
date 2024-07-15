@@ -15,7 +15,11 @@ from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
-from ai.backend.testutils.bootstrap import etcd_container, redis_container, sync_file_lock  # noqa: F401
+from ai.backend.testutils.bootstrap import (  # noqa: F401
+    etcd_container,
+    redis_container,
+    sync_file_lock,
+)
 from ai.backend.testutils.pants import get_parallel_slot
 
 
