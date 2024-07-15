@@ -74,6 +74,7 @@ pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
 mypy = "tools/mypy.lock"
 towncrier = "tools/towncrier.lock"
+setuptools = "tools/setuptools.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
@@ -109,3 +110,6 @@ install_from_resolve = "mypy"
 
 [towncrier]
 install_from_resolve = "towncrier"
+
+[setuptools]
+install_from_resolve = "setuptools"
