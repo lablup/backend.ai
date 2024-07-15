@@ -6,6 +6,7 @@ import json
 import logging
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,6 +24,7 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -44,6 +46,10 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
+    from . import (
+        KernelStatus,
+        SessionStatus,
+    )
 
 from ..defs import LockID
 from ..types import Sentinel
@@ -536,3 +542,17 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
+
+
+def get_first_timestamp_for_status(
+    status_history_records: list[dict[str, str]],
+    status: KernelStatus | SessionStatus,
+) -> datetime | None:
+    """
+    Get the first occurrence time of the given status from the status history records.
+    """
+
+    for status_history in status_history_records:
+        if status_history["status"] == status.name:
+            return dtparse(status_history["timestamp"])
+    return None

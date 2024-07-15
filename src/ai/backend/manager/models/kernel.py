@@ -46,7 +46,6 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ..api.exceptions import (
     BackendError,
@@ -83,7 +82,9 @@ from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
+    get_first_timestamp_for_status,
     sql_append_dict_to_list,
+    sql_json_merge,
 )
 
 if TYPE_CHECKING:
@@ -927,8 +928,8 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row.status_history
-        scheduled_at = get_first_timestamp_for_status(status_history, KernelStatus.SCHEDULED.name)
+        status_history = cast(list[dict[str, str]], row.status_history)
+        scheduled_at = get_first_timestamp_for_status(status_history, KernelStatus.SCHEDULED)
 
         return {
             # identity

@@ -28,7 +28,6 @@ from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
-from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -36,6 +35,7 @@ from ...func.session import ComputeSession
 from ...output.fields import session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
+from ...utils import get_first_timestamp_for_status
 from .. import events
 from ..pretty import (
     ProgressViewer,

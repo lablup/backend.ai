@@ -38,7 +38,6 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_timestamp_for_status
 
 from ..api.exceptions import (
     AgentError,
@@ -80,7 +79,9 @@ from .utils import (
     JSONCoalesceExpr,
     agg_to_array,
     execute_with_retry,
+    get_first_timestamp_for_status,
     sql_append_dict_to_list,
+    sql_json_merge,
 )
 
 if TYPE_CHECKING:
@@ -1324,9 +1325,7 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        scheduled_at = get_first_timestamp_for_status(
-            row.status_history, SessionStatus.SCHEDULED.name
-        )
+        scheduled_at = get_first_timestamp_for_status(row.status_history, SessionStatus.SCHEDULED)
 
         return {
             # identity
