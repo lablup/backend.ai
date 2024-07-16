@@ -8,7 +8,7 @@ Dashboard (Enterprise only)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Backend.AI Dashboard is an add-on service that displays various real-time and historical performance metrics.
-The metrics include the number of sessions, cluster power usage, GPU utilization, etc.
+The metrics include the number of sessions, cluster power usage, GPU utilization, and etc.
 
 Alerts (Enterprise only)
 ~~~~~~~~~~~~~~~~~~~~~~~~

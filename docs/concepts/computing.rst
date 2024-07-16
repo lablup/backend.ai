@@ -91,7 +91,7 @@ Interactive compute session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Interactive compute sessions are used to run various interactive applications and development tools,
-such as Jupyter Notebooks, web-based terminals, etc.
+such as Jupyter Notebooks, web-based terminals, and etc.
 It is expected that the users control their lifecycles (e.g., terminating them)
 while Backend.AI offers configuration knobs for the administrators to set idle timeouts with various criteria.
 
