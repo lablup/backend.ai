@@ -88,6 +88,17 @@
       },
       "display_icon": "rebel"
     },
+    "atom-plus.device" : {
+      "slot_name": "atom-plus.device",
+      "description": "ATOM+",
+      "human_readable_name": "ATOM+ Device",
+      "display_unit": "ATOM+",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
     "warboy.device": {
       "slot_name": "warboy.device",
       "description": "Furiosa Warboy",

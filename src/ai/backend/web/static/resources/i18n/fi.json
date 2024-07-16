@@ -38,7 +38,8 @@
     "WarboyEnabled": "Warboy NPU käytössä",
     "connectingToCluster": "Yhteyden muodostaminen Backend.AI-klusteriin...",
     "reserved": "varattu",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU käytössä"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU käytössä",
+    "ATOMPlusEnabled": "ATOM+ NPU käytössä"
   },
   "error": {
     "WrongAPIServerAddress": "Väärä API-palvelimen osoite.",
@@ -137,7 +138,10 @@
     "Config": "Config",
     "Next": "Seuraava",
     "Previous": "Edellinen",
-    "PushToImage": "Työnnä istunto mukautettuun kuvaan"
+    "PushToImage": "Työnnä istunto mukautettuun kuvaan",
+    "SaveWithoutClose": "Tallenna ilman sulkemista",
+    "Collapse": "Romahdus",
+    "Expand": "Laajentaa"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -366,7 +370,9 @@
       "DeleteForever": "Poista ikuisesti",
       "Restore": "Palauttaa",
       "FolderRestored": "Kansio {{ folderName }} on palautettu.",
-      "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi."
+      "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi.",
+      "FolderCloneFailed": "Kansiota ei onnistuttu kloonaamaan.",
+      "FolderClonePending": "Kansion kloonaus on käynnissä."
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
@@ -395,7 +401,8 @@
     "Add": "Lisätä",
     "CloningIsOnlyPossibleSameHost": "Tällä hetkellä kloonaus on mahdollista vain samassa isännässä.",
     "New": "Uusi",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Uusi kansion nimi"
   },
   "dialog": {
     "warning": {
@@ -411,7 +418,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Haluatteko jatkaa?",
-      "DoYouWantToDeleteSomething": "Oletko varma, että haluat poistaa \"{{ name }}\"?\"?"
+      "DoYouWantToDeleteSomething": "Oletko varma, että haluat poistaa \"{{ name }}\"?\"?",
+      "DoYouWantToResetChanges": "Haluatko nollata tekemäsi muutokset?"
     },
     "title": {
       "LetsDouble-Check": "Tupla-tarkistetaan",
@@ -546,7 +554,8 @@
     "ReadyToImport": "Valmis tuomaan",
     "RepoWillBeFolder": "Tuodut GitHub-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
     "WrongURLType": "Väärä URL-tyyppi",
-    "YouCanCreateNotebookCode": "Kirjoita muistikirjan URL-osoite luodaksesi alla olevan kaltaisen merkkikoodin, jonka voit suorittaa suoraan Backend.AI:ssa."
+    "YouCanCreateNotebookCode": "Kirjoita muistikirjan URL-osoite luodaksesi alla olevan kaltaisen merkkikoodin, jonka voit suorittaa suoraan Backend.AI:ssa.",
+    "InvalidNotebookURL": "Virheellinen Notbookin URL-osoite."
   },
   "information": {
     "APIVersion": "API-versio",
@@ -772,7 +781,10 @@
     "NoExtraMounts": "Ei ylimääräisiä kiinnikkeitä",
     "SyncRoutes": "Synkronoi reitit",
     "SyncRoutesFailed": "Reitin synkronointipyyntö epäonnistui.",
-    "SyncRoutesRequested": "Reitin synkronointia on pyydetty."
+    "SyncRoutesRequested": "Reitin synkronointia on pyydetty.",
+    "UpdateService": "Päivityspalvelu",
+    "StartNewService": "Aloita uusi palvelu",
+    "RuntimeVariant": "Päättelyn suoritusaikamuunnos"
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -1196,7 +1208,7 @@
       "PreOpenPortMaxCountLimit": "Voit määrittää enintään {{count}} ennalta avattuja portteja.",
       "PreOpenPortRangeGuide": "Syötä useita arvoja joko pilkulla (,) tai välilyönnillä erotettuina.",
       "preopen": "avataan etukäteen",
-      "FolderAliasInvalid": "Vain aakkosnumeeriset merkit, alaviiva (_), kauttaviiva (/) ja viiva (-) ovat sallittuja.",
+      "FolderAliasInvalid": "Vain aakkosnumeeriset merkit, alaviiva (_), kauttaviiva (/), piste (.) ja viiva (-) ovat sallittuja.",
       "Network": "Verkko",
       "Enable": "ota käyttöön",
       "StartTimeMustBeInTheFuture": "Alkamisajan on oltava nykyisen kellonajan jälkeen.",
@@ -1228,7 +1240,10 @@
       "EnvironmentVariableValueRequired": "Anna arvo.",
       "PleaseCompleteForm": "Lomake on puutteellinen tai sisältää virheitä. Tarkista syöttämäsi tiedot.",
       "FailedToStartNewSession": "Istunnon luominen epäonnistui. \nTarkista istuntosivun VALMIS-välilehti.",
-      "ProxyDirectTCPNotSupported": "Välityspalvelimen suoraa TCP-yhteyttä ei tueta vielä"
+      "ProxyDirectTCPNotSupported": "Välityspalvelimen suoraa TCP-yhteyttä ei tueta vielä",
+      "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
+      "DuplicatedPort": "Portteja on päällekkäin.",
+      "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1242,7 +1257,12 @@
     "SessionId": "Istunnon tunniste",
     "EnvironmentAndVersion": "Ympäristö ja versio",
     "Tags": "Tunnisteet",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Tämä toiminto lopettaa tai peruuttaa istunnon riippumatta sen nykyisestä tilasta. \nOletko varma?",
+    "WarningForceTerminateSessions": "Varoitus: pakota lopettamaan istunnot",
+    "ForceTerminateWarningMsg2": "Suorita vain, kun tila ei muutu kohtuuttoman pitkään.",
+    "ForceTerminateWarningMsg3": "Tämä toiminto ei poista agenttien varsinaisia ​​säilöjä. \nManuaalinen puhdistus saattaa olla tarpeen.",
+    "ContainerToCleanUp": "Säiliö(t) puhdistettava(t)."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1485,7 +1505,9 @@
     "LightMode": "Valotila",
     "UseSystemSetting": "Käytä järjestelmäasetuksia",
     "DescThemeMode": "Mukauta miltä Backend.AI WebUI näyttää laitteessasi.",
-    "ThemeMode": "Teematila"
+    "ThemeMode": "Teematila",
+    "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
+    "BootstrapScriptDeleted": "Bootstrap-skripti poistettu"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -1502,7 +1524,7 @@
     "DescNOTFOUND": "Valitettavasti etsimääsi sivua ei löytynyt.",
     "NOTFOUND": "<p>Oops!<br/>Sivua ei löydy...</p>",
     "UNAUTHORIZEDACCESS": "Luvaton pääsy",
-    "YouAreOffline": "Olet nyt offline-tilassa",
+    "YouAreOffline": "Offline: Ei yhteyttä mihinkään verkkoon.",
     "YouAreOnline": "Olet nyt verkossa",
     "menu": {
       "AIAccelerator": "AI-kiihdyttämö",
@@ -1599,7 +1621,10 @@
     "ServiceDetails": "Palvelun tiedot",
     "StartCommand": "Käynnistä komento",
     "Task": "Tehtävä",
-    "Version": "Versio"
+    "Version": "Versio",
+    "CloneToFolder": "Kloonaa kansioon",
+    "FolderAlreadyExists": "Tämän niminen kansio on jo olemassa.",
+    "FinetuneModel": "Finetune malli"
   },
   "table": {
     "SettingTable": "Kattaus",
@@ -1621,5 +1646,11 @@
   "propertyFilter": {
     "placeHolder": "Etsi",
     "ResetFilter": "ResetFilter"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Kirjaudu sisään Backend.AI-tililläsi",
+    "confirmLoginMessage": "Haluatko kirjautua sisään {{käyttäjätunnus}} ({{email}}) tilille?",
+    "ServiceName": "Palvelun nimi",
+    "useAnotherAccount": "Kirjaudu sisään eri tilillä"
   }
 }
