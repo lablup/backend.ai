@@ -345,7 +345,7 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception as e:
             match e:
                 case FileNotFoundError():
-                    msg = "Error: File not found: {!r}"
+                    msg = "File not found: {!r}"
                     if help_text:
                         msg += f" ({help_text})"
                     log.exception(msg, e.filename)

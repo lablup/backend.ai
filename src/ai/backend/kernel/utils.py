@@ -48,7 +48,7 @@ class TracebackSourceFilter(logging.Filter):
             _, _, exc_tb = record.exc_info
             filtered_traceback: list[traceback.FrameSummary] = []
             for tb in traceback.extract_tb(exc_tb):
-                if tb[0].startswith(self.path_prefix):
+                if tb.filename.startswith(self.path_prefix) and tb.name != "_handle_exception":
                     filtered_traceback.append(tb)
             lines = [" Traceback:"]
             for tb in filtered_traceback:
