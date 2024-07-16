@@ -68,7 +68,7 @@
       "MyEnvironments": "Τα περιβάλλοντα μου",
       "ResourcePolicy": "Πολιτική Πόρων"
     },
-    "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
+    "YouAreOffline": "Offline: Δεν είναι συνδεδεμένος σε κανένα δίκτυο.",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
     "NOTFOUND": " α0d4554eb75c21z0 Ωχ! <br/> Η σελίδα δεν βρέθηκε ... </p>",
     "DescNOTFOUND": "Δυστυχώς, δεν ήταν δυνατή η εύρεση της σελίδας που αναζητάτε.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Ενεργοποιημένη NPU Warboy",
     "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
+    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "προανοίγει",
       "Network": "Δίκτυο",
       "Enable": "επιτρέπω",
-      "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-).",
+      "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/), τελεία (.) και παύλα (-).",
       "PreOpenPortMaxCountLimit": "Μπορείτε να ορίσετε έως και {{count}} προ-ανοικτές θύρες.",
       "StartTimeMustBeInTheFuture": "Η ώρα έναρξης πρέπει να είναι μετά την τρέχουσα ώρα.",
       "EnqueueComputeSessionWarning": "Ανεπαρκείς πόροι. \nΗ συνεδρία ενδέχεται να εκκρεμεί.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Παρακαλώ εισάγετε μια τιμή.",
       "PleaseCompleteForm": "Το έντυπο είναι ελλιπές ή περιέχει σφάλματα. Παρακαλούμε ελέγξτε τα στοιχεία σας.",
       "FailedToStartNewSession": "Η δημιουργία συνεδρίας απέτυχε. \nΕλέγξτε την καρτέλα \"Πεπερασμένος\" στη σελίδα της συνεδρίας.",
-      "ProxyDirectTCPNotSupported": "Η απευθείας σύνδεση TCP μεσολάβησης δεν υποστηρίζεται ακόμη"
+      "ProxyDirectTCPNotSupported": "Η απευθείας σύνδεση TCP μεσολάβησης δεν υποστηρίζεται ακόμη",
+      "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
+      "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
+      "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -405,7 +409,12 @@
     "SessionId": "Αναγνωριστικό συνεδρίας",
     "EnvironmentAndVersion": "Περιβάλλον και Έκδοση",
     "Tags": "Ετικέτες",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Αυτή η ενέργεια θα τερματίσει ή θα ακυρώσει τη συνεδρία ανεξάρτητα από την τρέχουσα κατάστασή της. \nΕίσαι σίγουρος?",
+    "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
+    "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
+    "ForceTerminateWarningMsg3": "Αυτή η ενέργεια δεν διαγράφει τα πραγματικά κοντέινερ στους πράκτορες. \nΕνδέχεται να απαιτείται χειροκίνητος καθαρισμός.",
+    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό"
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -442,7 +451,10 @@
     "Config": "Διαμόρφωση",
     "Next": "Επόμενο",
     "Previous": "Προηγούμενο",
-    "PushToImage": "Σπρώξτε τη συνεδρία σε προσαρμοσμένη εικόνα"
+    "PushToImage": "Σπρώξτε τη συνεδρία σε προσαρμοσμένη εικόνα",
+    "SaveWithoutClose": "Αποθήκευση χωρίς κλείσιμο",
+    "Collapse": "Κατάρρευση",
+    "Expand": "Επεκτείνουν"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -658,7 +670,9 @@
       "FolderRestored": "Ο φάκελος {{ folderName }} έχει αποκατασταθεί.",
       "FolderDeletedForever": "Ο φάκελος {{ folderName }} έχει διαγραφεί οριστικά.",
       "MovedToTrashBin": "Ο φάκελος {{ folderName }} έχει μετακινηθεί στον κάδο απορριμμάτων.",
-      "MoveToTrashBin": "Μετακίνηση στον κάδο απορριμμάτων"
+      "MoveToTrashBin": "Μετακίνηση στον κάδο απορριμμάτων",
+      "FolderCloneFailed": "Απέτυχε η κλωνοποίηση του φακέλου.",
+      "FolderClonePending": "Η κλωνοποίηση του φακέλου βρίσκεται σε εξέλιξη."
     },
     "explorer": {
       "Delete": "Διαγράφω...",
@@ -750,7 +764,8 @@
     "New": "Νέος",
     "Add": "Προσθέστε",
     "CloningIsOnlyPossibleSameHost": "Προς το παρόν, η κλωνοποίηση είναι δυνατή μόνο στον ίδιο κεντρικό υπολογιστή.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Νέο όνομα φακέλου"
   },
   "dialog": {
     "warning": {
@@ -762,7 +777,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Θέλετε να συνεχίσετε?",
-      "DoYouWantToDeleteSomething": "Είστε σίγουροι ότι θέλετε να διαγράψετε το \"{{ name }}\";"
+      "DoYouWantToDeleteSomething": "Είστε σίγουροι ότι θέλετε να διαγράψετε το \"{{ name }}\";",
+      "DoYouWantToResetChanges": "Θέλετε να επαναφέρετε τις αλλαγές σας;"
     },
     "title": {
       "LetsDouble-Check": "Ας ελέγξουμε ξανά",
@@ -909,7 +925,9 @@
     "LightMode": "Λειτουργία φωτός",
     "UseSystemSetting": "Χρησιμοποιήστε τη ρύθμιση συστήματος",
     "DescThemeMode": "Προσαρμόστε την εμφάνιση του Backend.AI WebUI στη συσκευή σας.",
-    "ThemeMode": "Λειτουργία θέματος"
+    "ThemeMode": "Λειτουργία θέματος",
+    "BootstrapScriptEmpty": "Το σενάριο είναι κενό. \nΕισαγάγετε το σενάριο.",
+    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -1373,7 +1391,8 @@
     "ImportGitlabRepo": "Εισαγωγή αποθετηρίου GitLab",
     "GitlabRepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitLab μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της συνεδρίας.",
     "GitlabURL": "URL του GitLab",
-    "GitlabDefaultBranch": "Όνομα υποκαταστήματος GitLab"
+    "GitlabDefaultBranch": "Όνομα υποκαταστήματος GitLab",
+    "InvalidNotebookURL": "Μη έγκυρη διεύθυνση URL του Notbook."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Στατιστικά για αυτόν τον μήνα",
@@ -1512,7 +1531,10 @@
     "NoExtraMounts": "Χωρίς επιπλέον βάσεις",
     "SyncRoutes": "Διαδρομές συγχρονισμού",
     "SyncRoutesFailed": "Το αίτημα συγχρονισμού διαδρομής απέτυχε.",
-    "SyncRoutesRequested": "Ζητήθηκε συγχρονισμός διαδρομής."
+    "SyncRoutesRequested": "Ζητήθηκε συγχρονισμός διαδρομής.",
+    "UpdateService": "Υπηρεσία ενημέρωσης",
+    "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
+    "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων"
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
@@ -1599,7 +1621,10 @@
     "CloneAsFolder": "Clone as Folder",
     "CloneSuccess": "Η αίτηση κλωνοποίησης έχει σταλεί με επιτυχία.",
     "CloneInfo": "Θα κλωνοποιηθεί ως φάκελος τύπου χρήστη.",
-    "category": "Κατηγορία"
+    "category": "Κατηγορία",
+    "CloneToFolder": "Κλωνοποίηση σε φάκελο",
+    "FolderAlreadyExists": "Ένας φάκελος με αυτό το όνομα υπάρχει ήδη.",
+    "FinetuneModel": "Μοντέλο Finetune"
   },
   "table": {
     "SettingTable": "Ρύθμιση πίνακα",
@@ -1621,5 +1646,11 @@
   "propertyFilter": {
     "placeHolder": "Αναζήτηση",
     "ResetFilter": "Επαναφορά φίλτρου"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Συνδεθείτε με το λογαριασμό σας Backend.AI",
+    "confirmLoginMessage": "Θα θέλατε να συνδεθείτε με {{όνομα χρήστη}} ({{email}}) λογαριασμό?",
+    "ServiceName": "Όνομα υπηρεσίας",
+    "useAnotherAccount": "Συνδεθείτε με διαφορετικό λογαριασμό"
   }
 }
