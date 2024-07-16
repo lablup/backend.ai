@@ -52,7 +52,7 @@ class TracebackSourceFilter(logging.Filter):
                     filtered_traceback.append(tb)
             lines = ["  Traceback:"]
             for tb in filtered_traceback:
-                short_path = Path(tb.filename).relative_to(self.site_prefix)
+                short_path = tb.filename.removeprefix(self.site_prefix).removeprefix("/")
                 lines.append(f"    {short_path} (L{tb.lineno}): {tb.name}()")
             record.exc_text = "\n".join(lines)
         return True
