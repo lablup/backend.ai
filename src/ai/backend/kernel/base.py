@@ -348,7 +348,7 @@ class BaseRunner(metaclass=ABCMeta):
                     msg = "Could not find: {!r}"
                     if help_text:
                         msg += f" ({help_text})"
-                    log.exception(msg, e.filename)
+                    log.exception(msg, e.args)
                 case _:
                     msg = "Unexpected error!"
                     if help_text:

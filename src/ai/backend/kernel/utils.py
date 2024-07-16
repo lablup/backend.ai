@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import site
 import traceback
 from pathlib import Path
 from typing import Final
@@ -40,16 +41,20 @@ class TracebackSourceFilter(logging.Filter):
     def __init__(self, path_prefix: str) -> None:
         super().__init__()
         self.path_prefix = path_prefix
+        self.site_prefix = site.getsitepackages()[0]
 
     def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info:
             _, _, exc_tb = record.exc_info
-            filtered_traceback = []
+            filtered_traceback: list[traceback.FrameSummary] = []
             for tb in traceback.extract_tb(exc_tb):
                 if tb[0].startswith(self.path_prefix):
                     filtered_traceback.append(tb)
-            if filtered_traceback:
-                record.exc_text = "".join(traceback.format_list(filtered_traceback))
+            lines = ["  Traceback:"]
+            for tb in filtered_traceback:
+                short_path = Path(tb.filename).relative_to(self.site_prefix)
+                lines.append(f"    {short_path} (L{tb.lineno}): {tb.name}()")
+            record.exc_text = "\n".join(lines)
         return True
 
 
