@@ -1,5 +1,7 @@
 import asyncio
+import logging
 import os
+import traceback
 from pathlib import Path
 from typing import Final
 
@@ -32,6 +34,24 @@ def find_executable(*paths):
             if child.is_file() and child.stat().st_mode & 0o100 != 0:
                 return child
     return None
+
+
+class TracebackSourceFilter(logging.Filter):
+    def __init__(self, path_pattern: str):
+        super().__init__()
+        self.path_pattern = path_pattern
+
+    def filter(self, record: logging.LogRecord):
+        # Filter the traceback to include only lines from the specified source file path
+        if record.exc_info:
+            exc_type, exc_value, exc_tb = record.exc_info
+            filtered_traceback = []
+            for tb in traceback.extract_tb(exc_tb):
+                if self.path_pattern in tb[0]:
+                    filtered_traceback.append(tb)
+            if filtered_traceback:
+                record.exc_text = "".join(traceback.format_list(filtered_traceback))
+        return True
 
 
 async def safe_close_task(task):

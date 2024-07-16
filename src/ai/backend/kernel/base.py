@@ -45,9 +45,11 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
 from .service import ServiceParser
-from .utils import scan_proc_stats, wait_local_port_open
+from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
-log = BraceStyleAdapter(logging.getLogger())
+logger = logging.getLogger()
+logger.addFilter(TracebackSourceFilter(str(Path(__file__).parent)))
+log = BraceStyleAdapter(logger)
 
 TReturn = TypeVar("TReturn")
 
@@ -343,10 +345,10 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception as e:
             match e:
                 case FileNotFoundError():
-                    msg = "Could not find: %r"
+                    msg = "Could not find: {!r}"
                     if help_text:
                         msg += f" ({help_text})"
-                    log.error(msg, e.filename)
+                    log.exception(msg, e.filename)
                 case _:
                     msg = "Unexpected error!"
                     if help_text:
@@ -365,7 +367,7 @@ class BaseRunner(metaclass=ABCMeta):
             if ret is FAILURE:
                 log.warning(
                     "We are skipping the runtime-specific initialization failure, "
-                    "but the container may not work as expected."
+                    "and the container may not work as expected."
                 )
             await self._handle_exception(
                 init_sshd_service(self.child_env),
