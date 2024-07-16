@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7b2 (2024-07-17)
+
+### Fixes
+* Fix incorrect check of values returned from docker stat API. ([#2389](https://github.com/lablup/backend.ai/issues/2389))
+* Handle all possible exceptions when scheduling single node session so that the status information of pending session is not empty. ([#2411](https://github.com/lablup/backend.ai/issues/2411))
+* Improve error handling of initialization failures in the kernel runner ([#2478](https://github.com/lablup/backend.ai/issues/2478))
+
+
 ## 24.03.7b1 (2024-07-15)
 
 ### Features
