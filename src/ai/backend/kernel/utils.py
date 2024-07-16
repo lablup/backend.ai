@@ -50,10 +50,10 @@ class TracebackSourceFilter(logging.Filter):
             for tb in traceback.extract_tb(exc_tb):
                 if tb[0].startswith(self.path_prefix):
                     filtered_traceback.append(tb)
-            lines = ["  Traceback:"]
+            lines = [" Traceback:"]
             for tb in filtered_traceback:
                 short_path = tb.filename.removeprefix(self.site_prefix).removeprefix("/")
-                lines.append(f"    {short_path} (L{tb.lineno}): {tb.name}()")
+                lines.append(f"  {short_path} (L{tb.lineno}): {tb.name}()")
             record.exc_text = "\n".join(lines)
         return True
 

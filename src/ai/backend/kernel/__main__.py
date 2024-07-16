@@ -9,8 +9,6 @@ import signal
 import sys
 from pathlib import Path
 
-import uvloop
-
 from . import lang_map
 from .compat import asyncio_run_forever
 
@@ -61,5 +59,4 @@ def main(args) -> None:
 
 
 args = parse_args()
-uvloop.install()
 main(args)
