@@ -1,4 +1,4 @@
-name: default
+name: ci
 
 on:
   push:
@@ -11,8 +11,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  optimize-ci:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check_skip.outputs.skip }}
+    steps:
+      - name: Optimize CI
+        id: check_skip
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+
+
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -80,8 +99,41 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  alembic-check-multiple-heads:
+    if: |
+      ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v4
+      with:
+        lfs: false
+    - name: Parse versions from config
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Check for multiple heads
+      run: python scripts/check-multiple-alembic-heads.py
+
+
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -146,7 +198,13 @@ jobs:
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
@@ -211,7 +269,7 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -270,7 +328,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -335,8 +393,12 @@ jobs:
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
+
   build-sbom:
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
+    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/sbom.yml
+
 
   make-final-release:
     needs: [build-scies, build-wheels, build-sbom]
