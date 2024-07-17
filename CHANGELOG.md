@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7b3 (2024-07-17)
+
+### Fixes
+* Fix `BACKEND_MODEL_NAME` environment always overwritten to model name specified at model definition ([#2481](https://github.com/lablup/backend.ai/issues/2481))
+* Do not allow assigning preopen port which collides with image's own service port definition ([#2482](https://github.com/lablup/backend.ai/issues/2482))
+* Fix GET requests with queryparams defined in API spec occasionally throwing 400 Bad Request error ([#2483](https://github.com/lablup/backend.ai/issues/2483))
+
+
 ## 24.03.7b2 (2024-07-17)
 
 ### Fixes
