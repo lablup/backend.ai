@@ -17,7 +17,10 @@ jobs:
       author: ${{ steps.commit.outputs.author }}
       author_email: ${{ steps.commit.outputs.author_email }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout the revision
+        uses: actions/checkout@v4
+        with:
+          lfs: false
       - name: Extract pr_number from commit message
         id: commit
         run: |

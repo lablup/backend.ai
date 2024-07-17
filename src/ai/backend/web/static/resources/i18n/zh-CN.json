@@ -68,7 +68,7 @@
       "MyEnvironments": "我的环境",
       "ResourcePolicy": "资源政策"
     },
-    "YouAreOffline": "您现在离线",
+    "YouAreOffline": "脱机：未连接任何网络。",
     "YouAreOnline": "您现在在线",
     "NOTFOUND": " <p> 糟糕！ <br/> 页面未找到... </p>",
     "DescNOTFOUND": "抱歉，找不到您要找的页面。",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "启用 Warboy NPU",
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用",
+    "ATOMPlusEnabled": "ATOM+ NPU 启用"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "预开放端口",
       "Network": "网络",
       "Enable": "启用",
-      "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
+      "FolderAliasInvalid": "仅允许使用字母数字字符、下划线 (_)、斜杠 (/)、点 (.) 和破折号 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
       "EnqueueComputeSessionWarning": "资源不足。\n会话可能处于待处理状态。",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "请输入数值。",
       "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。",
       "FailedToStartNewSession": "会话创建失败。\n请检查会话页面上的“已完成”选项卡。",
-      "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接"
+      "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接",
+      "InvalidPortFormat": "端口号格式不正确。",
+      "DuplicatedPort": "有重复的端口。",
+      "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -405,7 +409,12 @@
     "SessionId": "会话 ID",
     "EnvironmentAndVersion": "环境及版本",
     "Tags": "标签",
-    "fGPU": "GPU"
+    "fGPU": "GPU",
+    "ForceTerminateWarningMsg": "无论会话当前状态如何，此操作都将终止或取消会话。\n你确定吗？",
+    "WarningForceTerminateSessions": "警告：强制终止会话",
+    "ForceTerminateWarningMsg2": "仅当状态在不合理的长时间内没有发生变化时才执行。",
+    "ForceTerminateWarningMsg3": "此操作不会删除代理上的实际容器。\n可能需要手动清理。",
+    "ContainerToCleanUp": "需要清理的容器"
   },
   "button": {
     "Cancel": "取消",
@@ -442,7 +451,10 @@
     "Config": "配置",
     "Next": "下一页",
     "Previous": "上一页",
-    "PushToImage": "将会话推送到自定义镜像"
+    "PushToImage": "将会话推送到自定义镜像",
+    "SaveWithoutClose": "保存而不关闭",
+    "Collapse": "坍塌",
+    "Expand": "扩张"
   },
   "agent": {
     "Endpoint": "端点",
@@ -658,7 +670,9 @@
       "FolderRestored": "{{ folderName }} 文件夹已恢复。",
       "FolderDeletedForever": "{{ folderName }} 文件夹已被永久删除。",
       "MoveToTrashBin": "移至垃圾箱",
-      "MovedToTrashBin": "{{ folderName }} 文件夹已移至垃圾箱。"
+      "MovedToTrashBin": "{{ folderName }} 文件夹已移至垃圾箱。",
+      "FolderCloneFailed": "克隆文件夹失败。",
+      "FolderClonePending": "正在克隆文件夹。"
     },
     "explorer": {
       "Delete": "删除...",
@@ -750,7 +764,8 @@
     "New": "新的",
     "Add": "添加",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "新文件夹名称"
   },
   "dialog": {
     "warning": {
@@ -762,7 +777,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "您要继续吗？",
-      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？"
+      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？",
+      "DoYouWantToResetChanges": "您想重置您的更改吗？"
     },
     "title": {
       "LetsDouble-Check": "让我们仔细检查",
@@ -909,7 +925,9 @@
     "LightMode": "灯光模式",
     "UseSystemSetting": "使用系统设置",
     "DescThemeMode": "自定义 Backend.AI WebUI 在您设备上的外观。",
-    "ThemeMode": "主题模式"
+    "ThemeMode": "主题模式",
+    "BootstrapScriptEmpty": "脚本是空的。\n请输入脚本。",
+    "BootstrapScriptDeleted": "引导脚本已删除"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -1373,7 +1391,8 @@
     "ImportGitlabRepo": "导入 GitLab 仓库",
     "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab 分支名称"
+    "GitlabDefaultBranch": "GitLab 分支名称",
+    "InvalidNotebookURL": "Notbook URL 无效。"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "本月统计",
@@ -1554,7 +1573,10 @@
     "SyncRoutes": "同步路线",
     "SyncRoutesFailed": "路由同步请求失败。",
     "SyncRoutesSuccess": "路由同步请求成功。",
-    "SyncRoutesRequested": "已请求路由同步。"
+    "SyncRoutesRequested": "已请求路由同步。",
+    "UpdateService": "更新服务",
+    "StartNewService": "开始新服务",
+    "RuntimeVariant": "推理运行时变量"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1600,7 +1622,10 @@
     "CloneAsFolder": "克隆为文件夹",
     "CloneSuccess": "克隆请求已成功发送。",
     "CloneInfo": "它将被克隆为用户类型文件夹。",
-    "category": "类别"
+    "category": "类别",
+    "CloneToFolder": "克隆到文件夹",
+    "FolderAlreadyExists": "该名称的文件夹已经存在。",
+    "FinetuneModel": "微调模型"
   },
   "table": {
     "SettingTable": "桌面设置",
@@ -1622,5 +1647,11 @@
   "propertyFilter": {
     "placeHolder": "搜索",
     "ResetFilter": "重置过滤器"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "使用 Backend.AI 账户登录",
+    "confirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
+    "ServiceName": "服务名称",
+    "useAnotherAccount": "使用其他账户登录"
   }
 }
