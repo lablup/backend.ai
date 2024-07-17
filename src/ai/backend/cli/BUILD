@@ -14,6 +14,7 @@ visibility_private_component(
         "//src/ai/backend/web/**",
         "//src/ai/backend/install/**",
         "//src/ai/backend/wsproxy/**",
+        "//src/ai/backend/plugin/**",
     ],
     allowed_dependencies=[
         "//src/ai/backend/plugin/**",
