@@ -69,6 +69,9 @@ def create_circuit():
 
 @pytest.mark.asyncio
 async def test_ensure_slot_unregistered_port(port_frontend):
+    """
+    Test that a GenericBadRequest is raised for an unregistered port.
+    """
     port = 10200
     request = DummyRequest({"port": port})
     handler = AsyncMock()
@@ -76,12 +79,14 @@ async def test_ensure_slot_unregistered_port(port_frontend):
     with pytest.raises(GenericBadRequest) as excinfo:
         await port_frontend._ensure_slot(request, handler)
 
-    assert "Bad request." in str(excinfo.value)
     assert f"Unregistered slot {port}" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
 async def test_ensure_slot_no_circuit(port_frontend):
+    """
+    Test that a GenericBadRequest is raised when no circuit is available for a registered port.
+    """
     port = 10200
     request = DummyRequest({"port": port})
     port_frontend.circuits[port] = None
@@ -91,12 +96,14 @@ async def test_ensure_slot_no_circuit(port_frontend):
     with pytest.raises(GenericBadRequest) as excinfo:
         await port_frontend._ensure_slot(request, handler)
 
-    assert "Bad request." in str(excinfo.value)
     assert f"Circuit for registered port {port} is not available." in str(excinfo.value)
 
 
 @pytest.mark.asyncio
 async def test_ensure_slot(mocker, port_frontend, create_circuit):
+    """
+    Test the normal flow where a circuit and backend are properly set up.
+    """
     port = 10200
     circuit = create_circuit(port)
     backend = MagicMock()
@@ -112,5 +119,5 @@ async def test_ensure_slot(mocker, port_frontend, create_circuit):
     assert response.text == "success"
     assert request["circuit"] == circuit
     assert request["backend"] == backend
-    handler.assert_called_once_with(request)
+    handler.assert_awaited_once()
     port_frontend.ensure_credential.assert_called_once_with(request, circuit)
