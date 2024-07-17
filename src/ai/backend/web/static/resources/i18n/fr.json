@@ -68,7 +68,7 @@
       "MyEnvironments": "Mes environnements",
       "ResourcePolicy": "Politique des ressources"
     },
-    "YouAreOffline": "Vous êtes maintenant hors ligne",
+    "YouAreOffline": "Hors ligne : N'est connecté à aucun réseau.",
     "YouAreOnline": "Vous êtes maintenant en ligne",
     "NOTFOUND": " <p> Oups ! <br/> Page non trouvée... </p>",
     "DescNOTFOUND": "Désolé, la page que vous recherchez est introuvable.",
@@ -116,7 +116,8 @@
     "ATOMEnabled": "ATOM NPU Activé",
     "WarboyEnabled": "Warboy NPU activé",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU activé"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU activé",
+    "ATOMPlusEnabled": "ATOM+ NPU activé"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "préouverture",
       "Network": "Réseau",
       "Enable": "Activer",
-      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés.",
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/), le point (.) et le tiret (-) sont autorisés.",
       "PreOpenPortMaxCountLimit": "Vous pouvez définir jusqu'à {{count}} ports pré-ouverts.",
       "StartTimeMustBeInTheFuture": "L'heure de début doit être postérieure à l'heure actuelle.",
       "EnqueueComputeSessionWarning": "Ressources insuffisantes. \nLa session est peut-être en attente.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Veuillez saisir une valeur.",
       "PleaseCompleteForm": "Le formulaire est incomplet ou contient des erreurs. Veuillez vérifier vos données.",
       "FailedToStartNewSession": "La création de la session a échoué. \nVeuillez vérifier l'onglet « TERMINÉ » sur la page de la session.",
-      "ProxyDirectTCPNotSupported": "La connexion TCP directe par proxy n'est pas encore prise en charge"
+      "ProxyDirectTCPNotSupported": "La connexion TCP directe par proxy n'est pas encore prise en charge",
+      "InvalidPortFormat": "Le format du numéro de port est incorrect.",
+      "DuplicatedPort": "Il y a des ports en double.",
+      "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -405,7 +409,12 @@
     "SessionId": "ID de session",
     "EnvironmentAndVersion": "Environnement et version",
     "Tags": "Mots clés",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Cette action mettra fin ou annulera la session quel que soit son statut actuel. \nEs-tu sûr?",
+    "WarningForceTerminateSessions": "Avertissement : Forcer la fin des sessions",
+    "ForceTerminateWarningMsg2": "Exécuter uniquement lorsque l’état ne change pas pendant une période de temps déraisonnablement longue.",
+    "ForceTerminateWarningMsg3": "Cette action ne supprime pas les conteneurs réels sur le ou les agents. \nUn nettoyage manuel peut être nécessaire.",
+    "ContainerToCleanUp": "Conteneur(s) à nettoyer"
   },
   "button": {
     "Cancel": "Annuler",
@@ -442,7 +451,10 @@
     "Config": "Config",
     "Next": "Suivant",
     "Previous": "Précédent",
-    "PushToImage": "Pousser la session vers une image personnalisée"
+    "PushToImage": "Pousser la session vers une image personnalisée",
+    "SaveWithoutClose": "Enregistrer sans fermer",
+    "Collapse": "Effondrement",
+    "Expand": "Développer"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -658,7 +670,9 @@
       "FolderRestored": "Le dossier {{ folderName }} a été restauré.",
       "FolderDeletedForever": "Le dossier {{ folderName }} a été supprimé définitivement.",
       "MoveToTrashBin": "Déplacer vers la poubelle",
-      "MovedToTrashBin": "Le dossier {{ folderName }} a été déplacé vers la corbeille."
+      "MovedToTrashBin": "Le dossier {{ folderName }} a été déplacé vers la corbeille.",
+      "FolderCloneFailed": "Échec du clonage du dossier.",
+      "FolderClonePending": "Le clonage du dossier est en cours."
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -750,7 +764,8 @@
     "New": "Nouveau",
     "Add": "Ajouter",
     "CloningIsOnlyPossibleSameHost": "Actuellement, le clonage n'est possible que sur le même hôte.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nouveau nom de dossier"
   },
   "dialog": {
     "warning": {
@@ -762,7 +777,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Voulez-vous poursuivre?",
-      "DoYouWantToDeleteSomething": "Êtes-vous sûr de vouloir supprimer \"{{ nom }}\" ?"
+      "DoYouWantToDeleteSomething": "Êtes-vous sûr de vouloir supprimer \"{{ nom }}\" ?",
+      "DoYouWantToResetChanges": "Voulez-vous réinitialiser vos modifications ?"
     },
     "title": {
       "LetsDouble-Check": "Vérifions deux fois",
@@ -909,7 +925,9 @@
     "LightMode": "Mode lumière",
     "UseSystemSetting": "Utiliser les paramètres du système",
     "DescThemeMode": "Personnalisez l'apparence de Backend.AI WebUI sur votre appareil.",
-    "ThemeMode": "Mode Thème"
+    "ThemeMode": "Mode Thème",
+    "BootstrapScriptEmpty": "Le script est vide. \nVeuillez entrer le script.",
+    "BootstrapScriptDeleted": "Script d'amorçage supprimé"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilisation avancée du terminal Web : copier le contenu du terminal",
@@ -1373,7 +1391,8 @@
     "ImportGitlabRepo": "Importer le dépôt GitLab",
     "GitlabRepoWillBeFolder": "Les dépôts GitLab importés sont convertis en dossiers et peuvent être montés au démarrage de la session.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Nom de la branche GitLab"
+    "GitlabDefaultBranch": "Nom de la branche GitLab",
+    "InvalidNotebookURL": "L'URL de Notbook n'est pas valide."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiques pour ce mois",
@@ -1565,7 +1584,10 @@
     "NoExtraMounts": "Pas de montures supplémentaires",
     "SyncRoutes": "Synchroniser les itinéraires",
     "SyncRoutesFailed": "La demande de synchronisation des routes a échoué.",
-    "SyncRoutesRequested": "La synchronisation de l'itinéraire a été demandée."
+    "SyncRoutesRequested": "La synchronisation de l'itinéraire a été demandée.",
+    "UpdateService": "Service de mise à jour",
+    "StartNewService": "Démarrer un nouveau service",
+    "RuntimeVariant": "Variante d'exécution de l'inférence"
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
@@ -1599,7 +1621,10 @@
     "CloneAsFolder": "Cloner en tant que dossier",
     "CloneSuccess": "La demande de clone a été envoyée avec succès.",
     "CloneInfo": "Il sera cloné en tant que dossier de votre type d'utilisateur.",
-    "category": "Catégorie"
+    "category": "Catégorie",
+    "CloneToFolder": "Cloner dans un dossier",
+    "FolderAlreadyExists": "Un dossier portant ce nom existe déjà.",
+    "FinetuneModel": "Modèle de réglage fin"
   },
   "table": {
     "SettingTable": "Paramètre de table",
@@ -1621,5 +1646,11 @@
   "propertyFilter": {
     "placeHolder": "Recherche",
     "ResetFilter": "Réinitialiser le filtre"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",
+    "confirmLoginMessage": "Souhaitez-vous vous connecter avec le compte {{nom d'utilisateur}} ({{email}}) ?",
+    "ServiceName": "Nom du service",
+    "useAnotherAccount": "Se connecter avec un autre compte"
   }
 }

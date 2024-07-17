@@ -14,7 +14,8 @@ jobs:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v4
       with:
         fetch-depth: 2
     - name: Create LFS file hash list

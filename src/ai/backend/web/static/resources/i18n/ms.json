@@ -68,7 +68,7 @@
       "MyEnvironments": "Persekitaran Saya",
       "ResourcePolicy": "Dasar Sumber"
     },
-    "YouAreOffline": "Anda kini berada di luar talian",
+    "YouAreOffline": "Luar talian: Tidak disambungkan ke mana-mana rangkaian.",
     "YouAreOnline": "Anda kini dalam talian",
     "NOTFOUND": " <p> Alamak! <br/> Halaman tidak dijumpai ... </p>",
     "DescNOTFOUND": "Maaf, halaman yang anda cari tidak dapat dijumpai.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Didayakan",
     "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan"
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
+    "ATOMPlusEnabled": "ATOM+ NPU Didayakan"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "prabuka",
       "Network": "Rangkaian",
       "Enable": "Dayakan",
-      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), titik (.), dan sempang (-) dibenarkan.",
       "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
       "EnqueueComputeSessionWarning": "Sumber yang tidak mencukupi. \nSesi mungkin belum selesai.",
       "SessionName": "Nama sesi",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
       "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
       "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi.",
-      "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi"
+      "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi",
+      "InvalidPortFormat": "Format nombor port tidak betul.",
+      "DuplicatedPort": "Terdapat port pendua.",
+      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -405,7 +409,12 @@
     "SessionId": "Id Sesi",
     "EnvironmentAndVersion": "Persekitaran dan Versi",
     "Tags": "Tag",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Tindakan ini akan menamatkan atau membatalkan sesi tanpa mengira status semasanya. \nAdakah anda pasti?",
+    "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
+    "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
+    "ForceTerminateWarningMsg3": "Tindakan ini tidak memadamkan bekas sebenar pada ejen. \nPembersihan manual mungkin diperlukan.",
+    "ContainerToCleanUp": "Bekas untuk dibersihkan"
   },
   "button": {
     "Cancel": "Batal",
@@ -442,7 +451,10 @@
     "Config": "Konfigurasi",
     "Next": "Seterusnya",
     "Previous": "Sebelumnya",
-    "PushToImage": "Sesi tolak ke imej tersuai"
+    "PushToImage": "Sesi tolak ke imej tersuai",
+    "SaveWithoutClose": "Simpan Tanpa Tutup",
+    "Collapse": "Runtuh",
+    "Expand": "Kembangkan"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -658,7 +670,9 @@
       "DeleteForever": "Padam selama-lamanya",
       "Restore": "Pulihkan",
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
-      "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya."
+      "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya.",
+      "FolderCloneFailed": "Gagal mengklon folder.",
+      "FolderClonePending": "Pengklonan folder sedang dijalankan."
     },
     "explorer": {
       "Delete": "Padamkan ...",
@@ -750,7 +764,8 @@
     "New": "Baru",
     "Add": "Tambah",
     "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nama folder baharu"
   },
   "dialog": {
     "warning": {
@@ -766,7 +781,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Adakah anda mahu meneruskan?",
-      "DoYouWantToDeleteSomething": "Adakah anda pasti mahu memadamkan \"{{ name }}\"?"
+      "DoYouWantToDeleteSomething": "Adakah anda pasti mahu memadamkan \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Adakah anda mahu menetapkan semula perubahan anda?"
     },
     "title": {
       "LetsDouble-Check": "Mari semak semula",
@@ -909,7 +925,9 @@
     "LightMode": "Mod Cahaya",
     "UseSystemSetting": "Gunakan Tetapan Sistem",
     "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
-    "ThemeMode": "Mod Tema"
+    "ThemeMode": "Mod Tema",
+    "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
+    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -1373,7 +1391,8 @@
     "ImportGitlabRepo": "Import Repositori GitLab",
     "GitlabRepoWillBeFolder": "Repositori GitLab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Nama Cawangan GitLab"
+    "GitlabDefaultBranch": "Nama Cawangan GitLab",
+    "InvalidNotebookURL": "URL Notbook tidak sah."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik untuk Bulan Ini",
@@ -1553,7 +1572,10 @@
     "NoExtraMounts": "Tiada pelekap tambahan",
     "SyncRoutes": "Segerakkan laluan",
     "SyncRoutesFailed": "Permintaan penyegerakan laluan gagal.",
-    "SyncRoutesRequested": "Penyegerakan laluan telah diminta."
+    "SyncRoutesRequested": "Penyegerakan laluan telah diminta.",
+    "UpdateService": "Perkhidmatan Kemas Kini",
+    "StartNewService": "Mulakan Perkhidmatan Baharu",
+    "RuntimeVariant": "Varian Masa Jalan Inferens"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1599,7 +1621,10 @@
     "CloneAsFolder": "Klon sebagai Folder",
     "CloneSuccess": "Permintaan klon telah berjaya dihantar.",
     "CloneInfo": "Ia akan diklonkan sebagai folder jenis pengguna anda.",
-    "category": "kategori"
+    "category": "kategori",
+    "CloneToFolder": "Klon ke folder",
+    "FolderAlreadyExists": "Folder dengan nama ini sudah wujud.",
+    "FinetuneModel": "Model Finetune"
   },
   "table": {
     "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
@@ -1621,5 +1646,11 @@
   "propertyFilter": {
     "placeHolder": "Cari",
     "ResetFilter": "ResetFilter"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Log masuk dengan akaun Backend.AI anda",
+    "confirmLoginMessage": "Adakah anda ingin melog masuk dengan akaun {{username}} ({{email}})?",
+    "ServiceName": "Nama perkhidmatan",
+    "useAnotherAccount": "Log masuk dengan akaun lain"
   }
 }
