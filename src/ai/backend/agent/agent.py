@@ -1938,7 +1938,7 @@ class AbstractAgent(
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
                         overlapping_services = [
-                            s for s in service_ports if s["container_ports"][0] == port_no
+                            s for s in service_ports if port_no in s["container_ports"]
                         ]
                         if len(overlapping_services) > 0:
                             raise AgentError(
@@ -2280,7 +2280,7 @@ class AbstractAgent(
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
                     overlapping_services = [
-                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                        s for s in service_ports if service["port"] in s["container_ports"]
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
