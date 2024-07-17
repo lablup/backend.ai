@@ -1919,16 +1919,6 @@ class AbstractAgent(
                     for folder in vfolder_mounts
                     if folder.usage_mode == VFolderUsageMode.MODEL
                 ]
-                if kernel_config["session_type"] == SessionTypes.INFERENCE:
-                    model_definition = await self.load_model_definition(
-                        RuntimeVariant(
-                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
-                        ),
-                        model_folders,
-                        environ,
-                        service_ports,
-                        kernel_config,
-                    )
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -1937,8 +1927,10 @@ class AbstractAgent(
                     ):
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
+                        if port_no in (2000, 2001):
+                            raise AgentError("Port 2000 and 2001 are reserved for internal use")
                         overlapping_services = [
-                            s for s in service_ports if s["container_ports"][0] == port_no
+                            s for s in service_ports if port_no in s["container_ports"]
                         ]
                         if len(overlapping_services) > 0:
                             raise AgentError(
@@ -1970,6 +1962,16 @@ class AbstractAgent(
                         })
                         exposed_ports.append(port)
                     log.debug("exposed ports: {!r}", exposed_ports)
+                if kernel_config["session_type"] == SessionTypes.INFERENCE:
+                    model_definition = await self.load_model_definition(
+                        RuntimeVariant(
+                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
+                        ),
+                        model_folders,
+                        environ,
+                        service_ports,
+                        kernel_config,
+                    )
 
                 runtime_type = image_labels.get("ai.backend.runtime-type", "python")
                 runtime_path = image_labels.get("ai.backend.runtime-path", None)
@@ -2280,8 +2282,10 @@ class AbstractAgent(
                     environ["BACKEND_MODEL_NAME"] = model["name"]
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
+                    if service["port"] in (2000, 2001):
+                        raise AgentError("Port 2000 and 2001 are reserved for internal use")
                     overlapping_services = [
-                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                        s for s in service_ports if service["port"] in s["container_ports"]
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(

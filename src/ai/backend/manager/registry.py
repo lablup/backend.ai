@@ -1078,11 +1078,23 @@ class AgentRegistry:
 
             labels = image_row.labels
             # Parse service ports to check for port errors
-            parse_service_ports(
+            service_ports = parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
                 labels.get("ai.backend.endpoint-ports", ""),
                 BackendError,
             )
+            preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
+
+            for preopen_port in preopen_ports:
+                if preopen_port in (2000, 2001, 2200, 7681):
+                    raise InvalidAPIParameters(
+                        "Port 2000, 2001, 2200 and 7681 are reserved for internal use"
+                    )
+                for service_port in service_ports:
+                    if preopen_port in service_port["container_ports"]:
+                        raise InvalidAPIParameters(
+                            "Preopen port allocation cannot overlap with service port predefined by image"
+                        )
 
             # Shared memory.
             # We need to subtract the amount of shared memory from the memory limit of
@@ -1222,7 +1234,7 @@ class AgentRegistry:
                 "resource_opts": resource_opts,
                 "environ": [f"{k}={v}" for k, v in environ.items()],
                 "bootstrap_script": kernel.get("bootstrap_script"),
-                "preopen_ports": creation_config.get("preopen_ports", []),
+                "preopen_ports": preopen_ports,
             })
 
             if image_ref.canonical not in session_images:
