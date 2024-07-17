@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
   optimize-ci:
     runs-on: ubuntu-latest
     outputs:
@@ -21,6 +22,8 @@ jobs:
         uses: withgraphite/graphite-ci-action@main
         with:
           graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+
+
   lint:
     if: |
       ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
@@ -390,10 +393,12 @@ jobs:
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
+
   build-sbom:
     needs: [lint, typecheck, test]
     if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/sbom.yml
+
 
   make-final-release:
     needs: [build-scies, build-wheels, build-sbom]
