@@ -97,4 +97,4 @@ Configuring Overlay Networks for Multi-node Training (Optional)
 Currently the cross-node inter-container overlay routing is controlled via Docker Swarm's overlay networks.
 In the manager, you need to `create a Swarm <https://docs.docker.com/engine/swarm/swarm-tutorial/create-swarm/>`_.
 In the agent nodes, you need to `join the Swarm <https://docs.docker.com/engine/swarm/swarm-tutorial/add-nodes/>`_.
-Then restart all manager and agent daemons to make it work.
+Then restart all manager and agent daemons to make it working.
