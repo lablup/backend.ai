@@ -1085,10 +1085,12 @@ class AgentRegistry:
                 BackendError,
             )
             preopen_ports: Sequence[int] = creation_config.get("preopen_ports", [])
-            if 2000 in preopen_ports or 2001 in preopen_ports:
-                raise InvalidAPIParameters("Port 2000 and 2001 are reserved for internal use")
 
             for preopen_port in preopen_ports:
+                if preopen_port in (2000, 2001, 2200, 7681):
+                    raise InvalidAPIParameters(
+                        "Port 2000, 2001, 2200 and 7681 are reserved for internal use"
+                    )
                 for service_port in service_ports:
                     if preopen_port in service_port["container_ports"]:
                         raise InvalidAPIParameters(
