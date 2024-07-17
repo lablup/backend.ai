@@ -20,6 +20,7 @@ jobs:
       - name: Optimize CI
         id: check_skip
         uses: withgraphite/graphite-ci-action@main
+        if: ${{ github.event_name == 'pull_request' }}
         with:
           graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
 
@@ -29,7 +30,7 @@ jobs:
       ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
         && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
         && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == 'false'
+        && needs.optimize-ci.outputs.skip == false
       }}
     needs: [optimize-ci]
     runs-on: ubuntu-latest
@@ -104,7 +105,7 @@ jobs:
       ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration')
         && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
         && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == 'false'
+        && needs.optimize-ci.outputs.skip == false
       }}
     needs: [optimize-ci]
     runs-on: ubuntu-latest
@@ -131,7 +132,7 @@ jobs:
       ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
         && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
         && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == 'false'
+        && needs.optimize-ci.outputs.skip == false
       }}
     needs: [optimize-ci]
     runs-on: ubuntu-latest
@@ -202,7 +203,7 @@ jobs:
       ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
         && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
         && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == 'false'
+        && needs.optimize-ci.outputs.skip == false
       }}
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
