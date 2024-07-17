@@ -1084,7 +1084,7 @@ class AgentRegistry:
                 labels.get("ai.backend.endpoint-ports", ""),
                 BackendError,
             )
-            preopen_ports: Sequence[int] = creation_config.get("preopen_ports", [])
+            preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
 
             for preopen_port in preopen_ports:
                 if preopen_port in (2000, 2001, 2200, 7681):
