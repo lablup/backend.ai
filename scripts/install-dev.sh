@@ -595,6 +595,10 @@ install_editable_webui() {
   if ! command -v node &> /dev/null; then
     install_node
   fi
+  if ! command -v pnpm &> /dev/null; then
+    show_info "Installing pnpm..."
+    npm install -g pnpm
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
