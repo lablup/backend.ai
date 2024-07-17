@@ -11,8 +11,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  optimize-ci:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check_skip.outputs.skip }}
+    steps:
+      - name: Optimize CI
+        id: check_skip
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRPAHITE_CI_OPTIMIZER_TOKEN }}
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -81,7 +97,13 @@ jobs:
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
     - name: Calculate the fetch depth
@@ -146,7 +168,13 @@ jobs:
 
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
+    if: |
+      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+        && github.event.pull_request.merged == false
+        && needs.optimize-ci.outputs.skip == 'false'
+      }}
+    needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
