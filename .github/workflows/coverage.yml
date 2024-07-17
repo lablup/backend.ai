@@ -54,6 +54,9 @@ jobs:
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
       uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
