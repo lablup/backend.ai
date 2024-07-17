@@ -6,6 +6,7 @@ import io
 import json
 import logging
 import math
+import os
 import re
 import secrets
 import time
@@ -54,7 +55,7 @@ from ai.backend.common.types import (
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData
+from .types import AgentEventData, KernelLifecycleStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -176,6 +177,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
+    status: KernelLifecycleStatus
 
     _tasks: Set[asyncio.Task]
 
@@ -212,6 +214,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.environ = environ
         self.runner = None
         self.container_id = None
+        self.state = KernelLifecycleStatus.PREPARING
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -232,6 +235,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         return props
 
     def __setstate__(self, props) -> None:
+        # Used when a `Kernel` object is loaded from pickle data.
+        if "state" not in props:
+            props["state"] = KernelLifecycleStatus.RUNNING
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -318,19 +324,50 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, filename, filedata):
+    async def accept_file(self, container_path: os.PathLike | str, filedata) -> None:
+        """
+        Put the uploaded file to the designated container path.
+        The path should be inside /home/work of the container.
+        A relative path is interpreted as a subpath inside /home/work.
+
+        WARNING: Since the implementations may use the scratch directory mounted as the home
+        directory inside the container, the file may not be visible inside the container if the
+        designated home-relative path overlaps with a vfolder mount.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    async def download_file(self, filepath):
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+        """
+        Download the designated path (a single file or an entire directory) as a tar archive.
+        The path should be inside /home/work of the container.
+        A relative path is interpreted as a subpath inside /home/work.
+        The return value is the raw byte stream of the archive itself, and it is the caller's
+        responsibility to extract the tar archive.
+
+        This API is intended to download a small set of files from the container filesystem.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    async def download_single(self, filepath):
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+        """
+        Download the designated path (a single file) as a tar archive.
+        The path should be inside /home/work of the container.
+        A relative path is interpreted as a subpath inside /home/work.
+        The return value is the content of the file *extracted* from the downloaded archive.
+
+        This API is intended to download a small file from the container filesystem.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, path: str):
+    async def list_files(self, container_path: os.PathLike | str):
+        """
+        List the directory entries of the designated path.
+        The path should be inside /home/work of the container.
+        A relative path is interpreted as a subpath inside /home/work.
+        """
         raise NotImplementedError
 
     @abstractmethod

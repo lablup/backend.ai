@@ -7,7 +7,11 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
+from ai.backend.client.cli.session.execute import (
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
@@ -137,6 +141,24 @@ def info(ctx: CLIContext, service_name_or_id: str):
     multiple=True,
     help="Environment variable (may appear multiple times)",
 )
+@click.option(
+    "-v",
+    "--volume",
+    "-m",
+    "--mount",
+    "mount",
+    metavar="NAME[=PATH] or NAME[:PATH]",
+    type=str,
+    multiple=True,
+    help=(
+        "Name or ID of virtual folders to mount."
+        "If path is not provided, virtual folder will be mounted under /home/work. "
+        "When the target path is relative, it is placed under /home/work "
+        "with auto-created parent directories if any. "
+        "Absolute paths are mounted as-is, but it is prohibited to "
+        "override the predefined Linux system directories."
+    ),
+)
 # extra options
 @click.option(
     "--bootstrap-script",
@@ -226,6 +248,12 @@ def info(ctx: CLIContext, service_name_or_id: str):
     help="Set the owner of the target session explicitly.",
 )
 @click.option(
+    "--model-definition-path",
+    metavar="PATH",
+    default=None,
+    help="Relative path to model definition file. Defaults to `model-definition.yaml`.",
+)
+@click.option(
     "--public",
     "--expose-to-public",
     is_flag=True,
@@ -244,6 +272,7 @@ def create(
     model_version: Optional[str],
     model_mount_destination: Optional[str],
     env: Sequence[str],
+    mount: Sequence[str],
     startup_command: Optional[str],
     resources: Sequence[str],
     resource_opts: Sequence[str],
@@ -256,6 +285,7 @@ def create(
     architecture: Optional[str],
     scaling_group: Optional[str],
     owner: Optional[str],
+    model_definition_path: Optional[str],
     public: bool,
 ):
     """
@@ -266,12 +296,16 @@ def create(
 
     """
     envs = prepare_env_arg(env)
+    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
+        "extra_mounts": mount,
+        "extra_mount_map": mount_map,
+        "extra_mount_options": mount_options,
         "startup_command": startup_command,
         "resources": parsed_resources,
         "resource_opts": parsed_resource_opts,
@@ -282,6 +316,7 @@ def create(
         "architecture": architecture,
         "scaling_group": scaling_group,
         "expose_to_public": public,
+        "model_definition_path": model_definition_path,
     }
     if model_mount_destination:
         body["model_mount_destination"] = model_mount_destination

@@ -17,7 +17,10 @@ jobs:
       author: ${{ steps.commit.outputs.author }}
       author_email: ${{ steps.commit.outputs.author_email }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout the revision
+        uses: actions/checkout@v4
+        with:
+          lfs: false
       - name: Extract pr_number from commit message
         id: commit
         run: |
@@ -50,9 +53,17 @@ jobs:
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
           echo $milestones
 
+          # Remove Backlog from the backport target branch
           milestones=($milestones)
           for i in "${!milestones[@]}"; do
             if [[ "${milestones[$i]}" == "Backlog" ]]; then
+              unset 'milestones[$i]'
+            fi
+          done
+          echo "${milestones[@]}"
+
+          for i in "${!milestones[@]}"; do
+            if ! git ls-remote --heads | grep -q "refs/heads/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
@@ -76,6 +87,8 @@ jobs:
     needs: backport-target-branch
     strategy:
       matrix: ${{ fromJson(needs.backport-target-branch.outputs.matrix) }}
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,10 +97,10 @@ jobs:
         run: |
           git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
           git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
-          git fetch origin main --depth=2
+          git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
-            --amend -m "${{ needs.backport-target-branch.outputs.commit_message }}" \
+            --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \
             --trailer "Backported-from=main (${{ needs.backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
@@ -99,13 +112,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - id: commit_message
         run: |
-          commit_header=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | head -n 1)
+          commit_header=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | head -n 1)
           echo "commit_header=$commit_header" >> $GITHUB_OUTPUT
-          commit_body=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==1')
+          commit_body=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | awk '/^$/{p++;next} p==1')
           echo "commit_body<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_body" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          commit_footer=$(echo "${{ needs.backport-target-branch.outputs.commit_message }}" | awk '/^$/{p++;next} p==2')
+          commit_footer=$(echo '${{ needs.backport-target-branch.outputs.commit_message }}' | awk '/^$/{p++;next} p==2')
           echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_footer" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -121,6 +134,8 @@ jobs:
           base: ${{ matrix.milestone }}
           labels: backport
           assignees: ${{ needs.backport-target-branch.outputs.author }}
+      - run: |
+          gh pr view ${{ needs.backport-target-branch.outputs.pr_number }} --json labels | jq -r '.labels[].name' | xargs -I {} gh pr edit ${{ steps.pr.outputs.pull-request-number }} --add-label {}
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='

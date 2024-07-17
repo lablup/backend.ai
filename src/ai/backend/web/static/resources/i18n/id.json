@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Masukkan kata sandi Anda",
       "InvalidBlankEmail": "Masukkan email Anda",
       "DisMatchUserEmail": "Email Pengguna tidak cocok",
-      "MyEnvironments": "Lingkungan Saya"
+      "MyEnvironments": "Lingkungan Saya",
+      "ResourcePolicy": "Kebijakan Sumber Daya"
     },
-    "YouAreOffline": "Anda sekarang offline",
+    "YouAreOffline": "Offline: Tidak terhubung ke jaringan apa pun.",
     "YouAreOnline": "Anda sekarang online",
     "NOTFOUND": " <p> Ups! <br/> Halaman tidak ditemukan... </p>",
     "DescNOTFOUND": "Maaf, halaman yang anda cari tidak ditemukan.",
@@ -115,7 +116,8 @@
     "ATOMEnabled": "ATOM NPU Diaktifkan",
     "WarboyEnabled": "Warboy NPU Diaktifkan",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan"
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan",
+    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan"
   },
   "session": {
     "launcher": {
@@ -229,7 +231,7 @@
       "StartModelServing": "Memulai Penyajian Model",
       "InferenceMode": "Kesimpulan",
       "ImageDoesNotProvideModelPath": "Gambar kontainer tidak menyediakan jalur model. Ini harus dimodifikasi.",
-      "ModelStorageToMount": "Penyimpanan model untuk dipasang",
+      "ModelStorageToMount": "Penyimpanan Model Untuk Dipasang",
       "AIAccelerator": "Akselerator AI",
       "DescAIAccelerator": "</p> <p>Akselerator AI (GPU atau NPU) sangat cocok untuk komputasi matriks / vektor yang terlibat dalam pembelajaran mesin. Akselerator AI mempercepat algoritme pelatihan / inferensi dengan urutan besarnya, mengurangi waktu berjalan dari berminggu-minggu menjadi beberapa hari.",
       "SessionAlreadyExists": "Nama sesi sudah ada",
@@ -248,10 +250,10 @@
       "preopen": "pra-buka",
       "Network": "Jaringan",
       "Enable": "Memungkinkan",
-      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan.",
+      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), titik (.), dan tanda hubung (-) yang diperbolehkan.",
       "PreOpenPortMaxCountLimit": "Anda dapat mengatur hingga {{count}} port yang telah dibuka sebelumnya.",
       "StartTimeMustBeInTheFuture": "Waktu mulai harus setelah waktu saat ini.",
-      "EnqueueComputeSessionWarning": "Jika Anda mengaturnya lebih besar dari sumber daya yang tersedia saat ini, pembuatan sesi akan tertunda dalam antrean hingga tersedia.",
+      "EnqueueComputeSessionWarning": "Sumber daya tidak mencukupi. \nSesi mungkin tertunda.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
       "TemplateAndHistory": "Templat",
@@ -264,13 +266,20 @@
       "EnvironmentVariableDuplicateName": "Nama variabel yang sudah ada.",
       "Template": "Templat Sesi",
       "EnableAutomaticShmem": "Memori bersama otomatis",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Hanya bilangan bulat yang diperbolehkan jika ukuran cluster tidak kurang dari 2.",
       "StartAfter": "Mulai setelah:",
       "StartTimeDoesNotApply": "Jika waktu mulai tidak ditetapkan, maka tidak berlaku.",
       "PreviousLauncher": "Classic",
       "PleaseCompleteForm": "Formulir tidak lengkap atau mengandung kesalahan. Silakan periksa masukan Anda.",
-      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSilakan periksa tab 'SELESAI' di halaman sesi."
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSilakan periksa tab 'SELESAI' di halaman sesi.",
+      "EnvironmentVariableValueRequired": "Silakan masukkan nilai.",
+      "EnableAutomaticMiniumShmem": "Mengatur memori bersama minimum",
+      "MiniumAllocation": "Persyaratan minimum",
+      "MiniumAllocationTooltip": "Pilih sebagai persyaratan minimum untuk lingkungan berjalan yang dipilih",
+      "ProxyDirectTCPNotSupported": "Koneksi TCP langsung proxy belum didukung",
+      "InvalidPortFormat": "Format nomor port salah.",
+      "DuplicatedPort": "Terdapat port ganda.",
+      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -396,11 +405,17 @@
     "GPU(MEM)": "GPU (memori)",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (memori)",
-    "ConvertSessionToImage": "Ubah Sesi menjadi Gambar",
     "SessionName": "Nama Sesi",
     "SessionId": "Id Sesi",
     "EnvironmentAndVersion": "Lingkungan dan Versi",
-    "Tags": "Tag"
+    "Tags": "Tag",
+    "Agents": "Agen",
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Tindakan ini akan mengakhiri atau membatalkan sesi terlepas dari statusnya saat ini. \nApa kamu yakin?",
+    "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
+    "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
+    "ForceTerminateWarningMsg3": "Tindakan ini tidak menghapus penampung sebenarnya pada agen. \nPembersihan manual mungkin diperlukan.",
+    "ContainerToCleanUp": "Wadah yang harus dibersihkan"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -437,7 +452,10 @@
     "Config": "Konfigurasi",
     "Next": "Berikutnya",
     "Previous": "Sebelumnya",
-    "PushToImage": "Sesi dorong ke gambar yang disesuaikan"
+    "PushToImage": "Sesi dorong ke gambar yang disesuaikan",
+    "SaveWithoutClose": "Simpan Tanpa Tutup",
+    "Collapse": "Runtuh",
+    "Expand": "Memperluas"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -462,7 +480,9 @@
     "Utilization": "Pemanfaatan",
     "NoAvailableLiveStat": "Tidak ada statistik langsung yang tersedia",
     "Allocation": "Alokasi",
-    "DiskPerc": "Disk %"
+    "DiskPerc": "Disk %",
+    "AutoRefreshEvery5s": "Penyegaran otomatis setiap 5 detik",
+    "Agent": "Agen"
   },
   "general": {
     "cores": "core",
@@ -484,7 +504,8 @@
     "Image": "Gambar",
     "All": "Semua",
     "InProgress": "Sedang Berlangsung",
-    "Session": "Sesi"
+    "Session": "Sesi",
+    "General": "Umum"
   },
   "credential": {
     "Permission": "Izin",
@@ -649,7 +670,10 @@
       "DeleteForever": "Hapus selamanya",
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
-      "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah."
+      "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah.",
+      "MoveToTrashBin": "Pindah ke tempat sampah",
+      "FolderCloneFailed": "Gagal mengkloning folder.",
+      "FolderClonePending": "Kloning folder sedang berlangsung."
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -700,7 +724,8 @@
       "EmptyFilesAndFoldersAreNotUploaded": "File kosong dan folder kosong tidak diunggah",
       "FolderAlreadyExists": "Folder yang akan diunggah sudah ada.",
       "NumberOfSFTPSessionsExceededTitle": "Mencapai batas jumlah sesi unggahan yang sedang berjalan",
-      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru."
+      "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru.",
+      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini."
     },
     "invitation": {
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -740,7 +765,8 @@
     "New": "Baru",
     "Add": "Menambahkan",
     "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nama folder baru"
   },
   "dialog": {
     "warning": {
@@ -751,7 +777,9 @@
       "DeleteForeverDesc": "PERINGATAN: item yang dipilih akan dihapus selamanya dan Anda tidak dapat memulihkannya."
     },
     "ask": {
-      "DoYouWantToProceed": "Apakah Anda ingin lanjut?"
+      "DoYouWantToProceed": "Apakah Anda ingin lanjut?",
+      "DoYouWantToDeleteSomething": "Apakah Anda yakin ingin menghapus \"{{ nama }}\"?",
+      "DoYouWantToResetChanges": "Apakah Anda ingin mengatur ulang perubahan Anda?"
     },
     "title": {
       "LetsDouble-Check": "Mari Periksa Kembali",
@@ -812,7 +840,10 @@
     "NoChangeMade": "Tidak ada perubahan yang dibuat",
     "Architecture": "Arsitektur",
     "NoImageToDisplay": "Tidak ada gambar yang akan ditampilkan",
-    "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus."
+    "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus.",
+    "DescImageResourceModified": "Batas sumber daya berhasil diubah",
+    "DescImagePortsModified": "Port Gambar berhasil dimodifikasi",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -895,7 +926,9 @@
     "LightMode": "Modus Cahaya",
     "UseSystemSetting": "Gunakan Pengaturan Sistem",
     "DescThemeMode": "Sesuaikan tampilan Backend.AI WebUI di perangkat Anda.",
-    "ThemeMode": "Modus Tema"
+    "ThemeMode": "Modus Tema",
+    "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
+    "BootstrapScriptDeleted": "Skrip bootstrap dihapus"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -944,8 +977,23 @@
     "SuccessfullyDeleted": "Kebijakan sumber daya berhasil dihapus.",
     "PolicyNameEmpty": "Nama kebijakan wajib diisi.",
     "AboutToDeleteResourcePolicy": "Anda akan menghapus kebijakan sumber daya ini:",
-    "MaxSessionLifeTime": "Sesi Seumur Hidup (detik)",
-    "NoResourcePolicyToDisplay": "Tidak ada Kebijakan Sumber Daya yang ditampilkan"
+    "MaxSessionLifetime": "Sesi Seumur Hidup (detik)",
+    "NoResourcePolicyToDisplay": "Tidak ada Kebijakan Sumber Daya yang ditampilkan",
+    "Keypair": "pasangan kunci",
+    "User": "Pengguna",
+    "Project": "Proyek",
+    "KeypairResourcePolicy": "Kebijakan Sumber Daya Pasangan Kunci",
+    "IdleTimeout": "Batas Waktu Diam",
+    "CreateResourcePolicy": "Buat Kebijakan Sumber Daya",
+    "ResourcePolicyNameAlreadyExists": "Nama kebijakan sumber daya sudah ada. \nSilakan ubah nama untuk ditambahkan.",
+    "UserResourcePolicy": "Kebijakan Sumber Daya Pengguna",
+    "MaxVFolderCount": "Jumlah Folder Maks",
+    "MaxSessionCountPerModelSession": "Jumlah Sesi Maks Per Sesi Model",
+    "MaxQuotaScopeSize": "Ukuran Cakupan Kuota Maks (GB)",
+    "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
+    "CreatedAt": "Dibuat di",
+    "MaxFolderCount": "Jumlah Folder Maks",
+    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1177,7 +1225,8 @@
     "ShowOnlyChanged": "Hanya Tampilan yang Berubah",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel."
+    "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel.",
+    "SearchPlaceholder": "Pencarian"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1343,7 +1392,8 @@
     "ImportGitlabRepo": "Impor Repositori GitLab",
     "GitlabRepoWillBeFolder": "Repositori GitLab yang diimpor akan dikonversi menjadi folder dan dapat dipasang saat sesi dimulai.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Nama Cabang GitLab"
+    "GitlabDefaultBranch": "Nama Cabang GitLab",
+    "InvalidNotebookURL": "URL Notbook tidak valid."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik Bulan Ini",
@@ -1491,7 +1541,6 @@
     "RoutingsCount": "Jumlah Rute",
     "Active/Total": "Aktif/Total",
     "Public": "Publik",
-    "YouAreAboutToTerminate": "Anda akan mengakhiri",
     "FailedToStartService": "Gagal membuat layanan.",
     "ServingRouteErrorModalTitle": "Kesalahan Rute Penyajian",
     "ClearErrors": "Hapus kesalahan dan coba lagi",
@@ -1512,12 +1561,33 @@
     "resources": "Sumber daya",
     "Image": "Gambar",
     "Owner": "Pemilik",
+    "Processing": "Pengolahan...",
+    "Success": "Kesuksesan",
+    "Error": "Kesalahan",
+    "SeeContainerLogs": "Lihat Log Kontainer",
+    "TimeStamp": "Stempel waktu",
+    "Result": "Hasil",
+    "Finished": "Selesai",
     "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
     "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
     "FailedToUpdateService": "Gagal memperbarui layanan.",
     "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
     "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
-    "ServiceTerminated": "Layanan model {{ name }} telah berhasil dihentikan."
+    "CannotValidateNow": "Tidak dapat memvalidasi layanan sekarang. \nSilakan periksa alokasi sumber daya atau konfigurasi lainnya.",
+    "Ready": "Siap",
+    "Validate": "Mengesahkan",
+    "ValidationInfo": "Info Validasi",
+    "ServiceTerminated": "Permintaan penutupan dikirim untuk layanan model '{{ nama }}'.",
+    "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
+    "AdditionalMounts": "Pemasangan Tambahan",
+    "ModelDefinitionPath": "Jalur File Definisi Model",
+    "NoExtraMounts": "Tidak ada tunggangan tambahan",
+    "SyncRoutes": "Menyinkronkan rute",
+    "SyncRoutesFailed": "Permintaan sinkronisasi rute gagal.",
+    "SyncRoutesRequested": "Sinkronisasi rute telah diminta.",
+    "UpdateService": "Layanan Pembaruan",
+    "StartNewService": "Mulai Layanan Baru",
+    "RuntimeVariant": "Varian Runtime Inferensi"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1551,14 +1621,36 @@
     "CloneAsFolder": "Mengkloning sebagai Folder",
     "CloneSuccess": "Permintaan kloning telah berhasil dikirim.",
     "CloneInfo": "Ini akan dikloning sebagai folder tipe pengguna Anda.",
-    "category": "Kategori"
+    "category": "Kategori",
+    "CloneToFolder": "Mengkloning ke folder",
+    "FolderAlreadyExists": "Folder dengan nama ini sudah ada.",
+    "FinetuneModel": "Penyempurnaan Model"
   },
   "table": {
     "SettingTable": "Penataan meja",
     "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
     "SearchTableColumn": "Cari kolom tabel"
   },
-  "setting": {
-    "SearchPlaceholder": "Masukkan Istilah Pencarian"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Kesalahan validasi kolom masukan",
+      "ValidationErrorText": "Jika Anda tidak memasukkan nilai di bidang yang wajib diisi atau memasukkan nilai yang tidak valid, pesan kesalahan akan ditampilkan di bidang tersebut.",
+      "FixErrorAndTryAgainText": "Jika ada bidang kesalahan, tombol Sesi peluncuran dinonaktifkan. \nHarap perbaiki kesalahannya dan coba lagi.",
+      "FixErrorFieldbyModifyButton": "Untuk kolom error tersebut, Anda bisa langsung menuju tombol Edit di pojok kanan atas untuk mengeditnya."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Menyalin",
+    "Copied": "Disalin"
+  },
+  "propertyFilter": {
+    "placeHolder": "Pencarian",
+    "ResetFilter": "Filter Ulang"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",
+    "confirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
+    "ServiceName": "Nama layanan",
+    "useAnotherAccount": "Masuk dengan akun yang berbeda"
   }
 }

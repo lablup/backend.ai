@@ -93,6 +93,13 @@ __all__: Sequence[str] = (
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
+
+class UserRoleInProject(enum.StrEnum):
+    ADMIN = enum.auto()  # TODO: impl project admin
+    USER = enum.auto()  # UserRole.USER is associated as user
+    NONE = enum.auto()
+
+
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
@@ -196,6 +203,11 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="group_row",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -275,8 +287,8 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added since 24.03.0.")
-    container_registry = graphene.JSONString(description="Added since 24.03.0.")
+    type = graphene.String(description="Added in 24.03.0.")
+    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -430,7 +442,9 @@ class GroupInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
-        description=("Added in 24.03.0."),
+        description=(
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+        ),
     )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
@@ -799,6 +813,7 @@ class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID(description="Added in 24.03.7. The undecoded id value stored in DB.")
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
@@ -809,6 +824,8 @@ class GroupNode(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
+    type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
+    container_registry = graphene.JSONString(description="Added in 24.03.7.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
     )
@@ -821,16 +838,19 @@ class GroupNode(graphene.ObjectType):
     def from_row(cls, row: GroupRow) -> GroupNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.name,
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
             modified_at=row.modified_at,
             domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts or {},
+            total_resource_slots=row.total_resource_slots.to_json() or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
+            type=row.type.name,
+            container_registry=row.container_registry,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -868,6 +888,7 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
+            _,
             conditions,
             cursor,
             pagination_order,
@@ -928,7 +949,8 @@ class GroupNode(graphene.ObjectType):
         )
         (
             query,
-            conditions,
+            cnt_query,
+            _,
             cursor,
             pagination_order,
             page_size,
@@ -944,9 +966,6 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(row) for row in group_rows]

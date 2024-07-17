@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0.dev6"
+pants_version = "2.21.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -36,7 +36,6 @@ root_patterns = [
     "/",
     "/src",
     "/stubs",
-    "/tests",
     "/tools/pants-plugins",
 ]
 
@@ -53,9 +52,9 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.12.2"]
+interpreter_constraints = ["CPython==3.12.4"]
 tailor_pex_binary_targets = false
-pip_version = "24.0"
+pip_version = "24.1.2"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -65,6 +64,7 @@ use_rust_parser = true
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+find_links = ["file://%(buildroot)s/wheelhouse"]
 
 [python.resolves]
 python-default = "python.lock"
@@ -82,12 +82,13 @@ setuptools = "tools/setuptools.lock"
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-version = "v2.3.0"
+# Pants 2.21.0 uses Pex 2.3.1 by default.
+version = "v2.10.0"
 known_versions = [
-    "v2.3.0|macos_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|macos_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+    "v2.10.0|macos_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
+    "v2.10.0|macos_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
+    "v2.10.0|linux_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
+    "v2.10.0|linux_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
