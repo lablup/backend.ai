@@ -868,36 +868,93 @@ class PermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    async def build(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: VFolderRBACPermission,
+    ) -> PermissionContext:
+        match target_scope:
+            case DomainScope(domain_name):
+                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
+                _user_perm_ctx = await self.build_in_user_scope_in_domain(
+                    ctx, ctx.user_id, domain_name
+                )
+                permission_ctx = PermissionContext.merge(permission_ctx, _user_perm_ctx)
+            case ProjectScope(project_id, domain_name):
+                permission_ctx = await self.build_in_project_scope(ctx, project_id)
+                if domain_name is not None:
+                    _user_perm_ctx = await self.build_in_user_scope_in_domain(
+                        ctx, ctx.user_id, domain_name
+                    )
+                    permission_ctx = PermissionContext.merge(permission_ctx, _user_perm_ctx)
+            case UserRBACScope(user_id, _):
+                permission_ctx = await self.build_in_user_scope(ctx, user_id)
+            case _:
+                raise InvalidScope
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
     async def build_in_domain_scope(
         self,
         ctx: ClientContext,
         domain_name: str,
-        *,
-        nested: bool = True,
     ) -> PermissionContext:
         roles = await ctx.get_roles_in_scope(DomainScope(domain_name), self.db_session)
+        domain_permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
+        result = PermissionContext(domain_name_to_permission_map={domain_name: domain_permissions})
+        return result
+
+    async def build_in_user_scope_in_domain(
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+        domain_name: str,
+    ) -> PermissionContext:
+        # For Superadmin and monitor who can create vfolders in multiple different domains.
+        roles = await ctx.get_roles_in_scope(UserRBACScope(user_id), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
-        result = PermissionContext(domain_name_to_permission_map={domain_name: permissions})
-        if nested and roles:
-            # User is part of the domain. Query all user's folders under the domain.
-            _project_stmt = (
-                sa.select(GroupRow)
-                .where(GroupRow.domain_name == domain_name)
-                .options(load_only(GroupRow.id))
+
+        _vfolder_stmt = (
+            sa.select(VFolderRow)
+            .where((VFolderRow.user == user_id) & (VFolderRow.domain_name == domain_name))
+            .options(load_only(VFolderRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = PermissionContext(object_id_to_additional_permission_map=own_folder_map)
+
+        _stmt = (
+            sa.select(VFolderPermissionRow)
+            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+            .where(
+                (VFolderPermissionRow.user == ctx.user_id)
+                & (
+                    VFolderRow.ownership_type == VFolderOwnershipType.USER
+                )  # filter out user vfolders
+                & (VFolderRow.domain_name == domain_name)
             )
-            for row in await self.db_session.scalars(_project_stmt):
-                _row = cast(GroupRow, row)
-                result = PermissionContext.merge(
-                    result, await self.build_in_project_scope(ctx, _row.id, nested=nested)
-                )
+        )
+        object_id_to_permission_map = {
+            row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+            for row in await self.db_session.scalars(_stmt)
+        }
+        if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            ctx_to_merge = PermissionContext(
+                object_id_to_additional_permission_map=object_id_to_permission_map
+            )
+        else:
+            ctx_to_merge = PermissionContext(
+                object_id_to_overriding_permission_map=object_id_to_permission_map
+            )
+        result = PermissionContext.merge(result, ctx_to_merge)
         return result
 
     async def build_in_project_scope(
         self,
         ctx: ClientContext,
         project_id: uuid.UUID,
-        *,
-        nested: bool = True,
     ) -> PermissionContext:
         roles = await ctx.get_roles_in_scope(ProjectScope(project_id), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
@@ -921,15 +978,12 @@ class PermissionContextBuilder(
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
-        if nested and roles:
-            # User is part of the project. Query all user's folders.
-            result = PermissionContext.merge(
-                result, await self.build_in_user_scope(ctx, ctx.user_id)
-            )
         return result
 
     async def build_in_user_scope(
-        self, ctx: ClientContext, user_id: uuid.UUID
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
     ) -> PermissionContext:
         roles = await ctx.get_roles_in_scope(UserRBACScope(user_id), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
@@ -995,8 +1049,8 @@ async def get_vfolders(
     db_conn: SAConnection,
     ctx: ClientContext,
     target_scope: BaseScope,
+    requested_permission: VFolderRBACPermission,
     extra_scope: StorageHost | None = None,
-    requested_permission: VFolderRBACPermission | None = None,
     *,
     vfolder_id: uuid.UUID | None = None,
     vfolder_name: str | None = None,
@@ -1004,26 +1058,9 @@ async def get_vfolders(
     allowed_status: Container[VFolderOperationStatus] | None = None,
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderWithPermissionSet]:
-    # Superadmin and monitors are able to create folders in multiple domains.
-    domain_name_filter: str | None = None
-
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        match target_scope:
-            case DomainScope(domain_name):
-                builder = PermissionContextBuilder(db_session)
-                permission_ctx = await builder.build_in_domain_scope(ctx, domain_name, nested=True)
-                if ctx.user_role in (UserRole.SUPERADMIN, UserRole.MONITOR):
-                    domain_name_filter = domain_name
-            case ProjectScope(project_id):
-                builder = PermissionContextBuilder(db_session)
-                permission_ctx = await builder.build_in_project_scope(ctx, project_id, nested=True)
-            case UserRBACScope(user_id):
-                builder = PermissionContextBuilder(db_session)
-                permission_ctx = await builder.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        if requested_permission is not None:
-            permission_ctx.filter_by_permission(requested_permission)
+        builder = PermissionContextBuilder(db_session)
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
 
         query_stmt = await permission_ctx.build_query()
         if query_stmt is None:
@@ -1042,8 +1079,6 @@ async def get_vfolders(
         result: list[VFolderWithPermissionSet] = []
         for row in await db_session.scalars(query_stmt):
             row = cast(VFolderRow, row)
-            if domain_name_filter is not None and row.domain_name != domain_name_filter:
-                continue
             permissions = await permission_ctx.calculate_final_permission(row)
             result.append(VFolderWithPermissionSet(row, permissions))
         return result
@@ -1062,8 +1097,8 @@ async def validate_permission(
         db_conn,
         ctx,
         target_scope,
+        permission,
         extra_scope,
-        requested_permission=permission,
         vfolder_id=vfolder_id,
     )
     if not vfolders:

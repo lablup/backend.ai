@@ -281,17 +281,19 @@ class DomainScope(BaseScope):
 @dataclass(frozen=True)
 class ProjectScope(BaseScope):
     project_id: uuid.UUID
+    domain_name: str | None = None
 
     def __str__(self) -> str:
-        return f"Project(id: {self.project_id})"
+        return f"Project(id: {self.project_id}, domain: {self.domain_name}])"
 
 
 @dataclass(frozen=True)
 class UserScope(BaseScope):
     user_id: uuid.UUID
+    domain_name: str | None = None
 
     def __str__(self) -> str:
-        return f"User(id: {self.user_id})"
+        return f"User(id: {self.user_id}, domain: {self.domain_name})"
 
 
 # Extra scope is to address some scopes that contain specific object types
