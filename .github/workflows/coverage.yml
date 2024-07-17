@@ -14,19 +14,10 @@ jobs:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
     runs-on: [ubuntu-latest-8-cores]
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v4
       with:
         fetch-depth: 2
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v4
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
-    - name: Git LFS Pull
-      run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -53,6 +44,9 @@ jobs:
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
       uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:

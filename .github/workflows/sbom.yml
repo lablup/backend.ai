@@ -6,18 +6,10 @@ jobs:
   sbom:
     runs-on: ubuntu-latest
     steps:
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
-    - name: Checkout the source tree
+    - name: Checkout the revision
       uses: actions/checkout@v4
       with:
         lfs: false
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Generate the SBOM report
       uses: CycloneDX/gh-python-generate-sbom@v2
     - name: Upload the SBOM report

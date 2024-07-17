@@ -46,7 +46,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload, with_loader_criteria
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
@@ -1079,11 +1079,23 @@ class AgentRegistry:
 
             labels = image_row.labels
             # Parse service ports to check for port errors
-            parse_service_ports(
+            service_ports = parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
                 labels.get("ai.backend.endpoint-ports", ""),
                 BackendError,
             )
+            preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
+
+            for preopen_port in preopen_ports:
+                if preopen_port in (2000, 2001, 2200, 7681):
+                    raise InvalidAPIParameters(
+                        "Port 2000, 2001, 2200 and 7681 are reserved for internal use"
+                    )
+                for service_port in service_ports:
+                    if preopen_port in service_port["container_ports"]:
+                        raise InvalidAPIParameters(
+                            "Preopen port allocation cannot overlap with service port predefined by image"
+                        )
 
             # Shared memory.
             # We need to subtract the amount of shared memory from the memory limit of
@@ -1223,7 +1235,7 @@ class AgentRegistry:
                 "resource_opts": resource_opts,
                 "environ": [f"{k}={v}" for k, v in environ.items()],
                 "bootstrap_script": kernel.get("bootstrap_script"),
-                "preopen_ports": creation_config.get("preopen_ports", []),
+                "preopen_ports": preopen_ports,
             })
 
             if image_ref.canonical not in session_images:
@@ -1626,11 +1638,23 @@ class AgentRegistry:
                         SessionRow.name,
                         SessionRow.creation_id,
                         SessionRow.access_key,
+                        SessionRow.session_type,
                     ),
+                    selectinload(
+                        SessionRow.kernels,
+                    ).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.agent,
+                            KernelRow.cluster_role,
+                            KernelRow.startup_command,
+                        )
+                    ),
+                    with_loader_criteria(KernelRow, KernelRow.cluster_role == DEFAULT_ROLE),
                 )
             )
             async with self.db.begin_readonly_session() as db_session:
-                updated_session = (await db_session.scalars(query)).first()
+                updated_session = cast(SessionRow, await db_session.scalar(query))
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -1648,6 +1672,9 @@ class AgentRegistry:
                     updated_session.access_key,
                 ),
             )
+
+            if updated_session.session_type == SessionTypes.BATCH:
+                await self.trigger_batch_execution(updated_session)
         except Exception:
             log.exception("error while executing _finalize_running")
             raise
@@ -2676,6 +2703,9 @@ class AgentRegistry:
             SessionStartedEvent(session.id, session.creation_id),
         )
 
+        if session.session_type == SessionTypes.BATCH:
+            await self.trigger_batch_execution(session)
+
     async def execute(
         self,
         session: SessionRow,
@@ -2707,6 +2737,22 @@ class AgentRegistry:
                     code,
                     opts,
                     flush_timeout,
+                )
+
+    async def trigger_batch_execution(
+        self,
+        session: SessionRow,
+    ) -> None:
+        async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
+            async with self.agent_cache.rpc_context(
+                session.main_kernel.agent,
+                invoke_timeout=30,
+                order_key=session.main_kernel.id,
+            ) as rpc:
+                return await rpc.call.trigger_batch_execution(
+                    str(session.id),
+                    str(session.main_kernel.id),
+                    session.main_kernel.startup_command or "",
                 )
 
     async def interrupt_session(
@@ -3357,10 +3403,15 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
+        image_ref = ImageRef(kernel.image, [registry], kernel.architecture)
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(
-                    str(kernel.id), email, filename=filename, extra_labels=extra_labels
+                    str(kernel.id),
+                    email,
+                    filename=filename,
+                    extra_labels=extra_labels,
+                    canonical=image_ref.canonical,
                 )
         return resp
 

@@ -18,11 +18,13 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v4
+    - name: Checkout the revision with minimal required history
+      uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         ref: ${{ github.head_ref }}
         token: ${{ secrets.OCTODOG }}
+        lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -72,13 +74,13 @@ jobs:
     name: Check Schema
     runs-on: ubuntu-latest
     permissions:
-      contents: read 
+      contents: read
       pull-requests: write
       checks: write
     steps:
       - uses: actions/checkout@v4
       - uses: kamilkisiela/graphql-inspector@release-1717403590269
         with:
-          schema: 'main:src/ai/backend/manager/api/schema.graphql'
+          schema: '${{ github.base_ref }}:src/ai/backend/manager/api/schema.graphql'
           rules: |
             gql-inspector-checker.js

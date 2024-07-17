@@ -124,7 +124,7 @@ The label may contain multiple port mapping declarations separated by commas, li
 
    jupyter:http:8080,tensorboard:http:6006
 
-The name may be an non-empty arbitrary ASCII alphanumeric string.
+The name may be a non-empty arbitrary ASCII alphanumeric string.
 We use the kebab-case for it.
 The protocol may be one of ``tcp``, ``http``, and ``pty``, but currently most services use ``http``.
 
@@ -138,7 +138,7 @@ Service Definition DSL
 
 Now the image author should define the service launch sequences using a DSL (domain-specific language).
 The service definitions are written as JSON files in the container's ``/etc/backend.ai/service-defs`` directory.
-The file names must be same with the name parts of the port mapping declarations.
+The file names must be same as the name parts of the port mapping declarations.
 
 For example, a sample service definition file for "jupyter" service (hence its filename must be ``/etc/backend.ai/service-defs/jupyter.json``) looks like:
 
@@ -254,7 +254,7 @@ Adding Custom Jail Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To write a new policy implementation, extend `the jail policy interface <https://github.com/lablup/backend.ai-jail>`_ in Go.
-Ebmed it inside your jail build.
+Embed it inside your jail build.
 Please give a look to existing jail policies as good references.
 
 
@@ -288,7 +288,7 @@ Custom startup scripts (aka custom entrypoint)
 ----------------------------------------------
 
 When the image has *preopen* service ports and/or an endpoint port, Backend.AI automatically sets up application proxy tunnels
-as if the listening applications are already started.
+as if the listening applications have already started.
 
 To initialize and start such applications, put a shell script as ``/opt/container/bootstrap.sh`` when building the image.
 This per-image bootstrap script is executed as *root* by the agent-injected ``entrypoint.sh``.
@@ -364,7 +364,7 @@ The key concept is separation of the "outer" daemon and the "inner" target progr
 The outer daemon should wrap the inner program inside a pseudo-tty.
 As the outer daemon is completely hidden in terminal interaction by the end-users, the programming language may differ from the inner program.
 The challenge is that you need to implement piping of ZeroMQ sockets from/to pseudo-tty file descriptors.
-It is up to you how you implement the outer daemon, but if you choose Python for it, we recommend to use asyncio or similar event loop libraries such as tornado and Twisted to mulitplex sockets and file descriptors for both input/output directions.
+It is up to you how you implement the outer daemon, but if you choose Python for it, we recommend using asyncio or similar event loop libraries such as tornado and Twisted to mulitplex sockets and file descriptors for both input/output directions.
 When piping the messages, the outer daemon should not apply any specific transformation; it should send and receive all raw data/control byte sequences transparently because the front-end (e.g., terminal.js) is responsible for interpreting them.
 Currently we use PUB/SUB ZeroMQ socket types but this may change later.
 

@@ -9,8 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title prefix
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "${{ github.event.pull_request.title }}" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore(\([^)]+\))?|deps)$';
+          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore(\([^)]+\))?|deps)$';
           then
             echo "PR title is valid."
           else

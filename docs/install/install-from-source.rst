@@ -43,7 +43,7 @@ you need to manually perform the same repository cloning along with the pyenv, P
 
    Since we use the mono-repo for the core packages, there is no way to separately clone the agent sources only.
    Just clone the entire repository and configure/execute the agent only.
-   Ensure that you **also pull the LFS files and submodules** when you manually clone it.
+   Ensure that you **also pull the LFS files** when you manually clone it.
 
 Once your ``pants`` is up and working, run ``pants export`` to populate virtualenvs and install dependencies.
 

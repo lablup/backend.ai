@@ -94,6 +94,13 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
+
+class UserRoleInProject(enum.StrEnum):
+    ADMIN = enum.auto()  # TODO: impl project admin
+    USER = enum.auto()  # UserRole.USER is associated as user
+    NONE = enum.auto()
+
+
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
