@@ -2276,7 +2276,8 @@ class AbstractAgent(
             model_definition = model_definition_iv.check(raw_definition)
             assert model_definition is not None
             for model in model_definition["models"]:
-                environ["BACKEND_MODEL_NAME"] = model["name"]
+                if "BACKEND_MODEL_NAME" not in environ:
+                    environ["BACKEND_MODEL_NAME"] = model["name"]
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
                     overlapping_services = [
