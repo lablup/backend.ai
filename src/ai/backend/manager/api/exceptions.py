@@ -205,6 +205,10 @@ class GroupNotFound(ObjectNotFound):
     object_name = "user group (or project)"
 
 
+class UserNotFound(ObjectNotFound):
+    object_name = "user"
+
+
 class ScalingGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
