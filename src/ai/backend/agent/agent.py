@@ -2132,6 +2132,131 @@ class AbstractAgent(
                 )
             )
 
+    async def load_model_definition(
+        self,
+        runtime_variant: RuntimeVariant,
+        model_folders: list[VFolderMount],
+        environ: MutableMapping[str, Any],
+        service_ports: list[ServicePort],
+        kernel_config: KernelCreationConfig,
+    ) -> Any:
+        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
+        if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
+            raise AgentError(
+                "image should have its own command when runtime variant is set to values other than CUSTOM!"
+            )
+        assert len(model_folders) > 0
+        model_folder: VFolderMount = model_folders[0]
+
+        match runtime_variant:
+            case RuntimeVariant.VLLM:
+                _model = {
+                    "name": "vllm-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.VLLM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.NIM:
+                _model = {
+                    "name": "nim-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.NIM
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CMD:
+                _model = {
+                    "name": "image-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": 8000,
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.CUSTOM:
+                if _fname := (kernel_config.get("internal_data") or {}).get(
+                    "model_definition_path"
+                ):
+                    model_definition_candidates = [_fname]
+                else:
+                    model_definition_candidates = [
+                        "model-definition.yaml",
+                        "model-definition.yml",
+                    ]
+
+                model_definition_path = None
+                for filename in model_definition_candidates:
+                    if (Path(model_folder.host_path) / filename).is_file():
+                        model_definition_path = Path(model_folder.host_path) / filename
+                        break
+
+                if not model_definition_path:
+                    raise AgentError(
+                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f" {model_folder.name} (ID {model_folder.vfid})",
+                    )
+                try:
+                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                        None, model_definition_path.read_text
+                    )
+                except FileNotFoundError as e:
+                    raise AgentError(
+                        "Model definition file (model-definition.yml) does not exist under"
+                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+                    ) from e
+                try:
+                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+                except yaml.error.YAMLError as e:
+                    raise AgentError(f"Invalid YAML syntax: {e}") from e
+        try:
+            model_definition = model_definition_iv.check(raw_definition)
+            assert model_definition is not None
+            for model in model_definition["models"]:
+                if "BACKEND_MODEL_NAME" not in environ:
+                    environ["BACKEND_MODEL_NAME"] = model["name"]
+                environ["BACKEND_MODEL_PATH"] = model["model_path"]
+                if service := model.get("service"):
+                    overlapping_services = [
+                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                    ]
+                    if len(overlapping_services) > 0:
+                        raise AgentError(
+                            f"Port {service['port']} overlaps with built-in service"
+                            f" {overlapping_services[0]['name']}"
+                        )
+                    service_ports.append({
+                        "name": f"{model['name']}-{service['port']}",
+                        "protocol": ServicePortProtocols.PREOPEN,
+                        "container_ports": (service["port"],),
+                        "host_ports": (None,),
+                        "is_inference": True,
+                    })
+            return model_definition
+        except DataError as e:
+            raise AgentError(
+                "Failed to validate model definition from vFolder"
+                f" {model_folder.name} (ID {model_folder.vfid})",
+            ) from e
+
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
