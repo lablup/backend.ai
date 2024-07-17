@@ -20,7 +20,7 @@ jobs:
         id: check_skip
         uses: withgraphite/graphite-ci-action@main
         with:
-          graphite_token: ${{ secrets.GRPAHITE_CI_OPTIMIZER_TOKEN }}
+          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
   lint:
     if: |
       ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
