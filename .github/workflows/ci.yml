@@ -99,7 +99,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  alembic-check-multiple-heads:
+  check-alembic-migrations:
     if: |
       ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration')
         && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
@@ -269,7 +269,7 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test, alembic-check-multiple-heads]
+    needs: [lint, typecheck, test, check-alembic-migrations]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -328,7 +328,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test, alembic-check-multiple-heads]
+    needs: [lint, typecheck, test, check-alembic-migrations]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -395,7 +395,7 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test, alembic-check-multiple-heads]
+    needs: [lint, typecheck, test, check-alembic-migrations]
     if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/sbom.yml
 
