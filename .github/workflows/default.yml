@@ -269,7 +269,7 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -328,7 +328,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -395,7 +395,7 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, alembic-check-multiple-heads]
     if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/sbom.yml
 
