@@ -1,7 +1,7 @@
 """allow_unicode_in_groups_and_domains_name
 
 Revision ID: 9a06e8c862e7
-Revises: 31463788c713
+Revises: 59a622c31820
 Create Date: 2023-11-27 14:36:18.676875
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "9a06e8c862e7"
-down_revision = "31463788c713"
+down_revision = "59a622c31820"
 branch_labels = None
 depends_on = None
 
