@@ -44,8 +44,8 @@ class HTTPBackend(AbstractBackend):
                 ranges.append(ratio_sum)
             rand = random.random() * ranges[-1]
             for i in range(len(ranges)):
-                ceiling = ranges[0]
-                if (i == 0 and rand < ceiling) or (ranges[i - 1] <= rand and rand < ceiling):
+                ceiling = ranges[i]
+                if rand < ceiling:
                     selected_route = routes[i]
                     break
             else:
