@@ -441,16 +441,16 @@ class AbstractPermissionContextBuilder(
         cls,
         roles: Iterable[ScopedUserRole],
     ) -> frozenset[PermissionType]:
-        result = set()
+        result: frozenset[PermissionType] = frozenset()
         for role in roles:
             result |= await cls.calculate_permission_by_role(role)
-        return frozenset(result)
+        return result
 
     @classmethod
     async def calculate_permission_by_role(
         cls,
         role: ScopedUserRole,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         # This forces to implement a get_permission() method for each Built-in role.
         match role:
             case ScopedUserRole.OWNER:
@@ -468,33 +468,33 @@ class AbstractPermissionContextBuilder(
     @abstractmethod
     async def _permission_for_owner(
         cls,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         pass
 
     @classmethod
     @abstractmethod
     async def _permission_for_admin(
         cls,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         pass
 
     @classmethod
     @abstractmethod
     async def _permission_for_monitor(
         cls,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         pass
 
     @classmethod
     @abstractmethod
     async def _permission_for_contributor(
         cls,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         pass
 
     @classmethod
     @abstractmethod
     async def _permission_for_member(
         cls,
-    ) -> set[PermissionType]:
+    ) -> frozenset[PermissionType]:
         pass

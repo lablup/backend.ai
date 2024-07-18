@@ -727,17 +727,19 @@ WhereClauseType: TypeAlias = (
 )
 # TypeAlias is deprecated since 3.12
 
-OWNER_PERMISSIONS: set[VFolderRBACPermission] = set([perm for perm in VFolderRBACPermission])
-ADMIN_PERMISSIONS: set[VFolderRBACPermission] = set([
+OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    perm for perm in VFolderRBACPermission
+])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
     VFolderRBACPermission.DELETE_VFOLDER,
 ])
-MONITOR_PERMISSIONS: set[VFolderRBACPermission] = set([
+MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
 ])
-CONTRIBUTOR_PERMISSIONS: set[VFolderRBACPermission] = set([
+CONTRIBUTOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.READ_CONTENT,
     VFolderRBACPermission.WRITE_CONTENT,
@@ -746,26 +748,7 @@ CONTRIBUTOR_PERMISSIONS: set[VFolderRBACPermission] = set([
     VFolderRBACPermission.MOUNT_RW,
     VFolderRBACPermission.MOUNT_WD,
 ])
-MEMBER_PERMISSIONS: set[VFolderRBACPermission] = set()
-ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-])  # Admins are allowed to READ folders that other users are invited to.
-USER_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.READ_CONTENT,
-    VFolderRBACPermission.WRITE_CONTENT,
-    VFolderRBACPermission.DELETE_CONTENT,
-    VFolderRBACPermission.MOUNT_RO,
-    VFolderRBACPermission.MOUNT_RW,
-    VFolderRBACPermission.MOUNT_WD,
-])
-# `ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS == OWNER_PERMISSIONS` is true
-# but it doesn't mean that admins are the owner of the project folders.
-ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = frozenset(
-    ADMIN_PERMISSIONS
-    | USER_PERMISSIONS_ON_PROJECT_FOLDERS
-    | {VFolderRBACPermission.CLONE, VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS}
-)
+MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
 
 # TODO: Change type of `vfolder_permissions.permission` to VFolderRBACPermission
 PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderRBACPermission]] = {
@@ -1012,31 +995,31 @@ class PermissionContextBuilder(
     @classmethod
     async def _permission_for_owner(
         cls,
-    ) -> set[VFolderRBACPermission]:
+    ) -> frozenset[VFolderRBACPermission]:
         return OWNER_PERMISSIONS
 
     @classmethod
     async def _permission_for_admin(
         cls,
-    ) -> set[VFolderRBACPermission]:
+    ) -> frozenset[VFolderRBACPermission]:
         return ADMIN_PERMISSIONS
 
     @classmethod
     async def _permission_for_monitor(
         cls,
-    ) -> set[VFolderRBACPermission]:
+    ) -> frozenset[VFolderRBACPermission]:
         return MONITOR_PERMISSIONS
 
     @classmethod
     async def _permission_for_contributor(
         cls,
-    ) -> set[VFolderRBACPermission]:
+    ) -> frozenset[VFolderRBACPermission]:
         return CONTRIBUTOR_PERMISSIONS
 
     @classmethod
     async def _permission_for_member(
         cls,
-    ) -> set[VFolderRBACPermission]:
+    ) -> frozenset[VFolderRBACPermission]:
         return MEMBER_PERMISSIONS
 
 
