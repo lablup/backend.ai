@@ -1,0 +1,1 @@
+Mounts the /etc/localtime and /etc/timezone to the container when it is made by the agent if the host system platform is linux-based.
