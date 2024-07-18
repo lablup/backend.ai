@@ -23,6 +23,7 @@ def upgrade():
                 (jsonb_each(status_history)).key AS status,
                 (jsonb_each(status_history)).value AS timestamp
             FROM kernels
+            WHERE jsonb_typeof(status_history) = 'object'
         )
         UPDATE kernels
         SET status_history = (
@@ -31,6 +32,7 @@ def upgrade():
             )
             FROM data
             WHERE data.id = kernels.id
+                AND jsonb_typeof(kernels.status_history) = 'object'
         );
     """
     )
@@ -44,6 +46,7 @@ def upgrade():
                 (jsonb_each(status_history)).key AS status,
                 (jsonb_each(status_history)).value AS timestamp
             FROM sessions
+            WHERE jsonb_typeof(status_history) = 'object'
         )
         UPDATE sessions
         SET status_history = (
@@ -52,6 +55,7 @@ def upgrade():
             )
             FROM data
             WHERE data.id = sessions.id
+                AND jsonb_typeof(sessions.status_history) = 'object'
         );
     """
     )
@@ -68,13 +72,15 @@ def downgrade():
                     elem->>'status', elem->>'timestamp'
                 ) AS new_status_history
             FROM kernels,
-            jsonb_array_elements(status_history) AS elem
+                 jsonb_array_elements(status_history) AS elem
+            WHERE jsonb_typeof(status_history) = 'array'
             GROUP BY id
         )
         UPDATE kernels
         SET status_history = data.new_status_history
         FROM data
-        WHERE data.id = kernels.id;
+        WHERE data.id = kernels.id
+            AND jsonb_typeof(kernels.status_history) = 'array';
     """
     )
     op.alter_column("kernels", "status_history", nullable=True, default=None)
@@ -88,13 +94,15 @@ def downgrade():
                     elem->>'status', elem->>'timestamp'
                 ) AS new_status_history
             FROM sessions,
-            jsonb_array_elements(status_history) AS elem
+                 jsonb_array_elements(status_history) AS elem
+            WHERE jsonb_typeof(status_history) = 'array'
             GROUP BY id
         )
         UPDATE sessions
         SET status_history = data.new_status_history
         FROM data
-        WHERE data.id = sessions.id;
+        WHERE data.id = sessions.id
+            AND jsonb_typeof(sessions.status_history) = 'array';
     """
     )
     op.alter_column("sessions", "status_history", nullable=True, default=None)
