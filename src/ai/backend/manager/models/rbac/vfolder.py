@@ -46,7 +46,9 @@ from . import (
     get_roles_in_scope,
 )
 from .exceptions import InvalidScope, NotEnoughPermission
-from .permission_defs import VFolderPermission
+from .permission_defs import StorageHostPermission, VFolderPermission
+from .storage import PermissionContext as StorageHostPermissionContext
+from .storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
 
 if TYPE_CHECKING:
     pass
@@ -121,9 +123,43 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderLegacyPermission.OWNER_PERM: frozenset(OWNER_PERMISSIONS),
 }
 
+_VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
+    VFolderPermission, StorageHostPermission
+] = {
+    VFolderPermission.CLONE: StorageHostPermission.CLONE,
+    VFolderPermission.ASSIGN_PERMISSION_TO_OTHERS: StorageHostPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    VFolderPermission.READ_ATTRIBUTE: StorageHostPermission.READ_ATTRIBUTE,
+    VFolderPermission.UPDATE_ATTRIBUTE: StorageHostPermission.UPDATE_ATTRIBUTE,
+    VFolderPermission.DELETE_VFOLDER: StorageHostPermission.DELETE_VFOLDER,
+    VFolderPermission.READ_CONTENT: StorageHostPermission.READ_CONTENT,
+    VFolderPermission.WRITE_CONTENT: StorageHostPermission.WRITE_CONTENT,
+    VFolderPermission.DELETE_CONTENT: StorageHostPermission.DELETE_CONTENT,
+    VFolderPermission.MOUNT_RO: StorageHostPermission.MOUNT_RO,
+    VFolderPermission.MOUNT_RW: StorageHostPermission.MOUNT_RW,
+    VFolderPermission.MOUNT_WD: StorageHostPermission.MOUNT_WD,
+}
+
+_STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
+    StorageHostPermission, VFolderPermission
+] = {
+    StorageHostPermission.CLONE: VFolderPermission.CLONE,
+    StorageHostPermission.ASSIGN_PERMISSION_TO_OTHERS: VFolderPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    StorageHostPermission.READ_ATTRIBUTE: VFolderPermission.READ_ATTRIBUTE,
+    StorageHostPermission.UPDATE_ATTRIBUTE: VFolderPermission.UPDATE_ATTRIBUTE,
+    StorageHostPermission.DELETE_VFOLDER: VFolderPermission.DELETE_VFOLDER,
+    StorageHostPermission.READ_CONTENT: VFolderPermission.READ_CONTENT,
+    StorageHostPermission.WRITE_CONTENT: VFolderPermission.WRITE_CONTENT,
+    StorageHostPermission.DELETE_CONTENT: VFolderPermission.DELETE_CONTENT,
+    StorageHostPermission.MOUNT_RO: VFolderPermission.MOUNT_RO,
+    StorageHostPermission.MOUNT_RW: VFolderPermission.MOUNT_RW,
+    StorageHostPermission.MOUNT_WD: VFolderPermission.MOUNT_WD,
+}
+
 
 @dataclass
 class VFolderPermissionContext(AbstractPermissionContext[VFolderPermission, VFolderRow, uuid.UUID]):
+    host_permission_ctx: StorageHostPermissionContext | None = None
+
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -158,7 +194,13 @@ class VFolderPermissionContext(AbstractPermissionContext[VFolderPermission, VFol
             cond = _OR_coalesce(
                 cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
             )
+        if self.host_permission_ctx is not None:
+            host_names = self.host_permission_ctx.host_to_permissions_map.keys()
+            cond = _AND_coalesce(cond, VFolderRow.host.in_(host_names))
         return cond
+
+    def apply_host_permission_ctx(self, host_permission_ctx: StorageHostPermissionContext) -> None:
+        self.host_permission_ctx = host_permission_ctx
 
     async def build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
@@ -182,6 +224,14 @@ class VFolderPermissionContext(AbstractPermissionContext[VFolderPermission, VFol
             permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
             permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
             permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
+
+        if self.host_permission_ctx is not None:
+            host_permission_map = self.host_permission_ctx.host_to_permissions_map
+            host_perms = host_permission_map.get(vfolder_row.host)
+            if host_perms is not None:
+                permissions &= {
+                    _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP[perm] for perm in host_perms
+                }
 
         return frozenset(permissions)
 
@@ -427,8 +477,13 @@ async def get_vfolders(
     blocked_status: Container[VFolderOperationStatus] | None = None,
 ) -> list[VFolderWithPermissionSet]:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+            ctx, target_scope, host_permission
+        )
         builder = VFolderPermissionContextBuilder(db_session)
         permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+        permission_ctx.apply_host_permission_ctx(host_permission_ctx)
 
         query_stmt = await permission_ctx.build_query()
         if query_stmt is None:

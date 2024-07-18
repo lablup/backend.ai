@@ -25,7 +25,10 @@ import graphene
 import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata, VFolderID
+from ai.backend.common.types import (
+    HardwareMetadata,
+    VFolderID,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument

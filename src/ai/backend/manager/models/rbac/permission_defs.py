@@ -22,3 +22,22 @@ class VFolderPermission(BasePermission):
     MOUNT_RO = enum.auto()
     MOUNT_RW = enum.auto()
     MOUNT_WD = enum.auto()
+
+
+class StorageHostPermission(BasePermission):
+    CREATE_FOLDER = enum.auto()
+
+    CLONE = VFolderPermission.CLONE
+    ASSIGN_PERMISSION_TO_OTHERS = VFolderPermission.ASSIGN_PERMISSION_TO_OTHERS
+
+    READ_ATTRIBUTE = VFolderPermission.READ_ATTRIBUTE
+    UPDATE_ATTRIBUTE = VFolderPermission.UPDATE_ATTRIBUTE
+    DELETE_VFOLDER = VFolderPermission.DELETE_VFOLDER
+
+    READ_CONTENT = VFolderPermission.READ_CONTENT
+    WRITE_CONTENT = VFolderPermission.WRITE_CONTENT
+    DELETE_CONTENT = VFolderPermission.DELETE_CONTENT
+
+    MOUNT_RO = VFolderPermission.MOUNT_RO
+    MOUNT_RW = VFolderPermission.MOUNT_RW
+    MOUNT_WD = VFolderPermission.MOUNT_WD
