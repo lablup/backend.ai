@@ -353,7 +353,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     MountPermission.READ_WRITE,
                 )
             )
-
+        # /etc/localtime and /etc/timezone mounts
+        if sys.platform.startswith("linux"):
+            mounts.append(
+                Mount(
+                    type=MountTypes.BIND,
+                    source=Path("/etc/localtime"),
+                    target=Path("/etc/localtime"),
+                    permission=MountPermission.READ_ONLY,
+                )
+            )
+            mounts.append(
+                Mount(
+                    type=MountTypes.BIND,
+                    source=Path("/etc/timezone"),
+                    target=Path("/etc/timezone"),
+                    permission=MountPermission.READ_ONLY,
+                )
+            )
         # lxcfs mounts
         lxcfs_root = Path("/var/lib/lxcfs")
         if lxcfs_root.is_dir():
