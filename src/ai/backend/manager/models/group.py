@@ -140,7 +140,7 @@ groups = sa.Table(
     "groups",
     mapper_registry.metadata,
     IDColumn("id"),
-    sa.Column("name", SlugType(length=64, allow_unicode=True), nullable=False),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),

@@ -619,11 +619,13 @@ class SlugType(TypeDecorator):
         self,
         *,
         length: int | None = None,
+        allow_dot: bool = False,
         allow_space: bool = False,
         allow_unicode: bool = False,
     ) -> None:
         super().__init__(length=length)
         self._tx_slug = tx.Slug(
+            allow_dot=allow_dot,
             allow_space=allow_space,
             allow_unicode=allow_unicode,
         )

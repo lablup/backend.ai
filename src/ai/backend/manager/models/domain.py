@@ -56,7 +56,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 domains = sa.Table(
     "domains",
     mapper_registry.metadata,
-    sa.Column("name", SlugType(length=64, allow_unicode=True), primary_key=True),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
