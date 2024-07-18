@@ -94,13 +94,15 @@ jobs:
         with:
           ref: ${{ matrix.milestone }}
       - name: Cherry-pick
+        env:
+          COMMIT_MESSAGE: ${{ needs.backport-target-branch.outputs.commit_message }}
         run: |
           git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
           git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
           git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
-            --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \
+            --amend -m "${COMMIT_MESSAGE}" \
             --trailer "Backported-from=main (${{ needs.backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
