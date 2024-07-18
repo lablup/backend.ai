@@ -228,6 +228,13 @@ show_guide() {
   fi
 }
 
+ARCH_UNAME=$(uname -m)
+case $ARCH_UNAME in
+  "x86_64" | "amd64")   ARCH_GO=amd64 ;;
+  "aarch64" | "arm64")  ARCH_GO=arm64 ;;
+  *)                    ARCH_GO=$ARCH_UNAME ;;
+esac
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
@@ -377,14 +384,20 @@ install_script_deps() {
   Debian)
     $sudo apt-get update
     $sudo apt-get install -y git jq gcc make g++
+    $sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH_GO}
+    $sudo chmod +x /usr/local/bin/yq
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
     $sudo yum install -y git jq gcc make gcc-c++
+    $sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH_GO}
+    $sudo chmod +x /usr/local/bin/yq
     ;;
   SUSE)
     $sudo zypper update
     $sudo zypper install -y git jq gcc make gcc-c++
+    $sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH_GO}
+    $sudo chmod +x /usr/local/bin/yq
     ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
@@ -393,7 +406,7 @@ install_script_deps() {
       install_brew
     fi
     brew update
-    brew install jq
+    brew install jq yq
     # Having Homebrew means that the user already has git.
     ;;
   esac
