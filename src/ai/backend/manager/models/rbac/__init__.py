@@ -45,7 +45,7 @@ class ScopedUserRole(enum.StrEnum):
     OWNER = enum.auto()
     ADMIN = enum.auto()
     MONITOR = enum.auto()
-    CONTRIBUTOR = enum.auto()  # User is part of a specific scope and has read(or some additional permissions) to objects that the scope has.
+    PRIVILEGED_MEMBER = enum.auto()  # User is part of a specific scope and has read(or some additional permissions) to objects that the scope has.
     MEMBER = (
         enum.auto()
     )  # User is part of a specific scope and has NO PERMISSION to objects that the scope has.
@@ -62,138 +62,161 @@ class ClientContext:
     user_id: uuid.UUID
     user_role: UserRole
 
-    async def _calculate_role_in_scope_for_suadmin(
-        self, db_session: AsyncSession, scope: BaseScope
-    ) -> frozenset[ScopedUserRole]:
-        match scope:
-            case DomainScope(domain_name):
-                stmt = (
-                    sa.select(DomainRow)
-                    .where(DomainRow.name == domain_name)
-                    .options(load_only(DomainRow.name))
-                )
-                domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
-                if domain_row is not None:
-                    return frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-            case ProjectScope(project_id):
-                stmt = (
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == project_id)
-                    .options(load_only(GroupRow.id))
-                )
-                project_row = cast(GroupRow | None, await db_session.scalar(stmt))
-                if project_row is None:
-                    return _EMPTY_FSET
-                if project_row is not None:
-                    return frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-            case UserScope(user_id):
-                if self.user_id == user_id:
-                    return frozenset([ScopedUserRole.OWNER])
-                stmt = (
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_id)
-                    .options(load_only(UserRow.uuid))
-                )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
-                if user_row is not None:
-                    return frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-            case _:
-                raise InvalidScope(f"invalid scope `{scope}`")
 
-    async def _calculate_role_in_scope_for_monitor(
-        self, db_session: AsyncSession, scope: BaseScope
-    ) -> frozenset[ScopedUserRole]:
-        match scope:
-            case DomainScope(domain_name):
-                stmt = (
-                    sa.select(DomainRow)
-                    .where(DomainRow.name == domain_name)
-                    .options(load_only(DomainRow.name))
-                )
-                domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
-                if domain_row is not None:
-                    return frozenset([ScopedUserRole.MONITOR])
-                else:
-                    return _EMPTY_FSET
-            case ProjectScope(project_id):
-                stmt = (
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == project_id)
-                    .options(
-                        load_only(GroupRow.id, GroupRow.domain_name),
-                        selectinload(GroupRow.users),
-                        with_loader_criteria(
-                            AssocGroupUserRow, AssocGroupUserRow.user_id == self.user_id
-                        ),
-                    )
-                )
-                project_row = cast(GroupRow | None, await db_session.scalar(stmt))
-                if project_row is None:
-                    return _EMPTY_FSET
-                if project_row.domain_name == self.domain_name:
-                    result = frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-                if project_row.users:
-                    result = frozenset([*result, ScopedUserRole.CONTRIBUTOR])
-                return result
-            case UserScope(user_id):
-                if self.user_id == user_id:
-                    return frozenset([ScopedUserRole.OWNER])
-                stmt = (
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_id)
-                    .options(load_only(UserRow.uuid))
-                )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
-                if user_row is not None:
-                    return frozenset([ScopedUserRole.MONITOR])
-                else:
-                    return _EMPTY_FSET
-            case _:
-                raise InvalidScope(f"invalid scope `{scope}`")
+async def get_roles_in_scope(
+    ctx: ClientContext,
+    scope: BaseScope,
+    db_session: AsyncSession | None = None,
+) -> frozenset[ScopedUserRole]:
+    async def _calculate_role(db_session: AsyncSession) -> frozenset[ScopedUserRole]:
+        match ctx.user_role:
+            case UserRole.SUPERADMIN:
+                return await _calculate_role_in_scope_for_suadmin(ctx, db_session, scope)
+            case UserRole.MONITOR:
+                return await _calculate_role_in_scope_for_monitor(ctx, db_session, scope)
+            case UserRole.ADMIN:
+                return await _calculate_role_in_scope_for_admin(ctx, db_session, scope)
+            case UserRole.USER:
+                return await _calculate_role_in_scope_for_user(ctx, db_session, scope)
 
-    async def _calculate_role_in_scope_for_admin(
-        self, db_session: AsyncSession, scope: BaseScope
-    ) -> frozenset[ScopedUserRole]:
-        match scope:
-            case DomainScope(domain_name):
-                if self.domain_name == domain_name:
-                    return frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-            case ProjectScope(project_id):
-                stmt = (
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == project_id)
-                    .options(
-                        load_only(GroupRow.id, GroupRow.domain_name),
-                        selectinload(GroupRow.users),
-                        with_loader_criteria(
-                            AssocGroupUserRow, AssocGroupUserRow.user_id == self.user_id
-                        ),
-                    )
-                )
-                project_row = cast(GroupRow | None, await db_session.scalar(stmt))
-                if project_row is None:
-                    return _EMPTY_FSET
+    if db_session is None:
+        async with ctx.db.begin_readonly_session() as _db_session:
+            return await _calculate_role(_db_session)
+    else:
+        return await _calculate_role(db_session)
 
-                if project_row.domain_name == self.domain_name:
-                    result = frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-                if project_row.users:
-                    result = frozenset([*result, ScopedUserRole.CONTRIBUTOR])
-                return result
-            case UserScope(user_id):
-                if self.user_id == user_id:
-                    return frozenset([ScopedUserRole.OWNER])
+
+async def _calculate_role_in_scope_for_suadmin(
+    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+) -> frozenset[ScopedUserRole]:
+    match scope:
+        case DomainScope(domain_name):
+            stmt = (
+                sa.select(DomainRow)
+                .where(DomainRow.name == domain_name)
+                .options(load_only(DomainRow.name))
+            )
+            domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
+            if domain_row is not None:
+                return frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+        case ProjectScope(project_id):
+            stmt = (
+                sa.select(GroupRow).where(GroupRow.id == project_id).options(load_only(GroupRow.id))
+            )
+            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            if project_row is None:
+                return _EMPTY_FSET
+            if project_row is not None:
+                return frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+        case UserScope(user_id):
+            if ctx.user_id == user_id:
+                return frozenset([ScopedUserRole.OWNER])
+            stmt = (
+                sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
+            )
+            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            if user_row is not None:
+                return frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+        case _:
+            raise InvalidScope(f"invalid scope `{scope}`")
+
+
+async def _calculate_role_in_scope_for_monitor(
+    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+) -> frozenset[ScopedUserRole]:
+    match scope:
+        case DomainScope(domain_name):
+            stmt = (
+                sa.select(DomainRow)
+                .where(DomainRow.name == domain_name)
+                .options(load_only(DomainRow.name))
+            )
+            domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
+            if domain_row is not None:
+                return frozenset([ScopedUserRole.MONITOR])
+            else:
+                return _EMPTY_FSET
+        case ProjectScope(project_id):
+            stmt = (
+                sa.select(GroupRow)
+                .where(GroupRow.id == project_id)
+                .options(
+                    load_only(GroupRow.id, GroupRow.domain_name),
+                    selectinload(GroupRow.users),
+                    with_loader_criteria(
+                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
+                    ),
+                )
+            )
+            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            if project_row is None:
+                return _EMPTY_FSET
+            if project_row.domain_name == ctx.domain_name:
+                result = frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+            if project_row.users:
+                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+            return result
+        case UserScope(user_id):
+            if ctx.user_id == user_id:
+                return frozenset([ScopedUserRole.OWNER])
+            stmt = (
+                sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
+            )
+            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            if user_row is not None:
+                return frozenset([ScopedUserRole.MONITOR])
+            else:
+                return _EMPTY_FSET
+        case _:
+            raise InvalidScope(f"invalid scope `{scope}`")
+
+
+async def _calculate_role_in_scope_for_admin(
+    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+) -> frozenset[ScopedUserRole]:
+    match scope:
+        case DomainScope(domain_name):
+            if ctx.domain_name == domain_name:
+                return frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+        case ProjectScope(project_id):
+            stmt = (
+                sa.select(GroupRow)
+                .where(GroupRow.id == project_id)
+                .options(
+                    load_only(GroupRow.id, GroupRow.domain_name),
+                    selectinload(GroupRow.users),
+                    with_loader_criteria(
+                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
+                    ),
+                )
+            )
+            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            if project_row is None:
+                return _EMPTY_FSET
+
+            if project_row.domain_name == ctx.domain_name:
+                result = frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+            if project_row.users:
+                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+            return result
+        case UserScope(user_id, domain_name):
+            if ctx.user_id == user_id:
+                return frozenset([ScopedUserRole.OWNER])
+            if domain_name is not None:
+                _domain_name = domain_name
+            else:
                 stmt = (
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_id)
@@ -202,66 +225,45 @@ class ClientContext:
                 user_row = cast(UserRow | None, await db_session.scalar(stmt))
                 if user_row is None:
                     return _EMPTY_FSET
+                _domain_name = user_row.domain_name
+            if _domain_name == ctx.domain_name:
+                return frozenset([ScopedUserRole.ADMIN])
+            else:
+                return _EMPTY_FSET
+        case _:
+            raise InvalidScope(f"invalid scope `{scope}`")
 
-                if user_row.domain_name == self.domain_name:
-                    return frozenset([ScopedUserRole.ADMIN])
-                else:
-                    return _EMPTY_FSET
-            case _:
-                raise InvalidScope(f"invalid scope `{scope}`")
 
-    async def _calculate_role_in_scope_for_user(
-        self, db_session: AsyncSession, scope: BaseScope
-    ) -> frozenset[ScopedUserRole]:
-        match scope:
-            case DomainScope(domain_name):
-                if self.domain_name == domain_name:
-                    return frozenset([ScopedUserRole.MEMBER])
-                else:
-                    return _EMPTY_FSET
-            case ProjectScope(project_id):
-                stmt = (
-                    sa.select(AssocGroupUserRow)
-                    .where(
-                        (AssocGroupUserRow.user_id == self.user_id)
-                        & (AssocGroupUserRow.group_id == project_id)
-                    )
-                    .options(load_only(AssocGroupUserRow.user_id))
+async def _calculate_role_in_scope_for_user(
+    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+) -> frozenset[ScopedUserRole]:
+    match scope:
+        case DomainScope(domain_name):
+            if ctx.domain_name == domain_name:
+                return frozenset([ScopedUserRole.MEMBER])
+            else:
+                return _EMPTY_FSET
+        case ProjectScope(project_id):
+            stmt = (
+                sa.select(AssocGroupUserRow)
+                .where(
+                    (AssocGroupUserRow.user_id == ctx.user_id)
+                    & (AssocGroupUserRow.group_id == project_id)
                 )
-                assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
-                if assoc_row is not None:
-                    return frozenset([ScopedUserRole.CONTRIBUTOR])
-                else:
-                    return _EMPTY_FSET
-            case UserScope(user_id):
-                if self.user_id == user_id:
-                    return frozenset([ScopedUserRole.OWNER])
-                else:
-                    return _EMPTY_FSET
-            case _:
-                raise InvalidScope(f"invalid scope `{scope}`")
-
-    async def get_roles_in_scope(
-        self,
-        scope: BaseScope,
-        db_session: AsyncSession | None = None,
-    ) -> frozenset[ScopedUserRole]:
-        async def _calculate_role(db_session: AsyncSession) -> frozenset[ScopedUserRole]:
-            match self.user_role:
-                case UserRole.SUPERADMIN:
-                    return await self._calculate_role_in_scope_for_suadmin(db_session, scope)
-                case UserRole.MONITOR:
-                    return await self._calculate_role_in_scope_for_monitor(db_session, scope)
-                case UserRole.ADMIN:
-                    return await self._calculate_role_in_scope_for_admin(db_session, scope)
-                case UserRole.USER:
-                    return await self._calculate_role_in_scope_for_user(db_session, scope)
-
-        if db_session is None:
-            async with self.db.begin_readonly_session() as _db_session:
-                return await _calculate_role(_db_session)
-        else:
-            return await _calculate_role(db_session)
+                .options(load_only(AssocGroupUserRow.user_id))
+            )
+            assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
+            if assoc_row is not None:
+                return frozenset([ScopedUserRole.PRIVILEGED_MEMBER])
+            else:
+                return _EMPTY_FSET
+        case UserScope(user_id):
+            if ctx.user_id == user_id:
+                return frozenset([ScopedUserRole.OWNER])
+            else:
+                return _EMPTY_FSET
+        case _:
+            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 class BaseScope(metaclass=ABCMeta):
@@ -457,8 +459,8 @@ class AbstractPermissionContextBuilder(
                 return await cls._permission_for_admin()
             case ScopedUserRole.MONITOR:
                 return await cls._permission_for_monitor()
-            case ScopedUserRole.CONTRIBUTOR:
-                return await cls._permission_for_contributor()
+            case ScopedUserRole.PRIVILEGED_MEMBER:
+                return await cls._permission_for_privileged_member()
             case ScopedUserRole.MEMBER:
                 return await cls._permission_for_member()
 
@@ -485,7 +487,7 @@ class AbstractPermissionContextBuilder(
 
     @classmethod
     @abstractmethod
-    async def _permission_for_contributor(
+    async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[PermissionType]:
         pass

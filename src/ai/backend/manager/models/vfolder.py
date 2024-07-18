@@ -96,6 +96,7 @@ from .rbac import (
     ProjectScope,
     ScopedUserRole,
     StorageHost,
+    get_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
@@ -739,7 +740,7 @@ MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
 ])
-CONTRIBUTOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.READ_CONTENT,
     VFolderRBACPermission.WRITE_CONTENT,
@@ -860,10 +861,30 @@ class PermissionContextBuilder(
         match target_scope:
             case DomainScope(domain_name):
                 permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
+            case ProjectScope(project_id, domain_name):
+                permission_ctx = await self.build_in_project_scope(ctx, project_id)
+            case UserRBACScope(user_id, _):
+                permission_ctx = await self.build_in_user_scope(ctx, user_id)
+            case _:
+                raise InvalidScope
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    async def build_in_nested_scope(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: VFolderRBACPermission,
+    ) -> PermissionContext:
+        match target_scope:
+            case DomainScope(domain_name):
+                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
                 _user_perm_ctx = await self.build_in_user_scope_in_domain(
                     ctx, ctx.user_id, domain_name
                 )
                 permission_ctx = PermissionContext.merge(permission_ctx, _user_perm_ctx)
+                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
+                permission_ctx = PermissionContext.merge(permission_ctx, _project_perm_ctx)
             case ProjectScope(project_id, domain_name):
                 permission_ctx = await self.build_in_project_scope(ctx, project_id)
                 if domain_name is not None:
@@ -883,9 +904,27 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
     ) -> PermissionContext:
-        roles = await ctx.get_roles_in_scope(DomainScope(domain_name), self.db_session)
+        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
         domain_permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
         result = PermissionContext(domain_name_to_permission_map={domain_name: domain_permissions})
+        return result
+
+    async def build_in_project_scopes_in_domain(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> PermissionContext:
+        result = PermissionContext()
+
+        _project_stmt = (
+            sa.select(GroupRow)
+            .where(GroupRow.domain_name == domain_name)
+            .options(load_only(GroupRow.id))
+        )
+        for row in await self.db_session.scalars(_project_stmt):
+            _row = cast(GroupRow, row)
+            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
+            result = PermissionContext.merge(result, _project_perm_ctx)
         return result
 
     async def build_in_user_scope_in_domain(
@@ -895,7 +934,7 @@ class PermissionContextBuilder(
         domain_name: str,
     ) -> PermissionContext:
         # For Superadmin and monitor who can create vfolders in multiple different domains.
-        roles = await ctx.get_roles_in_scope(UserRBACScope(user_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
 
         _vfolder_stmt = (
@@ -939,7 +978,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         project_id: uuid.UUID,
     ) -> PermissionContext:
-        roles = await ctx.get_roles_in_scope(ProjectScope(project_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
         result = PermissionContext(project_id_to_permission_map={project_id: permissions})
 
@@ -968,7 +1007,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         user_id: uuid.UUID,
     ) -> PermissionContext:
-        roles = await ctx.get_roles_in_scope(UserRBACScope(user_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
         permissions = await PermissionContextBuilder.calculate_permission_by_roles(roles)
         result = PermissionContext(user_id_to_permission_map={user_id: permissions})
 
@@ -1011,10 +1050,10 @@ class PermissionContextBuilder(
         return MONITOR_PERMISSIONS
 
     @classmethod
-    async def _permission_for_contributor(
+    async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
-        return CONTRIBUTOR_PERMISSIONS
+        return PRIVILEGED_MEMBER_PERMISSIONS
 
     @classmethod
     async def _permission_for_member(
