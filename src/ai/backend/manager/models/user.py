@@ -741,11 +741,8 @@ class ModifyUser(graphene.Mutation):
             data.pop("password", None)
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
-        if data.get("status") is None and props.is_active is not None:
+        if data.get("status") is None and props.is_active is not Undefined:
             data["status"] = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
-
-        if data.get("password") is not None:
-            data["password_changed_at"] = sa.func.now()
 
         main_access_key: str | None = data.get("main_access_key")
         user_update_data: Dict[str, Any] = {}
