@@ -209,19 +209,6 @@ def str_to_timedelta(tstr: str) -> timedelta:
     return timedelta(**params)  # type: ignore
 
 
-def compile_slug_re_pattern(allow_space: bool, allow_unicode: bool) -> re.Pattern[str]:
-    if allow_space:
-        _pattern = r"^\w([a-zA-Z0-9._-]*\w)?$"
-    else:
-        _pattern = r"^\w(?!\s)([\w._-]*\w)?$"
-
-    if allow_unicode:
-        _rx_slug = re.compile(_pattern)
-    else:
-        _rx_slug = re.compile(_pattern, flags=re.ASCII)
-    return _rx_slug
-
-
 class FstabEntry:
     """
     Entry class represents a non-comment line on the `fstab` file.

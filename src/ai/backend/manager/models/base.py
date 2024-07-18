@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
@@ -66,7 +67,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.common.utils import compile_slug_re_pattern
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
@@ -623,11 +623,16 @@ class SlugType(TypeDecorator):
         allow_unicode: bool = False,
     ) -> None:
         super().__init__(length=length)
-        self._rx_slug = compile_slug_re_pattern(allow_space, allow_unicode)
+        self._tx_slug = tx.Slug(
+            allow_space=allow_space,
+            allow_unicode=allow_unicode,
+        )
 
     def process_bind_param(self, value: str, dialect) -> str:
-        if self._rx_slug.search(string=value) is None:
-            raise ValueError("invalid name format. slug format required.", value)
+        try:
+            self._tx_slug.check(value)
+        except t.DataError as e:
+            raise ValueError(e.error, value)
         return value
 
 

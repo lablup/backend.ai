@@ -9,6 +9,7 @@ import json
 import os
 import pwd
 import random
+import re
 import uuid
 from collections.abc import Iterable
 from decimal import Decimal
@@ -48,7 +49,6 @@ from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
 from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
-from .utils import compile_slug_re_pattern
 
 __all__ = (
     "AliasedKey",
@@ -580,17 +580,54 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
+    _negative_head_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"^[\s._-]+"),
+        (True, False): re.compile(r"^[\s_-]+"),
+        (False, True): re.compile(r"^[._-]+"),
+        (False, False): re.compile(r"^[_-]+"),
+    }
+    _negative_tail_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]+$"),
+        (True, False): re.compile(r"[\s_-]+$"),
+        (False, True): re.compile(r"[._-]+$"),
+        (False, False): re.compile(r"[_-]+$"),
+    }
+    _negative_consecutive_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]{2,}"),
+        (True, False): re.compile(r"[\s_-]{2,}"),
+        (False, True): re.compile(r"[._-]{2,}"),
+        (False, False): re.compile(r"[_-]{2,}"),
+    }
+    _positive_body_pattern_sources = {
+        # allow_space, allow_dot
+        (True, True): r"[\w\s.-]+",
+        (True, False): r"[\w\s-]+",
+        (False, True): r"[\w.-]+",
+        (False, False): r"[\w-]+",
+    }
+
     def __init__(
         self,
         *,
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         allow_dot: bool = False,
+        allow_space: bool = False,
         allow_unicode: bool = False,
     ) -> None:
         super().__init__()
-        self._allow_dot = allow_dot
-        self._rx_slug = compile_slug_re_pattern(allow_space=True, allow_unicode=allow_unicode)
+        self._negative_head_pattern = self._negative_head_patterns[(allow_space, allow_dot)]
+        self._negative_tail_pattern = self._negative_tail_patterns[(allow_space, allow_dot)]
+        self._negative_consecutive_pattern = self._negative_consecutive_patterns[
+            (allow_space, allow_dot)
+        ]
+        self._positive_body_pattern = re.compile(
+            self._positive_body_pattern_sources[(allow_space, allow_dot)],
+            re.UNICODE if allow_unicode else re.ASCII,
+        )
         if min_length is not None and min_length < 0:
             raise TypeError("min_length must be larger than or equal to zero.")
         if max_length is not None and max_length < 0:
@@ -606,12 +643,13 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
                 self._failure(f"value is too short (min length {self._min_length})", value=value)
             if self._max_length is not None and len(value) > self._max_length:
                 self._failure(f"value is too long (max length {self._max_length})", value=value)
-            if self._allow_dot and value.startswith("."):
-                checked_value = value[1:]
-            else:
-                checked_value = value
-            match = self._rx_slug.search(checked_value)
-            if match is None:
+            if self._negative_head_pattern.search(value):
+                self._failure("value should not begin with non-word characters.")
+            if self._negative_tail_pattern.search(value):
+                self._failure("value should not end with non-word characters.")
+            if self._negative_consecutive_pattern.search(value):
+                self._failure("value should contain consecutive non-word characters.")
+            if not self._positive_body_pattern.fullmatch(value):
                 self._failure("value must be a valid slug.", value=value)
         else:
             self._failure("value must be a string", value=value)
