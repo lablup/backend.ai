@@ -625,6 +625,7 @@ class SlugType(TypeDecorator):
     ) -> None:
         super().__init__(length=length)
         self._tx_slug = tx.Slug(
+            max_length=length,
             allow_dot=allow_dot,
             allow_space=allow_space,
             allow_unicode=allow_unicode,
