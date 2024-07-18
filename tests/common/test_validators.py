@@ -344,38 +344,49 @@ def test_user_id():
         iv.check((1, 2))
 
 
-def test_slug():
+def test_slug_ascii():
     iv = tx.Slug()
     assert iv.check("a") == "a"
     assert iv.check("0Z") == "0Z"
     assert iv.check("abc") == "abc"
     assert iv.check("a-b") == "a-b"
     assert iv.check("a_b") == "a_b"
-
+    with pytest.raises(t.DataError):
+        iv.check("-b")
+    with pytest.raises(t.DataError):
+        iv.check("a_")
     with pytest.raises(t.DataError):
         iv.check("_")
     with pytest.raises(t.DataError):
         iv.check("")
-
-    iv = tx.Slug(allow_dot=True)
-    assert iv.check(".a") == ".a"
-    assert iv.check("a") == "a"
     with pytest.raises(t.DataError):
-        iv.check("..a")
+        iv.check("a__b")
+    with pytest.raises(t.DataError):
+        iv.check("a--b")
 
-    iv = tx.Slug[:4]
+
+def test_slug_length():
+    iv = tx.Slug[2:4]  # type: ignore
+    assert iv._min_length == 2
+    assert iv._max_length == 4
+
+    iv = tx.Slug(max_length=4)
+    assert iv._min_length is None
+    assert iv._max_length == 4
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
-    iv = tx.Slug[4:]
+    iv = tx.Slug(min_length=4)
+    assert iv._min_length == 4
+    assert iv._max_length is None
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"
     assert iv.check("abcde") == "abcde"
 
-    iv = tx.Slug[2:4]
+    iv = tx.Slug(min_length=2, max_length=4)
     with pytest.raises(t.DataError):
         iv.check("a")
     assert iv.check("ab") == "ab"
@@ -383,7 +394,7 @@ def test_slug():
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
-    iv = tx.Slug[2:2]
+    iv = tx.Slug(min_length=2, max_length=2)
     with pytest.raises(t.DataError):
         iv.check("a")
     assert iv.check("ab") == "ab"
@@ -391,11 +402,91 @@ def test_slug():
         iv.check("abc")
 
     with pytest.raises(TypeError):
-        tx.Slug[2:1]
+        tx.Slug(min_length=2, max_length=1)
     with pytest.raises(TypeError):
-        tx.Slug[-1:]
+        tx.Slug(max_length=-1)
     with pytest.raises(TypeError):
-        tx.Slug[:-1]
+        tx.Slug(min_length=-1)
+
+
+def test_slug_unicode():
+    iv = tx.Slug(allow_unicode=False)
+    with pytest.raises(t.DataError):
+        iv.check("한글")
+    with pytest.raises(t.DataError):
+        iv.check("가-힣")
+    with pytest.raises(t.DataError):
+        iv.check("한_글")
+    with pytest.raises(t.DataError):
+        iv.check("_한글")
+    with pytest.raises(t.DataError):
+        iv.check("한글-")
+
+    iv = tx.Slug(allow_unicode=True)
+    assert iv.check("한글") == "한글"
+    assert iv.check("가-힣") == "가-힣"
+    assert iv.check("한_글") == "한_글"
+    with pytest.raises(t.DataError):
+        iv.check("_한글")
+    with pytest.raises(t.DataError):
+        iv.check("한글-")
+
+
+def test_slug_spaces():
+    iv = tx.Slug(allow_space=False)
+    with pytest.raises(t.DataError):
+        iv.check("")
+    with pytest.raises(t.DataError):
+        iv.check(" ")
+    with pytest.raises(t.DataError):
+        iv.check("\t")
+    with pytest.raises(t.DataError):
+        iv.check("a b")
+    with pytest.raises(t.DataError):
+        iv.check("a\tb")
+
+    iv = tx.Slug(allow_space=True)
+    with pytest.raises(t.DataError):
+        iv.check("")
+    with pytest.raises(t.DataError):
+        iv.check(" ")
+    with pytest.raises(t.DataError):
+        iv.check("\t")
+    assert iv.check("a b") == "a b"
+    assert iv.check("a\tb") == "a\tb"
+    with pytest.raises(t.DataError):
+        # consecutive non-word chars are not allowed always.
+        iv.check("ab  cd")
+
+
+def test_slug_dot():
+    iv = tx.Slug(allow_dot=False)
+    with pytest.raises(t.DataError):
+        iv.check(".")
+    with pytest.raises(t.DataError):
+        iv.check("...")
+    with pytest.raises(t.DataError):
+        iv.check("ab..cd")
+    with pytest.raises(t.DataError):
+        iv.check(".abc")
+    with pytest.raises(t.DataError):
+        iv.check("abc.")
+    with pytest.raises(t.DataError):
+        iv.check("ab.c")
+
+    iv = tx.Slug(allow_dot=True)
+    with pytest.raises(t.DataError):
+        iv.check(".")
+    with pytest.raises(t.DataError):
+        iv.check("...")
+    with pytest.raises(t.DataError):
+        iv.check(".abc")
+    with pytest.raises(t.DataError):
+        iv.check("abc.")
+    assert iv.check("ab.c") == "ab.c"
+    with pytest.raises(t.DataError):
+        # consecutive non-word chars are not allowed always.
+        iv.check("ab..cd")
 
 
 def test_json_string():

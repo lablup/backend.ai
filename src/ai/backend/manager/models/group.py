@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import re
 import uuid
 from typing import (
     TYPE_CHECKING,
@@ -42,6 +41,7 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
+    SlugType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
@@ -92,7 +92,6 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 
 class UserRoleInProject(enum.StrEnum):
@@ -141,7 +140,7 @@ groups = sa.Table(
     "groups",
     mapper_registry.metadata,
     IDColumn("id"),
-    sa.Column("name", sa.String(length=64), nullable=False),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -498,8 +497,6 @@ class CreateGroup(graphene.Mutation):
         name: str,
         props: GroupInput,
     ) -> CreateGroup:
-        if _rx_slug.search(name) is None:
-            raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -563,8 +560,6 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "container_registry")
 
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
