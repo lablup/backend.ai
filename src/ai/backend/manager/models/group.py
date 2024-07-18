@@ -304,7 +304,9 @@ class Group(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
-            total_resource_slots=row["total_resource_slots"].to_json(),
+            total_resource_slots=row["total_resource_slots"].to_json()
+            if row["total_resource_slots"] is not None
+            else {},
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
