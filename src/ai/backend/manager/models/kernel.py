@@ -544,7 +544,7 @@ class KernelRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = (sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[]),)
+    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[])
     # status_history records all status changes
     # e.g)
     # [
@@ -552,8 +552,8 @@ class KernelRow(Base):
     #   {"status: "SCHEDULED", "timestamp": "2022-10-22T11:40:30"},
     #   {"status: "PREPARING", "timestamp": "2022-10-25T10:22:30"}
     # ]
-    callback_url = (sa.Column("callback_url", URLColumn, nullable=True, default=sa.null()),)
-    startup_command = (sa.Column("startup_command", sa.Text, nullable=True),)
+    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
     result = sa.Column(
         "result",
         EnumType(SessionResult),
