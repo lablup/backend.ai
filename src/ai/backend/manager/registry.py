@@ -3056,8 +3056,12 @@ class AgentRegistry:
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
-                    image_ref = ImageRef(image[0], known_registries, agent_info["architecture"])
-                    await pipe.sadd(image_ref.canonical, agent_id)
+                    try:
+                        image_ref = ImageRef(image[0], known_registries, agent_info["architecture"])
+                        await pipe.sadd(image_ref.canonical, agent_id)
+                    except ValueError:
+                        # Skip opaque (non-Backend.AI) image.
+                        continue
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
