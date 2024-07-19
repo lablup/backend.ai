@@ -1119,19 +1119,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # For legacy accelerator plugins
         self.docker = Docker()
 
-        async with closing_async(Docker()) as docker:
-            images = await docker.images.list()
-            for image in images:
-                if image["RepoTags"] is None:
-                    continue
-                for repo_tag in image["RepoTags"]:
-                    try:
-                        ImageRef(repo_tag, ["*"])
-                    except ValueError:
-                        log.warn(
-                            "Image tag {} does not conform to Backend.AI's naming rule. This image will be considered as uninstalled."
-                        )
-
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
@@ -1228,6 +1215,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 for repo_tag in image["RepoTags"]:
                     if repo_tag.endswith("<none>"):
                         continue
+                    try:
+                        ImageRef(repo_tag, ["*"])
+                    except ValueError:
+                        log.warn(
+                            "Image tag {} does not conform to Backend.AI's naming rule. This image will be considered as uninstalled.",
+                            repo_tag,
+                        )
+                        continue
+
                     img_detail = await docker.images.inspect(repo_tag)
                     labels = img_detail["Config"]["Labels"]
                     if labels is None or "ai.backend.kernelspec" not in labels:
