@@ -192,3 +192,4 @@ Here is the step-by-step guide to upgrade the halfstack containers.
    .. code-block:: shell
 
       sudo rm -rf ./postgres-volume-backup  # if copied in the step 4
+      rm ${DB_BACKUP_FILE}
