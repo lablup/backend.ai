@@ -27,9 +27,12 @@ jobs:
 
   lint:
     if: |
-      ${{ !(contains(github.event.pull_request.labels.*.name, 'skip:ci') || needs.optimize-ci.outputs.skip == true) }}
-      && ${{ !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) }}
-      && ${{ github.event.pull_request.merged == false }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == true
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
