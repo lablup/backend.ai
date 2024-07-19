@@ -21,7 +21,7 @@ refer
    services:
       backendai-pg-active:
          <<: *base
-         image: postgres:15.1-alpine
+         image: postgres:16.3-alpine
          restart: unless-stopped
          command: >
             postgres
