@@ -165,9 +165,9 @@ Here is the step-by-step guide to upgrade the halfstack containers.
       # overwrite the compose config
       cp ./docker-compose.halfstack-${TARGET_VERSION}.yml ${COMPOSE_FILE}
       # restore the port numbers
-      yq eval --inplace ".services.backendai-half-db.ports[0] = $MY_DB_PORT" docker-compose.halfstack.current.yml
-      yq eval --inplace ".services.backendai-half-redis.ports[0] = $MY_REDIS_PORT" docker-compose.halfstack.current.yml
-      yq eval --inplace ".services.backendai-half-etcd.ports[0] = $MY_ETCD_PORT" docker-compose.halfstack.current.yml
+      yq eval --inplace '.services.backendai-half-db.ports[0] = "'$MY_DB_PORT':5432"' docker-compose.halfstack.current.yml
+      yq eval --inplace '.services.backendai-half-redis.ports[0] = "'$MY_REDIS_PORT':6379"' docker-compose.halfstack.current.yml
+      yq eval --inplace '.services.backendai-half-etcd.ports[0] = "'$MY_ETCD_PORT':2379"' docker-compose.halfstack.current.yml
 
    .. tip::
 
