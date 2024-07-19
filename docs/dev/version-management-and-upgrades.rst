@@ -187,3 +187,8 @@ Here is the step-by-step guide to upgrade the halfstack containers.
       docker compose -p ${COMPOSE_PROJECT_NAME} -f ${COMPOSE_FILE} exec -T ${DB_SERVICE_NAME} psql -U ${DB_USER} -d ${DB_NAME} < ${DB_BACKUP_FILE}
 
 8. Start the Backend.AI services and test.
+   If it successfully runs, remove the volume backup directory so that ``pants`` does not get confused with unreadable directories due to the different uid ownership.
+
+   .. code-block:: shell
+
+      sudo rm -rf ./postgres-volume-backup  # if copied in the step 4
