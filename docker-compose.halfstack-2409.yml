@@ -1,0 +1,69 @@
+services:
+
+  backendai-half-db:
+    image: postgres:16.3-alpine
+    restart: unless-stopped
+    command: postgres -c 'max_connections=256'
+    networks:
+      - half
+    ports:
+      - "8100:5432"
+    environment:
+      - POSTGRES_PASSWORD=develove
+      - POSTGRES_DB=backend
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backendai-half-redis:
+    image: redis:7.2.4-alpine
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "8110:6379"
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
+    command: >
+      redis-server
+      --appendonly yes
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backendai-half-etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    restart: unless-stopped
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
+    networks:
+      - half
+    ports:
+      - "8120:2379"
+    command: >
+      /usr/local/bin/etcd
+      --name backendai-etcd
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://0.0.0.0:2380
+      --initial-cluster backendai-etcd=http://0.0.0.0:2380
+      --initial-cluster-token backendai-etcd-token
+      --initial-cluster-state new
+      --enable-v2=true
+      --auto-compaction-retention 1
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  half:
