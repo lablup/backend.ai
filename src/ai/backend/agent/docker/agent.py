@@ -1219,7 +1219,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         ImageRef(repo_tag, ["*"])
                     except ValueError:
                         log.warn(
-                            "Image tag {} does not conform to Backend.AI's naming rule. This image will be considered as uninstalled.",
+                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
                             repo_tag,
                         )
                         continue
