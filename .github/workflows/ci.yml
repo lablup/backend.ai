@@ -2,6 +2,9 @@ name: ci
 
 on:
   push:
+    branches:
+      - 'main'
+      - '[0-9][0-9].0[39]'
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
   merge_group:
@@ -27,11 +30,12 @@ jobs:
 
   lint:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == true
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -102,11 +106,10 @@ jobs:
 
   check-alembic-migrations:
     if: |
-      ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
+      && needs.optimize-ci.outputs.skip == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -129,11 +132,12 @@ jobs:
 
   typecheck:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == true
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -200,11 +204,12 @@ jobs:
 
   test:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == true
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
