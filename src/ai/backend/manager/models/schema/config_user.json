@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "user": {
+      "type": "object",
+      "properties": {
+        "desktop_notification": { "type": "boolean" },
+        "compact_sidebar": { "type": "boolean" },
+        "preserve_login": { "type": "boolean" },
+        "automatic_update_check": { "type": "boolean" },
+        "custom_ssh_port": { "type": "string" },
+        "beta_feature": { "type": "boolean" },
+        "endpoints": { "type": "array", "items": { "type": "string" } },
+        "automatic_update_count_trial": { "type": "integer" },
+        "current-resource": { "type": "string" },
+        "container_commit_sessions": { "type": "string" },
+        "last_window_close_time": { "type": "number" },
+        "use_2409_session_launcher": {"type": "boolean"},
+        "selected_language": { "type": "string" },
+        "auto_logout": {"type": "boolean"},
+        "projectGroup": {
+          "type": "object",
+          "properties": {
+            "^.*$": {"type": "string"}
+          }
+        }
+      },
+      "required": ["desktop_notification", "compact_sidebar", "preserve_login", "automatic_update_check", "custom_ssh_port", "beta_feature"]
+    },
+    "general": {
+      "type": "object",
+      "properties": {
+        "language": { "type": "string" },
+        "last_login": { "type": "integer"},
+        "login_attempt": { "type": "integer" }
+      },
+      "required": ["language"]
+    }
+  },
+  "required": ["user", "general"]
+}
