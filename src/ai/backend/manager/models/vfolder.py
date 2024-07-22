@@ -108,7 +108,6 @@ from .utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     sql_append_dict_to_list,
-    sql_json_merge,
 )
 
 if TYPE_CHECKING:
