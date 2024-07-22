@@ -1263,3 +1263,29 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
+
+
+@dataclass
+class KernelStatusCollection(JSONSerializableMixin):
+    KernelTerminationInfo = tuple[KernelId, str]
+
+    actual_existing_kernels: list[KernelId]
+    actual_terminating_kernels: list[KernelTerminationInfo]
+    actual_terminated_kernels: list[KernelTerminationInfo]
+
+    def to_json(self) -> dict[str, list[KernelId]]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> KernelStatusCollection:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict({
+            t.Key("actual_existing_kernels"): tx.ToList(tx.UUID),
+            t.Key("actual_terminating_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
+            t.Key("actual_terminated_kernels"): tx.ToList(t.Tuple(t.String, t.String)),
+        })

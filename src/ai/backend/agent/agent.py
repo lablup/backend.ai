@@ -1138,7 +1138,11 @@ class AbstractAgent(
                                 ),
                             )
                     # Notify cleanup waiters after all state updates.
-                    if kernel_obj is not None and kernel_obj.clean_event is not None:
+                    if (
+                        kernel_obj is not None
+                        and kernel_obj.clean_event is not None
+                        and not kernel_obj.clean_event.done()
+                    ):
                         kernel_obj.clean_event.set_result(None)
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
