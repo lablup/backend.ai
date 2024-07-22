@@ -2225,21 +2225,21 @@ class AgentRegistry:
                     kern.status = kernel_target_status
                     kern.terminated_at = current_time
                     kern.status_info = destroy_reason
-                    kern.status_history = sql_json_merge(
+                    kern.status_history = sql_append_dict_to_list(
                         KernelRow.status_history,
-                        (),
                         {
-                            kernel_target_status.name: current_time.isoformat(),
+                            "status": kernel_target_status.name,
+                            "timestamp": now.isoformat(),
                         },
                     )
                 session_row.status = target_status
                 session_row.terminated_at = current_time
                 session_row.status_info = destroy_reason
-                session_row.status_history = sql_json_merge(
+                session_row.status_history = sql_append_dict_to_list(
                     SessionRow.status_history,
-                    (),
                     {
-                        target_status.name: current_time.isoformat(),
+                        "status": target_status.name,
+                        "timestamp": current_time.isoformat(),
                     },
                 )
                 return session_row
@@ -3239,7 +3239,10 @@ class AgentRegistry:
                     ),
                     "status_history": sql_append_dict_to_list(
                         KernelRow.status_history,
-                        {"status": KernelStatus.TERMINATED.name, "timestamp": now.isoformat()},
+                        {
+                            "status": KernelStatus.TERMINATED.name,
+                            "timestamp": now.isoformat(),
+                        },
                     ),
                     "terminated_at": now,
                 }
