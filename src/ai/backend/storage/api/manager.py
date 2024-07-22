@@ -91,7 +91,7 @@ async def check_status(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
-                "type": "maanger-facing",
+                "type": "manager-facing",
                 "storage-proxy": __version__,
             },
         )
