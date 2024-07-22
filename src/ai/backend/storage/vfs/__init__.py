@@ -397,10 +397,17 @@ class BaseVolume(AbstractVolume):
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
+        if (qsid := vfid.quota_scope_id) is not None:
+            # Delete files and directories before deleting vfolder
+            # otherwise `delete_quota_scope()` raises NotEmptyError.
+            paths = [
+                PurePosixPath(dir_.path)
+                async for dir_ in self.scandir(vfid, PurePosixPath("."), recursive=False)
+            ]
+            await self.delete_files(vfid, paths, recursive=True)
+            await self.quota_model.delete_quota_scope(qsid)
         vfpath = self.mangle_vfpath(vfid)
         await self.fsop_model.delete_tree(vfpath)
-        if (qsid := vfid.quota_scope_id) is not None:
-            await self.quota_model.delete_quota_scope(qsid)
         for p in [vfpath, vfpath.parent, vfpath.parent.parent]:
             try:
                 await aiofiles.os.rmdir(p)
