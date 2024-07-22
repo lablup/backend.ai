@@ -204,10 +204,12 @@ jobs:
 
   test:
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        && needs.optimize-ci.outputs.skip == true
+      )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
-      && needs.optimize-ci.outputs.skip == false
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
