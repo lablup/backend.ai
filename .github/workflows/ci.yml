@@ -206,7 +206,7 @@ jobs:
     if: |
       !(
         contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && needs.optimize-ci.outputs.skip == true
+        || needs.optimize-ci.outputs.skip == true
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
