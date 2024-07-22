@@ -548,8 +548,9 @@ jobs:
     needs: [make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4
@@ -595,3 +596,5 @@ jobs:
     - name: Upload conda-pack to GitHub release
       run: |
         gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
