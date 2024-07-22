@@ -398,7 +398,7 @@ class BaseVolume(AbstractVolume):
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         if (qsid := vfid.quota_scope_id) is not None:
-            # Delete files and directories before deleting vfolder
+            # Delete files and directories before deleting quota
             # otherwise `delete_quota_scope()` raises NotEmptyError.
             paths = [
                 PurePosixPath(dir_.path)
