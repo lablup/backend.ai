@@ -399,6 +399,8 @@ class BaseVolume(AbstractVolume):
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         await self.fsop_model.delete_tree(vfpath)
+        if (qsid := vfid.quota_scope_id) is not None:
+            await self.quota_model.delete_quota_scope(qsid)
         for p in [vfpath, vfpath.parent, vfpath.parent.parent]:
             try:
                 await aiofiles.os.rmdir(p)
