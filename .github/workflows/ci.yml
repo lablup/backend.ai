@@ -17,6 +17,9 @@ jobs:
 
   optimize-ci:
     runs-on: ubuntu-latest
+    # NOTE: Job outputs are ALWAYS strings while context variables may have native types.
+    #       When evaluating the output in the 'if' condition of other jobs, we need to compare it
+    #       with a string literal like 'false', 'true'.
     outputs:
       skip: ${{ steps.check_skip.outputs.skip }}
     steps:
@@ -32,7 +35,7 @@ jobs:
     if: |
       !(
         contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == true
+        || needs.optimize-ci.outputs.skip == 'true'
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
@@ -109,7 +112,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'require:db-migration')
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
-      && needs.optimize-ci.outputs.skip == false
+      && needs.optimize-ci.outputs.skip == 'false'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -134,7 +137,7 @@ jobs:
     if: |
       !(
         contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == true
+        || needs.optimize-ci.outputs.skip == 'true'
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
@@ -206,7 +209,7 @@ jobs:
     if: |
       !(
         contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == true
+        || needs.optimize-ci.outputs.skip == 'true'
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
@@ -473,7 +476,7 @@ jobs:
         release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update stable installer shorten URL
-      if: ${{ !env.IS_PRERELEASE && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
