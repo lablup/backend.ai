@@ -476,7 +476,7 @@ jobs:
         release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update stable installer shorten URL
-      if: ${{ !env.IS_PRERELEASE && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
