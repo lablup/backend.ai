@@ -200,7 +200,7 @@ class Configure(Static):
                 validators=[Length(minimum=1)],
             )
             with Static(classes="button-group"):
-                yield Button("Save", id="save-config")
+                yield Button("Save", id="save-config", classes="primary")
                 yield Button("Cancel", id="cancel-config")
 
     def close(self) -> None:
