@@ -808,7 +808,7 @@ class DevContext(Context):
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
         public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
+        if public_facing_address in ("127.0.0.1", "localhost"):
             public_component_bind_address = "127.0.0.1"
         else:
             public_component_bind_address = "0.0.0.0"
