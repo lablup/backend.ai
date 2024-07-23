@@ -199,8 +199,9 @@ class Configure(Static):
                 validate_on=["changed"],
                 validators=[Length(minimum=1)],
             )
-            yield Button("Save", id="save-config")
-            yield Button("Cancel", id="cancel-config")
+            with Static(classes="button-group"):
+                yield Button("Save", id="save-config")
+                yield Button("Cancel", id="cancel-config")
 
     def close(self) -> None:
         switcher = self.app.query_one("#top", ContentSwitcher)
