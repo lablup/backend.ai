@@ -17,10 +17,13 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.events import Key
+from textual.validation import Length
 from textual.widgets import (
+    Button,
     ContentSwitcher,
     Footer,
     Header,
+    Input,
     Label,
     ListItem,
     ListView,
@@ -37,7 +40,7 @@ from ai.backend.plugin.entrypoint import find_build_root
 from . import __version__
 from .common import detect_os
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallInfo, InstallModes, PrerequisiteError
+from .types import CliArgs, DistInfo, InstallInfo, InstallModes, InstallVariable, PrerequisiteError
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -56,14 +59,16 @@ class DevSetup(Static):
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
-    def begin_install(self, dist_info: DistInfo) -> None:
+    def begin_install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         self.query_one("SetupLog.log").focus()
-        top_tasks.add(asyncio.create_task(self.install(dist_info)))
+        top_tasks.add(asyncio.create_task(self.install(dist_info, install_variable)))
 
-    async def install(self, dist_info: DistInfo) -> None:
+    async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        ctx = DevContext(dist_info, self.app, non_interactive=self._non_interactive)
+        ctx = DevContext(
+            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+        )
         try:
             # prerequisites
             await ctx.check_prerequisites()
@@ -111,14 +116,16 @@ class PackageSetup(Static):
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
-    def begin_install(self, dist_info: DistInfo) -> None:
+    def begin_install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         self.query_one("SetupLog.log").focus()
-        top_tasks.add(asyncio.create_task(self.install(dist_info)))
+        top_tasks.add(asyncio.create_task(self.install(dist_info, install_variable)))
 
-    async def install(self, dist_info: DistInfo) -> None:
+    async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        ctx = PackageContext(dist_info, self.app, non_interactive=self._non_interactive)
+        ctx = PackageContext(
+            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+        )
         try:
             # prerequisites
             if ctx.non_interactive:
@@ -164,6 +171,54 @@ class PackageSetup(Static):
             if self._non_interactive:
                 self.app.post_message(Key("q", "q"))
             current_log.reset(_log_token)
+
+
+class Configure(Static):
+    install_variable: InstallVariable | None
+    public_facing_address: str | None
+
+    def __init__(self, id: str, **kwargs) -> None:
+        super().__init__(**kwargs, id=id)
+        self.public_facing_address = None
+        self.install_variable = None
+
+    def feed_variables(self, install_variable: InstallVariable) -> None:
+        self.install_variable = install_variable
+        self.public_facing_address = install_variable.public_facing_address
+        address_input = self.app.query_one("#public-ip", Input)
+        address_input.value = install_variable.public_facing_address
+
+    def compose(self) -> ComposeResult:
+        yield Label("Configure", classes="mode-title")
+        with Vertical(id="configure-form"):
+            yield Label("Configuration", classes="section-title")
+            yield Input(
+                placeholder="Public address",
+                id="public-ip",
+                validate_on=["changed"],
+                validators=[Length(minimum=1)],
+            )
+            yield Button("Save", id="save-config")
+            yield Button("Cancel", id="cancel-config")
+
+    def close(self) -> None:
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "mode-menu"
+
+    @on(Input.Changed, "#public-ip")
+    def public_facing_address_changed(self, event: Input.Changed) -> None:
+        self.public_facing_address = event.value
+
+    @on(Button.Pressed, "#save-config")
+    def save_config(self) -> None:
+        assert self.install_variable
+        if self.public_facing_address is not None:
+            self.install_variable.public_facing_address = self.public_facing_address
+        self.close()
+
+    @on(Button.Pressed, "#cancel-config")
+    def cancel_config(self) -> None:
+        self.close()
 
 
 class InstallReport(Static):
@@ -307,6 +362,8 @@ class ModeMenu(Static):
     _dist_info: DistInfo
     _dist_info_path: Path | None
 
+    install_variable: InstallVariable
+
     def __init__(
         self,
         args: CliArgs,
@@ -340,6 +397,7 @@ class ModeMenu(Static):
         #     self._enabled_menus.add(InstallModes.MAINTAIN)
         assert mode is not None
         self._mode = mode
+        self.install_variable = InstallVariable(public_facing_address=args.public_facing_address)
 
     def compose(self) -> ComposeResult:
         yield Label(id="heading")
@@ -377,6 +435,15 @@ class ModeMenu(Static):
                     classes="disabled" if disabled else "",
                     id=f"mode-{mode.value.lower()}",
                 )
+            yield ListItem(
+                Vertical(
+                    Label("Configure", classes="mode-item-title"),
+                    Label(
+                        "Configure setup variables before installation", classes="mode-item-desc"
+                    ),
+                ),
+                id="mode-configure",
+            )
         yield Label(id="mode-desc")
 
     def on_mount(self) -> None:
@@ -410,7 +477,7 @@ class ModeMenu(Static):
         switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "dev-setup"
         dev_setup = self.app.query_one("#dev-setup", DevSetup)
-        self.app.call_later(dev_setup.begin_install, self._dist_info)
+        self.app.call_later(dev_setup.begin_install, self._dist_info, self.install_variable)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
@@ -420,13 +487,21 @@ class ModeMenu(Static):
         switcher = self.app.query_one("#top", ContentSwitcher)
         switcher.current = "pkg-setup"
         pkg_setup = self.app.query_one("#pkg-setup", PackageSetup)
-        self.app.call_later(pkg_setup.begin_install, self._dist_info)
+        self.app.call_later(pkg_setup.begin_install, self._dist_info, self.install_variable)
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
         if InstallModes.MAINTAIN not in self._enabled_menus:
             return
         pass
+
+    @on(ListView.Selected, "#mode-list", item="#mode-configure")
+    def start_configure_mode(self) -> None:
+        self.app.sub_title = "Configure Variable"
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "configure"
+        configure = self.app.query_one("#configure", Configure)
+        self.app.call_later(configure.feed_variables, self.install_variable)
 
 
 class InstallerApp(App):
@@ -452,6 +527,7 @@ class InstallerApp(App):
                 target_path=str(Path.home() / "backendai"),
                 show_guide=False,
                 non_interactive=False,
+                public_facing_address="127.0.0.1",
             )
         self._args = args
 
@@ -481,6 +557,7 @@ class InstallerApp(App):
                 yield ModeMenu(self._args, id="mode-menu")
                 yield DevSetup(id="dev-setup", non_interactive=self._args.non_interactive)
                 yield PackageSetup(id="pkg-setup", non_interactive=self._args.non_interactive)
+                yield Configure(id="configure")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -540,6 +617,12 @@ class InstallerApp(App):
     default=False,
     help="Run the installer as headless mode.",
 )
+@click.option(
+    "--public-facing-address",
+    type=str,
+    default="127.0.0.1",
+    help="Set public facing address for the Backend.AI server.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -549,6 +632,7 @@ def main(
     show_guide: bool,
     non_interactive: bool,
     headless: bool,
+    public_facing_address: str,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -565,6 +649,7 @@ def main(
         target_path=target_path,
         show_guide=show_guide,
         non_interactive=non_interactive,
+        public_facing_address=public_facing_address,
     )
     app = InstallerApp(args)
     app.run(headless=headless)
