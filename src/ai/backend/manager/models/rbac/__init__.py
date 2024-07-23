@@ -5,24 +5,17 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, cast
+from typing import Any, Generic, Self, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
 
-from ..domain import DomainRow
-from ..group import AssocGroupUserRow, GroupRow
-from ..user import UserRole, UserRow
+from .context import ClientContext
 from .exceptions import InvalidScope
-
-if TYPE_CHECKING:
-    from ..utils import ExtendedAsyncSAEngine
-
+from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
-    "BasePermission",
-    "ClientContext",
     "DomainScope",
     "ProjectScope",
     "UserScope",
@@ -32,10 +25,6 @@ __all__: Sequence[str] = (
     "AbstractPermissionContext",
     "AbstractPermissionContextBuilder",
 )
-
-
-class BasePermission(enum.StrEnum):
-    pass
 
 
 PermissionType = TypeVar("PermissionType", bound=BasePermission)
@@ -54,20 +43,13 @@ class ScopedUserRole(enum.StrEnum):
 _EMPTY_FSET: frozenset = frozenset()
 
 
-@dataclass
-class ClientContext:
-    db: ExtendedAsyncSAEngine
-
-    domain_name: str
-    user_id: uuid.UUID
-    user_role: UserRole
-
-
 async def get_roles_in_scope(
     ctx: ClientContext,
     scope: BaseScope,
     db_session: AsyncSession | None = None,
 ) -> frozenset[ScopedUserRole]:
+    from ..user import UserRole
+
     async def _calculate_role(db_session: AsyncSession) -> frozenset[ScopedUserRole]:
         match ctx.user_role:
             case UserRole.SUPERADMIN:
@@ -89,6 +71,10 @@ async def get_roles_in_scope(
 async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
 ) -> frozenset[ScopedUserRole]:
+    from ..domain import DomainRow
+    from ..group import GroupRow
+    from ..user import UserRow
+
     match scope:
         case DomainScope(domain_name):
             stmt = (
@@ -130,6 +116,10 @@ async def _calculate_role_in_scope_for_suadmin(
 async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
 ) -> frozenset[ScopedUserRole]:
+    from ..domain import DomainRow
+    from ..group import AssocGroupUserRow, GroupRow
+    from ..user import UserRow
+
     match scope:
         case DomainScope(domain_name):
             stmt = (
@@ -182,6 +172,9 @@ async def _calculate_role_in_scope_for_monitor(
 async def _calculate_role_in_scope_for_admin(
     ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
 ) -> frozenset[ScopedUserRole]:
+    from ..group import AssocGroupUserRow, GroupRow
+    from ..user import UserRow
+
     match scope:
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
@@ -237,6 +230,8 @@ async def _calculate_role_in_scope_for_admin(
 async def _calculate_role_in_scope_for_user(
     ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
 ) -> frozenset[ScopedUserRole]:
+    from ..group import AssocGroupUserRow
+
     match scope:
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
