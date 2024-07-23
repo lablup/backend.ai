@@ -2,6 +2,9 @@ name: ci
 
 on:
   push:
+    branches:
+      - 'main'
+      - '[0-9][0-9].0[39]'
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
   merge_group:
@@ -14,6 +17,9 @@ jobs:
 
   optimize-ci:
     runs-on: ubuntu-latest
+    # NOTE: Job outputs are ALWAYS strings while context variables may have native types.
+    #       When evaluating the output in the 'if' condition of other jobs, we need to compare it
+    #       with a string literal like 'false', 'true'.
     permissions:
       contents: read
       pull-requests: write
@@ -33,11 +39,12 @@ jobs:
 
   lint:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -108,11 +115,10 @@ jobs:
 
   check-alembic-migrations:
     if: |
-      ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
+      && needs.optimize-ci.outputs.skip == 'false'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -135,11 +141,12 @@ jobs:
 
   typecheck:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -206,11 +213,12 @@ jobs:
 
   test:
     if: |
-      ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-        && github.event.pull_request.merged == false
-        && needs.optimize-ci.outputs.skip == false
-      }}
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && github.event.pull_request.merged == false
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
@@ -474,7 +482,7 @@ jobs:
         release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update stable installer shorten URL
-      if: ${{ !env.IS_PRERELEASE && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
