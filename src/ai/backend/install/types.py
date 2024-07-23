@@ -19,6 +19,7 @@ class InstallModes(enum.StrEnum):
     DEVELOP = "DEVELOP"
     PACKAGE = "PACKAGE"
     MAINTAIN = "MAINTAIN"
+    CONFIGURE = "CONFIGURE"
 
 
 class PackageSource(enum.StrEnum):

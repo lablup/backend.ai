@@ -217,10 +217,12 @@ class Configure(Static):
         if self.public_facing_address is not None:
             self.install_variable.public_facing_address = self.public_facing_address
         self.close()
+        self.app.query_one("#mode-list", ListView).focus()
 
     @on(Button.Pressed, "#cancel-config")
     def cancel_config(self) -> None:
         self.close()
+        self.app.query_one("#mode-list", ListView).focus()
 
 
 class InstallReport(Static):
@@ -397,6 +399,7 @@ class ModeMenu(Static):
         # TODO: implement
         # if Path("INSTALL-INFO").exists():
         #     self._enabled_menus.add(InstallModes.MAINTAIN)
+        self._enabled_menus.add(InstallModes.CONFIGURE)
         assert mode is not None
         self._mode = mode
         self.install_variable = InstallVariable(public_facing_address=args.public_facing_address)
@@ -418,10 +421,12 @@ class ModeMenu(Static):
         else:
             # maintain_desc = "Could not find an existing setup (missing INSTALL-INFO)"
             maintain_desc = "Coming soon!"
+        configure_desc = "Configure setup variables before installation."
         mode_desc: dict[InstallModes, str] = {
             InstallModes.DEVELOP: develop_desc,
             InstallModes.PACKAGE: package_desc,
             InstallModes.MAINTAIN: maintain_desc,
+            InstallModes.CONFIGURE: configure_desc,
         }
         with ListView(
             id="mode-list", initial_index=list(InstallModes).index(InstallModes(self._mode))
@@ -437,15 +442,6 @@ class ModeMenu(Static):
                     classes="disabled" if disabled else "",
                     id=f"mode-{mode.value.lower()}",
                 )
-            yield ListItem(
-                Vertical(
-                    Label("Configure", classes="mode-item-title"),
-                    Label(
-                        "Configure setup variables before installation", classes="mode-item-desc"
-                    ),
-                ),
-                id="mode-configure",
-            )
         yield Label(id="mode-desc")
 
     def on_mount(self) -> None:
