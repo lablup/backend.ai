@@ -20,15 +20,21 @@ jobs:
     # NOTE: Job outputs are ALWAYS strings while context variables may have native types.
     #       When evaluating the output in the 'if' condition of other jobs, we need to compare it
     #       with a string literal like 'false', 'true'.
+    permissions:
+      contents: read
+      pull-requests: write
     outputs:
       skip: ${{ steps.check_skip.outputs.skip }}
     steps:
       - name: Optimize CI
+        if: ${{ github.event_name == 'pull_request' }}
         id: check_skip
         uses: withgraphite/graphite-ci-action@main
-        if: ${{ github.event_name == 'pull_request' }}
         with:
           graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+      - name: labeler
+        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
+        uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
 
 
   lint:
