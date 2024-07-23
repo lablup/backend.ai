@@ -134,7 +134,8 @@ class PackageSetup(Static):
                 if dist_info.target_path.exists():
                     input_box = InputDialog(
                         f"The target path {dist_info.target_path} already exists. "
-                        "Overwrite it or set a different target path.",
+                        "Please set a different target path below, or "
+                        "leave the box as blank to overwrite the folder.",
                         str(dist_info.target_path),
                         allow_cancel=False,
                     )
