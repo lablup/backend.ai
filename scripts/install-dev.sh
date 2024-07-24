@@ -283,6 +283,8 @@ PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
 PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
 PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
+NODE_VERSION=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SHOW_GUIDE=0
@@ -465,10 +467,10 @@ install_node() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
   fi
 
-  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
-  show_info "Installing Node.js v${node_version} via NVM..."
-  nvm install $node_version
-  nvm use node
+  
+  show_info "Installing Node.js v${NODE_VERSION} via NVM..."
+  nvm install $NODE_VERSION
+  nvm use $NODE_VERSION
 }
 
 set_brew_python_build_flags() {
@@ -592,7 +594,7 @@ bootstrap_pants() {
 }
 
 install_editable_webui() {
-  if ! command -v node &> /dev/null; then
+  if ! command -v node &> /dev/null || [ "$(node -v | awk -F. '{print $1}' | sed 's/v//')" != "$NODE_VERSION" ]; then
     install_node
   fi
   if ! command -v pnpm &> /dev/null; then
