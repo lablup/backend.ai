@@ -9,6 +9,7 @@ import functools
 import json
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
@@ -134,6 +135,19 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["group"],
         params["scaling_group"],
     )
+
+    cache_last_updated = request.app["_resource_usage_last_updated"]
+    cache = request.app["_resource_usage_cache"]
+    input_args = (
+        access_key,
+        resource_policy,
+        domain_name,
+        params["group"],
+        params["scalling_group"],
+    )
+    now = time.monotonic()
+    if input_args in cache and now - cache_last_updated <= 10.0:
+        return web.json_response(cache[input_args], status=200)
 
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
@@ -292,6 +306,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["group_remaining"] = group_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
+    cache[input_args] = resp
+    request.app["_resource_usage_last_updated"] = time.monotonic()
     return web.json_response(resp, status=200)
 
 
@@ -861,6 +877,8 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (4,)
     app["prefix"] = "resource"
+    app["_resource_usage_cache"] = dict()
+    app["_resource_usage_last_updated"] = 0
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
