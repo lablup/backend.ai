@@ -140,10 +140,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     cache = request.app["_resource_usage_cache"]
     input_args = (
         access_key,
-        resource_policy,
         domain_name,
         params["group"],
-        params["scalling_group"],
+        params["scaling_group"],
     )
     now = time.monotonic()
     if input_args in cache and now - cache_last_updated <= 10.0:
