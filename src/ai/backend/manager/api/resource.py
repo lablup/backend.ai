@@ -145,7 +145,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
     now = time.monotonic()
-    if input_args in cache and now - cache_last_updated <= 10.0:
+    if input_args in cache and now - cache_last_updated[input_args] <= 10.0:
         return web.json_response(cache[input_args], status=200)
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -306,7 +306,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
     cache[input_args] = resp
-    request.app["_resource_usage_last_updated"] = time.monotonic()
+    request.app["_resource_usage_last_updated"][input_args] = time.monotonic()
     return web.json_response(resp, status=200)
 
 
@@ -877,7 +877,7 @@ def create_app(
     app["api_versions"] = (4,)
     app["prefix"] = "resource"
     app["_resource_usage_cache"] = dict()
-    app["_resource_usage_last_updated"] = 0
+    app["_resource_usage_last_updated"] = dict()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
