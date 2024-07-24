@@ -234,6 +234,15 @@ async def login(
     """
     basic_auth: Optional[aiohttp.BasicAuth]
 
+    # TODO: Fix this.
+    if "public.ecr" in str(registry_url):
+        return {
+            "auth": None,
+            "headers": {
+                "Authorization": f"Bearer {credentials['password']}",
+            },
+        }
+
     if credentials.get("username") and credentials.get("password"):
         basic_auth = aiohttp.BasicAuth(
             credentials["username"],
