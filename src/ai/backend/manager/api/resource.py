@@ -138,15 +138,15 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
     cache_last_updated = request.app["_resource_usage_last_updated"]
     cache = request.app["_resource_usage_cache"]
-    input_args = (
+    cache_key = (
         access_key,
         domain_name,
         params["group"],
         params["scaling_group"],
     )
     now = time.monotonic()
-    if input_args in cache and now - cache_last_updated[input_args] <= 10.0:
-        return web.json_response(cache[input_args], status=200)
+    if cache_key in cache and now - cache_last_updated[cache_key] <= 10.0:
+        return web.json_response(cache[cache_key], status=200)
 
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
@@ -305,8 +305,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["group_remaining"] = group_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
-    cache[input_args] = resp
-    request.app["_resource_usage_last_updated"][input_args] = time.monotonic()
+    cache[cache_key] = resp
+    cache_last_updated[cache_key] = time.monotonic()
     return web.json_response(resp, status=200)
 
 
