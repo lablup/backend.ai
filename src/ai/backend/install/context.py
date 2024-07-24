@@ -54,6 +54,7 @@ from .types import (
     ImageSource,
     InstallInfo,
     InstallType,
+    InstallVariable,
     OSInfo,
     PackageSource,
     Platform,
@@ -78,18 +79,21 @@ class PostGuide(enum.Enum):
 class Context(metaclass=ABCMeta):
     os_info: OSInfo
     docker_sudo: list[str]
+    install_variable: InstallVariable
 
     _post_guides: list[PostGuide]
 
     def __init__(
         self,
         dist_info: DistInfo,
+        install_variable: InstallVariable,
         app: App,
         *,
         non_interactive: bool = False,
     ) -> None:
         self._post_guides = []
         self.app = app
+        self.install_variable = install_variable
         self.log = current_log.get()
         self.cwd = Path.cwd()
         self.dist_info = dist_info
@@ -803,6 +807,11 @@ class DevContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in ("127.0.0.1", "localhost"):
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
         halfstack_config = HalfstackConfig(
             ha_setup=False,
             postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
@@ -816,7 +825,10 @@ class DevContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             webui_menu_blocklist=["pipeline"],
@@ -825,13 +837,19 @@ class DevContext(Context):
             storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 5050),
+                face=HostPortPair(public_facing_address, 5050),
+            ),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
-            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6022),
+                face=HostPortPair(public_facing_address, 6022),
+            ),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_hex(32),
@@ -895,6 +913,11 @@ class PackageContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
         halfstack_config = HalfstackConfig(
             ha_setup=False,
             postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
@@ -908,7 +931,10 @@ class PackageContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             webui_menu_blocklist=["pipeline"],
@@ -917,13 +943,19 @@ class PackageContext(Context):
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 15050)),
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 15050),
+                face=HostPortPair(public_facing_address, 15050),
+            ),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
-            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6022),
+                face=HostPortPair(public_facing_address, 6022),
+            ),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_urlsafe(32),
