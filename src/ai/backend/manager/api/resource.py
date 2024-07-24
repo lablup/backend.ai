@@ -145,9 +145,21 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
     now = time.monotonic()
-    if cache_key in cache and now - cache_last_updated[cache_key] <= 10.0:
+    if cache_key in cache and now - cache_last_updated[cache_key] <= 20.0:
+        log.debug(
+            "CHECK_PRESETS (ak:{}, g:{}, sg:{}): cache hit!",
+            request["keypair"]["access_key"],
+            params["group"],
+            params["scaling_group"],
+        )
         return web.json_response(cache[cache_key], status=200)
 
+    log.debug(
+        "CHECK_PRESETS (ak:{}, g:{}, sg:{}): cache miss!",
+        request["keypair"]["access_key"],
+        params["group"],
+        params["scaling_group"],
+    )
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
