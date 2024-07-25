@@ -55,8 +55,10 @@ type Queries {
     """
     image_types: [String] = null
 
-    """Deprecated since 24.03.4. Use `image_types` instead."""
-    image_filters: [String] = null
+    """
+    Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    """
+    image_filters: [String] = null @deprecated(reason: "Deprecated since 24.03.8. Use `image_types` instead.")
   ): [Image]
 
   """Added in 24.03.1"""
