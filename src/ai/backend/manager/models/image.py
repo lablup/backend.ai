@@ -68,11 +68,11 @@ __all__ = (
     "rescan_images",
     "ImageType",
     "ImageAliasRow",
-    "ImageLoadFilter",
+    "ImageLoadType",
     "ImageRow",
     "Image",
     "PreloadImage",
-    "PublicImageLoadFilter",
+    "PublicImageLoadType",
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
@@ -84,14 +84,18 @@ __all__ = (
 )
 
 
-class PublicImageLoadFilter(enum.StrEnum):
+class PublicImageLoadType(enum.StrEnum):
+    GENERAL = "general"
+    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
     """Include customized images owned or accessible by API callee."""
 
 
-class ImageLoadFilter(enum.StrEnum):
+class ImageLoadType(enum.StrEnum):
+    GENERAL = "general"
+    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -672,12 +676,12 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        filters: set[ImageLoadFilter] = set(),
+        types: set[ImageLoadType] = set(),
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_type(ctx, types)
         ]
 
         return items
@@ -705,41 +709,38 @@ class Image(graphene.ObjectType):
 
         return filtered_items
 
-    def matches_filter(
+    def matches_type(
         self,
         ctx: GraphQueryContext,
-        filters: set[ImageLoadFilter],
+        types: set[ImageLoadType],
     ) -> bool:
         """
-        Determine if the image is filtered according to the `filters` parameter.
+        Determine if the image is filtered according to the `types` parameter.
         """
         user_role = ctx.user["role"]
 
-        if not filters:
-            return True
-
         # If the image filtered by any of its labels, return False early.
         # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
-        is_valid = False
+        is_valid = ImageLoadType.GENERAL in types
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value:
-                    if ImageLoadFilter.OPERATIONAL in filters:
+                    if ImageLoadType.OPERATIONAL in types:
                         is_valid = True
                     else:
                         return False
                 case "ai.backend.customized-image.owner":
                     if (
-                        ImageLoadFilter.CUSTOMIZED not in filters
-                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                        ImageLoadType.CUSTOMIZED not in types
+                        and ImageLoadType.CUSTOMIZED_GLOBAL not in types
                     ):
                         return False
-                    if ImageLoadFilter.CUSTOMIZED in filters:
+                    if ImageLoadType.CUSTOMIZED in types:
                         if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
-                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
+                    if ImageLoadType.CUSTOMIZED_GLOBAL in types:
                         if user_role == UserRole.SUPERADMIN:
                             is_valid = True
                         else:

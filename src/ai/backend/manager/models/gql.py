@@ -70,11 +70,11 @@ from .image import (
     ForgetImage,
     ForgetImageById,
     Image,
-    ImageLoadFilter,
+    ImageLoadType,
     ImageNode,
     ModifyImage,
     PreloadImage,
-    PublicImageLoadFilter,
+    PublicImageLoadType,
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
@@ -368,12 +368,17 @@ class Queries(graphene.ObjectType):
             description="Added in 19.09.0. If it is specified, fetch images installed on at least one agent."
         ),
         is_operation=graphene.Boolean(
-            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null."
+            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `image_types` is specified and is not null."
+        ),
+        image_types=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=f"Added in 24.03.8. Allowed values are: [{', '.join([f.value for f in PublicImageLoadType])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+            description="Deprecated since 24.03.4. Use `image_types` instead.",
         ),
     )
 
@@ -1105,7 +1110,7 @@ class Queries(graphene.ObjectType):
         client_domain = ctx.user["domain_name"]
         items = await Image.load_all(
             ctx,
-            filters=set((ImageLoadFilter.CUSTOMIZED,)),
+            types=set((ImageLoadType.CUSTOMIZED,)),
         )
         if client_role == UserRole.SUPERADMIN:
             pass
@@ -1132,36 +1137,38 @@ class Queries(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
+        image_types: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        image_load_filters: set[ImageLoadFilter] = set()
-        if image_filters is not None:
+        image_load_filters: set[ImageLoadType] = set()
+        _types = image_types or image_filters
+        if _types is not None:
             try:
-                _filters: list[PublicImageLoadFilter] = [
-                    PublicImageLoadFilter(f) for f in image_filters
-                ]
+                _filters: list[PublicImageLoadType] = [PublicImageLoadType(f) for f in _types]
             except ValueError as e:
-                allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
+                allowed_filter_values = ", ".join([f.value for f in PublicImageLoadType])
                 raise InvalidAPIParameters(
-                    f"{e}. All elements of `image_filters` should be one of ({allowed_filter_values})"
+                    f"{e}. All elements of `image_types` should be one of ({allowed_filter_values})"
                 )
-            image_load_filters.update([ImageLoadFilter(f) for f in _filters])
+            image_load_filters.update([ImageLoadType(f) for f in _filters])
             if (
                 client_role == UserRole.SUPERADMIN
-                and ImageLoadFilter.CUSTOMIZED in image_load_filters
+                and ImageLoadType.CUSTOMIZED in image_load_filters
             ):
-                image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
-                image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
+                image_load_filters.remove(ImageLoadType.CUSTOMIZED)
+                image_load_filters.add(ImageLoadType.CUSTOMIZED_GLOBAL)
         else:
+            image_load_filters.add(ImageLoadType.CUSTOMIZED)
+            image_load_filters.add(ImageLoadType.GENERAL)
             if is_operation is None:
                 # I know this logic is quite contradicts to the parameter name,
                 # but to conform with previous implementation...
-                image_load_filters.add(ImageLoadFilter.OPERATIONAL)
+                image_load_filters.add(ImageLoadType.OPERATIONAL)
 
-        items = await Image.load_all(ctx, filters=image_load_filters)
+        items = await Image.load_all(ctx, types=image_load_filters)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
