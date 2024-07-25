@@ -378,7 +378,8 @@ class Queries(graphene.ObjectType):
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description="Deprecated since 24.03.4. Use `image_types` instead.",
+            deprecation_reason="Deprecated since 24.03.8. Use `image_types` instead.",
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadType])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
     )
 
