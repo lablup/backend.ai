@@ -1156,6 +1156,8 @@ class Queries(graphene.ObjectType):
                 image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
                 image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
         else:
+            image_load_filters.add(ImageLoadFilter.CUSTOMIZED)
+            image_load_filters.add(ImageLoadFilter.GENERAL)
             if is_operation is None:
                 # I know this logic is quite contradicts to the parameter name,
                 # but to conform with previous implementation...
