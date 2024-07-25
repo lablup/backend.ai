@@ -1144,7 +1144,7 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        image_load_filters: set[ImageLoadType] = set()
+        image_load_types: set[ImageLoadType] = set()
         _types = image_types or image_filters
         if _types is not None:
             try:
@@ -1154,22 +1154,17 @@ class Queries(graphene.ObjectType):
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `image_types` should be one of ({allowed_filter_values})"
                 )
-            image_load_filters.update([ImageLoadType(f) for f in _filters])
-            if (
-                client_role == UserRole.SUPERADMIN
-                and ImageLoadType.CUSTOMIZED in image_load_filters
-            ):
-                image_load_filters.remove(ImageLoadType.CUSTOMIZED)
-                image_load_filters.add(ImageLoadType.CUSTOMIZED_GLOBAL)
+            image_load_types.update([ImageLoadType(f) for f in _filters])
+            if client_role == UserRole.SUPERADMIN and ImageLoadType.CUSTOMIZED in image_load_types:
+                image_load_types.remove(ImageLoadType.CUSTOMIZED)
+                image_load_types.add(ImageLoadType.CUSTOMIZED_GLOBAL)
         else:
-            image_load_filters.add(ImageLoadType.CUSTOMIZED)
-            image_load_filters.add(ImageLoadType.GENERAL)
             if is_operation is None:
                 # I know this logic is quite contradicts to the parameter name,
                 # but to conform with previous implementation...
-                image_load_filters.add(ImageLoadType.OPERATIONAL)
+                image_load_types.add(ImageLoadType.OPERATIONAL)
 
-        items = await Image.load_all(ctx, types=image_load_filters)
+        items = await Image.load_all(ctx, types=image_load_types)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):

@@ -85,8 +85,6 @@ __all__ = (
 
 
 class PublicImageLoadType(enum.StrEnum):
-    GENERAL = "general"
-    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -94,8 +92,6 @@ class PublicImageLoadType(enum.StrEnum):
 
 
 class ImageLoadType(enum.StrEnum):
-    GENERAL = "general"
-    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -719,9 +715,12 @@ class Image(graphene.ObjectType):
         """
         user_role = ctx.user["role"]
 
+        if not types:
+            return True
+
         # If the image filtered by any of its labels, return False early.
         # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
-        is_valid = ImageLoadType.GENERAL in types
+        is_valid = False
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value:
