@@ -6,7 +6,8 @@ import functools
 import json
 import logging
 import socket
-from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Final, FrozenSet, Tuple, cast
 
 import aiohttp_cors
 import attrs
@@ -24,6 +25,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .. import __version__
 from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
+from ..models.health import (
+    report_manager_status,
+)
 from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
 from .exceptions import (
@@ -34,7 +38,10 @@ from .exceptions import (
     ServiceUnavailable,
 )
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, set_handler_attr
+from .utils import (
+    check_api_params,
+    set_handler_attr,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
@@ -97,6 +104,21 @@ async def detect_status_update(root_ctx: RootContext) -> None:
                         root_ctx.pidx,
                         updated_status,
                     )
+    except asyncio.CancelledError:
+        pass
+
+
+async def report_status_bgtask(root_ctx: RootContext) -> None:
+    interval = cast(float, root_ctx.local_config["manager"]["status-update-interval"])
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                await report_manager_status(root_ctx)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.exception(f"Failed to report manager health status (e:{str(e)})")
     except asyncio.CancelledError:
         pass
 
@@ -275,19 +297,28 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     status_watch_task: asyncio.Task
+    db_status_report_task: asyncio.Task
 
 
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["manager.context"]
     app_ctx.status_watch_task = asyncio.create_task(detect_status_update(root_ctx))
+    app_ctx.db_status_report_task = asyncio.create_task(report_status_bgtask(root_ctx))
 
 
 async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["manager.context"]
     if app_ctx.status_watch_task is not None:
         app_ctx.status_watch_task.cancel()
-        await app_ctx.status_watch_task
+        await asyncio.sleep(0)
+        if not app_ctx.status_watch_task.done():
+            await app_ctx.status_watch_task
+    if app_ctx.db_status_report_task is not None:
+        app_ctx.db_status_report_task.cancel()
+        await asyncio.sleep(0)
+        if not app_ctx.db_status_report_task.done():
+            await app_ctx.db_status_report_task
 
 
 def create_app(
