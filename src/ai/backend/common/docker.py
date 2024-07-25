@@ -234,8 +234,7 @@ async def login(
     """
     basic_auth: Optional[aiohttp.BasicAuth]
 
-    # TODO: Fix this.
-    if "public.ecr" in str(registry_url):
+    if "public.ecr" in str(registry_url) or "dkr.ecr" in str(registry_url):
         return {
             "auth": None,
             "headers": {
