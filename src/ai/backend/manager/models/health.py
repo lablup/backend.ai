@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import socket
 from typing import TYPE_CHECKING, Optional, cast
 
+import redis.exceptions
 from pydantic import (
     BaseModel,
     Field,
@@ -39,6 +41,27 @@ _sqlalchemy_pool_type_names = (
     "SingletonThreadPool",
     "StaticPool",
 )
+
+
+_read_manager_status_script = """
+local cursor = "0"
+local pattern = KEYS[1]
+local matched_keys = {}
+
+repeat
+    local scan_result = redis.call("SCAN", cursor, "MATCH", pattern)
+    cursor = scan_result[1]
+    for i, key in ipairs(scan_result[2]) do
+        table.insert(matched_keys, key)
+    end
+until cursor == "0"
+
+if #matched_keys == 0 then
+    return {} -- Early return if no keys found
+end
+
+return redis.call("MGET", unpack(matched_keys))
+"""
 
 
 MANAGER_STATUS_KEY = "manager.status"
@@ -154,3 +177,30 @@ async def report_manager_status(root_ctx: RootContext) -> None:
             ex=lifetime,
         ),
     )
+
+
+async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInfoOfProcess]:
+    cxn_infos: list[ConnectionInfoOfProcess] = []
+
+    try:
+        _raw_value = cast(
+            list[bytes] | None,
+            await redis_helper.execute_script(
+                root_ctx.redis_stat,
+                "read_manager_status",
+                _read_manager_status_script,
+                [f"{MANAGER_STATUS_KEY}*"],
+                [],
+            ),
+        )
+    except (asyncio.TimeoutError, redis.exceptions.ConnectionError):
+        # Cannot get data from redis. Return process's own info.
+        cxn_infos = [(await _get_connnection_info(root_ctx))]
+    else:
+        if _raw_value is not None:
+            cxn_infos = [
+                ConnectionInfoOfProcess.model_validate(msgpack.unpackb(val)) for val in _raw_value
+            ]
+        else:
+            cxn_infos = [(await _get_connnection_info(root_ctx))]
+    return cxn_infos
