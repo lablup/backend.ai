@@ -37,9 +37,9 @@ relpath() {
 sed_inplace() {
   # BSD sed and GNU sed implements the "-i" option differently.
   case "$OSTYPE" in
-    darwin*) sed -i '' "$@" ;;
-    bsd*) sed -i '' "$@" ;;
-    *) sed -i "$@" ;;
+  darwin*) sed -i '' "$@" ;;
+  bsd*) sed -i '' "$@" ;;
+  *) sed -i "$@" ;;
   esac
 }
 
@@ -344,20 +344,20 @@ while [ $# -gt 0 ]; do
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
-    --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
+  --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
     --ipc-base-path)        IPC_BASE_PATH=$2; shift ;;
     --ipc-base-path=*)      IPC_BASE_PATH="${1#*=}" ;;
     --var-base-path)        VAR_BASE_PATH=$2; shift ;;
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
-    --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
-    --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+  --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
+  --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
     --agent-backend)        AGENT_BACKEND=$2; shift ;;
     --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
     --configure-ha)         CONFIGURE_HA=1 ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Run '$0 --help' for usage."
-      exit 1
+  *)
+    echo "Unknown option: $1"
+    echo "Run '$0 --help' for usage."
+    exit 1
   esac
   shift
 done
@@ -468,7 +468,7 @@ install_node() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
   fi
 
-  
+
   show_info "Installing Node.js v${NODE_VERSION} via NVM..."
   nvm install $NODE_VERSION
   nvm use $NODE_VERSION
@@ -720,31 +720,32 @@ wait_for_docker() {
   done
 }
 
+append_to_profiles() {
+  script_content="$1"
+  PROFILE_FILES=("zshrc" "bashrc" "profile" "bash_profile" "config/fish/config.fish")
+
+  for PROFILE_FILE in "${PROFILE_FILES[@]}"; do
+    FULL_PATH="${HOME}/.${PROFILE_FILE}"
+
+    if [ -e "$FULL_PATH" ] && ! grep -qF "$script_content" "$FULL_PATH"; then
+      echo "$script_content" >>"$FULL_PATH"
+    fi
+  done
+}
+
 setup_environment() {
   wait_for_docker
   # Install pyenv
-  if ! type "pyenv" >/dev/null 2>&1; then
-    if [ -d "$HOME/.pyenv" ]; then
-      eval "$pyenv_init_script"
-      pyenv --version
-    fi
+  if ! type "pyenv" >/dev/null 2>&1 && [ ! -d "$HOME/.pyenv" ]; then
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
-    for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-    do
-      if [ -e "${HOME}/.${PROFILE_FILE}" ]
-      then
-        echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
-      fi
-    done
     set +e
-    eval "$pyenv_init_script"
-    pyenv --version
     _INSTALLED_PYENV=1
-  else
-    eval "$pyenv_init_script"
   fi
+  append_to_profiles "$pyenv_init_script"
+  eval "$pyenv_init_script"
+  pyenv --version
 
   # Install Python and pyenv virtualenvs
   show_info "Checking and installing Python dependencies..."
@@ -1037,11 +1038,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-    fish)
+  fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
     ;;
-    *)
+  *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
     ;;
@@ -1064,11 +1065,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-    fish)
+  fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
     ;;
-    *)
+  *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
     ;;
@@ -1099,11 +1100,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-    fish)
+  fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
     ;;
-    *)
+  *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
     ;;
