@@ -259,7 +259,7 @@ you may pull the following starter images:
 
 .. code-block:: bash
 
-   docker pull cr.backend.ai/stable/filebrowser:21.02-ubuntu20.04
-   docker pull cr.backend.ai/stable/python:3.9-ubuntu20.04
-   docker pull cr.backend.ai/stable/python-pytorch:1.11-py38-cuda11.3
-   docker pull cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3
+   $ docker pull cr.backend.ai/stable/filebrowser:21.02-ubuntu20.04
+   $ docker pull cr.backend.ai/stable/python:3.9-ubuntu20.04
+   $ docker pull cr.backend.ai/stable/python-pytorch:1.11-py38-cuda11.3
+   $ docker pull cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3
