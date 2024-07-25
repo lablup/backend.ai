@@ -5,6 +5,7 @@ import base64
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import signal
@@ -20,6 +21,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Final,
     FrozenSet,
     List,
     Literal,
@@ -43,6 +45,7 @@ from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
+from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
@@ -58,6 +61,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -99,6 +103,19 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 eof_sentinel = Sentinel.TOKEN
+
+LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) ([\d\.]+)$")
+LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
+
+known_glibc_distros: Final[dict[float, str]] = {
+    2.17: "centos7.6",
+    2.27: "ubuntu18.04",
+    2.28: "centos8.0",
+    2.31: "ubuntu20.04",
+    2.34: "centos9.0",
+    2.35: "ubuntu22.04",
+    2.39: "ubuntu24.04",
+}
 
 
 def container_from_docker_container(src: DockerContainer) -> Container:
@@ -181,6 +198,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
@@ -196,6 +214,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             agent_id,
             event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -1223,6 +1242,61 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+
+        async with Docker() as docker:
+            image_id = image["digest"].partition(":")[-1]
+            # check if distro data is available on redis cache
+            cached_distro = await redis_helper.execute(
+                self.redis_stat_pool, lambda r: r.get(f"image:{image_id}:distro")
+            )
+            if cached_distro:
+                return cached_distro.decode()
+
+            container_config: dict[str, Any] = {
+                "Image": image["canonical"],
+                "Tty": True,
+                "Privileged": False,
+                "AttachStdin": False,
+                "AttachStdout": True,
+                "AttachStderr": True,
+                "HostConfig": {
+                    "Init": True,
+                },
+                "Cmd": ["ldd", "--version"],
+            }
+
+            container = await docker.containers.create(container_config)
+            await container.start()
+            container_log = await container.log(stdout=True, stderr=True, follow=False)
+            await container.stop()
+            await container.delete()
+            log.debug("response: {}", container_log)
+            version_lines = container_log[0].splitlines()
+            if m := LDD_GLIBC_REGEX.search(version_lines[0]):
+                version = float(m.group(1))
+                if version in known_glibc_distros:
+                    distro = known_glibc_distros[version]
+                else:
+                    for idx, known_version in enumerate(known_glibc_distros.keys()):
+                        if version < known_version:
+                            distro = list(known_glibc_distros.values())[idx - 1]
+                            break
+                    else:
+                        distro = list(known_glibc_distros.values())[-1]
+            elif m := LDD_MUSL_REGEX.search(version_lines[0]):
+                distro = "alpine3.8"
+            else:
+                raise RuntimeError("Could not determine the C library variant.")
+            await redis_helper.execute(
+                self.redis_stat_pool, lambda r: r.set(f"image:{image_id}:distro", distro)
+            )
+            return distro
+
     async def scan_images(self) -> Mapping[str, str]:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
@@ -1244,9 +1318,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
                     img_detail = await docker.images.inspect(repo_tag)
                     labels = img_detail["Config"]["Labels"]
-                    if labels is None or "ai.backend.kernelspec" not in labels:
+                    if labels is None:
                         continue
-                    kernelspec = int(labels["ai.backend.kernelspec"])
+                    kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         updated_images[repo_tag] = img_detail["Id"]
             for added_image in updated_images.keys() - self.images.keys():
@@ -1409,12 +1483,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DockerKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
             self.computers,
             self.port_pool,

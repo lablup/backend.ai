@@ -76,12 +76,12 @@ MAX_KERNELSPEC = 1
 
 common_image_label_schema = t.Dict({
     # Required labels
-    t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
-    t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
+    t.Key("ai.backend.kernelspec", default=1): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+    t.Key("ai.backend.features", default=[]): tx.StringList(delimiter=" "),
     # ai.backend.resource.min.*
-    t.Key("ai.backend.base-distro"): t.String(),
-    t.Key("ai.backend.runtime-type"): t.String(),
-    t.Key("ai.backend.runtime-path"): tx.PurePath(),
+    t.Key("ai.backend.base-distro", default=None): t.Null | t.String(),
+    t.Key("ai.backend.runtime-type", default="python"): t.String(),
+    t.Key("ai.backend.runtime-path", default="/opt/backend.ai/bin/python"): tx.PurePath(),
     # Optional labels
     t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
     t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),

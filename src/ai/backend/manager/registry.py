@@ -1733,7 +1733,7 @@ class AgentRegistry:
                                     "url": str(registry_url),
                                     **registry_creds,  # type: ignore
                                 },
-                                "digest": image_infos[binding.kernel.image].config_digest,
+                                "digest": image_infos[binding.kernel.image].config_digest.strip(),
                                 "repo_digest": None,
                                 "canonical": get_image_ref(binding.kernel).canonical,
                                 "architecture": get_image_ref(binding.kernel).architecture,

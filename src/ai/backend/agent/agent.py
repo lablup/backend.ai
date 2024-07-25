@@ -118,6 +118,7 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     HardwareMetadata,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelCreationResult,
@@ -191,6 +192,7 @@ KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
+    distro: str
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
@@ -211,13 +213,16 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
-        self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
+        self.kernel_features = frozenset(
+            self.image_labels.get("ai.backend.features", "batch query uid-match user-input").split()
+        )
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
@@ -229,6 +234,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             is_local=kernel_config["image"]["is_local"],
             architecture=kernel_config["image"].get("architecture", get_arch_name()),
         )
+        self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
         self.restarting = restarting
@@ -337,12 +343,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cache=LRUCache(maxsize=32),  # type: ignore
         key=lambda self: (
             self.image_ref,
-            self.kernel_config["image"]["labels"].get("ai.backend.base-distro", "ubuntu16.04"),
+            self.distro,
         ),
     )
     def get_krunner_info(self) -> Tuple[str, str, str, str, str]:
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
             self.local_config["container"]["krunner-volumes"], distro
         )
@@ -412,8 +417,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             )
 
         # Inject Backend.AI kernel runner dependencies.
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
 
         (
             arch,
@@ -438,14 +442,18 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        def mount_binary(filename: str, target_path: str) -> None:
+            resolved_path = self.resolve_krunner_filepath("runner/" + filename)
+            _mount(MountTypes.BIND, resolved_path, target_path)
+
+        mount_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
-        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
-        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
-        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
-        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
+        mount_binary(f"sftp-server.{arch}.bin", "/usr/libexec/sftp-server")
+        mount_binary(f"scp.{arch}.bin", "/usr/bin/scp")
+        mount_binary(f"dropbear.{arch}.bin", "/opt/kernel/dropbear")
+        mount_binary(f"dropbearconvert.{arch}.bin", "/opt/kernel/dropbearconvert")
+        mount_binary(f"dropbearkey.{arch}.bin", "/opt/kernel/dropbearkey")
+        mount_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
@@ -1242,6 +1250,10 @@ class AbstractAgent(
                 suppress_events,
             ),
         )
+
+    @abstractmethod
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        raise NotImplementedError
 
     @abstractmethod
     async def enumerate_containers(
