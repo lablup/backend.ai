@@ -37,9 +37,9 @@ relpath() {
 sed_inplace() {
   # BSD sed and GNU sed implements the "-i" option differently.
   case "$OSTYPE" in
-  darwin*) sed -i '' "$@" ;;
-  bsd*) sed -i '' "$@" ;;
-  *) sed -i "$@" ;;
+    darwin*) sed -i '' "$@" ;;
+    bsd*) sed -i '' "$@" ;;
+    *) sed -i "$@" ;;
   esac
 }
 
@@ -343,20 +343,20 @@ while [ $# -gt 0 ]; do
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
-  --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
+    --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
     --ipc-base-path)        IPC_BASE_PATH=$2; shift ;;
     --ipc-base-path=*)      IPC_BASE_PATH="${1#*=}" ;;
     --var-base-path)        VAR_BASE_PATH=$2; shift ;;
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
-  --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
-  --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+    --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
+    --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
     --agent-backend)        AGENT_BACKEND=$2; shift ;;
     --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
     --configure-ha)         CONFIGURE_HA=1 ;;
-  *)
-    echo "Unknown option: $1"
-    echo "Run '$0 --help' for usage."
-    exit 1
+    *)
+      echo "Unknown option: $1"
+      echo "Run '$0 --help' for usage."
+      exit 1
   esac
   shift
 done
@@ -1008,11 +1008,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-  fish)
+    fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
     ;;
-  *)
+    *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
     ;;
@@ -1035,11 +1035,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-  fish)
+    fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
     ;;
-  *)
+    *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
     ;;
@@ -1070,11 +1070,11 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
-  fish)
+    fish)
         echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
         echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
     ;;
-  *)
+    *)
         echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
         echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
     ;;
