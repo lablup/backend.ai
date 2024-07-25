@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import enum
 import functools
 import ipaddress
@@ -235,10 +236,14 @@ async def login(
     basic_auth: Optional[aiohttp.BasicAuth]
 
     if "public.ecr" in str(registry_url) or "dkr.ecr" in str(registry_url):
+        auth_token = base64.b64encode(
+            f"{credentials["username"]}:{credentials["password"]}".encode()
+        ).decode()
+
         return {
             "auth": None,
             "headers": {
-                "Authorization": f"Bearer {credentials['password']}",
+                "Authorization": f"Bearer {auth_token}",
             },
         }
 

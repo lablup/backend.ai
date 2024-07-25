@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Any, AsyncIterator, Mapping
 
@@ -15,6 +16,28 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
+    @staticmethod
+    def get_credential(registry_info: Mapping[str, Any]) -> dict[str, Any]:
+        access_key, secret_access_key, region, type_ = (
+            registry_info["access_key"],
+            registry_info["secret_access_key"],
+            registry_info["region"],
+            registry_info["type"],
+        )
+
+        ecr_client = boto3.client(
+            type_,
+            region_name=region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_access_key,
+        )
+
+        auth_token = ecr_client.get_authorization_token()["authorizationData"]["authorizationToken"]
+        decoded_auth_token = base64.b64decode(auth_token).decode("utf-8")
+        username, password = decoded_auth_token.split(":")
+
+        return {"username": username, "password": password}
+
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
@@ -32,19 +55,7 @@ class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
             ssl_verify=ssl_verify,
         )
 
-        access_key, secret_access_key, region, type_ = (
-            self.registry_info["access_key"],
-            self.registry_info["secret_access_key"],
-            self.registry_info["region"],
-            self.registry_info["type"],
-        )
-
-        self.ecr_client = boto3.client(
-            type_,
-            region_name=region,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_access_key,
-        )
+        self.credentials = AWSElasticContainerRegistry_v2.get_credential(registry_info)
 
     async def fetch_repositories(
         self,
@@ -73,13 +84,13 @@ class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
                     response = client.describe_repositories()
 
                 for repo in response["repositories"]:
-                    # TODO: Verify this logic
-                    repo_id = (repo["repositoryUri"].split("/"))[1]
-                    yield f"{repo_id}/{repo["repositoryName"]}"
+                    # TODO: Fix this.
+                    registry_alias = (repo["repositoryUri"].split("/"))[1]
+                    yield f"{registry_alias}/{repo["repositoryName"]}"
 
                 next_token = response.get("nextToken")
 
                 if not next_token:
                     break
         except Exception as e:
-            print(f"An error occurred: {e}")
+            log.error(f"Error occurred: {e}")
