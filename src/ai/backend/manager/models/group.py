@@ -115,7 +115,7 @@ association_groups_users = sa.Table(
 
 container_registry_iv = t.Dict({}) | t.Dict({
     t.Key("registry"): t.String(),
-    t.Key("project"): t.String(),
+    t.Key("project", optional=True): t.String() | t.Null,
 })
 
 
