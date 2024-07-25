@@ -79,9 +79,9 @@ class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
         try:
             while True:
                 if next_token:
-                    response = client.describe_repositories(nextToken=next_token)
+                    response = client.describe_repositories(nextToken=next_token, maxResults=30)
                 else:
-                    response = client.describe_repositories()
+                    response = client.describe_repositories(maxResults=30)
 
                 for repo in response["repositories"]:
                     # TODO: Fix this.
