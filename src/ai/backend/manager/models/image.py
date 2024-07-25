@@ -415,7 +415,7 @@ class ImageRow(Base):
             "tag": self.tag,
             "architecture": self.architecture,
             "registry": self.registry,
-            "digest": self.config_digest,
+            "digest": self.config_digest.strip() if self.config_digest else None,
             "labels": self.labels,
             "size_bytes": self.size_bytes,
             "resource_limits": res_limits,
@@ -514,7 +514,7 @@ class Image(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.config_digest,
+            digest=row.config_digest.strip() if row.config_digest else None,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
             size_bytes=row.size_bytes,
@@ -530,7 +530,7 @@ class Image(graphene.ObjectType):
             installed=len(installed_agents) > 0,
             installed_agents=installed_agents if not hide_agents else None,
             # legacy
-            hash=row.config_digest,
+            hash=row.config_digest.strip() if row.config_digest else None,
         )
 
     @classmethod
@@ -714,7 +714,7 @@ class ImageNode(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.config_digest,
+            digest=row.config_digest.strip() if row.config_digest else None,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             size_bytes=row.size_bytes,
             resource_limits=[
