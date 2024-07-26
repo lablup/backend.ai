@@ -529,6 +529,7 @@ def get_redis_object(
                 connection_pool=ConnectionPool.from_url(
                     str(url),
                     **conn_pool_opts,
+                    **conn_opts,
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,
