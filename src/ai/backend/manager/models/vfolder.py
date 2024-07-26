@@ -2425,30 +2425,31 @@ class ModelCard(graphene.ObjectType):
         resolve_info: graphene.ResolveInfo,
         vfolder_row: VFolderRow,
         err_msg: str,
-    ) -> ModelCard:
-        return cls(
-            id=vfolder_row.id,
-            row_id=vfolder_row.id,
-            name=vfolder_row.name,
-            author=vfolder_row.creator or "",
-            error_msg=err_msg,
-        )
+    ) -> ModelCard | None:
+        """
+        Parse ModelCard with error info.
+        Creator of the folder and admins are allowed to access ModelCard objects with error message.
+        """
+        graph_ctx: GraphQueryContext = resolve_info.context
+        if (
+            graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+            or vfolder_row.creator == graph_ctx.user["email"]
+        ):
+            return cls(
+                id=vfolder_row.id,
+                row_id=vfolder_row.id,
+                name=vfolder_row.name,
+                title=vfolder_row.name,
+                author=vfolder_row.creator or "",
+                error_msg=err_msg,
+            )
+        else:
+            return None
 
     @classmethod
-    def parse_empty_model(
-        cls,
-        resolve_info: graphene.ResolveInfo,
-        vfolder_row: VFolderRow,
-    ) -> ModelCard:
-        return cls(
-            id=vfolder_row.id,
-            row_id=vfolder_row.id,
-            name=vfolder_row.name,
-            author=vfolder_row.creator or "",
-        )
-
-    @classmethod
-    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelCard:
+    async def from_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
+    ) -> ModelCard | None:
         async def _fetch_file(
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
@@ -2469,19 +2470,6 @@ class ModelCard(graphene.ObjectType):
                         break
                     chunks += chunk
             return chunks
-
-        def _parse_model_with_err(
-            info: graphene.ResolveInfo, vfolder_row: VFolderRow, err_msg: str
-        ) -> ModelCard:
-            graph_ctx: GraphQueryContext = info.context
-            if (
-                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
-                or vfolder_row.creator == graph_ctx.user["email"]
-            ):
-                # Creator can see error
-                return cls.parse_model_from_err(info, vfolder_row, err_msg)
-            else:
-                return cls.parse_empty_model(info, vfolder_row)
 
         graph_ctx: GraphQueryContext = info.context
 
@@ -2504,7 +2492,7 @@ class ModelCard(graphene.ObjectType):
                 vfolder_files = (await storage_resp.json())["items"]
         except VFolderOperationFailed as e:
             err_msg = f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
-            return _parse_model_with_err(info, vfolder_row, err_msg)
+            return cls.parse_model_from_err(info, vfolder_row, err_msg)
 
         model_definition_filename: str | None = None
         readme_idx: int | None = None
@@ -2517,40 +2505,41 @@ class ModelCard(graphene.ObjectType):
             if item["name"].lower().startswith("readme."):
                 readme_idx = idx
 
-        if readme_idx is not None:
-            readme_filename: str = vfolder_files[readme_idx]["name"]
-            try:
-                chunks = await _fetch_file(readme_filename)
-            except VFolderOperationFailed as e:
-                err_msg = f"Failed to fetch README file (detail:{e.extra_msg})"
-                return _parse_model_with_err(info, vfolder_row, err_msg)
-            readme = chunks.decode("utf-8")
-            readme_filetype = readme_filename.split(".")[-1]
-        else:
-            readme = None
-            readme_filetype = None
-
         if model_definition_filename:
             try:
                 chunks = await _fetch_file(model_definition_filename)
             except VFolderOperationFailed as e:
                 err_msg = f"Failed to fetch model definition file (detail:{e.extra_msg})"
-                return _parse_model_with_err(info, vfolder_row, err_msg)
+                return cls.parse_model_from_err(info, vfolder_row, err_msg)
             model_definition_yaml = chunks.decode("utf-8")
             try:
                 model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
             except yaml.error.YAMLError as e:
                 err_msg = f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
-                return _parse_model_with_err(info, vfolder_row, err_msg)
+                return cls.parse_model_from_err(info, vfolder_row, err_msg)
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
             except t.DataError as e:
                 err_msg = f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
-                return _parse_model_with_err(info, vfolder_row, err_msg)
+                return cls.parse_model_from_err(info, vfolder_row, err_msg)
             assert model_definition is not None
             model_definition["id"] = vfolder_row_id
         else:
             model_definition = None
+
+        if readme_idx is not None:
+            readme_filename: str = vfolder_files[readme_idx]["name"]
+            try:
+                chunks = await _fetch_file(readme_filename)
+            except VFolderOperationFailed:
+                readme = "Failed to fetch README file."
+                readme_filetype = None
+            else:
+                readme = chunks.decode("utf-8")
+                readme_filetype = readme_filename.split(".")[-1]
+        else:
+            readme = None
+            readme_filetype = None
 
         return cls.parse_model(
             info,
@@ -2561,7 +2550,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -2646,7 +2635,12 @@ class ModelCard(graphene.ObjectType):
             )
             vfolder_rows = (await db_session.scalars(query)).all()
             total_cnt = await db_session.scalar(cnt_query)
-        result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
+        result = []
+        for vf in vfolder_rows:
+            if (_node := await cls.from_row(info, vf)) is not None:
+                result.append(_node)
+            else:
+                total_cnt -= 1
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
