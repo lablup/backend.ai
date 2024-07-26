@@ -2474,7 +2474,10 @@ class ModelCard(graphene.ObjectType):
             info: graphene.ResolveInfo, vfolder_row: VFolderRow, err_msg: str
         ) -> ModelCard:
             graph_ctx: GraphQueryContext = info.context
-            if vfolder_row.creator == graph_ctx.user["email"]:
+            if (
+                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user["email"]
+            ):
                 # Creator can see error
                 return cls.parse_model_from_err(info, vfolder_row, err_msg)
             else:
