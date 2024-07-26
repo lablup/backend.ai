@@ -50,7 +50,6 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.manager.container_registry.aws_ecr import AWSElasticContainerRegistry_v2
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import rescan_images
 
@@ -1189,20 +1188,12 @@ async def convert_session_to_image(
                         raise BackendError(extra_msg="Operation cancelled")
 
             if not new_image_ref.is_local:
-                if "public.ecr" in registry_hostname or "dkr.ecr" in str(registry_hostname):
-                    credential = AWSElasticContainerRegistry_v2.get_credential(registry_conf)
-                else:
-                    credential = registry_conf
-
-                username = credential.get("username")
-                password = credential.get("password")
-
                 # push image to registry from local agent
                 image_registry = ImageRegistry(
                     name=registry_hostname,
                     url=str(registry_conf[""]),
-                    username=username,
-                    password=password,
+                    username=registry_conf.get("username"),
+                    password=registry_conf.get("password"),
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
