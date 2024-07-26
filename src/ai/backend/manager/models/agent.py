@@ -8,6 +8,7 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -196,35 +197,18 @@ class Agent(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        rs = ctx.redis_stat
-        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
-        if live_stat is not None:
-            live_stat = msgpack.unpackb(live_stat)
-        return live_stat
+        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.live_stat")
+        return await loader.load(self.id)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        rs = ctx.redis_stat
-        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
-        if live_stat is not None:
-            live_stat = msgpack.unpackb(live_stat)
-            try:
-                return float(live_stat["node"]["cpu_util"]["pct"])
-            except (KeyError, TypeError, ValueError):
-                return 0.0
-        return 0.0
+        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.cpu_cur_pct")
+        return await loader.load(self.id)
 
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        rs = ctx.redis_stat
-        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
-        if live_stat is not None:
-            live_stat = msgpack.unpackb(live_stat)
-            try:
-                return int(live_stat["node"]["mem"]["current"])
-            except (KeyError, TypeError, ValueError):
-                return 0
-        return 0
+        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.mem_cur_bytes")
+        return await loader.load(self.id)
 
     async def resolve_hardware_metadata(
         self,
@@ -244,9 +228,8 @@ class Agent(graphene.ObjectType):
 
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        rs = ctx.redis_stat
-        cnt = await redis_helper.execute(rs, lambda r: r.get(f"container_count.{self.id}"))
-        return int(cnt) if cnt is not None else 0
+        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.container_count")
+        return await loader.load(self.id)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -379,6 +362,70 @@ class Agent(graphene.ObjectType):
                 agent_ids,
                 lambda row: row["id"],
             )
+
+    @classmethod
+    async def batch_load_live_stat(
+        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
+    ) -> Sequence[Any]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for agent_id in agent_ids:
+                await pipe.get(agent_id)
+            return pipe
+
+        ret = []
+        for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+            if stat is not None:
+                ret.append(msgpack.unpackb(stat))
+            else:
+                ret.append(None)
+
+        return ret
+
+    @classmethod
+    async def batch_load_cpu_cur_pct(
+        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
+    ) -> Sequence[Any]:
+        ret = []
+        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
+            if stat is not None:
+                try:
+                    ret.append(float(stat["node"]["cpu_util"]["pct"]))
+                except (KeyError, TypeError, ValueError):
+                    ret.append(0.0)
+            else:
+                ret.append(0.0)
+        return ret
+
+    @classmethod
+    async def batch_load_mem_cur_bytes(
+        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
+    ) -> Sequence[Any]:
+        ret = []
+        for stat in await cls.batch_load_live_stat(ctx, agent_ids):
+            if stat is not None:
+                try:
+                    ret.append(float(stat["node"]["mem"]["current"]))
+                except (KeyError, TypeError, ValueError):
+                    ret.append(0)
+            else:
+                ret.append(0)
+        return ret
+
+    @classmethod
+    async def batch_load_container_count(
+        cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
+    ) -> Sequence[int]:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for agent_id in agent_ids:
+                await pipe.get(f"container_count.{agent_id}")
+            return pipe
+
+        ret = []
+        for cnt in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
+            ret.append(int(cnt) if cnt is not None else 0)
+        return ret
 
 
 class ModifyAgentInput(graphene.InputObjectType):
