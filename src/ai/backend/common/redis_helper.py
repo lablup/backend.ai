@@ -531,6 +531,7 @@ def get_redis_object(
                     **conn_pool_opts,
                     **conn_opts,
                 ),
+                **conn_opts,
                 auto_close_connection_pool=True,
             ),
             sentinel=None,
