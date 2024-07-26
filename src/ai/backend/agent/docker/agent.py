@@ -1344,7 +1344,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            # TODO: Fix the error where no error is displayed even when an authentication error occurs.
             await docker.images.push(image_ref.canonical, auth=auth_config)
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
