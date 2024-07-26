@@ -41,13 +41,16 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
                     response = client.describe_repositories(maxResults=30)
 
                 for repo in response["repositories"]:
-                    if type_ == "ecr-public":
-                        # repositoryUri format:
-                        # public.ecr.aws/<registry_alias>/<repository>
-                        registry_alias = (repo["repositoryUri"].split("/"))[1]
-                        yield f"{registry_alias}/{repo["repositoryName"]}"
-                    else:
-                        yield repo["repositoryName"]
+                    match type_:
+                        case "ecr":
+                            yield repo["repositoryName"]
+                        case "ecr-public":
+                            # repositoryUri format:
+                            # public.ecr.aws/<registry_alias>/<repository>
+                            registry_alias = (repo["repositoryUri"].split("/"))[1]
+                            yield f"{registry_alias}/{repo["repositoryName"]}"
+                        case _:
+                            raise ValueError(f"Unknown registry type: {type_}")
 
                 next_token = response.get("nextToken")
 
