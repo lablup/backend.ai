@@ -2439,7 +2439,6 @@ class ModelCard(graphene.ObjectType):
                 id=vfolder_row.id,
                 row_id=vfolder_row.id,
                 name=vfolder_row.name,
-                title=vfolder_row.name,
                 author=vfolder_row.creator or "",
                 error_msg=err_msg,
             )
