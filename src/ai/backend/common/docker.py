@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import enum
 import functools
 import ipaddress
@@ -235,18 +234,6 @@ async def login(
     """
     basic_auth: Optional[aiohttp.BasicAuth]
 
-    if "public.ecr" in str(registry_url) or "dkr.ecr" in str(registry_url):
-        auth_token = base64.b64encode(
-            f"{credentials["username"]}:{credentials["password"]}".encode()
-        ).decode()
-
-        return {
-            "auth": None,
-            "headers": {
-                "Authorization": f"Bearer {auth_token}",
-            },
-        }
-
     if credentials.get("username") and credentials.get("password"):
         basic_auth = aiohttp.BasicAuth(
             credentials["username"],
@@ -271,7 +258,7 @@ async def login(
         return {"auth": basic_auth, "headers": {}}
     elif ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
-    elif ping_status == 401:
+    elif ping_status in [400, 401]:
         params = {
             "scope": scope,
             "offline_token": "true",
