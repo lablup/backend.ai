@@ -1182,7 +1182,7 @@ class AbstractAgent(
         reason: KernelLifecycleEventReason,
         *,
         container_id: Optional[ContainerId] = None,
-        exit_code: int = None,
+        exit_code: int | None = None,
         done_future: asyncio.Future = None,
         suppress_events: bool = False,
     ) -> None:

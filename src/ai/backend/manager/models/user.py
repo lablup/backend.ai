@@ -307,7 +307,7 @@ class User(graphene.ObjectType):
         group_id: UUID = None,
         is_active: bool | None = None,
         status: str | None = None,
-        limit: int = None,
+        limit: int | None = None,
     ) -> Sequence[User]:
         """
         Load user's information. Group names associated with the user are also returned.

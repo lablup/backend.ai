@@ -73,11 +73,16 @@ class Forward(Trafaret): ...
 
 class List(Trafaret, metclass=SquareBracketsMeta):
     def __init__(
-        self, trafaret: Trafaret | _Type[Trafaret], min_length: int = 0, max_length: int = None
+        self,
+        trafaret: Trafaret | _Type[Trafaret],
+        min_length: int = 0,
+        max_length: int | None = None,
     ) -> None: ...
 
 class Iterable(Trafaret):
-    def __init__(self, trafaret: Trafaret, min_length: int = 0, max_length: int = None) -> None: ...
+    def __init__(
+        self, trafaret: Trafaret, min_length: int = 0, max_length: int | None = None
+    ) -> None: ...
 
 class Tuple(Trafaret):
     def __init__(self, *args): ...
@@ -87,7 +92,10 @@ class Atom(Trafaret):
 
 class String(Trafaret):
     def __init__(
-        self, allow_blank: bool = False, min_length: int = None, max_length: int = None
+        self,
+        allow_blank: bool = False,
+        min_length: int | None = None,
+        max_length: int | None = None,
     ): ...
 
 class Bytes(Trafaret): ...

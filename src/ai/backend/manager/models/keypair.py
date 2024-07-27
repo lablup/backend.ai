@@ -285,7 +285,7 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         is_active: bool | None = None,
-        limit: int = None,
+        limit: int | None = None,
     ) -> Sequence[KeyPair]:
         from .user import users
 
