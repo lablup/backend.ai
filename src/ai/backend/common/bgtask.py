@@ -169,10 +169,10 @@ class BackgroundTaskManager:
                                 await resp.send("{}", event="bgtask_done")
                             await resp.send("{}", event="server_close")
                         case BgtaskCancelledEvent():
-                            await resp.send(json.dumps(body), event="bgtask_cancelled")
+                            await resp.send("{}", event="bgtask_failed")
                             await resp.send("{}", event="server_close")
                         case BgtaskFailedEvent():
-                            await resp.send(json.dumps(body), event="bgtask_failed")
+                            await resp.send("{}", event="bgtask_cancelled")
                             await resp.send("{}", event="server_close")
             except:
                 log.exception("")
