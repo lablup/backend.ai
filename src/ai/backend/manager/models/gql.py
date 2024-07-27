@@ -861,7 +861,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
@@ -1034,7 +1034,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         domain_name: str | None = None,
-        is_active: bool = None,
+        is_active: bool | None = None,
         type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
@@ -1219,7 +1219,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: uuid.UUID = None,
-        is_active: bool = None,
+        is_active: bool | None = None,
         status: UserStatus = None,
     ) -> Sequence[User]:
         from .user import UserRole
@@ -1258,7 +1258,7 @@ class Queries(graphene.ObjectType):
         order: str | None = None,
         domain_name: str | None = None,
         group_id: uuid.UUID = None,
-        is_active: bool = None,
+        is_active: bool | None = None,
         status: UserStatus = None,
     ) -> UserList:
         from .user import UserRole
@@ -1354,7 +1354,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         email: str | None = None,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[KeyPair]:
         ctx: GraphQueryContext = info.context
         if email is None:
@@ -1385,7 +1385,7 @@ class Queries(graphene.ObjectType):
         order: str | None = None,
         domain_name: str | None = None,
         email: str | None = None,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> KeyPairList:
         total_count = await KeyPair.load_count(
             info.context,
@@ -1554,7 +1554,7 @@ class Queries(graphene.ObjectType):
     async def resolve_scaling_groups(
         root: Any,
         info: graphene.ResolveInfo,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_all(info.context, is_active=is_active)
 
@@ -1564,7 +1564,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         domain: str,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_domain(
             info.context,
@@ -1578,7 +1578,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         user_group,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_group(
             info.context,
@@ -1592,7 +1592,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        is_active: bool = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_keypair(
             info.context,

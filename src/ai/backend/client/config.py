@@ -218,7 +218,7 @@ class APIConfig:
         secret_key: str | None = None,
         hash_type: str | None = None,
         vfolder_mounts: Iterable[str] = None,
-        skip_sslcert_validation: bool = None,
+        skip_sslcert_validation: bool | None = None,
         connection_timeout: float = None,
         read_timeout: float = None,
         announcement_handler: Callable[[str], None] = None,
