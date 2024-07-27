@@ -464,7 +464,7 @@ class AsyncEtcd:
         once: bool = False,
         ready_event: asyncio.Event = None,
         cleanup_event: asyncio.Event = None,
-        wait_timeout: float = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
@@ -502,7 +502,7 @@ class AsyncEtcd:
         once: bool = False,
         ready_event: asyncio.Event = None,
         cleanup_event: asyncio.Event = None,
-        wait_timeout: float = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
