@@ -48,7 +48,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
                 if not auth_header:
                     raise InvalidCredentials("E20006: Authorization header not provided")
                 auth_type, auth_key = auth_header.split(" ", maxsplit=2)
-                if auth_type == "BackendAI":
+                if auth_type in ("BackendAI", "Bearer"):
                     token = auth_key
                 else:
                     raise InvalidCredentials(
@@ -64,7 +64,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
                 except jwt.PyJWTError as e:
                     raise InvalidCredentials from e
 
-                if decoded.get("id") != circuit.id:
+                if decoded.get("id") != str(circuit.id):
                     raise InvalidCredentials("E20008: Authorization token mismatch")
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
