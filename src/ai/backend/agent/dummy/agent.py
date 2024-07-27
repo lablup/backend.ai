@@ -251,6 +251,11 @@ class DummyAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        delay = self.dummy_agent_cfg["delay"]["scan-image"]
+        await asyncio.sleep(delay)
+        return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+
     async def scan_images(self) -> Mapping[str, str]:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
