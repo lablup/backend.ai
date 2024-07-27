@@ -894,7 +894,7 @@ class RescanImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        registry: str = None,
+        registry: str | None = None,
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",

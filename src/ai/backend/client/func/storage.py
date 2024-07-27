@@ -47,8 +47,8 @@ class Storage(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Lists the keypairs.

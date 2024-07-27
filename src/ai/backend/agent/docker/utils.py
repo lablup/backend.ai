@@ -23,7 +23,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: str = None,
+        name: str | None = None,
     ) -> None:
         self.image_ref = image_ref
         arch = get_arch_name()

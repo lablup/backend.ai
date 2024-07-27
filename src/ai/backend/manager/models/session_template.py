@@ -146,7 +146,7 @@ async def query_accessible_session_templates(
     template_type: TemplateType,
     *,
     user_role: UserRole = None,
-    domain_name: str = None,
+    domain_name: str | None = None,
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
 ) -> List[Mapping[str, Any]]:

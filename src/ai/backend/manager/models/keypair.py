@@ -248,7 +248,9 @@ class KeyPair(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
         return await loader.load(self.access_key)
 
-    async def resolve_compute_sessions(self, info: graphene.ResolveInfo, raw_status: str = None):
+    async def resolve_compute_sessions(
+        self, info: graphene.ResolveInfo, raw_status: str | None = None
+    ):
         ctx: GraphQueryContext = info.context
         from . import KernelStatus  # noqa: avoid circular imports
 
@@ -281,7 +283,7 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
+        domain_name: str | None = None,
         is_active: bool = None,
         limit: int = None,
     ) -> Sequence[KeyPair]:
@@ -341,10 +343,10 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        email: str = None,
+        domain_name: str | None = None,
+        email: str | None = None,
         is_active: bool = None,
-        filter: str = None,
+        filter: str | None = None,
     ) -> int:
         from .group import association_groups_users, groups
         from .user import users
@@ -375,11 +377,11 @@ class KeyPair(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        email: str = None,
+        domain_name: str | None = None,
+        email: str | None = None,
         is_active: bool = None,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[KeyPair]:
         from .group import association_groups_users, groups
         from .user import users
@@ -428,7 +430,7 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
+        domain_name: str | None = None,
         is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
         from .group import association_groups_users, groups
@@ -470,7 +472,7 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         access_keys: Sequence[AccessKey],
         *,
-        domain_name: str = None,
+        domain_name: str | None = None,
     ) -> Sequence[Optional[KeyPair]]:
         from .group import association_groups_users, groups
         from .user import users

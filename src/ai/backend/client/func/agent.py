@@ -56,13 +56,13 @@ class Agent(BaseFunction):
     async def paginated_list(
         cls,
         status: str = "ALIVE",
-        scaling_group: str = None,
+        scaling_group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult:
         """
         Lists the keypairs.

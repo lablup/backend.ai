@@ -1604,8 +1604,8 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
         *,
-        domain_name: str = None,
-        access_key: str = None,
+        domain_name: str | None = None,
+        access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid

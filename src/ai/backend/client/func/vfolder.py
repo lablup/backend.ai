@@ -63,9 +63,9 @@ class VFolder(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: str = None,
-        unmanaged_path: str = None,
-        group: str = None,
+        host: str | None = None,
+        unmanaged_path: str | None = None,
+        group: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
         cloneable: bool = False,
@@ -103,13 +103,13 @@ class VFolder(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        group: str = None,
+        group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
@@ -137,8 +137,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of own vfolders.
@@ -164,8 +164,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -191,8 +191,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -728,7 +728,7 @@ class VFolder(BaseFunction):
     async def clone(
         self,
         target_name: str,
-        target_host: str = None,
+        target_host: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
     ):
@@ -743,7 +743,9 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update_options(self, name: str, permission: str = None, cloneable: bool = None):
+    async def update_options(
+        self, name: str, permission: str | None = None, cloneable: bool = None
+    ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json({
             "cloneable": cloneable,
@@ -769,7 +771,7 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: str = None):
+    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: str | None = None):
         rqst = Request("POST", "/folders/_/shared")
         rqst.set_json({
             "vfolder": vfolder,

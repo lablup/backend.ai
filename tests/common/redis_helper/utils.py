@@ -71,7 +71,7 @@ async def interrupt(
     do_unpause: asyncio.Event,
     paused: asyncio.Event,
     unpaused: asyncio.Event,
-    redis_password: str = None,
+    redis_password: str | None = None,
 ) -> None:
     # Interrupt
     await do_pause.wait()
