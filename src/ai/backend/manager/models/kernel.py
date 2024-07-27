@@ -1064,7 +1064,7 @@ class ComputeContainer(graphene.ObjectType):
         cluster_role: str | None = None,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey = None,
+        access_key: AccessKey | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[Optional[ComputeContainer]]:
@@ -1123,7 +1123,7 @@ class ComputeContainer(graphene.ObjectType):
         container_ids: Sequence[KernelId],
         *,
         domain_name: str | None = None,
-        access_key: AccessKey = None,
+        access_key: AccessKey | None = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
             sa.select(KernelRow)
@@ -1385,7 +1385,7 @@ class LegacyComputeSession(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey = None,
+        access_key: AccessKey | None = None,
         status: str | None = None,
     ) -> int:
         if isinstance(status, str):
@@ -1418,7 +1418,7 @@ class LegacyComputeSession(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey = None,
+        access_key: AccessKey | None = None,
         status: str | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
@@ -1511,7 +1511,7 @@ class LegacyComputeSession(graphene.ObjectType):
         sess_ids: Sequence[SessionId],
         *,
         domain_name: str | None = None,
-        access_key: AccessKey = None,
+        access_key: AccessKey | None = None,
         status: str | None = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
         status_list = []
