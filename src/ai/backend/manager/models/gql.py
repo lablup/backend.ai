@@ -1220,7 +1220,7 @@ class Queries(graphene.ObjectType):
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         is_active: bool | None = None,
-        status: UserStatus = None,
+        status: UserStatus | None = None,
     ) -> Sequence[User]:
         from .user import UserRole
 
@@ -1259,7 +1259,7 @@ class Queries(graphene.ObjectType):
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         is_active: bool | None = None,
-        status: UserStatus = None,
+        status: UserStatus | None = None,
     ) -> UserList:
         from .user import UserRole
 
