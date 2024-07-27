@@ -1468,8 +1468,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
         from .group import groups
@@ -1500,8 +1500,8 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[VirtualFolder]:
@@ -1584,7 +1584,7 @@ class VirtualFolder(graphene.ObjectType):
         user_uuids: Sequence[uuid.UUID],
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from .user import users
 
@@ -1616,8 +1616,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
         from .user import users
@@ -1654,8 +1654,8 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
@@ -1701,8 +1701,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models import association_groups_users as agus
@@ -1736,8 +1736,8 @@ class VirtualFolder(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
@@ -2027,7 +2027,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        user_id: uuid.UUID = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
         from .user import users
@@ -2052,7 +2052,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: uuid.UUID = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolderPermission]:

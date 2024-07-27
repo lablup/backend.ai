@@ -1218,7 +1218,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         is_active: bool | None = None,
         status: UserStatus = None,
     ) -> Sequence[User]:
@@ -1257,7 +1257,7 @@ class Queries(graphene.ObjectType):
         filter: str | None = None,
         order: str | None = None,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         is_active: bool | None = None,
         status: UserStatus = None,
     ) -> UserList:
@@ -1641,8 +1641,8 @@ class Queries(graphene.ObjectType):
         id: str,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
         user_role = graph_ctx.user["role"]
@@ -1665,8 +1665,8 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> VirtualFolderList:
@@ -1698,7 +1698,7 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: uuid.UUID = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> VirtualFolderPermissionList:
@@ -1726,7 +1726,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        user_id: uuid.UUID = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> VirtualFolderList:
@@ -1756,7 +1756,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        user_id: uuid.UUID = None,  # not used, fixed
+        user_id: uuid.UUID | None = None,  # not used, fixed
         filter: str | None = None,
         order: str | None = None,
     ) -> VirtualFolderList:
@@ -1786,7 +1786,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        user_id: uuid.UUID = None,  # not used, fixed
+        user_id: uuid.UUID | None = None,  # not used, fixed
         filter: str | None = None,
         order: str | None = None,
     ) -> VirtualFolderList:
@@ -1820,7 +1820,7 @@ class Queries(graphene.ObjectType):
         session_id: SessionId,
         role: UserRole = None,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
@@ -1881,7 +1881,7 @@ class Queries(graphene.ObjectType):
         filter: str | None = None,
         order: str | None = None,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
         status: str | None = None,
     ) -> ComputeSessionList:
@@ -1938,7 +1938,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
         status: str | None = None,
         order_key: str | None = None,

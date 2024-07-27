@@ -1029,7 +1029,7 @@ class ComputeContainer(graphene.ObjectType):
         *,
         cluster_role: str | None = None,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: str | None = None,
         filter: str | None = None,
     ) -> int:
@@ -1063,7 +1063,7 @@ class ComputeContainer(graphene.ObjectType):
         *,
         cluster_role: str | None = None,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
         filter: str | None = None,
         order: str | None = None,
@@ -1384,7 +1384,7 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
         status: str | None = None,
     ) -> int:
@@ -1417,7 +1417,7 @@ class LegacyComputeSession(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
         status: str | None = None,
         order_key: str | None = None,
@@ -1465,7 +1465,7 @@ class LegacyComputeSession(graphene.ObjectType):
         access_keys: AccessKey,
         *,
         domain_name: str | None = None,
-        group_id: uuid.UUID = None,
+        group_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> Sequence[Optional[LegacyComputeSession]]:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
