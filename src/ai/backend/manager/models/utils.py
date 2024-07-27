@@ -456,7 +456,7 @@ def sql_json_increment(
     col,
     key: Tuple[str, ...],
     *,
-    parent_updates: Mapping[str, Any] = None,
+    parent_updates: Mapping[str, Any] | None = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """

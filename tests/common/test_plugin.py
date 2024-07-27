@@ -47,8 +47,8 @@ class DummyEntrypoint:
 
 def mock_entrypoints_with_instance(
     plugin_group_name: str,
-    allowlist: set[str] = None,
-    blocklist: set[str] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     mocked_plugin,
 ):
@@ -64,8 +64,8 @@ def mock_entrypoints_with_instance(
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: set[str] = None,
-    blocklist: set[str] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls: list[Type[AbstractPlugin]],
 ) -> Iterator[DummyEntrypoint]: ...
@@ -74,8 +74,8 @@ def mock_entrypoints_with_class(
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: set[str] = None,
-    blocklist: set[str] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls: Type[AbstractPlugin],
 ) -> DummyEntrypoint: ...
@@ -83,8 +83,8 @@ def mock_entrypoints_with_class(
 
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: set[str] = None,
-    blocklist: set[str] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls,
 ):

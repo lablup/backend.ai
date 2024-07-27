@@ -141,7 +141,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         src: str | Path,
         target: str | Path,
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Mapping[str, Any] | None = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 

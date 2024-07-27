@@ -453,7 +453,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(
             type,

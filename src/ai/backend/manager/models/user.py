@@ -479,7 +479,7 @@ class User(graphene.ObjectType):
     async def batch_load_by_email(
         cls,
         ctx: GraphQueryContext,
-        emails: Sequence[str] = None,
+        emails: Sequence[str] | None = None,
         *,
         domain_name: str | None = None,
         is_active: bool | None = None,
@@ -509,7 +509,7 @@ class User(graphene.ObjectType):
     async def batch_load_by_uuid(
         cls,
         ctx: GraphQueryContext,
-        user_ids: Sequence[UUID] = None,
+        user_ids: Sequence[UUID] | None = None,
         *,
         domain_name: str | None = None,
         is_active: bool | None = None,

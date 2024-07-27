@@ -37,7 +37,7 @@ class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Union[float, int] = None,
+        value: Union[float, int] | None = None,
     ) -> None:
         pass
 
@@ -52,8 +52,8 @@ class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def capture_exception(
         self,
-        exc_instance: Exception = None,
-        context: Mapping[str, Any] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         pass
 
@@ -69,7 +69,7 @@ class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Union[float, int] = None,
+        value: Union[float, int] | None = None,
     ) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.report_metric(metric_type, metric_name, value)
@@ -80,8 +80,8 @@ class ErrorPluginContext(BasePluginContext[AbstractErrorReporterPlugin]):
 
     async def capture_exception(
         self,
-        exc_instance: Exception = None,
-        context: Mapping[str, Any] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.capture_exception(exc_instance, context)

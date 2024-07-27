@@ -99,7 +99,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     def _get_handlers(
         self,
         event_name: str,
-        order: Sequence[str] = None,
+        order: Sequence[str] | None = None,
     ) -> Sequence[Tuple[str, HookHandler]]:
         handlers = []
         for plugin_name, plugin_instance in self.plugins.items():
@@ -122,7 +122,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         *,
         return_when: HookReturnTiming = ALL_COMPLETED,
         success_if_no_hook: bool = True,
-        order: Sequence[str] = None,
+        order: Sequence[str] | None = None,
     ) -> HookResult:
         """
         Invoke the handlers that matches with the given ``event_name``.

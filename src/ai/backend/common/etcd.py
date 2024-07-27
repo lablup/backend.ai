@@ -171,7 +171,7 @@ class AsyncEtcd:
 
     def _merge_scope_prefix_map(
         self,
-        override: Mapping[ConfigScopes, str] = None,
+        override: Mapping[ConfigScopes, str] | None = None,
     ) -> Mapping[ConfigScopes, str]:
         """
         This stub ensures immutable usage of the ChainMap because ChainMap does *not*
@@ -186,7 +186,7 @@ class AsyncEtcd:
         val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         """
         Put a single key-value pair to the etcd.
@@ -210,7 +210,7 @@ class AsyncEtcd:
         dict_obj: NestedStrKeyedMapping,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         """
         Put a nested dict object under the given key prefix.
@@ -255,7 +255,7 @@ class AsyncEtcd:
         flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         """
         Put a flattened key-value pairs into the etcd.
@@ -286,7 +286,7 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> Optional[str]:
         """
         Get a single key from the etcd.
@@ -332,7 +332,7 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> GetPrefixValue:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
@@ -418,7 +418,7 @@ class AsyncEtcd:
         new_val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -446,7 +446,7 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -458,7 +458,7 @@ class AsyncEtcd:
         keys: Iterable[str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         async with self.etcd.connect() as communicator:
@@ -476,7 +476,7 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
@@ -517,7 +517,7 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
@@ -557,7 +557,7 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,

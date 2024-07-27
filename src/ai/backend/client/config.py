@@ -207,21 +207,21 @@ class APIConfig:
     def __init__(
         self,
         *,
-        endpoint: Union[URL, str] = None,
+        endpoint: Union[URL, str] | None = None,
         endpoint_type: str | None = None,
         domain: str | None = None,
         group: str | None = None,
-        storage_proxy_address_map: Mapping[str, str] = None,
+        storage_proxy_address_map: Mapping[str, str] | None = None,
         version: str | None = None,
         user_agent: str | None = None,
         access_key: str | None = None,
         secret_key: str | None = None,
         hash_type: str | None = None,
-        vfolder_mounts: Iterable[str] = None,
+        vfolder_mounts: Iterable[str] | None = None,
         skip_sslcert_validation: bool | None = None,
         connection_timeout: float | None = None,
         read_timeout: float | None = None,
-        announcement_handler: Callable[[str], None] = None,
+        announcement_handler: Callable[[str], None] | None = None,
     ) -> None:
         from . import get_user_agent
 
