@@ -339,9 +339,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     "size_bytes": manifest["size"],
                     "labels": manifest["labels"],  # keep the original form
                 }
-                accels = manifest["labels"].get("ai.backend.accelerators")
-                if accels:
-                    updates["accels"] = accels
+                if "ai.backend.kernelspec" in manifest["labels"]:
+                    accels = manifest["labels"].get("ai.backend.accelerators")
+                    if accels:
+                        updates["accels"] = accels
+                else:
+                    # allow every accelerators for non-backend.ai image
+                    updates["accels"] = "*"
 
                 resources = {  # default fallback if not defined
                     "cpu": {"min": "1", "max": None},
