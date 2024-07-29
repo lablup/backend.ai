@@ -158,16 +158,19 @@ SESSION_KEY = "aiohttp_session"
 STORAGE_KEY = "aiohttp_session_storage"
 
 
-async def update_expires(request: web.Request) -> int:
+async def update_expires(request: web.Request) -> str:
     storage = request.get(STORAGE_KEY)
     if storage is None:
         raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
     session: Session = await get_session(request)
     if storage.expires is None:
         await storage.update_expires(session)
+    if session is not None:
+        expires_timestamp = int(storage.expires) if storage.expires is not None else 0
+        session.expires = expires_timestamp
+        return datetime.fromtimestamp(timestamp=expires_timestamp, tz=timezone.utc).isoformat()
     else:
-        session.expires = int(storage.expires)
-    return storage.login_session_extend_time
+        raise RuntimeError("Session is None")
 
 
 async def get_session(request: web.Request) -> Session:

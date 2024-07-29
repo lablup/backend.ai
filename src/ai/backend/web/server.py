@@ -433,8 +433,8 @@ async def logout_handler(request: web.Request) -> web.Response:
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
-    new_expires = await update_expires(request)
-    result = {"status": 201, "expires": new_expires}
+    expires = await update_expires(request)
+    result = {"status": 201, "expires": expires}
     return web.json_response(result)
 
 
