@@ -117,7 +117,7 @@ jobs:
     if: |
       (
         contains(github.event.pull_request.labels.*.name, 'require:db-migration')
-        || github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
