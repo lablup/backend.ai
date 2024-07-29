@@ -168,10 +168,10 @@ class BackgroundTaskManager:
                                 await resp.send("{}", event="bgtask_done")
                             await resp.send("{}", event="server_close")
                         case BgtaskCancelledEvent():
-                            await resp.send("{}", event="bgtask_failed")
+                            await resp.send(json.dumps(body), event="bgtask_cancelled")
                             await resp.send("{}", event="server_close")
                         case BgtaskFailedEvent():
-                            await resp.send("{}", event="bgtask_cancelled")
+                            await resp.send(json.dumps(body), event="bgtask_failed")
                             await resp.send("{}", event="server_close")
             except:
                 log.exception("")
@@ -272,6 +272,8 @@ class BackgroundTaskManager:
         task_name: str | None,
         **kwargs,
     ) -> None:
+        print("_wrapper_task")
+
         task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
