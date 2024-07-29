@@ -272,8 +272,6 @@ class BackgroundTaskManager:
         task_name: str | None,
         **kwargs,
     ) -> None:
-        print("_wrapper_task")
-
         task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
         message = ""
