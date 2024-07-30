@@ -163,8 +163,7 @@ async def update_expires(request: web.Request) -> str:
     if storage is None:
         raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
     session: Session = await get_session(request)
-    if storage.expires is None:
-        await storage.update_expires(session)
+    await storage.update_expires(session)
     if session is not None:
         expires_timestamp = int(storage.expires) if storage.expires is not None else 0
         session.expires = expires_timestamp
