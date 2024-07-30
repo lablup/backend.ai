@@ -194,6 +194,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         while tag_list_url is not None:
             async with sess.get(tag_list_url, **rqst_args) as resp:
                 data = json.loads(await resp.read())
+                if "errors" in data:
+                    error_details = []
+                    for error in data["errors"]:
+                        error_details.append(f"{error['code']}: {error['message']}")
+                    error_messages = "; ".join(error_details)
+                    raise RuntimeError(f"Errors occurred: {error_messages}")
+
                 if "tags" in data:
                     # sometimes there are dangling image names in the hub.
                     tags.extend(data["tags"])
