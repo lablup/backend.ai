@@ -9,10 +9,12 @@ import ssl
 import sys
 import time
 import traceback
+from collections.abc import MutableMapping
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, MutableMapping, Tuple
+from typing import Any, AsyncIterator, Tuple, cast
 
 import aiohttp_cors
 import aiotools
@@ -27,7 +29,11 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.web.session import extra_config_headers, get_session, update_expires
+from ai.backend.common.web.session import (
+    extra_config_headers,
+    get_current_time,
+    get_session,
+)
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -433,7 +439,15 @@ async def logout_handler(request: web.Request) -> web.Response:
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
-    expires = await update_expires(request)
+    config = request.app["config"]
+    login_session_extension_sec = cast(int, config["session"]["login_session_extension_sec"])
+
+    current = await get_current_time(request)
+    session = await get_session(request)
+
+    session.expiration_dt = current + login_session_extension_sec
+    expires = datetime.fromtimestamp(session.expiration_dt, tz=timezone.utc).isoformat()
+
     result = {"status": 201, "expires": expires}
     return web.json_response(result)
 
@@ -619,10 +633,11 @@ async def server_main(
         await app["redis"].flushdb()
         log.info("flushed session storage.")
 
+    if config["session"]["login_session_extension_sec"] is None:
+        config["session"]["login_session_extension_sec"] = config["session"]["max_age"]
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
-        login_session_extend_time=config["session"]["login_session_extend_time"],
     )
 
     setup_session(app, redis_storage)
