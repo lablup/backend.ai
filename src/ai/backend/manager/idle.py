@@ -1039,11 +1039,17 @@ class UtilizationIdleChecker(BaseIdleChecker):
             utilizations = {k: 0.0 for k in self.resource_thresholds.keys()}
             live_stat = {}
             for kernel_id in kernel_ids:
-                raw_live_stat = await redis_helper.execute(
-                    self._redis_stat,
-                    lambda r: r.get(str(kernel_id)),
+                raw_live_stat = cast(
+                    bytes | None,
+                    await redis_helper.execute(
+                        self._redis_stat,
+                        lambda r: r.get(str(kernel_id)),
+                    ),
                 )
-                live_stat = msgpack.unpackb(raw_live_stat)
+                if raw_live_stat is None:
+                    log.warning(f"Utilization data not found (k:{kernel_id})")
+                    continue
+                live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_thresholds.keys()
