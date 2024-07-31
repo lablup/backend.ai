@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7rc1 (2024-07-31)
+
+### Features
+* Allow `Bearer` as valid token type on model service authentication ([#2583](https://github.com/lablup/backend.ai/issues/2583))
+
+### Fixes
+* Update `GQLPrivilegeCheckMiddleware` to align with upstream changes on `graphql-core` package ([#2598](https://github.com/lablup/backend.ai/issues/2598))
+
+
 ## 24.03.7b4 (2024-07-29)
 
 ### Features
