@@ -2249,5 +2249,5 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path.key}")  # noqa
+                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
