@@ -292,7 +292,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         manifest: Mapping[str, Any],
         rqst_args: Mapping[str, Any],
         image: str,
-    ) -> Mapping[str, Any]:
+    ) -> dict[str, Any]:
         """
         Extracts informations from
         [Docker iamge manifest](https://github.com/openshift/docker-distribution/blob/master/docs/spec/manifest-v2-2.md#example-image-manifest)
