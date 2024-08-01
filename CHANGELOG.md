@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7rc2 (2024-08-01)
+
+### Miscellaneous
+* * Add POST `/folders` API endpoints to replace DELETE APIs that require request body.
+  * Allow `DELETE` requests to have body data. ([#2571](https://github.com/lablup/backend.ai/issues/2571))
+
+
 ## 24.03.7rc1 (2024-07-31)
 
 ### Features
