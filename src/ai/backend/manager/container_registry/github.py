@@ -20,7 +20,7 @@ class GitHubRegistry_v2(BaseContainerRegistry):
         name, access_token, type_ = (
             self.registry_info["username"],
             self.registry_info["password"],
-            self.registry_info["name_type"],
+            self.registry_info["entity_type"],
         )
 
         base_url = f"https://api.github.com/{type_}/{name}/packages"
