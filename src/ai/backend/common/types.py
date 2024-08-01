@@ -1044,6 +1044,7 @@ class ImageConfig(TypedDict):
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
+    auto_pull: str  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):

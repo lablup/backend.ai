@@ -12,6 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Final,
     Iterable,
@@ -20,6 +21,7 @@ from typing import (
     Optional,
     Sequence,
     Union,
+    cast,
 )
 
 import aiohttp
@@ -35,6 +37,9 @@ from .etcd import unquote as etcd_unquote
 from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
 from .service_ports import parse_service_ports
+
+if TYPE_CHECKING:
+    from .types import ImageConfig, ImageRegistry
 
 __all__ = (
     "arch_name_aliases",
@@ -309,7 +314,7 @@ def is_known_registry(
     return False
 
 
-async def get_registry_info(etcd: AsyncEtcd, name: str) -> tuple[yarl.URL, dict]:
+async def get_registry_info(etcd: AsyncEtcd, name: str) -> ImageRegistry:
     reg_path = f"config/docker/registry/{etcd_quote(name)}"
     item = await etcd.get_prefix(reg_path)
     if not item:
@@ -318,14 +323,14 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> tuple[yarl.URL, dict]
     if not registry_addr:
         raise UnknownImageRegistry(name)
     assert isinstance(registry_addr, str)
-    creds = {}
-    username = item.get("username")
-    if username is not None:
-        creds["username"] = username
-    password = item.get("password")
-    if password is not None:
-        creds["password"] = password
-    return yarl.URL(registry_addr), creds
+    username = cast(str | None, item.get("username"))
+    password = cast(str | None, item.get("password"))
+    return {
+        "name": name,
+        "url": registry_addr,
+        "username": username,
+        "password": password,
+    }
 
 
 def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
@@ -449,6 +454,15 @@ class ImageRef:
             if not rx_slug.search(self._tag):
                 raise InvalidImageTag(self._tag, self._value)
         self._update_tag_set()
+
+    @classmethod
+    def from_image_config(cls, config: ImageConfig) -> ImageRef:
+        return ImageRef(
+            config["canonical"],
+            known_registries=[config["registry"]["name"]],
+            is_local=config["is_local"],
+            architecture=config["architecture"],
+        )
 
     @staticmethod
     def _parse_image_tag(s: str, using_default_registry: bool = False) -> tuple[str, str]:

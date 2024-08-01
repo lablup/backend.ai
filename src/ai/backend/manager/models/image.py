@@ -3,16 +3,14 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     Union,
     cast,
@@ -31,11 +29,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, get_registry_info
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.common.types import (
+    AutoPullBehavior,
+    BinarySize,
+    ImageAlias,
+    ImageConfig,
+    ImageRegistry,
+    ResourceSlot,
+)
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
@@ -247,6 +252,10 @@ class ImageRow(Base):
         self.resources = resources
 
     @property
+    def trimmed_digest(self) -> str:
+        return self.config_digest.strip()
+
+    @property
     def image_ref(self):
         return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
 
@@ -449,7 +458,7 @@ class ImageRow(Base):
             "tag": self.tag,
             "architecture": self.architecture,
             "registry": self.registry,
-            "digest": self.config_digest.strip() if self.config_digest else None,
+            "digest": self.trimmed_digest or None,
             "labels": self.labels,
             "size_bytes": self.size_bytes,
             "resource_limits": res_limits,
@@ -475,6 +484,40 @@ class ImageRow(Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self.resources = resources
+
+
+async def bulk_get_image_configs(
+    db_session: AsyncSession,
+    etcd: AsyncEtcd,
+    image_refs: Iterable[ImageRef],
+    auto_pull: AutoPullBehavior = AutoPullBehavior.DIGEST,
+) -> list[ImageConfig]:
+    result = []
+    for ref in image_refs:
+        resolved_image_info = await ImageRow.resolve(db_session, [ref])
+        if resolved_image_info.image_ref.is_local:
+            is_local = True
+            registry_conf: ImageRegistry = {
+                "name": ref.registry,
+                "url": "http://127.0.0.1",  # "http://localhost",
+                "username": None,
+                "password": None,
+            }
+        else:
+            is_local = False
+            registry_conf = await get_registry_info(etcd, ref.registry)
+        image_conf: ImageConfig = {
+            "architecture": ref.architecture,
+            "canonical": ref.canonical,
+            "is_local": is_local,
+            "digest": resolved_image_info.digest,
+            "labels": resolved_image_info.labels,
+            "repo_digest": None,
+            "registry": registry_conf,
+            "auto_pull": auto_pull.value,
+        }
+        result.append(image_conf)
+    return result
 
 
 class ImageAliasRow(Base):
@@ -551,7 +594,7 @@ class Image(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.config_digest.strip() if row.config_digest else None,
+            digest=row.trimmed_digest or None,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
             size_bytes=row.size_bytes,
@@ -567,7 +610,7 @@ class Image(graphene.ObjectType):
             installed=len(installed_agents) > 0,
             installed_agents=installed_agents if not hide_agents else None,
             # legacy
-            hash=row.config_digest.strip() if row.config_digest else None,
+            hash=row.trimmed_digest or None,
         )
         ret.raw_labels = row.labels
         return ret
@@ -789,7 +832,7 @@ class ImageNode(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.config_digest.strip() if row.config_digest else None,
+            digest=row.trimmed_digest or None,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             size_bytes=row.size_bytes,
             resource_limits=[
@@ -814,7 +857,7 @@ class ImageNode(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.digest,
+            digest=row.trimmed_digest,
             labels=row.labels,
             size_bytes=row.size_bytes,
             resource_limits=row.resource_limits,
