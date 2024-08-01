@@ -253,10 +253,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_manifest_list(
         self,
+        content_type: str,
         sess: aiohttp.ClientSession,
         manifest_list: Sequence[Any],
         rqst_args: Mapping[str, Any],
         image: str,
+        image_info: Mapping[str, Any],
         tag: str,
     ) -> None:
         manifests = {}
@@ -267,12 +269,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             architecture = manifest["platform"]["architecture"]
             architecture = arch_name_aliases.get(architecture, architecture)
 
-            async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{manifest['digest']}", **rqst_args
-            ) as resp:
-                data = await resp.json()
-            config_digest = data["config"]["digest"]
-            size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+            match content_type:
+                case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                    config_digest = image_info["config"]["digest"]
+                    size_bytes = (
+                        sum(layer["size"] for layer in image_info["layers"])
+                        + image_info["config"]["size"]
+                    )
+                case _:
+                    async with sess.get(
+                        self.registry_url / f"v2/{image}/manifests/{manifest['digest']}",
+                        **rqst_args,
+                    ) as resp:
+                        data = await resp.json()
+
+                    config_digest = data["config"]["digest"]
+                    size_bytes = (
+                        sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+                    )
 
             async with sess.get(
                 self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
@@ -280,6 +294,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 resp.raise_for_status()
                 data = json.loads(await resp.read())
             labels = {}
+
             # we should favor `config` instead of `container_config` since `config` can contain additional datas
             # set when commiting image via `--change` flag
             if _config_labels := data.get("config", {}).get("Labels"):
@@ -313,7 +328,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ]
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
-        await self._process_manifest_list(sess, manifest_list, rqst_args, image, tag)
+        await self._process_manifest_list(
+            self.MEDIA_TYPE_OCI_INDEX, sess, manifest_list, rqst_args, image, image_info, tag
+        )
 
     async def _process_docker_v2_multiplatform_image(
         self,
@@ -327,7 +344,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         manifest_list = image_info["manifests"]
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
-        await self._process_manifest_list(sess, manifest_list, rqst_args, image, tag)
+        await self._process_manifest_list(
+            self.MEDIA_TYPE_DOCKER_MANIFEST_LIST,
+            sess,
+            manifest_list,
+            rqst_args,
+            image,
+            image_info,
+            tag,
+        )
 
     async def _process_docker_v2_image(
         self,
@@ -353,7 +378,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             **image_info,
         }
 
-        await self._process_manifest_list(sess, [manifest], rqst_args, image, tag)
+        await self._process_manifest_list(
+            self.MEDIA_TYPE_DOCKER_MANIFEST, sess, [manifest], rqst_args, image, image_info, tag
+        )
 
     async def _read_manifest(
         self,
