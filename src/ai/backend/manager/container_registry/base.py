@@ -6,7 +6,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
 
 import aiohttp
 import aiotools
@@ -251,23 +251,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 "listing multiarch images."
                             )
 
-    async def _process_oci_index(
+    async def _process_manifest_list(
         self,
-        tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
+        manifest_list: Sequence[Any],
         rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
-        image_info: Mapping[str, Any],
     ) -> None:
         manifests = {}
-        manifest_list = [
-            item
-            for item in image_info["manifests"]
-            if "annotations" not in item  # skip attestation manifests
-        ]
-        rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
-
         for manifest in manifest_list:
             platform_arg = f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
             if variant := manifest["platform"].get("variant", None):
@@ -304,6 +296,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 "digest": config_digest,
             }
         await self._read_manifest(image, tag, manifests)
+
+    async def _process_oci_index(
+        self,
+        tg: aiotools.TaskGroup,
+        sess: aiohttp.ClientSession,
+        rqst_args: Mapping[str, Any],
+        image: str,
+        tag: str,
+        image_info: Mapping[str, Any],
+    ) -> None:
+        manifest_list = [
+            item
+            for item in image_info["manifests"]
+            if "annotations" not in item  # skip attestation manifests
+        ]
+        rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
+
+        await self._process_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
     async def _process_docker_v2_multiplatform_image(
         self,
@@ -314,46 +324,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        manifests = {}
         manifest_list = image_info["manifests"]
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
-        for manifest in manifest_list:
-            platform_arg = f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
-            if variant := manifest["platform"].get("variant", None):
-                platform_arg += f"/{variant}"
-            architecture = manifest["platform"]["architecture"]
-            architecture = arch_name_aliases.get(architecture, architecture)
-
-            async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{manifest['digest']}", **rqst_args
-            ) as resp:
-                data = await resp.json()
-            config_digest = data["config"]["digest"]
-            size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
-
-            async with sess.get(
-                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
-            ) as resp:
-                resp.raise_for_status()
-                data = json.loads(await resp.read())
-            labels = {}
-            # we should favor `config` instead of `container_config` since `config` can contain additional datas
-            # set when commiting image via `--change` flag
-            if _config_labels := data.get("config", {}).get("Labels"):
-                labels = _config_labels
-            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
-                labels = _container_config_labels
-
-            if not labels:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
-
-            manifests[architecture] = {
-                "size": size_bytes,
-                "labels": labels,
-                "digest": config_digest,
-            }
-        await self._read_manifest(image, tag, manifests)
+        await self._process_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
     async def _process_docker_v2_image(
         self,
@@ -374,47 +348,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             resp.raise_for_status()
             blob_data = json.loads(await resp.read())
 
-        manifest_os = blob_data["os"]
-        manifest_arch = blob_data["architecture"]
-        architecture = arch_name_aliases.get(manifest_arch, manifest_arch)
-        manifest_variant = blob_data.get("variant", None)
+        manifest = {
+            "platform": blob_data,
+            **image_info,
+        }
 
-        platform_arg = f"{manifest_os}/{manifest_arch}"
-        if manifest_variant:
-            platform_arg += f"/{manifest_variant}"
-
-        size_bytes = (
-            sum(layer["size"] for layer in image_info["layers"]) + image_info["config"]["size"]
-        )
-
-        async with sess.get(
-            self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
-        ) as resp:
-            resp.raise_for_status()
-            data = json.loads(await resp.read())
-        labels = {}
-
-        # we should favor `config` instead of `container_config` since `config` can contain additional datas
-        # set when commiting image via `--change` flag
-        if _config_labels := data.get("config", {}).get("Labels"):
-            labels = _config_labels
-        elif _container_config_labels := data.get("container_config", {}).get("Labels"):
-            labels = _container_config_labels
-
-        if not labels:
-            log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
-
-        await self._read_manifest(
-            image,
-            tag,
-            {
-                architecture: {
-                    "size": size_bytes,
-                    "labels": labels,
-                    "digest": config_digest,
-                }
-            },
-        )
+        await self._process_manifest_list(sess, [manifest], rqst_args, image, tag)
 
     async def _read_manifest(
         self,
