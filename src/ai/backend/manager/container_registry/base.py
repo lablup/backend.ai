@@ -178,7 +178,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         sess: aiohttp.ClientSession,
         image: str,
     ) -> None:
-        log.info("_scan_image()")
         rqst_args = await registry_login(
             sess,
             self.registry_url,
@@ -251,16 +250,19 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 "listing multiarch images."
                             )
 
-    async def _process_manifest_list(
+    async def _read_manifest_list(
         self,
-        content_type: str,
         sess: aiohttp.ClientSession,
         manifest_list: Sequence[Any],
         rqst_args: Mapping[str, Any],
         image: str,
-        image_info: Mapping[str, Any],
         tag: str,
     ) -> None:
+        """
+        Understands images defined under [OCI image manifest](https://github.com/opencontainers/image-spec/blob/main/manifest.md#example-image-manifest) or
+        [Docker image manifest list](https://github.com/openshift/docker-distribution/blob/master/docs/spec/manifest-v2-2.md#example-manifest-list)
+        and imports Backend.AI compatible images.
+        """
         manifests = {}
         for manifest in manifest_list:
             platform_arg = f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
@@ -269,48 +271,55 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             architecture = manifest["platform"]["architecture"]
             architecture = arch_name_aliases.get(architecture, architecture)
 
-            match content_type:
-                case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                    config_digest = image_info["config"]["digest"]
-                    size_bytes = (
-                        sum(layer["size"] for layer in image_info["layers"])
-                        + image_info["config"]["size"]
-                    )
-                case _:
-                    async with sess.get(
-                        self.registry_url / f"v2/{image}/manifests/{manifest['digest']}",
-                        **rqst_args,
-                    ) as resp:
-                        data = await resp.json()
-
-                    config_digest = data["config"]["digest"]
-                    size_bytes = (
-                        sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
-                    )
-
             async with sess.get(
-                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+                self.registry_url / f"v2/{image}/manifests/{manifest['digest']}",
+                **rqst_args,
             ) as resp:
-                resp.raise_for_status()
-                data = json.loads(await resp.read())
-            labels = {}
+                manifest_info = await resp.json()
 
-            # we should favor `config` instead of `container_config` since `config` can contain additional datas
-            # set when commiting image via `--change` flag
-            if _config_labels := data.get("config", {}).get("Labels"):
-                labels = _config_labels
-            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
-                labels = _container_config_labels
+            manifests[architecture] = await self._preprocess_manifest(
+                sess, manifest_info, rqst_args, image
+            )
 
-            if not labels:
+            if not manifests[architecture]["labels"]:
                 log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
 
-            manifests[architecture] = {
-                "size": size_bytes,
-                "labels": labels,
-                "digest": config_digest,
-            }
         await self._read_manifest(image, tag, manifests)
+
+    async def _preprocess_manifest(
+        self,
+        sess: aiohttp.ClientSession,
+        manifest: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
+        image: str,
+    ) -> Mapping[str, Any]:
+        """
+        Extracts informations from
+        [Docker iamge manifest](https://github.com/openshift/docker-distribution/blob/master/docs/spec/manifest-v2-2.md#example-image-manifest)
+        required by Backend.AI.
+        """
+        config_digest = manifest["config"]["digest"]
+        size_bytes = sum(layer["size"] for layer in manifest["layers"]) + manifest["config"]["size"]
+
+        async with sess.get(
+            self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+        ) as resp:
+            resp.raise_for_status()
+            data = json.loads(await resp.read())
+        labels = {}
+
+        # we should favor `config` instead of `container_config` since `config` can contain additional datas
+        # set when commiting image via `--change` flag
+        if _config_labels := data.get("config", {}).get("Labels"):
+            labels = _config_labels
+        elif _container_config_labels := data.get("container_config", {}).get("Labels"):
+            labels = _container_config_labels
+
+        return {
+            "size": size_bytes,
+            "labels": labels,
+            "digest": config_digest,
+        }
 
     async def _process_oci_index(
         self,
@@ -328,9 +337,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ]
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
-        await self._process_manifest_list(
-            self.MEDIA_TYPE_OCI_INDEX, sess, manifest_list, rqst_args, image, image_info, tag
-        )
+        await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
     async def _process_docker_v2_multiplatform_image(
         self,
@@ -344,13 +351,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         manifest_list = image_info["manifests"]
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
-        await self._process_manifest_list(
-            self.MEDIA_TYPE_DOCKER_MANIFEST_LIST,
+        await self._read_manifest_list(
             sess,
             manifest_list,
             rqst_args,
             image,
-            image_info,
             tag,
         )
 
@@ -373,14 +378,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             resp.raise_for_status()
             blob_data = json.loads(await resp.read())
 
-        manifest = {
-            "platform": blob_data,
-            **image_info,
-        }
+        manifest_arch = blob_data["architecture"]
+        architecture = arch_name_aliases.get(manifest_arch, manifest_arch)
 
-        await self._process_manifest_list(
-            self.MEDIA_TYPE_DOCKER_MANIFEST, sess, [manifest], rqst_args, image, image_info, tag
-        )
+        manifests = {
+            architecture: await self._preprocess_manifest(sess, image_info, rqst_args, image),
+        }
+        await self._read_manifest(image, tag, manifests)
 
     async def _read_manifest(
         self,
@@ -389,6 +393,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         manifests: dict[str, dict],
         skip_reason: Optional[str] = None,
     ) -> None:
+        """
+        Detects if image is compatible with Backend.AI and injects the matadata to database if it complies.
+        """
         if not manifests:
             if not skip_reason:
                 skip_reason = "missing/deleted"
