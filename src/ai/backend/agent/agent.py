@@ -229,12 +229,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.agent_id = agent_id
         self.event_producer = event_producer
         self.kernel_config = kernel_config
-        self.image_ref = ImageRef(
-            kernel_config["image"]["canonical"],
-            known_registries=[kernel_config["image"]["registry"]["name"]],
-            is_local=kernel_config["image"]["is_local"],
-            architecture=kernel_config["image"].get("architecture", get_arch_name()),
-        )
+        self.image_ref = ImageRef.from_image_config(kernel_config["image"])
         self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
