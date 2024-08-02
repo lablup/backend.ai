@@ -1113,9 +1113,12 @@ class UntagImageFromRegistry(graphene.Mutation):
                 ):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
-            registry_info = await ctx.shared_config.get_container_registry(
-                image_row.image_ref.registry
+            query = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == image_row.image_ref.registry
             )
+
+            registry_info = (await session.execute(query)).scalar()
+
             if registry_info.get("type", "") != "harbor2":
                 raise NotImplementedError("This feature is only supported for Harbor 2 registries")
 

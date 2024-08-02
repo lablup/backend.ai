@@ -50,6 +50,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import rescan_images
 
@@ -1136,7 +1137,14 @@ async def convert_session_to_image(
 
     registry_hostname = project.container_registry["registry"]
     registry_project = project.container_registry["project"]
-    registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
+
+    async with root_ctx.db.begin_readonly() as db_session:
+        query = sa.select(ContainerRegistryRow).where(
+            ContainerRegistryRow.registry_name == registry_hostname
+        )
+
+        registry_conf = (await db_session.execute(query)).scalar()
+
     if not registry_conf:
         raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
     if registry_project not in registry_conf.get("project", ""):
@@ -1276,7 +1284,6 @@ async def convert_session_to_image(
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
             await rescan_images(
-                root_ctx.shared_config.etcd,
                 root_ctx.db,
                 new_image_ref.canonical,
                 local=new_image_ref.is_local,

@@ -220,6 +220,7 @@ class ContainerRegistry(graphene.ObjectType):
         )
         (
             query,
+            _,
             conditions,
             cursor,
             pagination_order,
