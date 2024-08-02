@@ -1279,7 +1279,7 @@ type ContainerRegistryConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ContainerRegistry` and its cursor."""
+"""A Relay edge containing a `ContainerRegistry` and its cursor. Added in 24.09.0."""
 type ContainerRegistryEdge {
   """The item at the end of the edge"""
   node: ContainerRegistry
