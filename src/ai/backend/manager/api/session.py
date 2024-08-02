@@ -654,13 +654,18 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     else:
         raise InvalidAPIParameters("API version not supported")
     params["config"] = creation_config
-    if params["config"]["agent_list"] is not None and request["user"]["role"] != (
-        UserRole.SUPERADMIN
-    ):
-        raise InsufficientPrivilege(
-            "You are not allowed to manually assign agents for your session."
-        )
-    if request["user"]["role"] == (UserRole.SUPERADMIN):
+
+    root_ctx: RootContext = request.app["_root.context"]
+
+    # if params["config"]["agent_list"] is not None and request["user"]["role"] != (
+    #     UserRole.SUPERADMIN
+    # ):
+    #     raise InsufficientPrivilege(
+    #         "You are not allowed to manually assign agents for your session."
+    #     )
+    if not root_ctx.local_config["manager"][
+        "hide-agents"
+    ]:  # request["user"]["role"] == (UserRole.SUPERADMIN):
         if not params["config"]["agent_list"]:
             pass
         else:
