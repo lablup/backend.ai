@@ -2253,8 +2253,7 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path[0]}")
-
+                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
 
 
@@ -2278,7 +2277,6 @@ class GQLDeprecatedQueryCheckMiddleware:
             "vfolders",
             "container_registries",
         ]
-        # log.error("fieild name: {}", info.field_name)
         # Check if the current query is in the list of non-paginated queries
         if info.field_name in non_paginated_queries:
             log.warning(
