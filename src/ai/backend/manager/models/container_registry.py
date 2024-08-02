@@ -52,6 +52,8 @@ class ContainerRegistryType(enum.StrEnum):
 
 
 class ContainerRegistryTypeField(Scalar):
+    """Added in 24.09.0."""
+
     allowed_values = tuple(t.value for t in ContainerRegistryType)
 
     @staticmethod
@@ -152,6 +154,8 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 
 class DeleteContainerRegistryInput(graphene.InputObjectType):
+    """Added in 24.09.0."""
+
     id = graphene.String(
         required=True,
         description="Object id. Can be either global id or object id. Added in 24.09.0.",
@@ -297,6 +301,8 @@ class ContainerRegistry(graphene.ObjectType):
 
 
 class ContainerRegistryConnection(Connection):
+    """Added in 24.09.0."""
+
     class Meta:
         node = ContainerRegistry
 
@@ -307,7 +313,7 @@ class CreateContainerRegistry(graphene.Mutation):
     container_registry = graphene.Field(ContainerRegistry)
 
     class Arguments:
-        props = CreateContainerRegistryInput(required=True)
+        props = CreateContainerRegistryInput(required=True, description="Added in 24.09.0.")
 
     @classmethod
     @privileged_mutation(
