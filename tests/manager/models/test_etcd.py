@@ -32,6 +32,7 @@ def etcd_context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F8
     superadmin_user = {"role": "superadmin"}
     return base_context(shared_config=shared_config, user=superadmin_user)
 
+
 @pytest.mark.dependency()
 @pytest.mark.asyncio
 async def test_create_container_registry(client: Client, etcd_context: GraphQueryContext):

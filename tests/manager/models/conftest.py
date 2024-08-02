@@ -96,7 +96,7 @@ def non_deprecated_query():
 def deep_update(original: dict, updates: dict) -> dict:
     """
     Recursively updates the original dictionary with values from the updates dictionary.
-    
+
     :param original: The original dictionary to update.
     :param updates: The dictionary containing updates.
     :return: The updated dictionary.
