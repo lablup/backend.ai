@@ -86,7 +86,7 @@ for distro in "${distros[@]}"; do
 done
 
 cd "$temp_dir"
-git clone -c advice.detachedHead=false --branch "DROPBEAR_2020.81" https://github.com/mkj/dropbear dropbear
+git clone -c advice.detachedHead=false --branch "DROPBEAR_2024.85" https://github.com/mkj/dropbear dropbear
 
 for distro in "${distros[@]}"; do
   docker run --rm -it \
