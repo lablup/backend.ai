@@ -1049,9 +1049,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 )
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data (k:{kernel_id})"
+                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
                     )
-                    continue
+                    return None
                 live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
