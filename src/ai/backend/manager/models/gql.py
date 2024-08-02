@@ -779,20 +779,22 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(ContainerRegistry, id=graphene.UUID(required=True))
+    container_registry = graphene.Field(
+        ContainerRegistry, id=graphene.UUID(required=True), description="Added in 24.09.0."
+    )
 
     container_registries = graphene.List(
         ContainerRegistry,
         registry_name=graphene.String(required=True),
-        description="Added in 24.03.0.",
+        description="Added in 24.09.0.",
     )
 
     container_registry_node = graphene.Field(
-        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.03.0."
+        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.09.0."
     )
 
     container_registry_nodes = PaginatedConnectionField(
-        ContainerRegistryConnection, description="Added in 24.03.0."
+        ContainerRegistryConnection, description="Added in 24.09.0."
     )
 
     model_card = graphene.Field(

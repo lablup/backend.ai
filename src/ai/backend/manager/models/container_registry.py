@@ -121,50 +121,52 @@ class ContainerRegistryRow(Base):
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
-    url = graphene.String(required=True)
+    url = graphene.String(required=True, description="Added in 24.09.0.")
     type = ContainerRegistryTypeField(
         required=True,
-        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
+        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0.",
     )
-    registry_name = graphene.String(required=True)
-    is_global = graphene.Boolean()
-    project = graphene.String()
-    username = graphene.String()
-    password = graphene.String()
-    ssl_verify = graphene.Boolean()
+    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+    project = graphene.String(description="Added in 24.09.0.")
+    username = graphene.String(description="Added in 24.09.0.")
+    password = graphene.String(description="Added in 24.09.0.")
+    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     id = graphene.String(
-        required=True, description="Object id. Can be either global id or object id"
+        required=True,
+        description="Object id. Can be either global id or object id. Added in 24.09.0.",
     )
-    url = graphene.String()
+    url = graphene.String(description="Added in 24.09.0.")
     type = ContainerRegistryTypeField(
-        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}."
+        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
     )
-    registry_name = graphene.String()
-    is_global = graphene.Boolean()
-    project = graphene.String()
-    username = graphene.String()
-    password = graphene.String()
-    ssl_verify = graphene.Boolean()
+    registry_name = graphene.String(description="Added in 24.09.0.")
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+    project = graphene.String(description="Added in 24.09.0.")
+    username = graphene.String(description="Added in 24.09.0.")
+    password = graphene.String(description="Added in 24.09.0.")
+    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
 
 class DeleteContainerRegistryInput(graphene.InputObjectType):
     id = graphene.String(
-        required=True, description="Object id. Can be either global id or object id"
+        required=True,
+        description="Object id. Can be either global id or object id. Added in 24.09.0.",
     )
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
-    url = graphene.String(required=True)
-    type = ContainerRegistryTypeField(required=True)
-    registry_name = graphene.String(required=True)
-    is_global = graphene.Boolean()
-    project = graphene.String()
-    username = graphene.String()
-    password = graphene.String()
-    ssl_verify = graphene.Boolean()
+    url = graphene.String(required=True, description="Added in 24.09.0.")
+    type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
+    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+    project = graphene.String(description="Added in 24.09.0.")
+    username = graphene.String(description="Added in 24.09.0.")
+    password = graphene.String(description="Added in 24.09.0.")
+    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
 
 class ContainerRegistry(graphene.ObjectType):
