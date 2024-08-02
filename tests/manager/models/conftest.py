@@ -14,7 +14,7 @@ def client() -> Client:
 
 
 @pytest.fixture(scope="module")
-def base_context() -> GraphQueryContext:  # noqa: F811
+def base_context():  # noqa: F811
     def _base_context(**overrides):
         """
         default_params is used to bypass the decorators.
