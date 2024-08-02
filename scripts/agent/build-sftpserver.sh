@@ -2,11 +2,12 @@
 set -e
 
 arch=$(uname -m)
-distros=("alpine3.8" "centos7.6" "centos8.0" "ubuntu16.04" "ubuntu18.04" "ubuntu20.04")
+# distros=("alpine3.8" "centos7.6" "centos8.0" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04")
+distros=("alpine3.8" "centos8.0" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04")
 
 static_libs_dockerfile_part=$(cat <<'EOF'
 ENV ZLIB_VER=1.3.1 \
-    SSL_VER=1.1.1i
+    SSL_VER=3.3.1
 
 RUN wget https://www.zlib.net/zlib-${ZLIB_VER}.tar.gz -O /root/zlib-${ZLIB_VER}.tar.gz && \
     wget https://www.openssl.org/source/openssl-${SSL_VER}.tar.gz -O /root/openssl-${SSL_VER}.tar.gz
@@ -29,17 +30,6 @@ RUN echo "BUILD: OpenSSL" && \
 EOF
 )
 
-ubuntu1604_builder_dockerfile=$(cat <<'EOF'
-FROM ubuntu:16.04
-RUN apt-get update
-RUN apt-get install -y make gcc
-RUN apt-get install -y autoconf
-RUN apt-get install -y wget
-# below required for sys/mman.h
-RUN apt-get install -y libc6-dev
-EOF
-)
-
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
 RUN apt-get update
@@ -47,7 +37,7 @@ RUN apt-get install -y make gcc
 RUN apt-get install -y autoconf
 RUN apt-get install -y wget
 # below required for sys/mman.h
-RUN apt-get install -y libc6-dev
+RUN apt-get install -y libc6-dev zlib1g-dev
 EOF
 )
 
@@ -58,7 +48,18 @@ RUN apt-get install -y make gcc
 RUN apt-get install -y autoconf
 RUN apt-get install -y wget
 # below required for sys/mman.h
-RUN apt-get install -y libc6-dev
+RUN apt-get install -y libc6-dev zlib1g-dev
+EOF
+)
+
+ubuntu2204_builder_dockerfile=$(cat <<'EOF'
+FROM ubuntu:20.04
+RUN apt-get update
+RUN apt-get install -y make gcc
+RUN apt-get install -y autoconf
+RUN apt-get install -y wget
+# below required for sys/mman.h
+RUN apt-get install -y libc6-dev zlib1g-dev
 EOF
 )
 
@@ -66,6 +67,7 @@ centos_builder_dockerfile=$(cat <<'EOF'
 FROM centos:7
 RUN yum install -y make gcc
 RUN yum install -y autoconf
+RUN yum install -y perl-core zlib-devel
 RUN yum install -y wget
 EOF
 )
@@ -73,9 +75,9 @@ EOF
 centos8_builder_dockerfile=$(cat <<'EOF'
 FROM centos:centos8
 RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
-
 RUN dnf install -y make gcc
-RUN dnf install -y autoconf
+RUN yum install -y autoconf
+RUN yum install -y perl-core zlib-devel
 RUN dnf install -y wget
 EOF
 )
@@ -108,14 +110,15 @@ make clean
 EOF
 )
 
+OPENSSH_TAG="V_9_8_P1"
 SCRIPT_DIR=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 temp_dir=$(mktemp -d -t sftpserver-build.XXXXX)
 echo "Using temp directory: $temp_dir"
 echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
-echo -e "$ubuntu1604_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu16.04.dockerfile"
 echo -e "$ubuntu1804_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu18.04.dockerfile"
 echo -e "$ubuntu2004_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu20.04.dockerfile"
+echo -e "$ubuntu2204_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.ubuntu22.04.dockerfile"
 echo -e "$centos_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.centos7.6.dockerfile"
 echo -e "$centos8_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.centos8.0.dockerfile"
 echo -e "$alpine_builder_dockerfile\n$static_libs_dockerfile_part" > "$SCRIPT_DIR/sftpserver-builder.alpine3.8.dockerfile"
@@ -124,18 +127,17 @@ for distro in "${distros[@]}"; do
   docker build -t sftpserver-builder:$distro \
     -f $SCRIPT_DIR/sftpserver-builder.$distro.dockerfile $SCRIPT_DIR
 done
-
 cd "$temp_dir"
-git clone -c advice.detachedHead=false --branch "V_8_1_P1" https://github.com/openssh/openssh-portable openssh-portable
-
+git clone -c advice.detachedHead=false --branch "$OPENSSH_TAG" --depth=1 https://github.com/openssh/openssh-portable openssh-portable
 for distro in "${distros[@]}"; do
+  git clone -c advice.detachedHead=false --branch "$OPENSSH_TAG" ./openssh-portable "./openssh-portable-${distro}"
   docker run --rm -it \
     -e X_DISTRO=$distro \
     -e X_ARCH=$arch \
     -u $(id -u):$(id -g) \
     -w /workspace \
-    -v $temp_dir:/workspace \
-    sftpserver-builder:$distro \
+    -v "${temp_dir}:/workspace" \
+    "sftpserver-builder:${distro}" \
     /workspace/build.sh
 done
 
