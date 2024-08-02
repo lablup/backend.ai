@@ -43,8 +43,12 @@ def base_context():  # noqa: F811
             "registry": None,
             "idle_checker_host": None,
         }
-        default_params.update(overrides)
-        return GraphQueryContext(**default_params)
+        # if "user" in overrides:
+        #     default_params["user"] = update_dict_fields(default_params["user"], overrides["user"])
+        #     del overrides["user"]
+        updated_params = deep_update(default_params, overrides)
+        # default_params.update(overrides)
+        return GraphQueryContext(**updated_params)
 
     return _base_context
 
@@ -87,3 +91,19 @@ def non_deprecated_query():
     """
     variables = {"limit": 1, "offset": 0, "status": "RUNNING"}
     return query, variables
+
+
+def deep_update(original: dict, updates: dict) -> dict:
+    """
+    Recursively updates the original dictionary with values from the updates dictionary.
+    
+    :param original: The original dictionary to update.
+    :param updates: The dictionary containing updates.
+    :return: The updated dictionary.
+    """
+    for key, value in updates.items():
+        if isinstance(value, dict) and key in original and isinstance(original[key], dict):
+            original[key] = deep_update(original[key], value)
+        else:
+            original[key] = value
+    return original

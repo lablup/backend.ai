@@ -29,8 +29,8 @@ def etcd_context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F8
         etcd_password="",
         namespace="local",
     )
-    return base_context(shared_config=shared_config)
-
+    superadmin_user = {"role": "superadmin"}
+    return base_context(shared_config=shared_config, user=superadmin_user)
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
@@ -87,6 +87,7 @@ async def test_modify_container_registry(client: Client, etcd_context: GraphQuer
     }
 
     response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    print(response)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
