@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import relationship, selectinload, with_loader_criteria
+from sqlalchemy.orm import load_only, relationship, selectinload, with_loader_criteria
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
@@ -33,7 +33,7 @@ from .base import (
     simple_db_mutate,
 )
 from .group import association_groups_users
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, kernels
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from .keypair import keypairs
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -237,9 +237,9 @@ class Agent(graphene.ObjectType):
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
-        "schedulable": ("schedulabe", None),
+        "schedulable": ("schedulable", None),
         "addr": ("addr", None),
-        "first_contact": ("first_contat", dtparse),
+        "first_contact": ("first_contact", dtparse),
         "lost_at": ("lost_at", dtparse),
         "version": ("version", None),
     }
@@ -642,29 +642,24 @@ class AgentSummaryList(graphene.ObjectType):
     items = graphene.List(AgentSummary, required=True)
 
 
-async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:
-    query = (
-        sa.select([
-            kernels.c.occupied_slots,
-        ])
-        .select_from(kernels)
+async def recalc_agent_resource_occupancy(db_session: SASession, agent_id: AgentId) -> None:
+    _stmt = (
+        sa.select(KernelRow)
         .where(
-            (kernels.c.agent == agent_id)
-            & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            (KernelRow.agent == agent_id)
+            & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
+        .options(load_only(KernelRow.occupied_slots))
     )
+    kernel_rows = cast(list[KernelRow], (await db_session.scalars(_stmt)).all())
     occupied_slots = ResourceSlot()
-    result = await db_conn.execute(query)
-    for row in result:
-        occupied_slots += row["occupied_slots"]
-    query = (
-        sa.update(agents)
-        .values({
-            "occupied_slots": occupied_slots,
-        })
-        .where(agents.c.id == agent_id)
+    for row in kernel_rows:
+        occupied_slots += row.occupied_slots
+
+    _update_stmt = (
+        sa.update(AgentRow).values(occupied_slots=occupied_slots).where(AgentRow.id == agent_id)
     )
-    await db_conn.execute(query)
+    await db_session.execute(_update_stmt)
 
 
 async def recalc_agent_resource_occupancy_using_orm(

@@ -5,6 +5,8 @@ on:
     branches:
       - 'main'
       - '[0-9][0-9].0[39]'
+    tags:
+      - '[0-9][0-9].0[39].*'
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
   merge_group:
@@ -24,14 +26,22 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      skip: ${{ steps.check_skip.outputs.skip }}
+      skip: ${{ steps.check_skip.outputs.SKIP }}
     steps:
       - name: Optimize CI
         if: ${{ github.event_name == 'pull_request' }}
-        id: check_skip
+        id: graphite-ci-action
         uses: withgraphite/graphite-ci-action@main
         with:
           graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+      - name: Check if should skip the CI
+        id: check_skip
+        run: |
+          if [ "${{ steps.graphite-ci-action.outputs.skip }}" == "true" ]; then
+            echo "SKIP=true" >> $GITHUB_OUTPUT
+          else
+            echo "SKIP=false" >> $GITHUB_OUTPUT
+          fi
       - name: labeler
         if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
         uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
@@ -115,7 +125,10 @@ jobs:
 
   check-alembic-migrations:
     if: |
-      contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+      (
+        contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+        || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
+      )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
       && needs.optimize-ci.outputs.skip == 'false'

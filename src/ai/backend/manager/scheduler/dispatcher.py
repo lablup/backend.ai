@@ -41,6 +41,7 @@ from ai.backend.common.events import (
     DoPrepareEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
@@ -1578,6 +1579,25 @@ class SchedulerDispatcher(aobject):
                     )
                 except Exception as e:
                     log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+
+    async def update_session_status(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoUpdateSessionStatusEvent,
+    ) -> None:
+        log.debug("update_session_status(): triggered")
+        candidates = await self.registry.get_status_updatable_sessions()
+
+        async def _transit(session_id: SessionId):
+            async with self.db.connect() as db_conn:
+                row, is_transited = await self.registry.transit_session_status(db_conn, session_id)
+            if is_transited:
+                await self.registry.post_status_transition(row)
+
+        async with aiotools.TaskGroup() as tg:
+            for session_id in candidates:
+                tg.create_task(_transit(session_id))
 
     async def start_session(
         self,
