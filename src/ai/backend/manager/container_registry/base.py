@@ -169,10 +169,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
-            username = self.registry_info["username"]
+            username = self.registry_info.username
             if username is not None:
                 self.credentials["username"] = username
-            password = self.registry_info["password"]
+            password = self.registry_info.password
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
