@@ -24,7 +24,6 @@ from ai.backend.manager.models.gql_relay import (
 
 from .container_registry import (
     ContainerRegistry,
-    ContainerRegistryConnection,
     CreateContainerRegistry,
     DeleteContainerRegistry,
     ModifyContainerRegistry,
@@ -779,23 +778,9 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(
-        ContainerRegistry, id=graphene.UUID(required=True), description="Added in 24.09.0."
-    )
+    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
-    container_registries = graphene.List(
-        ContainerRegistry,
-        registry_name=graphene.String(required=True),
-        description="Added in 24.09.0.",
-    )
-
-    container_registry_node = graphene.Field(
-        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.09.0."
-    )
-
-    container_registry_nodes = PaginatedConnectionField(
-        ContainerRegistryConnection, description="Added in 24.09.0."
-    )
+    container_registries = graphene.List(ContainerRegistry)
 
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
@@ -2328,54 +2313,19 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registry(
         root: Any,
         info: graphene.ResolveInfo,
-        id: graphene.UUID,
+        hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load(ctx, id)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
-        registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.list_by_registry_name(ctx, registry_name)
-
-    @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_container_registry_node(
-        root: Any,
-        info: graphene.ResolveInfo,
-        id: str,
-    ) -> ContainerRegistry:
-        return await ContainerRegistry.get_node(info, id)
-
-    @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_container_registry_nodes(
-        root: Any,
-        info: graphene.ResolveInfo,
-        *,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
-    ) -> ConnectionResolverResult:
-        return await ContainerRegistry.get_connection(
-            info,
-            filter,
-            order,
-            offset,
-            after,
-            first,
-            before,
-            last,
-        )
+        return await ContainerRegistry.load_all(ctx)
 
     async def resolve_model_card(
         root: Any,
