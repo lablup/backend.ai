@@ -1139,15 +1139,18 @@ async def convert_session_to_image(
     registry_project = project.container_registry["project"]
 
     async with root_ctx.db.begin_readonly() as db_session:
-        query = sa.select(ContainerRegistryRow).where(
-            ContainerRegistryRow.registry_name == registry_hostname
-        )
+        query = sa.select([
+            ContainerRegistryRow.username,
+            ContainerRegistryRow.password,
+            ContainerRegistryRow.project,
+            ContainerRegistryRow.url,
+        ]).where(ContainerRegistryRow.registry_name == registry_hostname)
 
-        registry_conf = (await db_session.execute(query)).scalar()
+        registry_conf = (await db_session.execute(query)).fetchall()[0]
 
     if not registry_conf:
         raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.get("project", ""):
+    if registry_project not in registry_conf.project:
         raise InvalidAPIParameters(f"Project {registry_project} not found")
 
     base_image_ref = session.main_kernel.image_ref
@@ -1261,9 +1264,9 @@ async def convert_session_to_image(
                 # push image to registry from local agent
                 image_registry = ImageRegistry(
                     name=registry_hostname,
-                    url=str(registry_conf[""]),
-                    username=registry_conf.get("username"),
-                    password=registry_conf.get("password"),
+                    url=str(registry_conf.url),
+                    username=registry_conf.username,
+                    password=registry_conf.password,
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
