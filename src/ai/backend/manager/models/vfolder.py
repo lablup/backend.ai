@@ -2278,7 +2278,7 @@ class ModelCard(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
-    row_id = graphene.UUID(description="Added in 8. UUID type id of DB vfolders row.")
+    row_id = graphene.UUID(description="Added in 24.03.8. UUID type id of DB vfolders row.")
     vfolder = graphene.Field(VirtualFolder)
     vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
