@@ -1264,8 +1264,10 @@ type ContainerRegistryConfig {
   ssl_verify: Boolean
 }
 
+"""Added in 24.09.0."""
 scalar ContainerRegistryTypeField
 
+"""Added in 24.09.0."""
 type ContainerRegistryConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1466,7 +1468,10 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
-  create_container_registry(props: CreateContainerRegistryInput!): CreateContainerRegistry
+  create_container_registry(
+    """Added in 24.09.0."""
+    props: CreateContainerRegistryInput!
+  ): CreateContainerRegistry
   modify_container_registry(props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(props: DeleteContainerRegistryInput!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
@@ -2193,6 +2198,7 @@ type DeleteContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Added in 24.09.0."""
 input DeleteContainerRegistryInput {
   """Object id. Can be either global id or object id. Added in 24.09.0."""
   id: String!
