@@ -1036,7 +1036,7 @@ type ModelCard implements Node {
   id: ID!
   name: String
 
-  """Added in 24.03.7. UUID type id of DB vfolders row."""
+  """Added in 24.03.8. UUID type id of DB vfolders row."""
   row_id: UUID
   vfolder: VirtualFolder
 
@@ -1068,7 +1068,7 @@ type ModelCard implements Node {
   """
   readme_filetype: String
 
-  """Added in 24.03.7."""
+  """Added in 24.03.8."""
   error_msg: String
 }
 
