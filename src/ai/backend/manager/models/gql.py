@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
@@ -11,6 +12,7 @@ from graphql import Undefined
 
 set_input_object_type_default_value(Undefined)
 
+from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
@@ -149,6 +151,8 @@ from .vfolder import (
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -2246,4 +2250,38 @@ class GQLMutationPrivilegeCheckMiddleware:
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
                 return mutation_cls(False, f"no permission to execute {info.path[0]}")
+
+        return next(root, info, **args)
+
+
+class GQLDeprecatedQueryCheckMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        # List of non-paginated query names
+        non_paginated_queries = [
+            "agents",
+            "domains",
+            "groups",
+            "images",
+            "customized_images" "users",
+            "keypairs",
+            "keypair_resource_policies",
+            "user_resource_policies",
+            "resource_presets",
+            "scaling_groups",
+            "scaling_groups_for_domain",
+            "scaling_groups_for_user_group",
+            "scaling_groups_for_keypair",
+            "vfolders",
+            "container_registries",
+        ]
+        # log.error("fieild name: {}", info.field_name)
+        # Check if the current query is in the list of non-paginated queries
+        if info.field_name in non_paginated_queries:
+            log.warning(
+                "Non-paginated query '{}' is being used. "
+                "Consider updating to a paginated version.",
+                info.field_name,
+            )
+
+        # Proceed with the query resolution
         return next(root, info, **args)

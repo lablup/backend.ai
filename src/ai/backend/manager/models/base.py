@@ -929,7 +929,7 @@ def scoped_query(
 
     :param autofill_user: When the *user_key* is not specified,
         automatically fills out the user data with the current
-        user who is makeing the API request.
+        user who is making the API request.
     :param user_key: The key used for storing user identification value
         in the keyword arguments.
     """

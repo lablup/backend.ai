@@ -18,7 +18,13 @@ from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.base import DataLoaderManager
-from ..models.gql import GQLMutationPrivilegeCheckMiddleware, GraphQueryContext, Mutations, Queries
+from ..models.gql import (
+    GQLDeprecatedQueryCheckMiddleware,
+    GQLMutationPrivilegeCheckMiddleware,
+    GraphQueryContext,
+    Mutations,
+    Queries,
+)
 from .auth import auth_required
 from .exceptions import GraphQLError as BackendGQLError
 from .manager import GQLMutationUnfrozenRequiredMiddleware
@@ -87,6 +93,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             GQLLoggingMiddleware(),
             GQLMutationUnfrozenRequiredMiddleware(),
             GQLMutationPrivilegeCheckMiddleware(),
+            GQLDeprecatedQueryCheckMiddleware(),
         ],
     )
 
