@@ -19,6 +19,7 @@ from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverRes
 from .container_registry import (
     ContainerRegistry,
     ContainerRegistryConnection,
+    ContainerRegistryNode,
     CreateContainerRegistry,
     DeleteContainerRegistry,
     ModifyContainerRegistry,
@@ -713,18 +714,12 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(
-        ContainerRegistry, id=graphene.UUID(required=True), description="Added in 24.09.0."
-    )
+    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
-    container_registries = graphene.List(
-        ContainerRegistry,
-        registry_name=graphene.String(required=True),
-        description="Added in 24.09.0.",
-    )
+    container_registries = graphene.List(ContainerRegistry)
 
     container_registry_node = graphene.Field(
-        ContainerRegistry, id=graphene.String(required=True), description="Added in 24.09.0."
+        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
     )
 
     container_registry_nodes = PaginatedConnectionField(
@@ -2216,10 +2211,10 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registry(
         root: Any,
         info: graphene.ResolveInfo,
-        id: graphene.UUID,
+        hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load(ctx, id)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2229,7 +2224,7 @@ class Queries(graphene.ObjectType):
         registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.list_by_registry_name(ctx, registry_name)
+        return await ContainerRegistry.load_all(ctx)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2237,8 +2232,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ) -> ContainerRegistry:
-        return await ContainerRegistry.get_node(info, id)
+    ) -> ContainerRegistryNode:
+        return await ContainerRegistryNode.get_node(info, id)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2254,7 +2249,7 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
-        return await ContainerRegistry.get_connection(
+        return await ContainerRegistryNode.get_connection(
             info,
             filter,
             order,
