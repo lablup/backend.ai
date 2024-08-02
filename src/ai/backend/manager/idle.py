@@ -1038,6 +1038,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations = {k: 0.0 for k in self.resource_thresholds.keys()}
             live_stat = {}
+            divider = len(kernel_ids) if kernel_ids else 1
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
@@ -1060,9 +1061,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 utilizations = {
                     k: utilizations[k] + kernel_utils[k] for k in self.resource_thresholds.keys()
                 }
-            utilizations = {
-                k: utilizations[k] / len(kernel_ids) for k in self.resource_thresholds.keys()
-            }
+            utilizations = {k: utilizations[k] / divider for k in self.resource_thresholds.keys()}
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
