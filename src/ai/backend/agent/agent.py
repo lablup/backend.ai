@@ -1912,12 +1912,18 @@ class AbstractAgent(
                     "is_inference": False,
                 })
 
+                internal_data = ctx.kernel_config["internal_data"] or {}
+
                 model_definition: Optional[Mapping[str, Any]] = None
                 # Read model config
                 model_folders = [
                     folder
                     for folder in vfolder_mounts
                     if folder.usage_mode == VFolderUsageMode.MODEL
+                    and (
+                        "model_service_folder_id" not in internal_data
+                        or str(folder.vfid.folder_id) != internal_data["model_service_folder_id"]
+                    )
                 ]
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
@@ -1964,9 +1970,7 @@ class AbstractAgent(
                     log.debug("exposed ports: {!r}", exposed_ports)
                 if kernel_config["session_type"] == SessionTypes.INFERENCE:
                     model_definition = await self.load_model_definition(
-                        RuntimeVariant(
-                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
-                        ),
+                        RuntimeVariant(internal_data.get("runtime_variant", "custom")),
                         model_folders,
                         environ,
                         service_ports,
