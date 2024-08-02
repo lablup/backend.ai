@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Sequence, cast
 
 import graphene
@@ -10,6 +11,7 @@ import graphql
 import sqlalchemy as sa
 import yarl
 from graphene.types import Scalar
+from graphql import Undefined
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 from sqlalchemy.orm.exc import NoResultFound
@@ -25,8 +27,6 @@ from .base import (
     OrderExprArg,
     StrEnumType,
     generate_sql_info_for_gql_connection,
-    privileged_mutation,
-    set_if_set,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -52,25 +52,6 @@ class ContainerRegistryType(enum.StrEnum):
     HARBOR = "harbor"
     HARBOR2 = "harbor2"
     LOCAL = "local"
-
-
-class ContainerRegistryTypeField(Scalar):
-    """Added in 24.09.0."""
-
-    allowed_values = tuple(t.value for t in ContainerRegistryType)
-
-    @staticmethod
-    def serialize(val: ContainerRegistryType) -> str:
-        return val.value
-
-    @staticmethod
-    def parse_literal(node, _variables=None):
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return ContainerRegistryType(node.value)
-
-    @staticmethod
-    def parse_value(value: str) -> ContainerRegistryType:
-        return ContainerRegistryType(value)
 
 
 class ContainerRegistryRow(Base):
@@ -173,47 +154,94 @@ class ContainerRegistryRow(Base):
         return result
 
 
-class CreateContainerRegistryInput(graphene.InputObjectType):
-    url = graphene.String(required=True, description="Added in 24.09.0.")
-    type = ContainerRegistryTypeField(
-        required=True,
-        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0.",
-    )
-    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
-    is_global = graphene.Boolean(description="Added in 24.09.0.")
-    project = graphene.String(description="Added in 24.09.0.")
-    username = graphene.String(description="Added in 24.09.0.")
-    password = graphene.String(description="Added in 24.09.0.")
-    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-
-
-class ModifyContainerRegistryInput(graphene.InputObjectType):
-    id = graphene.String(
-        required=True,
-        description="Object id. Can be either global id or object id. Added in 24.09.0.",
-    )
-    url = graphene.String(description="Added in 24.09.0.")
-    type = ContainerRegistryTypeField(
-        description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
-    )
-    registry_name = graphene.String(description="Added in 24.09.0.")
-    is_global = graphene.Boolean(description="Added in 24.09.0.")
-    project = graphene.String(description="Added in 24.09.0.")
-    username = graphene.String(description="Added in 24.09.0.")
-    password = graphene.String(description="Added in 24.09.0.")
-    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-
-
-class DeleteContainerRegistryInput(graphene.InputObjectType):
+class ContainerRegistryTypeField(Scalar):
     """Added in 24.09.0."""
 
-    id = graphene.String(
-        required=True,
-        description="Object id. Can be either global id or object id. Added in 24.09.0.",
-    )
+    allowed_values = tuple(t.value for t in ContainerRegistryType)
+
+    @staticmethod
+    def serialize(val: ContainerRegistryType) -> str:
+        return val.value
+
+    @staticmethod
+    def parse_literal(node, _variables=None):
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return ContainerRegistryType(node.value)
+
+    @staticmethod
+    def parse_value(value: str) -> ContainerRegistryType:
+        return ContainerRegistryType(value)
 
 
+# Legacy
+class CreateContainerRegistryInput(graphene.InputObjectType):
+    url = graphene.String(required=True)
+    type = graphene.String(required=True)
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+
+
+# Legacy
+class ModifyContainerRegistryInput(graphene.InputObjectType):
+    url = graphene.String()
+    type = graphene.String()
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+
+
+# Legacy
 class ContainerRegistryConfig(graphene.ObjectType):
+    url = graphene.String(required=True)
+    type = graphene.String(required=True)
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+
+
+# Legacy
+class ContainerRegistry(graphene.ObjectType):
+    hostname = graphene.String()
+    config = graphene.Field(ContainerRegistryConfig)
+
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    @classmethod
+    async def load_by_hostname(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
+        async with ctx.db.begin_readonly_session() as session:
+            return cls.from_row(
+                ctx,
+                await ContainerRegistryRow.get_by_hostname(
+                    session,
+                    hostname,
+                ),
+            )
+
+    @classmethod
+    async def load_all(
+        cls,
+        ctx: GraphQueryContext,
+    ) -> Sequence[ContainerRegistry]:
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await session.execute(sa.select(ContainerRegistryRow))
+            return [cls.from_row(ctx, row) for row in rows]
+
+
+class ContainerRegistryNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+        description = "Added in 24.09.0."
+
+    row_id = graphene.UUID(
+        description="Added in 24.09.0. The undecoded UUID type id of DB container_registries row."
+    )
+    name = graphene.String()
     url = graphene.String(required=True, description="Added in 24.09.0.")
     type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
     registry_name = graphene.String(required=True, description="Added in 24.09.0.")
@@ -223,31 +251,22 @@ class ContainerRegistryConfig(graphene.ObjectType):
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
-
-class ContainerRegistry(graphene.ObjectType):
-    class Meta:
-        interfaces = (AsyncNode,)
-
-    config = graphene.Field(ContainerRegistryConfig)
-
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
-        "id": ("id", None),
+        "row_id": ("id", None),
         "registry_name": ("registry_name", None),
     }
-
     _queryorder_colmap: dict[str, OrderSpecItem] = {
-        "id": ("id", None),
+        "row_id": ("id", None),
         "registry_name": ("registry_name", None),
     }
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistry:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:
         graph_ctx: GraphQueryContext = info.context
-
         _, reg_id = AsyncNode.resolve_global_id(info, id)
         select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            reg_row = await db_session.scalar(select_stmt)
+            reg_row = cast(ContainerRegistryRow | None, await db_session.scalar(select_stmt))
             if reg_row is None:
                 raise ValueError(f"Container registry not found (id: {reg_id})")
             return cls.from_row(graph_ctx, reg_row)
@@ -277,8 +296,8 @@ class ContainerRegistry(graphene.ObjectType):
         )
         (
             query,
+            cnt_query,
             _,
-            conditions,
             cursor,
             pagination_order,
             page_size,
@@ -294,99 +313,82 @@ class ContainerRegistry(graphene.ObjectType):
             before=before,
             last=last,
         )
-        cnt_query = sa.select(sa.func.count()).select_from(ContainerRegistryRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            reg_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(graph_ctx, row) for row in reg_rows]
-
+            reg_rows = await db_session.scalars(query)
             total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+        result = [cls.from_row(graph_ctx, cast(ContainerRegistryRow, row)) for row in reg_rows]
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
+    def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistryNode:
         return cls(
-            id=row.id,
-            config=ContainerRegistryConfig(
-                url=row.url,
-                type=row.type,
-                registry_name=row.registry_name,
-                project=row.project,
-                username=row.username,
-                password=PASSWORD_PLACEHOLDER if row.password is not None else None,
-                ssl_verify=row.ssl_verify,
-                is_global=row.is_global,
-            ),
+            row_id=row.id,
+            url=row.url,
+            type=row.type,
+            registry_name=row.registry_name,
+            project=row.project,
+            username=row.username,
+            password=PASSWORD_PLACEHOLDER if row.password is not None else None,
+            ssl_verify=row.ssl_verify,
+            is_global=row.is_global,
         )
-
-    @classmethod
-    async def load(cls, ctx: GraphQueryContext, id: str | uuid.UUID) -> ContainerRegistry:
-        async with ctx.db.begin_readonly_session() as session:
-            return cls.from_row(
-                ctx,
-                await ContainerRegistryRow.get(
-                    session,
-                    id,
-                ),
-            )
-
-    @classmethod
-    async def load_all(
-        cls,
-        ctx: GraphQueryContext,
-    ) -> Sequence[ContainerRegistry]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await session.execute(sa.select(ContainerRegistryRow))
-            return [cls.from_row(ctx, row) for row in rows]
-
-    @classmethod
-    async def list_by_registry_name(
-        cls,
-        ctx: GraphQueryContext,
-        registry_name: str,
-    ) -> Sequence[ContainerRegistry]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await ContainerRegistryRow.list_by_registry_name(session, registry_name)
-            return [cls.from_row(ctx, row) for row in rows]
 
 
 class ContainerRegistryConnection(Connection):
     """Added in 24.09.0."""
 
     class Meta:
-        node = ContainerRegistry
+        node = ContainerRegistryNode
 
 
 class CreateContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    id = graphene.UUID(required=True)
-    container_registry = graphene.Field(ContainerRegistry)
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
-        props = CreateContainerRegistryInput(required=True, description="Added in 24.09.0.")
+        url = graphene.String(required=True, description="Added in 24.09.0.")
+        type = ContainerRegistryTypeField(
+            required=True,
+            description=f"Added in 24.09.0. Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
+        )
+        registry_name = graphene.String(required=True, description="Added in 24.09.0.")
+        is_global = graphene.Boolean(description="Added in 24.09.0.")
+        project = graphene.String(description="Added in 24.09.0.")
+        username = graphene.String(description="Added in 24.09.0.")
+        password = graphene.String(description="Added in 24.09.0.")
+        ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
     @classmethod
-    @privileged_mutation(
-        UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
-    )
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, props: CreateContainerRegistryInput
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        url: str,
+        type: ContainerRegistryType,
+        registry_name: str,
+        is_global: bool,
+        project: str,
+        username: str,
+        password: str,
+        ssl_verify: bool,
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {
-            "registry_name": props.registry_name,
-            "url": props.url,
-            "type": props.type,
+            "registry_name": registry_name,
+            "url": url,
+            "type": type,
         }
 
-        set_if_set(props, input_config, "project")
-        set_if_set(props, input_config, "username")
-        set_if_set(props, input_config, "password")
-        set_if_set(props, input_config, "ssl_verify")
-        set_if_set(props, input_config, "is_global")
+        def _set_if_set(name: str, val: Any) -> None:
+            if val is not Undefined:
+                input_config[name] = val
+
+        _set_if_set("project", project)
+        _set_if_set("username", username)
+        _set_if_set("password", password)
+        _set_if_set("ssl_verify", ssl_verify)
+        _set_if_set("is_global", is_global)
 
         async with ctx.db.begin_session() as db_session:
             reg_row = ContainerRegistryRow(**input_config)
@@ -395,44 +397,64 @@ class CreateContainerRegistry(graphene.Mutation):
             await db_session.refresh(reg_row)
 
             return cls(
-                id=reg_row.id,
-                container_registry=ContainerRegistry.from_row(ctx, reg_row),
+                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
             )
 
 
 class ModifyContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistry)
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
-        props = ModifyContainerRegistryInput(required=True)
+        id = graphene.String(
+            required=True,
+            description="Object id. Can be either global id or object id. Added in 24.09.0.",
+        )
+        url = graphene.String(description="Added in 24.09.0.")
+        type = ContainerRegistryTypeField(
+            description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
+        )
+        registry_name = graphene.String(description="Added in 24.09.0.")
+        is_global = graphene.Boolean(description="Added in 24.09.0.")
+        project = graphene.String(description="Added in 24.09.0.")
+        username = graphene.String(description="Added in 24.09.0.")
+        password = graphene.String(description="Added in 24.09.0.")
+        ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
 
     @classmethod
-    @privileged_mutation(
-        UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
-    )
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        props: ModifyContainerRegistryInput,
+        id: str,
+        url: str,
+        type: ContainerRegistryType,
+        registry_name: str,
+        is_global: bool,
+        project: str,
+        username: str,
+        password: str,
+        ssl_verify: bool,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {}
 
-        set_if_set(props, input_config, "url")
-        set_if_set(props, input_config, "type")
-        set_if_set(props, input_config, "registry_name")
-        set_if_set(props, input_config, "is_global")
-        set_if_set(props, input_config, "username")
-        set_if_set(props, input_config, "password")
-        set_if_set(props, input_config, "project")
-        set_if_set(props, input_config, "ssl_verify")
+        def _set_if_set(name: str, val: Any) -> None:
+            if val is not Undefined:
+                input_config[name] = val
 
-        _, _id = AsyncNode.resolve_global_id(info, props.id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(props.id)
+        _set_if_set("url", url)
+        _set_if_set("type", type)
+        _set_if_set("registry_name", registry_name)
+        _set_if_set("username", username)
+        _set_if_set("password", password)
+        _set_if_set("project", project)
+        _set_if_set("ssl_verify", ssl_verify)
+        _set_if_set("is_global", is_global)
+
+        _, _id = AsyncNode.resolve_global_id(info, id)
+        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
         async with ctx.db.begin_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
@@ -442,34 +464,42 @@ class ModifyContainerRegistry(graphene.Mutation):
             for field, val in input_config.items():
                 setattr(reg_row, field, val)
 
-            return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
+            return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
 
 
 class DeleteContainerRegistry(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistry)
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
-        props = DeleteContainerRegistryInput(required=True)
+        id = graphene.String(
+            required=True,
+            description="Object id. Can be either global id or object id. Added in 24.09.0.",
+        )
 
     @classmethod
-    @privileged_mutation(
-        UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
-    )
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        props: DeleteContainerRegistryInput,
+        id: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
 
-        _, _id = AsyncNode.resolve_global_id(info, props.id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(props.id)
-        container_registry = await ContainerRegistry.load(ctx, reg_id)
-        async with ctx.db.begin_session() as session:
-            await session.execute(
+        _, _id = AsyncNode.resolve_global_id(info, id)
+        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        async with ctx.db.begin_session() as db_session:
+            reg_row = await ContainerRegistry.load(ctx, reg_id)
+            reg_row = cast(
+                ContainerRegistryRow | None,
+                await db_session.scalar(
+                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                ),
+            )
+            if reg_row is None:
+                raise ValueError(f"Container registry not found (id:{reg_id})")
+            container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
+            await db_session.execute(
                 sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
             )
 
