@@ -1072,7 +1072,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
             return utilizations
         except Exception as e:
-            log.warning("Unable to collect utilization for idleness check", exc_info=e)
+            _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
+            log.warning(_msg, exc_info=e)
             return None
 
     async def get_checker_result(
