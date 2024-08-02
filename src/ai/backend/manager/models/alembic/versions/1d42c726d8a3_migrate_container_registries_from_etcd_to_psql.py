@@ -1,7 +1,7 @@
 """Migrate container registries from `etcd` to `postgreSQL`
 
 Revision ID: 1d42c726d8a3
-Revises: 75ea2b136830
+Revises: 59a622c31820
 Create Date: 2024-03-05 10:36:24.197922
 
 """
@@ -28,7 +28,7 @@ from ai.backend.manager.models.image import ImageRow
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
-down_revision = "75ea2b136830"
+down_revision = "59a622c31820"
 branch_labels = None
 depends_on = None
 
