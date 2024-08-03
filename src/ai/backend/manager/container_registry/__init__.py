@@ -30,6 +30,10 @@ def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[Base
         from .harbor import HarborRegistry_v2
 
         cr_cls = HarborRegistry_v2
+    elif registry_type == ContainerRegistryType.GITHUB:
+        from .github import GitHubRegistry_v2
+
+        cr_cls = GitHubRegistry_v2
     elif registry_type == ContainerRegistryType.LOCAL:
         from .local import LocalRegistry
 
