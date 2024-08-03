@@ -8,12 +8,19 @@ if [ -f .pants.rc ]; then
 fi
 CURRENT_COMMIT=$(git rev-parse --short HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}/p')" ]; then
-  # if we are on the release branch, use it as the base branch.
-  BASE_BRANCH="$CURRENT_BRANCH"
+
+# Get the base branch name from GitHub.
+if ! command -v gh &> /dev/null; then
+  echo "GitHub CLI (gh) is not installed. Please install it and authenticate."
+  exit 1
+fi
+if gh pr view "$CURRENT_BRANCH" &> /dev/null; then
+  # Get the base branch name if we are on a pull request.
+  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName')
 else
   BASE_BRANCH="main"
 fi
+
 if [ "$1" != "origin" ]; then
   # extract the owner name of the target repo
   ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
