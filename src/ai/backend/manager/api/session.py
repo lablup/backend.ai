@@ -2328,6 +2328,8 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/upload", upload_files))
     cors.add(app.router.add_route("GET", "/{session_name}/download", download_files))
     cors.add(app.router.add_route("GET", "/{session_name}/download_single", download_single))
+    cors.add(app.router.add_route("POST", "/{session_name}/download", download_files))
+    cors.add(app.router.add_route("POST", "/{session_name}/download_single", download_single))
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
