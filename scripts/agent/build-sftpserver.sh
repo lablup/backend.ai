@@ -51,9 +51,9 @@ docker run --rm -it \
     sftpserver-builder \
     /workspace/build.sh
 
-ls -l .
 cp $temp_dir/sftp-server.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 cp $temp_dir/scp.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+ls -lh src/ai/backend/runner
 
 cd $SCRIPT_DIR/..
 rm -rf "$temp_dir"

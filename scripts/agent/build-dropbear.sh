@@ -67,9 +67,9 @@ docker run --rm -it \
   dropbear-builder \
   /workspace/build.sh
 
-ls -l .
 cp $temp_dir/dropbear.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
 cp $temp_dir/dropbearkey.*.bin     $SCRIPT_DIR/../../src/ai/backend/runner
 cp $temp_dir/dropbearconvert.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+ls -lh src/ai/backend/runner
 
 rm -rf "$temp_dir"
