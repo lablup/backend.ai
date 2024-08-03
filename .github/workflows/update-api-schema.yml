@@ -54,7 +54,7 @@ jobs:
       run: pants export --resolve=python-default
     - name: Create GraphQL schema dump
       run: |
-        ./backend.ai mgr api dump-gql-schema --output src/ai/backend/manager/api/schema.graphql
+        ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
     - name: Extract the author information
       id: get_author_info
       run: |
