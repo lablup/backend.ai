@@ -2,15 +2,19 @@
 set -e
 
 arch=$(uname -m)
-
 if [ $arch = "arm64" ]; then
   arch="aarch64"
 fi
 
 builder_dockerfile=$(cat <<'EOF'
-FROM alpine:3.8
-RUN apk add --no-cache make gcc musl-dev
-RUN apk add --no-cache autoconf automake libtool zlib-dev git
+FROM alpine:3.20
+RUN apk add --no-cache make gcc musl-dev autoconf automake git wget
+RUN apk add --no-cache zlib-dev zlib-static libtool pkgconfig
+RUN wget https://ftp.gnu.org/gnu/shtool/shtool-2.0.8.tar.gz \
+    && tar -xzf shtool-2.0.8.tar.gz \
+    && cd shtool-2.0.8 \
+    && ./configure && make && make install
+RUN mkdir -p /opt && ln -s /usr/local/bin/shtool /opt/
 EOF
 )
 
@@ -19,8 +23,9 @@ build_script=$(cat <<'EOF'
 #! /bin/sh
 set -e
 
-git clone -c advice.detachedHead=false --branch "DROPBEAR_2024.85" https://github.com/mkj/dropbear dropbear
-
+git clone -c advice.detachedHead=false --branch "DROPBEAR_2024.85" \
+  https://github.com/mkj/dropbear \
+  dropbear
 cd dropbear
 autoconf && autoheader
 ./configure --enable-static --prefix=/opt/kernel

@@ -2,16 +2,14 @@
 set -e
 
 arch=$(uname -m)
-
 if [ $arch = "arm64" ]; then
   arch="aarch64"
 fi
 
 builder_dockerfile=$(cat <<'EOF'
-FROM alpine:3.8
-RUN apk add --no-cache make gcc musl-dev git
-RUN apk add --no-cache autoconf automake libtool
-RUN apk add --no-cache wget
+FROM alpine:3.20
+RUN apk add --no-cache make gcc musl-dev autoconf automake git wget
+RUN apk add --no-cache zlib-dev zlib-static libressl-dev
 # below required for sys/mman.h
 RUN apk add --no-cache linux-headers
 EOF
@@ -20,38 +18,16 @@ EOF
 build_script=$(cat <<'EOF'
 #! /bin/sh
 set -e
-export ZLIB_VER=1.3.1
-export SSL_VER=1.1.1i
 
-cd /workspace
-
-wget https://www.zlib.net/zlib-${ZLIB_VER}.tar.gz -O /workspace/zlib-${ZLIB_VER}.tar.gz && \
-    wget https://www.openssl.org/source/openssl-${SSL_VER}.tar.gz -O /workspace/openssl-${SSL_VER}.tar.gz
-git clone -c advice.detachedHead=false --branch "V_8_9_P1" https://github.com/openssh/openssh-portable openssh-portable
-
-tar xzvf zlib-${ZLIB_VER}.tar.gz && \
-    tar xzvf openssl-${SSL_VER}.tar.gz
-
-echo "BUILD: zlib" && \
-    cd /workspace/zlib-${ZLIB_VER} && \
-    ./configure --prefix=/workspace/usr --static && \
-    make -j$(nproc) && \
-    make install
-
-echo "BUILD: OpenSSL" && \
-    cd /workspace/openssl-${SSL_VER} && \
-    ./config --prefix=/workspace/usr no-shared --openssldir=/workspace/usr/openssl && \
-    make -j$(nproc) && \
-    make install_sw
-
-cd /workspace/openssh-portable
+git clone -c advice.detachedHead=false --branch "V_9_8_P1" \
+  https://github.com/openssh/openssh-portable \
+  openssh-portable
+cd openssh-portable
 autoreconf
-export LDFLAGS="-L/workspace/usr/lib -pthread -static"
-export CFLAGS="-I/workspace/usr/include -L/workspace/usr/lib -fPIC -static"
-export CPPFLAGS="-I/workspace/usr/include -L/workspace/usr/lib -fPIC -static"
-export LIBS="-ldl"
-./configure --prefix=/workspace/usr
-sed -i 's/^# \?define SFTP_MAX_MSG_LENGTH[ \t]*.*/#define SFTP_MAX_MSG_LENGTH 5242880/g' sftp-common.h
+./configure --prefix=/usr --enable-static --with-ldflags=-static
+
+sed -i 's/^# \?define sftp_max_msg_length[ \t]*.*/#define sftp_max_msg_length 5242880/g' sftp-common.h
+
 make -j$(nproc) sftp-server scp
 cp sftp-server /workspace/sftp-server.$X_ARCH.bin
 cp scp /workspace/scp.$X_ARCH.bin
