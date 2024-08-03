@@ -1616,7 +1616,7 @@ class AbstractAgent(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
             )
         except FileNotFoundError:
-            pass
+            return
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
             if kernel_obj.runner is not None:
