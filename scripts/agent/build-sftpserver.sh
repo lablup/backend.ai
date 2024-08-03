@@ -19,14 +19,15 @@ build_script=$(cat <<'EOF'
 #! /bin/sh
 set -e
 
-git clone -c advice.detachedHead=false --branch "V_9_8_P1" \
+git clone -c advice.detachedHead=false --depth=1 \
+  --branch "V_9_8_P1" \
   https://github.com/openssh/openssh-portable \
   openssh-portable
 cd openssh-portable
 autoreconf
 ./configure --prefix=/usr --enable-static --with-ldflags=-static
 
-sed -i 's/^# \?define sftp_max_msg_length[ \t]*.*/#define sftp_max_msg_length 5242880/g' sftp-common.h
+sed -i 's/^# \?define SFTP_MAX_MSG_LENGTH[ \t]*.*/#define SFTP_MAX_MSG_LENGTH 5242880/g' sftp-common.h
 
 make -j$(nproc) sftp-server scp
 cp sftp-server /workspace/sftp-server.$X_ARCH.bin

@@ -23,7 +23,8 @@ build_script=$(cat <<'EOF'
 #! /bin/sh
 set -e
 
-git clone -c advice.detachedHead=false --branch "DROPBEAR_2024.85" \
+git clone -c advice.detachedHead=false --depth=1 \
+  --branch "DROPBEAR_2024.85" \
   https://github.com/mkj/dropbear \
   dropbear
 cd dropbear
