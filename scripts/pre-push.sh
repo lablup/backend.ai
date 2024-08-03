@@ -15,10 +15,12 @@ if ! command -v gh &> /dev/null; then
   pants lint check ::
 else
   # Get the base branch name from GitHub if we are on a pull request.
-  if gh pr view "$CURRENT_BRANCH" &> /dev/null; then
-    BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName')
-  else
+  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null)
+  if [[ -z "$BASE_BRANCH" ]]; then
     BASE_BRANCH="main"
+    echo "No pull request found for the branch $CURRENT_BRANCH, falling back to main."
+  else
+    echo "Detected the pull request's base branch: $BASE_BRANCH"
   fi
   if [ "$1" != "origin" ]; then
     # extract the owner name of the target repo
