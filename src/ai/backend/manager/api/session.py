@@ -99,12 +99,10 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .scaling_group import query_wsproxy_status
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    BaseResponseModel,
     catch_unexpected,
     check_api_params,
     deprecated_stub,
     get_access_key_scopes,
-    pydantic_params_api_handler,
     undefined,
 )
 
