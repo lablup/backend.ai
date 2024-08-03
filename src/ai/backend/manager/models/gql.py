@@ -27,8 +27,11 @@ from .container_registry import (
     ContainerRegistryConnection,
     ContainerRegistryNode,
     CreateContainerRegistry,
+    CreateContainerRegistryNode,
     DeleteContainerRegistry,
+    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
+    ModifyContainerRegistryNode,
 )
 
 if TYPE_CHECKING:
@@ -296,6 +299,17 @@ class Mutations(graphene.ObjectType):
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
+    create_container_registry_node = CreateContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    modify_container_registry_node = ModifyContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    delete_container_registry_node = DeleteContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+
+    # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()

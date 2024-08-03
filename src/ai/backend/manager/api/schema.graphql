@@ -158,15 +158,11 @@ type Queries {
   endpoint_token(token: String!): EndpointToken
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
+  container_registry(hostname: String!): ContainerRegistry
+  container_registries: [ContainerRegistry]
 
   """Added in 24.09.0."""
-  container_registry(id: UUID!): ContainerRegistry
-
-  """Added in 24.09.0."""
-  container_registries(registry_name: String!): [ContainerRegistry]
-
-  """Added in 24.09.0."""
-  container_registry_node(id: String!): ContainerRegistry
+  container_registry_node(id: String!): ContainerRegistryNode
 
   """Added in 24.09.0."""
   container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
@@ -1241,10 +1237,33 @@ type QuotaDetails {
 type ContainerRegistry implements Node {
   """The ID of the object"""
   id: ID!
+  hostname: String
   config: ContainerRegistryConfig
 }
 
 type ContainerRegistryConfig {
+  url: String!
+  type: String!
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+}
+
+"""Added in 24.09.0."""
+type ContainerRegistryNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """
+  Added in 24.09.0. The undecoded UUID type id of DB container_registries row.
+  """
+  row_id: UUID
+  name: String
+
   """Added in 24.09.0."""
   url: String!
 
@@ -1288,7 +1307,7 @@ type ContainerRegistryConnection {
 """A Relay edge containing a `ContainerRegistry` and its cursor."""
 type ContainerRegistryEdge {
   """The item at the end of the edge"""
-  node: ContainerRegistry
+  node: ContainerRegistryNode
 
   """A cursor for use in pagination"""
   cursor: String!
@@ -1476,10 +1495,65 @@ type Mutations {
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
   create_container_registry(
     """Added in 24.09.0."""
-    props: CreateContainerRegistryInput!
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String!
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'local').
+    """
+    type: ContainerRegistryTypeField!
+
+    """Added in 24.09.0."""
+    url: String!
+
+    """Added in 24.09.0."""
+    username: String
   ): CreateContainerRegistry
-  modify_container_registry(props: ModifyContainerRegistryInput!): ModifyContainerRegistry
-  delete_container_registry(props: DeleteContainerRegistryInput!): DeleteContainerRegistry
+  modify_container_registry(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'local'). Added in 24.09.0.
+    """
+    type: ContainerRegistryTypeField
+
+    """Added in 24.09.0."""
+    url: String
+
+    """Added in 24.09.0."""
+    username: String
+  ): ModifyContainerRegistry
+  delete_container_registry(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+  ): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 }
 
@@ -2133,81 +2207,15 @@ type UnsetQuotaScope {
 }
 
 type CreateContainerRegistry {
-  id: UUID!
-  container_registry: ContainerRegistry
-}
-
-input CreateContainerRegistryInput {
-  """Added in 24.09.0."""
-  url: String!
-
-  """
-  Registry type. One of ('docker', 'harbor', 'harbor2', 'local'). Added in 24.09.0.
-  """
-  type: ContainerRegistryTypeField!
-
-  """Added in 24.09.0."""
-  registry_name: String!
-
-  """Added in 24.09.0."""
-  is_global: Boolean
-
-  """Added in 24.09.0."""
-  project: String
-
-  """Added in 24.09.0."""
-  username: String
-
-  """Added in 24.09.0."""
-  password: String
-
-  """Added in 24.09.0."""
-  ssl_verify: Boolean
+  container_registry: ContainerRegistryNode
 }
 
 type ModifyContainerRegistry {
-  container_registry: ContainerRegistry
-}
-
-input ModifyContainerRegistryInput {
-  """Object id. Can be either global id or object id. Added in 24.09.0."""
-  id: String!
-
-  """Added in 24.09.0."""
-  url: String
-
-  """
-  Registry type. One of ('docker', 'harbor', 'harbor2', 'local'). Added in 24.09.0.
-  """
-  type: ContainerRegistryTypeField
-
-  """Added in 24.09.0."""
-  registry_name: String
-
-  """Added in 24.09.0."""
-  is_global: Boolean
-
-  """Added in 24.09.0."""
-  project: String
-
-  """Added in 24.09.0."""
-  username: String
-
-  """Added in 24.09.0."""
-  password: String
-
-  """Added in 24.09.0."""
-  ssl_verify: Boolean
+  container_registry: ContainerRegistryNode
 }
 
 type DeleteContainerRegistry {
-  container_registry: ContainerRegistry
-}
-
-"""Added in 24.09.0."""
-input DeleteContainerRegistryInput {
-  """Object id. Can be either global id or object id. Added in 24.09.0."""
-  id: String!
+  container_registry: ContainerRegistryNode
 }
 
 type ModifyEndpoint {

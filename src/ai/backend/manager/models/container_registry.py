@@ -11,7 +11,7 @@ import graphql
 import sqlalchemy as sa
 import yarl
 from graphene.types import Scalar
-from graphql import Undefined
+from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 from sqlalchemy.orm.exc import NoResultFound
@@ -27,6 +27,7 @@ from .base import (
     OrderExprArg,
     StrEnumType,
     generate_sql_info_for_gql_connection,
+    set_if_set,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -181,6 +182,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
 # Legacy
@@ -191,6 +193,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
 # Legacy
@@ -339,9 +342,13 @@ class ContainerRegistryConnection(Connection):
 
     class Meta:
         node = ContainerRegistryNode
+        description = "Added in 24.09.0."
 
 
-class CreateContainerRegistry(graphene.Mutation):
+class CreateContainerRegistryNode(graphene.Mutation):
+    class Meta:
+        description = "Added in 24.09.0."
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistryNode)
 
@@ -366,12 +373,12 @@ class CreateContainerRegistry(graphene.Mutation):
         url: str,
         type: ContainerRegistryType,
         registry_name: str,
-        is_global: bool,
-        project: str,
-        username: str,
-        password: str,
-        ssl_verify: bool,
-    ) -> CreateContainerRegistry:
+        is_global: bool | UndefinedType = Undefined,
+        project: str | UndefinedType = Undefined,
+        username: str | UndefinedType = Undefined,
+        password: str | UndefinedType = Undefined,
+        ssl_verify: bool | UndefinedType = Undefined,
+    ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {
@@ -401,9 +408,12 @@ class CreateContainerRegistry(graphene.Mutation):
             )
 
 
-class ModifyContainerRegistry(graphene.Mutation):
+class ModifyContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistryNode)
+
+    class Meta:
+        description = "Added in 24.09.0."
 
     class Arguments:
         id = graphene.String(
@@ -427,15 +437,15 @@ class ModifyContainerRegistry(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: str,
-        url: str,
-        type: ContainerRegistryType,
-        registry_name: str,
-        is_global: bool,
-        project: str,
-        username: str,
-        password: str,
-        ssl_verify: bool,
-    ) -> ModifyContainerRegistry:
+        url: str | UndefinedType = Undefined,
+        type: ContainerRegistryType | UndefinedType = Undefined,
+        registry_name: str | UndefinedType = Undefined,
+        is_global: bool | UndefinedType = Undefined,
+        project: str | UndefinedType = Undefined,
+        username: str | UndefinedType = Undefined,
+        password: str | UndefinedType = Undefined,
+        ssl_verify: bool | UndefinedType = Undefined,
+    ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {}
@@ -467,9 +477,12 @@ class ModifyContainerRegistry(graphene.Mutation):
             return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
 
 
-class DeleteContainerRegistry(graphene.Mutation):
+class DeleteContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistryNode)
+
+    class Meta:
+        description = "Added in 24.09.0."
 
     class Arguments:
         id = graphene.String(
@@ -483,7 +496,7 @@ class DeleteContainerRegistry(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: str,
-    ) -> DeleteContainerRegistry:
+    ) -> DeleteContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
@@ -503,4 +516,116 @@ class DeleteContainerRegistry(graphene.Mutation):
                 sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
             )
 
+        return cls(container_registry=container_registry)
+
+
+# Legacy mutations
+class CreateContainerRegistry(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+        props = CreateContainerRegistryInput(required=True)
+
+    @classmethod
+    async def mutate(
+        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+    ) -> CreateContainerRegistry:
+        ctx: GraphQueryContext = info.context
+
+        input_config: dict[str, Any] = {
+            "registry_name": hostname,
+            "url": props.url,
+            "type": ContainerRegistryType(props.type),
+        }
+
+        if props.project:
+            input_config["project"] = props.project[0]
+
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "is_global")
+
+        async with ctx.db.begin_session() as db_session:
+            reg_row = ContainerRegistryRow(**input_config)
+            db_session.add(reg_row)
+            await db_session.flush()
+            await db_session.refresh(reg_row)
+
+            return cls(
+                container_registry=ContainerRegistry.from_row(ctx, reg_row),
+            )
+
+
+class ModifyContainerRegistry(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+        props = ModifyContainerRegistryInput(required=True)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        props: ModifyContainerRegistryInput,
+    ) -> ModifyContainerRegistry:
+        ctx: GraphQueryContext = info.context
+
+        input_config: dict[str, Any] = {
+            "registry_name": hostname,
+        }
+
+        if props.project:
+            input_config["project"] = props.project[0]
+
+        if props.type:
+            input_config["type"] = ContainerRegistryType(props.type)
+
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "is_global")
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+
+        async with ctx.db.begin_session() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == hostname
+            )
+            reg_row = await session.scalar(stmt)
+            if reg_row is None:
+                raise ValueError(f"ContainerRegistry not found (hostname: {hostname})")
+
+            for field, val in input_config.items():
+                setattr(reg_row, field, val)
+
+            return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
+
+
+class DeleteContainerRegistry(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        hostname: str,
+    ) -> DeleteContainerRegistry:
+        ctx: GraphQueryContext = info.context
+        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
+        async with ctx.db.begin_session() as session:
+            stmt = sa.delete(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == hostname
+            )
+            await session.execute(stmt)
         return cls(container_registry=container_registry)
