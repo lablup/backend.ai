@@ -53,6 +53,8 @@ class ContainerRegistryType(enum.StrEnum):
     HARBOR2 = "harbor2"
     GITHUB = "github"
     GITLAB = "gitlab"
+    ECR = "ecr"
+    ECR_PUB = "ecr-public"
     LOCAL = "local"
 
 

@@ -253,7 +253,7 @@ async def login(
         return {"auth": basic_auth, "headers": {}}
     elif ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
-    elif ping_status == 401:
+    elif ping_status in [400, 401]:
         params = {
             "scope": scope,
             "offline_token": "true",
