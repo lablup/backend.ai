@@ -2,13 +2,12 @@
 set -e
 
 arch=$(uname -m)
-
 if [ $arch = "arm64" ]; then
   arch="aarch64"
 fi
 
 builder_dockerfile=$(cat <<'EOF'
-FROM alpine:3.8
+FROM alpine:3.20
 RUN apk add --no-cache make gcc musl-dev git
 EOF
 )
@@ -40,7 +39,7 @@ docker run --rm -it \
   suexec-builder \
   /workspace/build.sh
 
-ls -l .
 cp $temp_dir/su-exec.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+ls -lh src/ai/backend/runner
 
 rm -rf "$temp_dir"
