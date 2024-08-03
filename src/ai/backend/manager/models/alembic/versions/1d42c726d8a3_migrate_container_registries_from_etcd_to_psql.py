@@ -65,7 +65,7 @@ def get_container_registry_row_schema():
         )
         project = sa.Column("project", sa.String(length=255), nullable=False)
         username = sa.Column("username", sa.String(length=255), nullable=True)
-        password = sa.Column("password", sa.String(length=255), nullable=True)
+        password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
         is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
 

@@ -59,7 +59,7 @@ class ContainerRegistryRow(Base):
     )
     project = sa.Column("project", sa.String(length=255), index=True, nullable=False)
     username = sa.Column("username", sa.String(length=255), nullable=True)
-    password = sa.Column("password", sa.String(length=255), nullable=True)
+    password = sa.Column("password", sa.String, nullable=True)
     ssl_verify = sa.Column(
         "ssl_verify", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
