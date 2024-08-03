@@ -12,7 +12,7 @@ from .base import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class GitHubRegistry_v2(BaseContainerRegistry):
+class GitHubRegistry(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
