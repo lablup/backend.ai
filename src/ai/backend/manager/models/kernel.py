@@ -75,11 +75,17 @@ from .base import (
 )
 from .group import groups
 from .image import ImageNode, ImageRow
-from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    execute_with_retry,
+    get_first_timestamp_for_status,
+    sql_append_dict_to_list,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -538,7 +544,14 @@ class KernelRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[])
+    # status_history records all status changes
+    # e.g)
+    # [
+    #   {"status: "PENDING", "timestamp": "2022-10-22T10:22:30"},
+    #   {"status: "SCHEDULED", "timestamp": "2022-10-22T11:40:30"},
+    #   {"status: "PREPARING", "timestamp": "2022-10-25T10:22:30"}
+    # ]
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
     result = sa.Column(
@@ -723,12 +736,9 @@ class KernelRow(Base):
         data = {
             "status": status,
             "status_changed": now,
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                (),
-                {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
-                },
+            "status_history": sql_append_dict_to_list(
+                KernelRow.status_history,
+                {"status": status.name, "timestamp": now.isoformat()},
             ),
         }
         if status_data is not None:
@@ -774,12 +784,9 @@ class KernelRow(Base):
                 if update_data is None:
                     update_values = {
                         "status": new_status,
-                        "status_history": sql_json_merge(
+                        "status_history": sql_append_dict_to_list(
                             KernelRow.status_history,
-                            (),
-                            {
-                                new_status.name: now.isoformat(),
-                            },
+                            {"status": new_status.name, "timestamp": now.isoformat()},
                         ),
                     }
                 else:
@@ -921,7 +928,9 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row.status_history or {}
+        status_history = cast(list[dict[str, str]], row.status_history)
+        scheduled_at = get_first_timestamp_for_status(status_history, KernelStatus.SCHEDULED)
+
         return {
             # identity
             "id": row.id,
@@ -947,7 +956,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
+            "scheduled_at": scheduled_at,
             "occupied_slots": row.occupied_slots.to_json(),
             # resources
             "agent": row.agent if not hide_agents else None,
@@ -1001,7 +1010,7 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
-        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), dtparse),
+        "scheduled_at": ("scheduled_at", None),
     }
 
     _queryorder_colmap: ColumnMapType = {
@@ -1018,7 +1027,7 @@ class ComputeContainer(graphene.ObjectType):
         "status_changed": ("status_changed", None),
         "created_at": ("created_at", None),
         "terminated_at": ("terminated_at", None),
-        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
+        "scheduled_at": ("scheduled_at", None),
     }
 
     @classmethod
