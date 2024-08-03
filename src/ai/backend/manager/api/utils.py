@@ -45,9 +45,10 @@ from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
 from .exceptions import (
+    DeprecatedAPI,
     GenericForbidden,
     InvalidAPIParameters,
-    QueryNotImplemented,
+    NotImplementedAPI,
 )
 
 if TYPE_CHECKING:
@@ -414,8 +415,15 @@ def get_handler_attr(request, key, default=None):
     return default
 
 
-async def not_impl_stub(request) -> web.Response:
-    raise QueryNotImplemented
+async def not_impl_stub(request: web.Request) -> web.Response:
+    raise NotImplementedAPI
+
+
+def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
+    async def deprecated_stub_impl(request: web.Request) -> web.Response:
+        raise DeprecatedAPI(extra_msg=msg)
+
+    return deprecated_stub_impl
 
 
 def chunked(iterable, n):
