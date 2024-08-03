@@ -2,14 +2,14 @@
 set -e
 
 arch=$(uname -m)
-
 if [ $arch = "arm64" ]; then
   arch="aarch64"
 fi
 
 builder_dockerfile=$(cat <<'EOF'
-FROM alpine:3.8
-RUN apk add --no-cache make gcc g++ musl-dev file bison flex curl
+FROM alpine:3.20
+RUN apk add --no-cache make gcc g++ musl-dev
+RUN apk add --no-cache file bison flex curl
 RUN apk add --no-cache pkgconfig
 EOF
 )
@@ -69,7 +69,7 @@ docker run --rm -it \
   tmux-builder \
   /workspace/build.sh
 
-ls -l .
 cp $temp_dir/tmux.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
+ls -lh src/ai/backend/runner
 
 rm -rf "$temp_dir"
