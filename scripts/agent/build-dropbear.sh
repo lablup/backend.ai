@@ -31,12 +31,12 @@ autoconf && autoheader
 ./configure --enable-static --prefix=/opt/kernel
 
 # Improve SFTP up/download throughputs.
-sed -i 's/\(DEFAULT_RECV_WINDOW\) [0-9][0-9]*/\1 2097152/' default_options.h
-sed -i 's/\(RECV_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' default_options.h
-sed -i 's/\(TRANS_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' default_options.h
-sed -i 's/\(MAX_CMD_LEN\) [0-9][0-9]*/\1 20000/' sysoptions.h
-sed -i '/channel->transwindow -= len;/s/^/\/\//' common-channel.c
-sed -i 's/DEFAULT_PATH/getenv("PATH")/' svr-chansession.c
+sed -i 's/\(DEFAULT_RECV_WINDOW\) [0-9][0-9]*/\1 2097152/' src/default_options.h
+sed -i 's/\(RECV_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' src/default_options.h
+sed -i 's/\(TRANS_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' src/default_options.h
+sed -i 's/\(MAX_CMD_LEN\) [0-9][0-9]*/\1 20000/' src/sysoptions.h
+sed -i '/channel->transwindow -= len;/s/^/\/\//' src/common-channel.c
+sed -i 's/DEFAULT_PATH/getenv("PATH")/' src/svr-chansession.c
 
 # Disable clearing environment variables for new pty sessions and remote commands
 sed -i 's%/\* *#define \+DEBUG_VALGRIND *\*/%#define DEBUG_VALGRIND%' src/debug.h
