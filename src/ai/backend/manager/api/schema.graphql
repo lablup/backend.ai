@@ -1493,7 +1493,9 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
-  create_container_registry(
+
+  """Added in 24.09.0."""
+  create_container_registry_node(
     """Added in 24.09.0."""
     is_global: Boolean
 
@@ -1519,8 +1521,10 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): CreateContainerRegistry
-  modify_container_registry(
+  ): CreateContainerRegistryNode
+
+  """Added in 24.09.0."""
+  modify_container_registry_node(
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
 
@@ -1549,11 +1553,16 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): ModifyContainerRegistry
-  delete_container_registry(
+  ): ModifyContainerRegistryNode
+
+  """Added in 24.09.0."""
+  delete_container_registry_node(
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
-  ): DeleteContainerRegistry
+  ): DeleteContainerRegistryNode
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+  delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 }
 
@@ -2206,16 +2215,55 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
-type CreateContainerRegistry {
+"""Added in 24.09.0."""
+type CreateContainerRegistryNode {
   container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type ModifyContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+type CreateContainerRegistry {
+  container_registry: ContainerRegistry
+}
+
+input CreateContainerRegistryInput {
+  url: String!
+  type: String!
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModifyContainerRegistry {
-  container_registry: ContainerRegistryNode
+  container_registry: ContainerRegistry
+}
+
+input ModifyContainerRegistryInput {
+  url: String
+  type: String
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type DeleteContainerRegistry {
-  container_registry: ContainerRegistryNode
+  container_registry: ContainerRegistry
 }
 
 type ModifyEndpoint {
