@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import Undefined
+from graphql import OperationType, Undefined
+from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
@@ -2242,10 +2243,13 @@ class Queries(graphene.ObjectType):
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
-        if info.operation.operation == "mutation" and len(info.path) == 1:
-            mutation_cls = getattr(Mutations, info.field_name).type
+        if info.operation.operation == OperationType.MUTATION:
+            mutation_field: GraphQLField | None = getattr(Mutations, info.field_name, None)  # noqa
+            if mutation_field is None:
+                return next(root, info, **args)
+            mutation_cls = mutation_field.type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path[0]}")
+                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
