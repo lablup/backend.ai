@@ -753,7 +753,7 @@ type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  """Added in 24.03.4. ID of VFolder."""
   row_id: UUID
   host: String
   quota_scope_id: String
@@ -1036,7 +1036,7 @@ type ModelCard implements Node {
   id: ID!
   name: String
 
-  """Added in 24.03.8. UUID type id of DB vfolders row."""
+  """Added in 24.03.8. ID of VFolder."""
   row_id: UUID
   vfolder: VirtualFolder
 
