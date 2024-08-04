@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import Undefined
+from graphql import OperationType, Undefined
+from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
@@ -373,7 +374,7 @@ class Queries(graphene.ObjectType):
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
         ),
     )
 
@@ -1156,6 +1157,8 @@ class Queries(graphene.ObjectType):
                 image_load_filters.remove(ImageLoadFilter.CUSTOMIZED)
                 image_load_filters.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
         else:
+            image_load_filters.add(ImageLoadFilter.CUSTOMIZED)
+            image_load_filters.add(ImageLoadFilter.GENERAL)
             if is_operation is None:
                 # I know this logic is quite contradicts to the parameter name,
                 # but to conform with previous implementation...
@@ -2240,10 +2243,13 @@ class Queries(graphene.ObjectType):
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
-        if info.operation.operation == "mutation" and len(info.path) == 1:
-            mutation_cls = getattr(Mutations, info.field_name).type
+        if info.operation.operation == OperationType.MUTATION:
+            mutation_field: GraphQLField | None = getattr(Mutations, info.field_name, None)  # noqa
+            if mutation_field is None:
+                return next(root, info, **args)
+            mutation_cls = mutation_field.type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path[0]}")
+                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
