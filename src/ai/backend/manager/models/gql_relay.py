@@ -3,18 +3,58 @@ from __future__ import annotations
 import enum
 import functools
 import re
-from typing import Any, Awaitable, Callable, NamedTuple, Protocol
+from typing import Any, Awaitable, Callable, NamedTuple, Protocol, Type
 
 import graphene
 from graphene.relay.connection import (
     ConnectionOptions,
     IterableConnectionField,
     PageInfo,
-    get_edge_class,
 )
-from graphene.relay.node import Node, NodeField, is_node
+from graphene.relay.node import AbstractNode, Node, NodeField, is_node
+from graphene.types import NonNull, String
+from graphene.types.field import Field
+from graphene.types.objecttype import ObjectType
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
+
+
+def get_edge_class(
+    connection_class: Type["Connection"],
+    _node: Type[AbstractNode],
+    base_name: str,
+    strict_types: bool = False,
+    *,
+    description: str | None = None,
+):
+    """
+    This method has been implemented to have additional fields, such as `description`.
+    Refer to: https://github.com/graphql-python/graphene/blob/dc3b2e49c116bd6ed54a977291b0f04b51fc9306/graphene/relay/connection.py#L12-L39
+    """
+    edge_class = getattr(connection_class, "Edge", None)
+
+    class EdgeBase:
+        node = Field(
+            NonNull(_node) if strict_types else _node,
+            description="The item at the end of the edge",
+        )
+        cursor = String(required=True, description="A cursor for use in pagination")
+
+    if not description:
+        description = f"A Relay edge containing a `{base_name}` and its cursor."
+
+    class EdgeMeta:
+        pass
+
+    setattr(EdgeMeta, "description", description)
+
+    edge_name = f"{base_name}Edge"
+
+    edge_bases = [edge_class, EdgeBase] if edge_class else [EdgeBase]
+    if not isinstance(edge_class, ObjectType):
+        edge_bases = [*edge_bases, ObjectType]
+
+    return type(edge_name, tuple(edge_bases), {"Meta": EdgeMeta})
 
 
 class PageInfoType(Protocol):
@@ -171,7 +211,8 @@ class Connection(graphene.ObjectType):
             )
 
         if "edges" not in _meta.fields:
-            edge_class = get_edge_class(cls, node, base_name, strict_types)  # type: ignore
+            description = getattr(cls, "description", None)
+            edge_class = get_edge_class(cls, node, base_name, strict_types, description=description)  # type: ignore
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
                 graphene.NonNull(

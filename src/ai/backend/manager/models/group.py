@@ -973,6 +973,7 @@ class GroupNode(graphene.ObjectType):
 class GroupConnection(Connection):
     class Meta:
         node = GroupNode
+        description = "NOW YOU SEE ME"
 
 
 class GroupDotfile(TypedDict):
