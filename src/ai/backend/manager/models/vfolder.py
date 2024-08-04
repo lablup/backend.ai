@@ -218,6 +218,13 @@ class VFolderStatusSet(enum.StrEnum):
     """Represents VFolder which is now completely removed from storage and only its record is being kept"""
 
 
+class ModelCardProcessError(RuntimeError):
+    msg: str
+
+    def __init__(self, msg: str) -> None:
+        self.msg = msg
+
+
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
     VFolderStatusSet.READABLE: {
         VFolderOperationStatus.READY,
@@ -2420,33 +2427,34 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    def parse_model_from_err(
-        cls,
-        resolve_info: graphene.ResolveInfo,
-        vfolder_row: VFolderRow,
-        err_msg: str,
+    async def from_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
     ) -> ModelCard | None:
-        """
-        Parse ModelCard with error info.
-        Creator of the folder and admins are allowed to access ModelCard objects with error message.
-        """
-        graph_ctx: GraphQueryContext = resolve_info.context
-        if (
-            graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
-            or vfolder_row.creator == graph_ctx.user["email"]
-        ):
-            return cls(
-                id=vfolder_row.id,
-                row_id=vfolder_row.id,
-                name=vfolder_row.name,
-                author=vfolder_row.creator or "",
-                error_msg=err_msg,
-            )
-        else:
-            return None
+        graph_ctx: GraphQueryContext = info.context
+
+        try:
+            return await cls.parse_row(info, vfolder_row)
+        except Exception as e:
+            if isinstance(e, ModelCardProcessError):
+                error_msg = e.msg
+            else:
+                error_msg = "Unknown error"
+            if (
+                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user["email"]
+            ):
+                return cls(
+                    id=vfolder_row.id,
+                    row_id=vfolder_row.id,
+                    name=vfolder_row.name,
+                    author=vfolder_row.creator or "",
+                    error_msg=error_msg,
+                )
+            else:
+                return None
 
     @classmethod
-    async def from_row(
+    async def parse_row(
         cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
     ) -> ModelCard | None:
         async def _fetch_file(
@@ -2490,8 +2498,9 @@ class ModelCard(graphene.ObjectType):
             ) as (_, storage_resp):
                 vfolder_files = (await storage_resp.json())["items"]
         except VFolderOperationFailed as e:
-            err_msg = f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
-            return cls.parse_model_from_err(info, vfolder_row, err_msg)
+            raise ModelCardProcessError(
+                f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
+            )
 
         model_definition_filename: str | None = None
         readme_idx: int | None = None
@@ -2508,19 +2517,22 @@ class ModelCard(graphene.ObjectType):
             try:
                 chunks = await _fetch_file(model_definition_filename)
             except VFolderOperationFailed as e:
-                err_msg = f"Failed to fetch model definition file (detail:{e.extra_msg})"
-                return cls.parse_model_from_err(info, vfolder_row, err_msg)
+                raise ModelCardProcessError(
+                    f"Failed to fetch model definition file (detail:{e.extra_msg})"
+                )
             model_definition_yaml = chunks.decode("utf-8")
             try:
                 model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
             except yaml.error.YAMLError as e:
-                err_msg = f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
-                return cls.parse_model_from_err(info, vfolder_row, err_msg)
+                raise ModelCardProcessError(
+                    f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
+                )
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
             except t.DataError as e:
-                err_msg = f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
-                return cls.parse_model_from_err(info, vfolder_row, err_msg)
+                raise ModelCardProcessError(
+                    f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
+                )
             assert model_definition is not None
             model_definition["id"] = vfolder_row_id
         else:
