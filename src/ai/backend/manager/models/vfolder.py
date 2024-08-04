@@ -1791,7 +1791,7 @@ class VirtualFolderNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 24.03.4."
 
-    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
+    row_id = graphene.UUID(description="Added in 24.03.4. ID of VFolder.")
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
