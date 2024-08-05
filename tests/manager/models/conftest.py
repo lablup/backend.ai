@@ -43,11 +43,7 @@ def base_context():  # noqa: F811
             "registry": None,
             "idle_checker_host": None,
         }
-        # if "user" in overrides:
-        #     default_params["user"] = update_dict_fields(default_params["user"], overrides["user"])
-        #     del overrides["user"]
         updated_params = deep_update(default_params, overrides)
-        # default_params.update(overrides)
         return GraphQueryContext(**updated_params)
 
     return _base_context
