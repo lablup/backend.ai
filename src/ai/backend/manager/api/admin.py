@@ -24,6 +24,7 @@ from .exceptions import GraphQLError as BackendGQLError
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
+from .validators import GQLDeprecatedQueryValidator
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -54,7 +55,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         validate_errors = validate(
             schema=app_ctx.gql_schema.graphql_schema,
             document_ast=parse(params["query"]),
-            rules=(DisableIntrospection,),
+            rules=(DisableIntrospection, GQLDeprecatedQueryValidator),
         )
         if validate_errors:
             return ExecutionResult(None, errors=validate_errors)

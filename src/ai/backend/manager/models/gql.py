@@ -289,6 +289,7 @@ class Queries(graphene.ObjectType):
         Agent,
         scaling_group=graphene.String(),
         status=graphene.String(),
+        deprecation_reason="deprecated_reason",
     )
 
     agent_summary = graphene.Field(
@@ -316,6 +317,7 @@ class Queries(graphene.ObjectType):
     domains = graphene.List(
         Domain,
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     group_node = graphene.Field(
@@ -341,6 +343,7 @@ class Queries(graphene.ObjectType):
         Group,
         name=graphene.String(required=True),
         domain_name=graphene.String(),
+        deprecation_reason="deprecated_reason",
     )
 
     groups = graphene.List(
@@ -354,6 +357,7 @@ class Queries(graphene.ObjectType):
                 f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
             ),
         ),
+        deprecation_reason="deprecated_reason",
     )
 
     image = graphene.Field(
@@ -376,9 +380,14 @@ class Queries(graphene.ObjectType):
             default_value=None,
             description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
         ),
+        deprecation_reason="deprecated_reason",
     )
 
-    customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
+    customized_images = graphene.List(
+        ImageNode,
+        description="Added in 24.03.1",
+        deprecation_reason="deprecated_reason",
+    )
 
     user = graphene.Field(
         User,
@@ -398,6 +407,7 @@ class Queries(graphene.ObjectType):
         group_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
+        deprecation_reason="deprecated_reason",
     )
 
     user_list = graphene.Field(
@@ -429,6 +439,7 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         email=graphene.String(),
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     keypair_list = graphene.Field(
@@ -458,9 +469,18 @@ class Queries(graphene.ObjectType):
         name=graphene.String(required=True),
     )
 
-    keypair_resource_policies = graphene.List(KeyPairResourcePolicy)
-    user_resource_policies = graphene.List(UserResourcePolicy)
-    project_resource_policies = graphene.List(ProjectResourcePolicy)
+    keypair_resource_policies = graphene.List(
+        KeyPairResourcePolicy,
+        deprecation_reason="deprecated_reason",
+    )
+    user_resource_policies = graphene.List(
+        UserResourcePolicy,
+        deprecation_reason="deprecated_reason",
+    )
+    project_resource_policies = graphene.List(
+        ProjectResourcePolicy,
+        deprecation_reason="deprecated_reason",
+    )
 
     resource_preset = graphene.Field(
         ResourcePreset,
@@ -469,6 +489,7 @@ class Queries(graphene.ObjectType):
 
     resource_presets = graphene.List(
         ResourcePreset,
+        deprecation_reason="deprecated_reason",
     )
 
     # super-admin only
@@ -482,6 +503,7 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         name=graphene.String(),
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     # super-admin only
@@ -489,6 +511,7 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         domain=graphene.String(required=True),
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     # super-admin only
@@ -496,6 +519,7 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         user_group=graphene.String(required=True),
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     # super-admin only
@@ -503,6 +527,7 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         access_key=graphene.String(required=True),
         is_active=graphene.Boolean(),
+        deprecation_reason="deprecated_reason",
     )
 
     # super-admin only
@@ -591,6 +616,7 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.String(),
         access_key=graphene.String(),  # must be empty for user requests
+        deprecation_reason="deprecated_reason",
     )
 
     compute_session = graphene.Field(
@@ -708,7 +734,10 @@ class Queries(graphene.ObjectType):
 
     container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
-    container_registries = graphene.List(ContainerRegistry)
+    container_registries = graphene.List(
+        ContainerRegistry,
+        deprecation_reason="deprecated_reason",
+    )
 
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."

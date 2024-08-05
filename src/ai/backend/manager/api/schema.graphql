@@ -11,11 +11,11 @@ type Queries {
   ): Node
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
-  agents(scaling_group: String, status: String): [Agent]
+  agents(scaling_group: String, status: String): [Agent] @deprecated(reason: "deprecated_reason")
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
   domain(name: String): Domain
-  domains(is_active: Boolean): [Domain]
+  domains(is_active: Boolean): [Domain] @deprecated(reason: "deprecated_reason")
 
   """Added in 24.03.0."""
   group_node(id: String!): GroupNode
@@ -29,14 +29,14 @@ type Queries {
     """Added in 24.03.0."""
     type: [String] = ["GENERAL"]
   ): Group
-  groups_by_name(name: String!, domain_name: String): [Group]
+  groups_by_name(name: String!, domain_name: String): [Group] @deprecated(reason: "deprecated_reason")
   groups(
     domain_name: String
     is_active: Boolean
 
     """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
     type: [String] = ["GENERAL"]
-  ): [Group]
+  ): [Group] @deprecated(reason: "deprecated_reason")
   image(
     """Added in 24.03.1"""
     id: String
@@ -54,13 +54,13 @@ type Queries {
     Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.
     """
     image_filters: [String] = null
-  ): [Image]
+  ): [Image] @deprecated(reason: "deprecated_reason")
 
   """Added in 24.03.1"""
-  customized_images: [ImageNode]
+  customized_images: [ImageNode] @deprecated(reason: "deprecated_reason")
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
-  users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
+  users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User] @deprecated(reason: "deprecated_reason")
   user_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, is_active: Boolean, status: String): UserList
 
   """Added in 24.03.0."""
@@ -69,21 +69,21 @@ type Queries {
   """Added in 24.03.0."""
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
   keypair(domain_name: String, access_key: String): KeyPair
-  keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair]
+  keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair] @deprecated(reason: "deprecated_reason")
   keypair_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, email: String, is_active: Boolean): KeyPairList
   keypair_resource_policy(name: String): KeyPairResourcePolicy
   user_resource_policy(name: String): UserResourcePolicy
   project_resource_policy(name: String!): ProjectResourcePolicy
-  keypair_resource_policies: [KeyPairResourcePolicy]
-  user_resource_policies: [UserResourcePolicy]
-  project_resource_policies: [ProjectResourcePolicy]
+  keypair_resource_policies: [KeyPairResourcePolicy] @deprecated(reason: "deprecated_reason")
+  user_resource_policies: [UserResourcePolicy] @deprecated(reason: "deprecated_reason")
+  project_resource_policies: [ProjectResourcePolicy] @deprecated(reason: "deprecated_reason")
   resource_preset(name: String): ResourcePreset
-  resource_presets: [ResourcePreset]
+  resource_presets: [ResourcePreset] @deprecated(reason: "deprecated_reason")
   scaling_group(name: String): ScalingGroup
-  scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
-  scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
-  scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
-  scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup]
+  scaling_groups(name: String, is_active: Boolean): [ScalingGroup] @deprecated(reason: "deprecated_reason")
+  scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup] @deprecated(reason: "deprecated_reason")
+  scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup] @deprecated(reason: "deprecated_reason")
+  scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup] @deprecated(reason: "deprecated_reason")
   storage_volume(id: String): StorageVolume
   storage_volume_list(limit: Int!, offset: Int!, filter: String, order: String): StorageVolumeList
   vfolder(id: String): VirtualFolder
@@ -98,7 +98,7 @@ type Queries {
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_invited_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_project_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
-  vfolders(domain_name: String, group_id: String, access_key: String): [VirtualFolder]
+  vfolders(domain_name: String, group_id: String, access_key: String): [VirtualFolder] @deprecated(reason: "deprecated_reason")
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
@@ -114,7 +114,7 @@ type Queries {
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
   container_registry(hostname: String!): ContainerRegistry
-  container_registries: [ContainerRegistry]
+  container_registries: [ContainerRegistry] @deprecated(reason: "deprecated_reason")
 
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
