@@ -16,6 +16,76 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.7 (2024-08-04)
+
+### Features
+* Allow `Bearer` as valid token type on model service authentication ([#2583](https://github.com/lablup/backend.ai/issues/2583))
+* Add a pre-setup configuration menu to the TUI installer to allow setting the public-facing address of Backend.AI components ([#2541](https://github.com/lablup/backend.ai/issues/2541))
+* Add `row_id`, `type` and `container_registry` fields to the `GroupNode` GQL schema. ([#2409](https://github.com/lablup/backend.ai/issues/2409))
+* Add support for PureStorage RapidFiles Toolkit v2 ([#2419](https://github.com/lablup/backend.ai/issues/2419))
+* Add support for fetching container logs of a specific kernel. ([#2364](https://github.com/lablup/backend.ai/issues/2364))
+* Allow superadmins to force-update session status through destroy API. ([#2275](https://github.com/lablup/backend.ai/issues/2275))
+* Introduce Python native WSProxy ([#2372](https://github.com/lablup/backend.ai/issues/2372))
+
+### Improvements
+* Optimize the query latency when fetching a large number of agents with stat metrics from Redis ([#2558](https://github.com/lablup/backend.ai/issues/2558))
+* Remove database-level foreign key constraints in `vfolders.{user,group}` columns to decouple the timing of vfolder deletion and user/group deletion. ([#2404](https://github.com/lablup/backend.ai/issues/2404))
+
+### Fixes
+* Update `GQLPrivilegeCheckMiddleware` to align with upstream changes on `graphql-core` package ([#2598](https://github.com/lablup/backend.ai/issues/2598))
+* Check null value of user mutation by `Undefined` sentinel value rather than `None`. ([#2506](https://github.com/lablup/backend.ai/issues/2506))
+* Do null check on `groups.total_resource_slots` and `domains.total_resource_slots` value. ([#2509](https://github.com/lablup/backend.ai/issues/2509))
+* Fix hearbeat processing failing when agent reports image with its name not compilant to Backend.AI's naming rule ([#2516](https://github.com/lablup/backend.ai/issues/2516))
+* Corrected a typo (`maanger` corrected to `manager`) in the `check_status()` API response of the storage component ([#2523](https://github.com/lablup/backend.ai/issues/2523))
+* Prevent session status from being transit to `PULLING` status event if image pull is not required ([#2556](https://github.com/lablup/backend.ai/issues/2556))
+* Initialize Redis connection pool objects with specified connection opts rather than ignoring them. ([#2574](https://github.com/lablup/backend.ai/issues/2574))
+* Fix `BACKEND_MODEL_NAME` environment always overwritten to model name specified at model definition ([#2481](https://github.com/lablup/backend.ai/issues/2481))
+* Do not allow assigning preopen port which collides with image's own service port definition ([#2482](https://github.com/lablup/backend.ai/issues/2482))
+* Fix GET requests with queryparams defined in API spec occasionally throwing 400 Bad Request error ([#2483](https://github.com/lablup/backend.ai/issues/2483))
+* Fix incorrect check of values returned from docker stat API. ([#2389](https://github.com/lablup/backend.ai/issues/2389))
+* Handle all possible exceptions when scheduling single node session so that the status information of pending session is not empty. ([#2411](https://github.com/lablup/backend.ai/issues/2411))
+* Improve error handling of initialization failures in the kernel runner ([#2478](https://github.com/lablup/backend.ai/issues/2478))
+* Add missing `commit_session_to_file` to `OP_EXC` ([#2127](https://github.com/lablup/backend.ai/issues/2127))
+* Pass ImageRef.canonical in `commit_session_to_file` ([#2134](https://github.com/lablup/backend.ai/issues/2134))
+* Omit to clean containerless kernels which are still creating its container. ([#2317](https://github.com/lablup/backend.ai/issues/2317))
+* Run batch execution after the batch session starts. ([#2327](https://github.com/lablup/backend.ai/issues/2327))
+* Add support for configuring `sync_container_lifecycles()` task. ([#2338](https://github.com/lablup/backend.ai/issues/2338))
+* Restrict GraphQL query to `user_nodes` field to require `superadmin` privilege ([#2401](https://github.com/lablup/backend.ai/issues/2401))
+* Utilize `ExtendedJSONEncoder` for error logging to handle `UUID` objects in `extra_data` ([#2415](https://github.com/lablup/backend.ai/issues/2415))
+* Change outdated references in event module from `kernels` to `sessions`. ([#2421](https://github.com/lablup/backend.ai/issues/2421))
+* Upgrade `inquirer` to remove dependency on deprecated `distutils`, which breaks up execution of the scie builds ([#2424](https://github.com/lablup/backend.ai/issues/2424))
+* Allow specific status of vfolders to query to purge. ([#2429](https://github.com/lablup/backend.ai/issues/2429))
+* Update the install-dev scripts to use `pnpm` instead of `npm` to speed up installation and resolve some peculiar version resolution issues related to esbuild. ([#2436](https://github.com/lablup/backend.ai/issues/2436))
+* Fix a packaging issue in the `backendai-webserver` scie executable due to missing explicit requirement of setuptools ([#2454](https://github.com/lablup/backend.ai/issues/2454))
+* Improve pruning of non-physical filesystems when measuring disk usage in agents ([#2460](https://github.com/lablup/backend.ai/issues/2460))
+* Fix buggy resolver of `model_card` GQL Query. ([#2161](https://github.com/lablup/backend.ai/issues/2161))
+* Keep `sync_container_lifecycles()` bgtask alive in a loop. ([#2178](https://github.com/lablup/backend.ai/issues/2178))
+* Shutdown agent properly by removing a code that waits a cancelled task. ([#2392](https://github.com/lablup/backend.ai/issues/2392))
+* Fix user creation error when any model-store does not exists. ([#2160](https://github.com/lablup/backend.ai/issues/2160))
+* Ensure that utilization idleness is checked after a set period. ([#2205](https://github.com/lablup/backend.ai/issues/2205))
+* Fix `ZeroDivisionError` in volume usage calculation by returning 0% when volume capacity is zero ([#2245](https://github.com/lablup/backend.ai/issues/2245))
+* Fix GraphQL to support query to non-installed images ([#2250](https://github.com/lablup/backend.ai/issues/2250))
+* Add missing `push_image` method implementation to Dummy Agent ([#2253](https://github.com/lablup/backend.ai/issues/2253))
+* Corrected an issue where the `resource_policy` field in the user model was incorrectly mapped to `domain_name`. ([#2314](https://github.com/lablup/backend.ai/issues/2314))
+* Fix mismatches between responses of `/services/_runtimes` and new model service creation input ([#2371](https://github.com/lablup/backend.ai/issues/2371))
+* Skip mounting zero-byte lxcfs files when lxcfs is activated to prevent crashes in session containers ([#2604](https://github.com/lablup/backend.ai/issues/2604))
+* Fix typo in minilang query field spec and column map. ([#2605](https://github.com/lablup/backend.ai/issues/2605))
+* Silence falsy Redis timeout warnings when retrying blocking commands if the timeout does not exceed the expected command timeout ([#2632](https://github.com/lablup/backend.ai/issues/2632))
+* Fix a regression of #2483 in the session-download API used by the `backend.ai ssh` command ([#2635](https://github.com/lablup/backend.ai/issues/2635))
+
+### Miscellaneous
+* * Add POST `/folders` API endpoints to replace DELETE APIs that require request body.
+  * Allow `DELETE` requests to have body data. ([#2571](https://github.com/lablup/backend.ai/issues/2571))
+* Handle container creation exception and start exception in separate try-except contexts. ([#2316](https://github.com/lablup/backend.ai/issues/2316))
+* Finally stabilize the hanging tests in our CI due to docker-internal races on TCP port mappings to concurrently spawned fixture containers by introducing monotonically increasing TCP port numbers ([#2379](https://github.com/lablup/backend.ai/issues/2379))
+* Further improve the monotonic port allocation logic for the test containers to remove maximum concurrency restrictions ([#2396](https://github.com/lablup/backend.ai/issues/2396))
+
+### External Dependency Updates
+* Upgrade aiodocker to 0.22.1 to fix error handling when trying to extract the log of non-existing containers ([#2402](https://github.com/lablup/backend.ai/issues/2402))
+* Upgrade the base CPython from 3.12.2 to 3.12.4 ([#2449](https://github.com/lablup/backend.ai/issues/2449))
+* Upgrade aiodocker to v0.22.0 with minor bug fixes found by improved type annotations ([#2339](https://github.com/lablup/backend.ai/issues/2339))
+
+
 ## 24.03.7rc2 (2024-08-01)
 
 ### Miscellaneous
