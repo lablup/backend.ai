@@ -465,7 +465,12 @@ shared_config_iv = t.Dict({
         },
     ).allow_extra("*"),
     t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
-    t.Key("anonymous_ratelimit", default=None): t.Null | t.ToInt,
+    t.Key("anonymous_ratelimiter", default=None): t.Null
+    | t.Dict({
+        t.Key("rlimit"): t.ToInt(),
+        t.Key("hot_clients_ips_maxsize", default=1000): t.Null | t.ToInt(),
+        t.Key("hot_clients_ips_threshold_ratio", default=0.8): t.Null | t.ToFloat(),
+    }),
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {
