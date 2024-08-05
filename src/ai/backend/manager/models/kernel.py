@@ -68,6 +68,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
@@ -119,6 +120,7 @@ class KernelStatus(enum.Enum):
     # ---
     BUILDING = 20
     PULLING = 21
+    READY_TO_CREATE = 22
     # ---
     RUNNING = 30
     RESTARTING = 31
@@ -213,28 +215,36 @@ def default_hostname(context) -> str:
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.PENDING: {
-        s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
+        KernelStatus.SCHEDULED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.SCHEDULED,
-            KernelStatus.PENDING,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PULLING,
+        KernelStatus.READY_TO_CREATE,
+        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PULLING: {
+        KernelStatus.READY_TO_CREATE,
+        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.READY_TO_CREATE: {
+        KernelStatus.PREPARING,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.PREPARING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PREPARING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.RUNNING,
+        KernelStatus.TERMINATING,
+        KernelStatus.TERMINATED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.BUILDING: {
         s
@@ -242,17 +252,6 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         if s
         not in (
             KernelStatus.BUILDING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.PULLING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PULLING,
             KernelStatus.PENDING,
             KernelStatus.SCHEDULED,
             KernelStatus.TERMINATED,
@@ -300,7 +299,7 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     },
     KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
     KernelStatus.TERMINATED: set(),
-    KernelStatus.ERROR: set(),
+    KernelStatus.ERROR: {KernelStatus.TERMINATING, KernelStatus.TERMINATED},
     KernelStatus.CANCELLED: set(),
 }
 
@@ -482,7 +481,7 @@ class KernelRow(Base):
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
-        EnumType(KernelStatus),
+        StrEnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
         nullable=False,

@@ -63,6 +63,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -117,7 +118,8 @@ class SessionStatus(enum.Enum):
     SCHEDULED = 5
     # manager can set PENDING and SCHEDULED independently
     # ---
-    PULLING = 9
+    PULLING = 7
+    READY_TO_CREATE = 9
     PREPARING = 10
     # ---
     RUNNING = 30
@@ -131,12 +133,13 @@ class SessionStatus(enum.Enum):
 
 
 FOLLOWING_SESSION_STATUSES = (
-    # Session statuses that need to wait all sibling kernel
+    # Session statuses that need to wait all kernels belonging to the session
+    SessionStatus.READY_TO_CREATE,
     SessionStatus.RUNNING,
     SessionStatus.TERMINATED,
 )
 LEADING_SESSION_STATUSES = (
-    # Session statuses that declare first, do not need to wait any sibling kernel
+    # Session statuses that declare first, do not need to wait any kernel
     s
     for s in SessionStatus
     if s not in FOLLOWING_SESSION_STATUSES
@@ -195,6 +198,7 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.PREPARING: SessionStatus.PREPARING,
     KernelStatus.BUILDING: SessionStatus.PREPARING,
     KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.READY_TO_CREATE: SessionStatus.READY_TO_CREATE,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
     KernelStatus.RESTARTING: SessionStatus.RESTARTING,
     KernelStatus.RESIZING: SessionStatus.RUNNING,
@@ -210,6 +214,7 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
     SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
     SessionStatus.PREPARING: KernelStatus.PREPARING,
     SessionStatus.PULLING: KernelStatus.PULLING,
+    SessionStatus.READY_TO_CREATE: KernelStatus.READY_TO_CREATE,
     SessionStatus.RUNNING: KernelStatus.RUNNING,
     SessionStatus.RESTARTING: KernelStatus.RESTARTING,
     SessionStatus.TERMINATING: KernelStatus.TERMINATING,
@@ -221,29 +226,30 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
 SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.PENDING: {
         SessionStatus.SCHEDULED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
         SessionStatus.PULLING,
-        SessionStatus.PREPARING,
-        SessionStatus.TERMINATED,
+        SessionStatus.READY_TO_CREATE,
+        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PULLING: {
+        SessionStatus.READY_TO_CREATE,
+        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        SessionStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.READY_TO_CREATE: {
         SessionStatus.PREPARING,
-        SessionStatus.RUNNING,
-        SessionStatus.RUNNING_DEGRADED,
-        # SessionStatus.TERMINATING,  # cannot destroy PULLING session by user
-        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARING: {
-        SessionStatus.PULLING,
+        SessionStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.RUNNING,
         SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
@@ -273,7 +279,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     },
     SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
     SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: {SessionStatus.TERMINATED},
+    SessionStatus.ERROR: {SessionStatus.TERMINATING, SessionStatus.TERMINATED},
     SessionStatus.CANCELLED: set(),
 }
 
@@ -293,6 +299,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                     case (
                         KernelStatus.PENDING
                         | KernelStatus.SCHEDULED
+                        | KernelStatus.READY_TO_CREATE
                         | KernelStatus.SUSPENDED
                         | KernelStatus.TERMINATED
                         | KernelStatus.CANCELLED
@@ -316,6 +323,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         pass
                     case (
                         KernelStatus.SCHEDULED
+                        | KernelStatus.READY_TO_CREATE
                         | KernelStatus.PREPARING
                         | KernelStatus.BUILDING
                         | KernelStatus.PULLING
@@ -335,6 +343,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                 match k.status:
                     case (
                         KernelStatus.PENDING
+                        | KernelStatus.READY_TO_CREATE
                         | KernelStatus.SCHEDULED
                         | KernelStatus.PREPARING
                         | KernelStatus.BUILDING
@@ -635,7 +644,7 @@ class SessionRow(Base):
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
-        EnumType(SessionStatus),
+        StrEnumType(SessionStatus),
         default=SessionStatus.PENDING,
         server_default=SessionStatus.PENDING.name,
         nullable=False,
