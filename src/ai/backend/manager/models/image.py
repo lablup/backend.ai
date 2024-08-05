@@ -85,6 +85,8 @@ __all__ = (
 
 
 class PublicImageLoadFilter(enum.StrEnum):
+    """Shorthand of `ImageLoadFilter` enum with `CUSTOMIZED_GLOBAL` removed (as it is not intended for API input)."""
+
     GENERAL = "general"
     """Include general purpose images."""
     OPERATIONAL = "operational"
@@ -94,6 +96,8 @@ class PublicImageLoadFilter(enum.StrEnum):
 
 
 class ImageLoadFilter(enum.StrEnum):
+    """Enum describing kind of a "search preset" when loading Image data via GQL. Not intended for declaring attributes of image data itself."""
+
     GENERAL = "general"
     """Include general purpose images."""
     OPERATIONAL = "operational"
