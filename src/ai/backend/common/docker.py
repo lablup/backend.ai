@@ -258,6 +258,8 @@ async def login(
         return {"auth": basic_auth, "headers": {}}
     elif ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
+    # Should check also 400 status since the AWS ECR Public server returns a 400 response
+    # when given invalid credential authorization.
     elif ping_status in [400, 401]:
         params = {
             "scope": scope,

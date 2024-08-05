@@ -13,7 +13,7 @@ from .base import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
+class AWSElasticContainerRegistry(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
@@ -41,6 +41,8 @@ class AWSElasticContainerRegistry_v2(BaseContainerRegistry):
                     response = client.describe_repositories(maxResults=30)
 
                 for repo in response["repositories"]:
+                    # repositoryUri format:
+                    # public.ecr.aws/<registry_alias>/<repository>
                     registry_alias = (repo["repositoryUri"].split("/"))[1]
                     yield f"{registry_alias}/{repo["repositoryName"]}"
 
