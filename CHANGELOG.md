@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.8rc1 (2024-08-06)
+
+### Fixes
+* Rename `images.image_filters` GQL Query argument to `images.image_types` ([#2555](https://github.com/lablup/backend.ai/issues/2555))
+* Prevent other user's customized image from being listed as a response of `images` GQL query ([#2557](https://github.com/lablup/backend.ai/issues/2557))
+* Delete sessions DB records when purging project. ([#2573](https://github.com/lablup/backend.ai/issues/2573))
+* Implement missing `StrEnumType` handling in `populate_fixture()`. ([#2648](https://github.com/lablup/backend.ai/issues/2648))
+
+### External Dependency Updates
+* Upgrade the intrinsic kernel-runner binaries (dropbear, scp, sftp-server, su-exec and tmux) to use statically built executables based on the latest Alpine Linux and the latest source codes ([#2625](https://github.com/lablup/backend.ai/issues/2625))
+
+
 ## 24.03.7 (2024-08-04)
 
 ### Features
