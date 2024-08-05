@@ -3303,12 +3303,13 @@ class AgentRegistry:
         self,
         session_id: SessionId,
         status_changed_at: datetime | None = None,
-    ) -> None:
+    ) -> SessionRow:
         now = status_changed_at or datetime.now(tzutc())
         async with self.db.connect() as db_conn:
             row, is_transited = await self._transit_session_status(db_conn, session_id, now)
         if is_transited:
             await self._post_status_transition(row)
+        return row
 
     async def set_status_updatable_session(self, session_id: SessionId) -> None:
         try:

@@ -76,6 +76,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    SessionId,
     SessionTypes,
     VFolderID,
 )
@@ -967,6 +968,44 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
     return web.json_response({}, status=200)
+
+
+class TransitSessionStatusRequestModel(BaseModel):
+    id: uuid.UUID = Field(
+        validation_alias=AliasChoices("id", "session_id", "sessionId", "SessionId"),
+        description="ID of the session to check and transit status.",
+    )
+
+
+class SessionStatusResponseModel(BaseResponseModel):
+    session_status: str
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(TransitSessionStatusRequestModel)
+async def check_and_transit_status(
+    request: web.Request, params: TransitSessionStatusRequestModel
+) -> SessionStatusResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_id = SessionId(params.id)
+    user_role = cast(UserRole, request["user"]["role"])
+    user_id = cast(uuid.UUID, request["user"]["uuid"])
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_id)
+
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
+    if session_row.user_uuid != user_id and user_role not in (
+        UserRole.ADMIN,
+        UserRole.SUPERADMIN,
+    ):
+        raise InvalidAPIParameters(
+            f"You are not allowed to transit others's sessions status (s:{session_id})"
+        )
+    now = datetime.now(tzutc())
+    row = await root_ctx.registry.transit_session_status(session_id, now)
+    return SessionStatusResponseModel(session_status=row.status.name)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -2313,6 +2352,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
+    cors.add(app.router.add_route("PATCH", "/_/transit-status", check_and_transit_status))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
