@@ -32,6 +32,10 @@ def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseCon
         from .github import GitHubRegistry
 
         cr_cls = GitHubRegistry
+    elif registry_type == "gitlab":
+        from .gitlab import GitLabRegistry
+
+        cr_cls = GitLabRegistry
     elif registry_type == "local":
         from .local import LocalRegistry
 
