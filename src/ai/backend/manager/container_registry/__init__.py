@@ -29,9 +29,9 @@ def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseCon
 
         cr_cls = HarborRegistry_v2
     elif registry_type == "github":
-        from .github import GitHubRegistry_v2
+        from .github import GitHubRegistry
 
-        cr_cls = GitHubRegistry_v2
+        cr_cls = GitHubRegistry
     elif registry_type == "local":
         from .local import LocalRegistry
 
