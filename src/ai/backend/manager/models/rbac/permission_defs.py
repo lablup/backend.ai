@@ -41,3 +41,30 @@ class StorageHostPermission(BasePermission):
     MOUNT_RO = VFolderPermission.MOUNT_RO
     MOUNT_RW = VFolderPermission.MOUNT_RW
     MOUNT_WD = VFolderPermission.MOUNT_WD
+
+
+class AgentPermission(BasePermission):
+    READ_RESOURCE_SLOT = enum.auto()
+    UPDATE_SCHEDULABLE = enum.auto()
+
+    READ_ATTRIBUTE = enum.auto()  # id, status, region, scaling_group, schedulable etc
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_COMPUTE_SESSION = enum.auto()
+    CREATE_MODEL_SERVICE_SESSION = enum.auto()
+
+
+class ScalingGroupPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    READ_AGENT_RESOURCE_SLOT = AgentPermission.READ_RESOURCE_SLOT
+    UPDATE_AGENT_SCHEDULABLE = AgentPermission.UPDATE_SCHEDULABLE
+
+    READ_AGENT_ATTRIBUTE = (
+        AgentPermission.READ_ATTRIBUTE
+    )  # id, status, region, scaling_group, schedulable etc
+    UPDATE_AGENT_ATTRIBUTE = AgentPermission.UPDATE_ATTRIBUTE
+
+    CREATE_COMPUTE_SESSION = AgentPermission.CREATE_COMPUTE_SESSION
+    CREATE_MODEL_SERVICE_SESSION = AgentPermission.CREATE_MODEL_SERVICE_SESSION
