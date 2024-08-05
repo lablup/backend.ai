@@ -1073,11 +1073,11 @@ async def convert_session_to_image(
         )
 
     registry_hostname = project.container_registry["registry"]
-    registry_project = project.container_registry["project"]
+    registry_project = project.container_registry.get("project", "")
     registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
     if not registry_conf:
         raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.get("project", ""):
+    if registry_project and registry_project not in registry_conf.get("project", ""):
         raise InvalidAPIParameters(f"Project {registry_project} not found")
 
     base_image_ref = session.main_kernel.image_ref
@@ -1099,9 +1099,10 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
+            if registry_project:
+                new_canonical = f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            else:
+                new_canonical = f"{registry_hostname}/{new_name}:{'-'.join(filtered_tag_set)}"
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
