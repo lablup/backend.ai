@@ -41,3 +41,15 @@ class StorageHostPermission(BasePermission):
     MOUNT_RO = VFolderPermission.MOUNT_RO
     MOUNT_RW = VFolderPermission.MOUNT_RW
     MOUNT_WD = VFolderPermission.MOUNT_WD
+
+
+class ScalingGroupPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    # Permission set of bindings and sub-scopes
+    AGENT_PERMISSIONS = enum.auto()
+    COMPUTE_SESSION_PERMISSIONS = enum.auto()
+    INFERENCE_SERVICE_PERMISSIONS = enum.auto()
+
+    STORAGE_HOST_PERMISSIONS = enum.auto()
