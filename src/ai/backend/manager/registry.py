@@ -54,7 +54,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
+from ai.backend.common.docker import ImageRef, get_known_registries
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -90,6 +90,7 @@ from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
+    AutoPullBehavior,
     BinarySize,
     ClusterInfo,
     ClusterMode,
@@ -99,6 +100,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageConfig,
     ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
@@ -168,6 +170,7 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
+from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
@@ -1358,40 +1361,18 @@ class AgentRegistry:
             )
             result = await db_sess.execute(query)
             resource_policy = result.scalars().first()
-        auto_pull = self.shared_config["docker"]["image"]["auto_pull"]
+        idle_timeout = cast(int, resource_policy.idle_timeout)
+        auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
 
         # Aggregate image registry information
-        keyfunc = lambda item: item.kernel.image_ref
-        image_infos: MutableMapping[str, ImageRow] = {}
-        is_local_image = True
-        registry_url = URL("http://localhost")
-        registry_creds: dict[str, str] = {}
-        async with self.db.begin_readonly_session() as session:
-            for image_ref, _ in itertools.groupby(
-                sorted(kernel_agent_bindings, key=keyfunc),
-                key=keyfunc,
-            ):
-                # img_query = sa.select(ImageRow).where(ImageRow.id == image_id)
-                # img_row: ImageRow = (await session.execute(img_query)).scalars().first()
-                # image_ref = img_row.image_ref
-                log.debug(
-                    "start_session(): image ref => {} ({})", image_ref, image_ref.architecture
-                )
-                resolved_image_info = await ImageRow.resolve(session, [image_ref])
-                image_infos[str(image_ref)] = resolved_image_info
-                if not resolved_image_info.image_ref.is_local:
-                    is_local_image = False
-                    registry_url, registry_creds = await get_registry_info(
-                        self.shared_config.etcd, image_ref.registry
-                    )
-        image_info = {
-            "image_infos": image_infos,
-            "registry_url": registry_url,
-            "registry_creds": registry_creds,
-            "resource_policy": resource_policy,
-            "auto_pull": auto_pull,
-            "is_local": is_local_image,
-        }
+        _image_refs: set[ImageRef] = set([item.kernel.image_ref for item in kernel_agent_bindings])
+        _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in _image_refs])
+        log.debug(f"start_session(): {_log_msg}")
+        async with self.db.begin_readonly_session() as db_session:
+            configs = await bulk_get_image_configs(
+                db_session, self.shared_config.etcd, _image_refs, AutoPullBehavior(auto_pull)
+            )
+        image_ref_config_map = {item["canonical"]: item for item in configs}
 
         network_name: Optional[str] = None
         cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
@@ -1527,8 +1508,9 @@ class AgentRegistry:
                         agent_alloc_ctx,
                         scheduled_session,
                         items,
-                        image_info,
+                        image_ref_config_map,
                         cluster_info,
+                        idle_timeout,
                     ),
                 ),
             )
@@ -1579,15 +1561,10 @@ class AgentRegistry:
         agent_alloc_ctx: AgentAllocationContext,
         scheduled_session: SessionRow,
         items: Sequence[KernelAgentBinding],
-        image_info: Mapping[str, Any],
+        image_configs: Mapping[str, ImageConfig],
         cluster_info,
+        idle_timeout: float | int,
     ) -> None:
-        registry_url = image_info["registry_url"]
-        registry_creds = image_info["registry_creds"]
-        image_infos = image_info["image_infos"]
-        is_local = image_info["is_local"]
-        resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
-        auto_pull = image_info["auto_pull"]
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
 
@@ -1611,7 +1588,10 @@ class AgentRegistry:
                 agent_alloc_ctx.agent_id,
                 order_key=str(scheduled_session.id),
             ) as rpc:
-                get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
+
+                def get_image_conf(kernel: KernelRow) -> ImageConfig:
+                    return image_configs[str(kernel.image_ref)]
+
                 # Issue a batched RPC call to create kernels on this agent
                 # created_infos = await rpc.call.create_kernels(
                 await rpc.call.create_kernels(
@@ -1621,37 +1601,35 @@ class AgentRegistry:
                         {
                             "image": {
                                 # TODO: refactor registry and is_local to be specified per kernel.
-                                "registry": {
-                                    "name": get_image_ref(binding.kernel).registry,
-                                    "url": str(registry_url),
-                                    **registry_creds,  # type: ignore
-                                },
-                                "digest": image_infos[binding.kernel.image].config_digest,
-                                "repo_digest": None,
-                                "canonical": get_image_ref(binding.kernel).canonical,
-                                "architecture": get_image_ref(binding.kernel).architecture,
-                                "labels": image_infos[binding.kernel.image].labels,
-                                "is_local": is_local,
+                                "registry": get_image_conf(binding.kernel)["registry"],
+                                "digest": get_image_conf(binding.kernel)["digest"],
+                                "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
+                                "canonical": get_image_conf(binding.kernel)["canonical"],
+                                "architecture": get_image_conf(binding.kernel)["architecture"],
+                                "labels": get_image_conf(binding.kernel)["labels"],
+                                "is_local": get_image_conf(binding.kernel)["is_local"],
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
                             "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
-                            "idle_timeout": resource_policy.idle_timeout,
+                            "idle_timeout": idle_timeout,
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
                                 # inherit per-session environment variables
                                 **scheduled_session.environ,
                                 # set per-kernel environment variables
                                 "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
-                                "BACKENDAI_KERNEL_IMAGE": str(get_image_ref(binding.kernel)),
+                                "BACKENDAI_KERNEL_IMAGE": get_image_conf(binding.kernel)[
+                                    "canonical"
+                                ],
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
                                 "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                                 "BACKENDAI_SERVICE_PORTS": str(
-                                    image_infos[binding.kernel.image].labels.get(
+                                    get_image_conf(binding.kernel)["labels"].get(
                                         "ai.backend.service-ports"
                                     )
                                 ),
@@ -1661,7 +1639,7 @@ class AgentRegistry:
                             "bootstrap_script": binding.kernel.bootstrap_script,
                             "startup_command": binding.kernel.startup_command,
                             "internal_data": scheduled_session.main_kernel.internal_data,
-                            "auto_pull": auto_pull,
+                            "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
                             "preopen_ports": scheduled_session.main_kernel.preopen_ports,
                             "allocated_host_ports": list(binding.allocated_host_ports),
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
