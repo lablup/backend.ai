@@ -68,11 +68,11 @@ __all__ = (
     "rescan_images",
     "ImageType",
     "ImageAliasRow",
-    "ImageLoadType",
+    "ImageLoadFilter",
     "ImageRow",
     "Image",
     "PreloadImage",
-    "PublicImageLoadType",
+    "PublicImageLoadFilter",
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
@@ -84,14 +84,14 @@ __all__ = (
 )
 
 
-class PublicImageLoadType(enum.StrEnum):
+class PublicImageLoadFilter(enum.StrEnum):
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
     """Include customized images owned or accessible by API callee."""
 
 
-class ImageLoadType(enum.StrEnum):
+class ImageLoadFilter(enum.StrEnum):
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -672,7 +672,7 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        types: set[ImageLoadType] = set(),
+        types: set[ImageLoadFilter] = set(),
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
@@ -708,7 +708,7 @@ class Image(graphene.ObjectType):
     def matches_type(
         self,
         ctx: GraphQueryContext,
-        types: set[ImageLoadType],
+        types: set[ImageLoadFilter],
     ) -> bool:
         """
         Determine if the image is filtered according to the `types` parameter.
@@ -724,22 +724,22 @@ class Image(graphene.ObjectType):
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value:
-                    if ImageLoadType.OPERATIONAL in types:
+                    if ImageLoadFilter.OPERATIONAL in types:
                         is_valid = True
                     else:
                         return False
                 case "ai.backend.customized-image.owner":
                     if (
-                        ImageLoadType.CUSTOMIZED not in types
-                        and ImageLoadType.CUSTOMIZED_GLOBAL not in types
+                        ImageLoadFilter.CUSTOMIZED not in types
+                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in types
                     ):
                         return False
-                    if ImageLoadType.CUSTOMIZED in types:
+                    if ImageLoadFilter.CUSTOMIZED in types:
                         if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
-                    if ImageLoadType.CUSTOMIZED_GLOBAL in types:
+                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in types:
                         if user_role == UserRole.SUPERADMIN:
                             is_valid = True
                         else:
