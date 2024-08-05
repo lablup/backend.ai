@@ -56,7 +56,7 @@ type Queries {
     image_types: [String] = null
 
     """
-    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.
     """
     image_filters: [String] = null @deprecated(reason: "Deprecated since 24.03.8. Use `image_types` instead.")
   ): [Image]
@@ -758,7 +758,7 @@ type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  """Added in 24.03.4. ID of VFolder."""
   row_id: UUID
   host: String
   quota_scope_id: String
@@ -1040,6 +1040,9 @@ type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
+
+  """Added in 24.03.8. ID of VFolder."""
+  row_id: UUID
   vfolder: VirtualFolder
 
   """Added in 24.09.0."""
@@ -1069,6 +1072,9 @@ type ModelCard implements Node {
   Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
   """
   readme_filetype: String
+
+  """Added in 24.03.8."""
+  error_msg: String
 }
 
 type ModelCardConnection {

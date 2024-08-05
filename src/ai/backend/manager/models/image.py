@@ -85,6 +85,8 @@ __all__ = (
 
 
 class PublicImageLoadFilter(enum.StrEnum):
+    GENERAL = "general"
+    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -92,6 +94,8 @@ class PublicImageLoadFilter(enum.StrEnum):
 
 
 class ImageLoadFilter(enum.StrEnum):
+    GENERAL = "general"
+    """Include general purpose images."""
     OPERATIONAL = "operational"
     """Include operational images."""
     CUSTOMIZED = "customized"
@@ -708,38 +712,35 @@ class Image(graphene.ObjectType):
     def matches_type(
         self,
         ctx: GraphQueryContext,
-        types: set[ImageLoadFilter],
+        load_filters: set[ImageLoadFilter],
     ) -> bool:
         """
-        Determine if the image is filtered according to the `types` parameter.
+        Determine if the image is filtered according to the `load_filters` parameter.
         """
         user_role = ctx.user["role"]
 
-        if not types:
-            return True
-
         # If the image filtered by any of its labels, return False early.
         # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
-        is_valid = False
+        is_valid = ImageLoadFilter.GENERAL in load_filters
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value:
-                    if ImageLoadFilter.OPERATIONAL in types:
+                    if ImageLoadFilter.OPERATIONAL in load_filters:
                         is_valid = True
                     else:
                         return False
                 case "ai.backend.customized-image.owner":
                     if (
-                        ImageLoadFilter.CUSTOMIZED not in types
-                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in types
+                        ImageLoadFilter.CUSTOMIZED not in load_filters
+                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
                     ):
                         return False
-                    if ImageLoadFilter.CUSTOMIZED in types:
+                    if ImageLoadFilter.CUSTOMIZED in load_filters:
                         if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
-                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in types:
+                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in load_filters:
                         if user_role == UserRole.SUPERADMIN:
                             is_valid = True
                         else:
