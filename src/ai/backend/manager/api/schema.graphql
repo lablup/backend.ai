@@ -405,6 +405,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
+"""NOW YOU SEE ME"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
