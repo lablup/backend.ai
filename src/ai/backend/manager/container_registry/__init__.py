@@ -36,6 +36,10 @@ def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseCon
         from .gitlab import GitLabRegistry
 
         cr_cls = GitLabRegistry
+    elif registry_type == "ecr" or registry_type == "ecr-public":
+        from .aws_ecr import AWSElasticContainerRegistry
+
+        cr_cls = AWSElasticContainerRegistry
     elif registry_type == "local":
         from .local import LocalRegistry
 
