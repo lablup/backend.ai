@@ -226,11 +226,11 @@ async def get_known_container_registries(
 
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
 
-        for item in registries:
-            project, registry_name, url = item
+        for registry_row in registries:
+            project, registry_name, url = registry_row
 
             if project not in result:
-                result[item[0]] = {}
+                result[registry_row[0]] = {}
 
             result[project][registry_name] = yarl.URL(url)
 

@@ -20,6 +20,7 @@ from aiohttp import web
 from ai.backend.common import redis_helper
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.resource import get_container_registries
 
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
@@ -290,6 +291,20 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
         await root_ctx.shared_config.deregister_myself()
 
 
+@superadmin_required
+async def get_docker_registries(request: web.Request) -> web.Response:
+    """
+    Returns the list of all registered docker registries.
+    """
+
+    log.info("ETCD.GET_DOCKER_REGISTRIES ()")
+    log.warning(
+        "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd. Use /resource/container-registries API instead."
+    )
+
+    return get_container_registries(request)
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
@@ -301,6 +316,7 @@ def create_app(
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))
     cors.add(app.router.add_route("GET", r"/resource-slots/details", get_resource_metadata))
     cors.add(app.router.add_route("GET", r"/vfolder-types", get_vfolder_types))
+    cors.add(app.router.add_route("GET", r"/docker-registries", get_docker_registries))
     cors.add(app.router.add_route("POST", r"/get", get_config))
     cors.add(app.router.add_route("POST", r"/set", set_config))
     cors.add(app.router.add_route("POST", r"/delete", delete_config))
