@@ -526,7 +526,7 @@ class AgentSummary(graphene.ObjectType):
         "id": ("id", None),
         "status": ("status", enum_field_getter(AgentStatus)),
         "scaling_group": ("scaling_group", None),
-        "schedulable": ("schedulabe", None),
+        "schedulable": ("schedulable", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {

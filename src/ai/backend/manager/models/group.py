@@ -673,6 +673,7 @@ class PurgeGroup(graphene.Mutation):
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
+            await cls.delete_sessions(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
@@ -742,6 +743,20 @@ class PurgeGroup(graphene.Mutation):
         if result.rowcount > 0:
             log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
         return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        db_conn: SAConnection,
+        group_id: uuid.UUID,
+    ) -> None:
+        """
+        Delete all sessions run from the target groups.
+        """
+        from .session import SessionRow
+
+        stmt = sa.delet(SessionRow).where(SessionRow.group_id == group_id)
+        await db_conn.execute(stmt)
 
     @classmethod
     async def group_vfolder_mounted_to_active_kernels(
