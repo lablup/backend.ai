@@ -150,6 +150,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
@@ -157,6 +158,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -173,6 +175,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         cmdargs: list[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
