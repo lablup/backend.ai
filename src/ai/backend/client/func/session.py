@@ -928,7 +928,7 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            "GET",
+            "POST",
             f"/{prefix}/{self.name}/download",
             params=params,
         )

@@ -237,9 +237,9 @@ class Agent(graphene.ObjectType):
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
-        "schedulable": ("schedulabe", None),
+        "schedulable": ("schedulable", None),
         "addr": ("addr", None),
-        "first_contact": ("first_contat", dtparse),
+        "first_contact": ("first_contact", dtparse),
         "lost_at": ("lost_at", dtparse),
         "version": ("version", None),
     }
@@ -527,7 +527,7 @@ class AgentSummary(graphene.ObjectType):
         "id": ("id", None),
         "status": ("status", enum_field_getter(AgentStatus)),
         "scaling_group": ("scaling_group", None),
-        "schedulable": ("schedulabe", None),
+        "schedulable": ("schedulable", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {

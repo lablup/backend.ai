@@ -218,6 +218,13 @@ class VFolderStatusSet(enum.StrEnum):
     """Represents VFolder which is now completely removed from storage and only its record is being kept"""
 
 
+class ModelCardProcessError(RuntimeError):
+    msg: str
+
+    def __init__(self, msg: str) -> None:
+        self.msg = msg
+
+
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
     VFolderStatusSet.READABLE: {
         VFolderOperationStatus.READY,
@@ -1791,7 +1798,7 @@ class VirtualFolderNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 24.03.4."
 
-    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
+    row_id = graphene.UUID(description="Added in 24.03.4. ID of VFolder.")
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
@@ -2278,6 +2285,7 @@ class ModelCard(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
+    row_id = graphene.UUID(description="Added in 24.03.8. ID of VFolder.")
     vfolder = graphene.Field(VirtualFolder)
     vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
@@ -2299,6 +2307,7 @@ class ModelCard(graphene.ObjectType):
             "Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ..."
         )
     )
+    error_msg = graphene.String(description="Added in 24.03.8.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
@@ -2396,6 +2405,7 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
+            row_id=vfolder_row.id,
             vfolder=VirtualFolder.from_orm_row(vfolder_row),
             vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
@@ -2417,7 +2427,36 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelCard:
+    async def from_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
+    ) -> ModelCard | None:
+        graph_ctx: GraphQueryContext = info.context
+
+        try:
+            return await cls.parse_row(info, vfolder_row)
+        except Exception as e:
+            if isinstance(e, ModelCardProcessError):
+                error_msg = e.msg
+            else:
+                error_msg = "Unknown error"
+            if (
+                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user["email"]
+            ):
+                return cls(
+                    id=vfolder_row.id,
+                    row_id=vfolder_row.id,
+                    name=vfolder_row.name,
+                    author=vfolder_row.creator or "",
+                    error_msg=error_msg,
+                )
+            else:
+                return None
+
+    @classmethod
+    async def parse_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
+    ) -> ModelCard | None:
         async def _fetch_file(
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
@@ -2444,25 +2483,29 @@ class ModelCard(graphene.ObjectType):
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
-        folder_name = vfolder_row.name
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": ".",
-            },
-        ) as (_, storage_resp):
-            vfolder_files = (await storage_resp.json())["items"]
+        try:
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/file/list",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(vfolder_id),
+                    "relpath": ".",
+                },
+            ) as (_, storage_resp):
+                vfolder_files = (await storage_resp.json())["items"]
+        except VFolderOperationFailed as e:
+            raise ModelCardProcessError(
+                f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
+            )
 
         model_definition_filename: str | None = None
         readme_idx: int | None = None
 
-        for idx, item in zip(range(len(vfolder_files)), vfolder_files):
+        for idx, item in enumerate(vfolder_files):
             if (item["name"] in ("model-definition.yml", "model-definition.yaml")) and (
                 not model_definition_filename
             ):
@@ -2470,32 +2513,44 @@ class ModelCard(graphene.ObjectType):
             if item["name"].lower().startswith("readme."):
                 readme_idx = idx
 
-        if readme_idx is not None:
-            readme_filename: str = vfolder_files[readme_idx]["name"]
-            chunks = await _fetch_file(readme_filename)
-            readme = chunks.decode("utf-8")
-            readme_filetype = readme_filename.split(".")[-1]
-        else:
-            readme = None
-            readme_filetype = None
-
         if model_definition_filename:
-            chunks = await _fetch_file(model_definition_filename)
+            try:
+                chunks = await _fetch_file(model_definition_filename)
+            except VFolderOperationFailed as e:
+                raise ModelCardProcessError(
+                    f"Failed to fetch model definition file (detail:{e.extra_msg})"
+                )
             model_definition_yaml = chunks.decode("utf-8")
-            model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            try:
+                model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            except yaml.error.YAMLError as e:
+                raise ModelCardProcessError(
+                    f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
+                )
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
-                assert model_definition is not None
             except t.DataError as e:
-                raise InvalidAPIParameters(
-                    f"Failed to validate model definition from vFolder {folder_name} (ID"
-                    f" {vfolder_row_id}): {e}",
-                ) from e
-            except yaml.error.YAMLError as e:
-                raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+                raise ModelCardProcessError(
+                    f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
+                )
+            assert model_definition is not None
             model_definition["id"] = vfolder_row_id
         else:
             model_definition = None
+
+        if readme_idx is not None:
+            readme_filename: str = vfolder_files[readme_idx]["name"]
+            try:
+                chunks = await _fetch_file(readme_filename)
+            except VFolderOperationFailed:
+                readme = "Failed to fetch README file."
+                readme_filetype = None
+            else:
+                readme = chunks.decode("utf-8")
+                readme_filetype = readme_filename.split(".")[-1]
+        else:
+            readme = None
+            readme_filetype = None
 
         return cls.parse_model(
             info,
@@ -2506,7 +2561,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -2523,7 +2578,7 @@ class ModelCard(graphene.ObjectType):
                 raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
-            return await cls.from_row(info, vfolder_row)
+        return await cls.from_row(info, vfolder_row)
 
     @classmethod
     async def get_connection(
@@ -2580,20 +2635,24 @@ class ModelCard(graphene.ObjectType):
                 .scalars()
                 .all()
             )
-        additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
-            VFolderRow.group.in_(model_store_project_gids)
-        )
-        query = query.where(additional_cond)
-        query = query.options(
-            joinedload(VFolderRow.user_row),
-            joinedload(VFolderRow.group_row),
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+            additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+                VFolderRow.group.in_(model_store_project_gids)
+            )
+            query = query.where(additional_cond)
+            cnt_query = cnt_query.where(additional_cond)
+            query = query.options(
+                joinedload(VFolderRow.user_row),
+                joinedload(VFolderRow.group_row),
+            )
             vfolder_rows = (await db_session.scalars(query)).all()
-            result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
-
             total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+        result = []
+        for vf in vfolder_rows:
+            if (_node := await cls.from_row(info, vf)) is not None:
+                result.append(_node)
+            else:
+                total_cnt -= 1
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
 class ModelCardConnection(Connection):
