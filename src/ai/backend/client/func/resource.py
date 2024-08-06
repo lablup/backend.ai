@@ -57,11 +57,14 @@ class Resource(BaseFunction):
         :param month: The month you want to get the statistics (yyyymm).
         :param group_ids: Groups IDs to be included in the result.
         """
-        rqst = Request("GET", "/resource/usage/month")
-        rqst.set_json({
-            "month": month,
-            "group_ids": group_ids,
-        })
+        rqst = Request(
+            "GET",
+            "/resource/usage/month",
+            params={
+                "month": month,
+                "group_ids": group_ids,
+            },
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -76,12 +79,15 @@ class Resource(BaseFunction):
         :param end_date: end date in string format (yyyymmdd).
         :param group_id: Groups ID to list usage statistics.
         """
-        rqst = Request("GET", "/resource/usage/period")
-        rqst.set_json({
-            "group_id": group_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        rqst = Request(
+            "GET",
+            "/resource/usage/period",
+            params={
+                "group_id": group_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
