@@ -752,17 +752,6 @@ class Context(metaclass=ABCMeta):
                     }
                     await self.etcd_put_json("config", data)
 
-                    async with aiotools.closing_async(await self.get_db_connection()) as conn:
-                        for project in ["stable", "community", "multiarch"]:
-                            await conn.execute(
-                                "INSERT INTO container_registries (id, url, registry_name, type, project) VALUES ($1, $2, $3, $4, $5);",
-                                "fe878f09-06cc-4b91-9242-4c71015cce04",
-                                "https://cr.backend.ai",
-                                "cr.backend.ai",
-                                "harbor2",
-                                project,
-                            )
-
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
@@ -788,16 +777,6 @@ class Context(metaclass=ABCMeta):
                         },
                     }
                     await self.etcd_put_json("config", data)
-
-                    async with aiotools.closing_async(await self.get_db_connection()) as conn:
-                        await conn.execute(
-                            "INSERT INTO container_registries (id, url, registry_name, type, username) VALUES ($1, $2, $3, $4, $5);",
-                            "abc42a05-4471-41fa-8772-10bf6452c7d1",
-                            "https://registry-1.docker.io",
-                            "index.docker.io",
-                            "docker",
-                            "lablup",
-                        )
 
                     for ref in self.dist_info.image_refs:
                         await self.run_manager_cli(["mgr", "image", "rescan", ref])
