@@ -298,9 +298,11 @@ class Group(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
-            total_resource_slots=row["total_resource_slots"].to_json()
-            if row["total_resource_slots"] is not None
-            else {},
+            total_resource_slots=(
+                row["total_resource_slots"].to_json()
+                if row["total_resource_slots"] is not None
+                else {}
+            ),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
@@ -755,7 +757,7 @@ class PurgeGroup(graphene.Mutation):
         """
         from .session import SessionRow
 
-        stmt = sa.delet(SessionRow).where(SessionRow.group_id == group_id)
+        stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
         await db_conn.execute(stmt)
 
     @classmethod
