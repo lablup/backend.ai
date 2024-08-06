@@ -57,14 +57,11 @@ class Resource(BaseFunction):
         :param month: The month you want to get the statistics (yyyymm).
         :param group_ids: Groups IDs to be included in the result.
         """
-        rqst = Request(
-            "GET",
-            "/resource/usage/month",
-            params={
-                "month": month,
-                "group_ids": group_ids,
-            },
-        )
+        rqst = Request("GET", "/resource/usage/month")
+        rqst.set_json({
+            "month": month,
+            "group_ids": group_ids,
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
