@@ -339,6 +339,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     MountPermission.READ_WRITE,
                 )
                 for lxcfs_proc_path in (lxcfs_root / "proc").iterdir()
+                if lxcfs_proc_path.stat().st_size > 0
             )
             mounts.extend(
                 Mount(
