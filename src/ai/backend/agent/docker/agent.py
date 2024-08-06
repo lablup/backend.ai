@@ -1080,7 +1080,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
