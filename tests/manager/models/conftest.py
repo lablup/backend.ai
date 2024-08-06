@@ -14,8 +14,8 @@ def client() -> Client:
 
 
 @pytest.fixture(scope="function")
-def base_context():  # noqa: F811
-    def _base_context(**overrides):
+def get_base_context():  # noqa: F811
+    def _get_base_context(**overrides):
         """
         default_params is used to bypass the decorators.
         """
@@ -46,7 +46,7 @@ def base_context():  # noqa: F811
         updated_params = deep_update(default_params, overrides)
         return GraphQueryContext(**updated_params)
 
-    return _base_context
+    return _get_base_context
 
 
 def deep_update(original: dict, updates: dict) -> dict:

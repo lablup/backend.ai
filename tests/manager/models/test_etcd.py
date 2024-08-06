@@ -22,7 +22,7 @@ CONTAINER_REGISTRY_FIELDS = """
 
 
 @pytest.fixture(scope="function")
-def context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
+def context(get_base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
     shared_config = SharedConfig(
         etcd_addr=etcd_container[1],
         etcd_user="",
@@ -30,7 +30,7 @@ def context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
         namespace="local",
     )
     superadmin_user = {"role": "superadmin"}
-    return base_context(shared_config=shared_config, user=superadmin_user)
+    return get_base_context(shared_config=shared_config, user=superadmin_user)
 
 
 @pytest.mark.dependency()
