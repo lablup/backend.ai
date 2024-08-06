@@ -10,7 +10,6 @@ import graphene
 import graphql
 import sqlalchemy as sa
 import yarl
-from graphene.types import Scalar
 from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
@@ -155,7 +154,7 @@ class ContainerRegistryRow(Base):
         return result
 
 
-class ContainerRegistryTypeField(Scalar):
+class ContainerRegistryTypeField(graphene.Scalar):
     """Added in 24.09.0."""
 
     allowed_values = tuple(t.value for t in ContainerRegistryType)
@@ -216,14 +215,31 @@ class ContainerRegistry(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
+        return cls(
+            hostname=row.registry_name,
+            config=ContainerRegistryConfig(
+                url=row.url,
+                type=str(row.type),
+                project=[row.project],
+                username=row.username,
+                password=PASSWORD_PLACEHOLDER if row.password is not None else None,
+                ssl_verify=row.ssl_verify,
+                is_global=row.is_global,
+            ),
+        )
+
+    @classmethod
     async def load_by_hostname(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         async with ctx.db.begin_readonly_session() as session:
             return cls.from_row(
                 ctx,
-                await ContainerRegistryRow.get_by_hostname(
-                    session,
-                    hostname,
-                ),
+                (
+                    await ContainerRegistryRow.list_by_registry_name(
+                        session,
+                        hostname,
+                    )
+                )[0],
             )
 
     @classmethod
@@ -502,12 +518,9 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
         async with ctx.db.begin_session() as db_session:
-            reg_row = await ContainerRegistry.load(ctx, reg_id)
-            reg_row = cast(
-                ContainerRegistryRow | None,
-                await db_session.scalar(
-                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                ),
+            reg_row = await ContainerRegistryRow.get(db_session, reg_id)
+            reg_row = await db_session.scalar(
+                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
             )
             if reg_row is None:
                 raise ValueError(f"Container registry not found (id:{reg_id})")
