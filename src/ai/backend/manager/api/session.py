@@ -2149,9 +2149,11 @@ async def get_container_logs(
             session_name,
             owner_access_key,
             allow_stale=True,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY
-            if kernel_id is None
-            else KernelLoadingStrategy.ALL_KERNELS,
+            kernel_loading_strategy=(
+                KernelLoadingStrategy.MAIN_KERNEL_ONLY
+                if kernel_id is None
+                else KernelLoadingStrategy.ALL_KERNELS
+            ),
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
