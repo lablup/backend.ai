@@ -13,7 +13,7 @@ def client() -> Client:
     return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def base_context():  # noqa: F811
     def _base_context(**overrides):
         """

@@ -21,8 +21,8 @@ CONTAINER_REGISTRY_FIELDS = """
 """
 
 
-@pytest.fixture(scope="module")
-def etcd_context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
+@pytest.fixture(scope="function")
+def context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
     shared_config = SharedConfig(
         etcd_addr=etcd_container[1],
         etcd_user="",
@@ -35,7 +35,7 @@ def etcd_context(base_context, etcd_container) -> GraphQueryContext:  # noqa: F8
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
-async def test_create_container_registry(client: Client, etcd_context: GraphQueryContext):
+async def test_create_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation CreateContainerRegistry($hostname: String!, $props: CreateContainerRegistryInput!) {
             create_container_registry(hostname: $hostname, props: $props) {
@@ -56,7 +56,7 @@ async def test_create_container_registry(client: Client, etcd_context: GraphQuer
         },
     }
 
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["create_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"] == {
@@ -71,7 +71,7 @@ async def test_create_container_registry(client: Client, etcd_context: GraphQuer
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
 @pytest.mark.asyncio
-async def test_modify_container_registry(client: Client, etcd_context: GraphQueryContext):
+async def test_modify_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
             modify_container_registry(hostname: $hostname, props: $props) {
@@ -87,8 +87,7 @@ async def test_modify_container_registry(client: Client, etcd_context: GraphQuer
         },
     }
 
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
-    print(response)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
@@ -106,7 +105,7 @@ async def test_modify_container_registry(client: Client, etcd_context: GraphQuer
         },
     }
 
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
@@ -119,7 +118,7 @@ async def test_modify_container_registry(client: Client, etcd_context: GraphQuer
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
-    client: Client, etcd_context: GraphQueryContext
+    client: Client, context: GraphQueryContext
 ):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
@@ -138,7 +137,7 @@ async def test_modify_container_registry_allows_empty_string(
     }
 
     # Then password is set to empty string
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
@@ -148,16 +147,14 @@ async def test_modify_container_registry_allows_empty_string(
     assert container_registry["config"]["ssl_verify"] is False
 
     # Direct access to the etcd to reveal that the password is actually set as an empty string
-    raw_container_registry = await etcd_context.shared_config.get_container_registry(
-        "cr.example.com"
-    )
+    raw_container_registry = await context.shared_config.get_container_registry("cr.example.com")
     assert raw_container_registry["password"] == ""
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
-    client: Client, etcd_context: GraphQueryContext
+    client: Client, context: GraphQueryContext
 ):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
@@ -176,7 +173,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     }
 
     # Then password is unset
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr2.example.com"
@@ -189,7 +186,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
-async def test_delete_container_registry(client: Client, etcd_context: GraphQueryContext):
+async def test_delete_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation DeleteContainerRegistry($hostname: String!) {
             delete_container_registry(hostname: $hostname) {
@@ -202,7 +199,7 @@ async def test_delete_container_registry(client: Client, etcd_context: GraphQuer
         "hostname": "cr.example.com",
     }
 
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["delete_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
 
@@ -214,5 +211,5 @@ async def test_delete_container_registry(client: Client, etcd_context: GraphQuer
         }
     """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    response = await client.execute_async(query, variables=variables, context_value=etcd_context)
+    response = await client.execute_async(query, variables=variables, context_value=context)
     assert response["data"] is None
