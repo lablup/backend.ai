@@ -736,7 +736,7 @@ type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  """Added in 24.03.4. ID of VFolder."""
   row_id: UUID
   host: String
   quota_scope_id: String
@@ -1018,6 +1018,9 @@ type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
+
+  """Added in 24.03.8. ID of VFolder."""
+  row_id: UUID
   vfolder: VirtualFolder
 
   """Added in 24.09.0."""
@@ -1047,6 +1050,9 @@ type ModelCard implements Node {
   Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
   """
   readme_filetype: String
+
+  """Added in 24.03.8."""
+  error_msg: String
 }
 
 type ModelCardConnection {
