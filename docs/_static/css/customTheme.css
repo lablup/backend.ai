@@ -4705,6 +4705,10 @@ p {
   margin: 0 0 7.692vw;
 }
 
+.admonition p, .admonition div {
+  margin-bottom: 12px;
+}
+
 tbody tr td ul p {
   font-size: 2.821vw;
 }
@@ -4844,7 +4848,7 @@ hr {
   white-space: nowrap;
   max-width: 100%;
   background: #fff;
-  border: 1px solid #e1e4e5;
+  border: none;
   /* padding: 0 5px; */
   /* font-family: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,Courier,monospace; */
   color: #e74c3c;
@@ -5588,11 +5592,24 @@ hr {
 .wy-nav-top a {
   font-family: Pretendard, sans-serif;
   font-style: italic;
+  padding-right: 1rem;
   display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@media screen and (min-width: 1200px) {
+  .wy-nav-top a {
+    max-width: 45%;
+  }
+}
+
+@media screen and (min-width: 1495px) {
+  .wy-nav-top a {
+    max-width: 78rem;
+  }
 }
 
 .wy-nav-top img {
@@ -5765,6 +5782,10 @@ footer p {
     width: 35rem;
     top: 9rem;
   }
+}
+
+.wy-menu.wy-menu-vertical .caption {
+  display: none;
 }
 
 .wy-menu.wy-menu-vertical,.wy-side-scroll {
@@ -6223,6 +6244,10 @@ div.rst-other-versions small a {
   text-decoration: none
 }
 
+.reference.internal.image-reference img {
+  margin-bottom: 3rem;
+}
+
 .rst-content.style-external-links a.reference.external:after {
   font-family: FontAwesome;
   content: "\f08e";
@@ -6327,6 +6352,10 @@ div.rst-other-versions small a {
 
 .pre {
   font-family: Pretendard, sans-serif !important;
+}
+
+code .pre {
+  font-family: monospace !important;
 }
 
 .rst-content div.highlight span.linenos {
@@ -6829,8 +6858,8 @@ html.writer-html5 .rst-content table.docutils td>p,html.writer-html5 .rst-conten
 }
 
 .rst-content code,.rst-content tt {
-  color: #000;
-  font-family: Pretendard sans-serif;
+  color: #1f2328;
+  font-family: monospace;
   padding: 2px 4px;
 }
 
@@ -6842,19 +6871,18 @@ html.writer-html5 .rst-content table.docutils td>p,html.writer-html5 .rst-conten
 .rst-content code.literal,.rst-content tt.literal {
   font-size: 85%;
   vertical-align: baseline;
-  font-weight: 600;
   padding: 2px 6px;
-  color: #FF9D00;
-  border: 1px solid var(--gray-2, #CCC);
+  color: #1f2328;
   border-radius: 4px;
   background: var(--gray-1, #F3F3F3);
   white-space: normal;
   line-height: 160%;
+  border: none;
 }
 
 .rst-content code.xref,.rst-content tt.xref,a .rst-content code,a .rst-content tt {
   font-weight: 700;
-  color: #404040;
+  color: #1f2328;
   overflow-wrap: normal
 }
 

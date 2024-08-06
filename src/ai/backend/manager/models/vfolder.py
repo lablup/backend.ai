@@ -4,8 +4,7 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import (
@@ -16,7 +15,6 @@ from typing import (
     NamedTuple,
     Optional,
     Sequence,
-    TypeAlias,
     cast,
 )
 
@@ -83,18 +81,9 @@ from .base import (
     metadata,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from .group import GroupRow, ProjectType, UserRoleInProject
+from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .rbac import (
-    AbstractPermissionContext,
-    AbstractPermissionContextBuilder,
-    BasePermission,
-    BaseScope,
-    ClientContext,
-    StorageHost,
-)
-from .rbac.exceptions import NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
 from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
@@ -109,7 +98,6 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
-    "VFolderRBACPermission",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
@@ -138,11 +126,6 @@ __all__: Sequence[str] = (
     "SOFT_DELETED_VFOLDER_STATUSES",
     "HARD_DELETED_VFOLDER_STATUSES",
     "VFolderPermissionSetAlias",
-    "get_vfolders",
-    "VFolderWithPermissionSet",
-    "OWNER_PERMISSIONS",
-    "PermissionContext",
-    "PermissionContextBuilder",
 )
 
 
@@ -233,6 +216,13 @@ class VFolderStatusSet(enum.StrEnum):
 
     INACCESSIBLE = "inaccessible"
     """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+
+class ModelCardProcessError(RuntimeError):
+    msg: str
+
+    def __init__(self, msg: str) -> None:
+        self.msg = msg
 
 
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
@@ -442,6 +432,8 @@ vfolder_permissions = sa.Table(
 class VFolderPermissionRow(Base):
     __table__ = vfolder_permissions
 
+    vfolder_row = relationship("VFolderRow", back_populates="permission_rows")
+
 
 class VFolderRow(Base):
     __table__ = vfolders
@@ -457,6 +449,7 @@ class VFolderRow(Base):
         back_populates="vfolder_rows",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+    permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
 
     @classmethod
     async def get(
@@ -692,497 +685,6 @@ async def query_accessible_vfolders(
                 entry["permission"] = overriding_permissions[entry["id"]]
 
     return entries
-
-
-class VFolderRBACPermission(BasePermission):
-    # Only owners can do
-    CLONE = enum.auto()
-    ASSIGN_PERMISSION_TO_OTHERS = enum.auto()  # Invite, share
-
-    # `create_vfolder` action should be in {Domain, Project, or User} permissions, not here
-    READ_ATTRIBUTE = enum.auto()
-    UPDATE_ATTRIBUTE = enum.auto()
-    DELETE_VFOLDER = enum.auto()
-
-    READ_CONTENT = enum.auto()
-    WRITE_CONTENT = enum.auto()
-    DELETE_CONTENT = enum.auto()
-
-    MOUNT_RO = enum.auto()
-    MOUNT_RW = enum.auto()
-    MOUNT_WD = enum.auto()
-
-
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
-# TypeAlias is deprecated since 3.12
-
-OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
-    perm for perm in VFolderRBACPermission
-])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER,
-])
-ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-])  # Admins are allowed to READ folders that other users are invited to.
-USER_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.READ_CONTENT,
-    VFolderRBACPermission.WRITE_CONTENT,
-    VFolderRBACPermission.DELETE_CONTENT,
-    VFolderRBACPermission.MOUNT_RO,
-    VFolderRBACPermission.MOUNT_RW,
-    VFolderRBACPermission.MOUNT_WD,
-])
-# `ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS == OWNER_PERMISSIONS` is true
-# but it doesn't mean that admins are the owner of the project folders.
-ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS: frozenset[VFolderRBACPermission] = (
-    ADMIN_PERMISSIONS
-    | USER_PERMISSIONS_ON_PROJECT_FOLDERS
-    | {VFolderRBACPermission.CLONE, VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS}
-)
-
-# TODO: Change type of `vfolder_permissions.permission` to VFolderRBACPermission
-PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[VFolderPermission, frozenset[VFolderRBACPermission]] = {
-    VFolderPermission.READ_ONLY: frozenset([
-        VFolderRBACPermission.READ_ATTRIBUTE,
-        VFolderRBACPermission.READ_CONTENT,
-    ]),
-    VFolderPermission.READ_WRITE: frozenset([
-        VFolderRBACPermission.READ_ATTRIBUTE,
-        VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
-        VFolderRBACPermission.READ_CONTENT,
-        VFolderRBACPermission.WRITE_CONTENT,
-        VFolderRBACPermission.DELETE_CONTENT,
-        VFolderRBACPermission.MOUNT_RO,
-        VFolderRBACPermission.MOUNT_RW,
-    ]),
-    VFolderPermission.RW_DELETE: frozenset([
-        VFolderRBACPermission.READ_ATTRIBUTE,
-        VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
-        VFolderRBACPermission.READ_CONTENT,
-        VFolderRBACPermission.WRITE_CONTENT,
-        VFolderRBACPermission.DELETE_CONTENT,
-        VFolderRBACPermission.MOUNT_RO,
-        VFolderRBACPermission.MOUNT_RW,
-        VFolderRBACPermission.MOUNT_WD,
-    ]),
-    VFolderPermission.OWNER_PERM: OWNER_PERMISSIONS,
-}
-
-
-@dataclass
-class PermissionContext(AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]):
-    @property
-    def query_condition(self) -> WhereClauseType | None:
-        cond: WhereClauseType | None = None
-
-        def _OR_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
-        ) -> WhereClauseType:
-            return base_cond | _cond if base_cond is not None else _cond
-
-        def _AND_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
-        ) -> WhereClauseType:
-            return base_cond & _cond if base_cond is not None else _cond
-
-        if self.user_id_to_permission_map:
-            cond = _OR_coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
-        if self.project_id_to_permission_map:
-            cond = _OR_coalesce(
-                cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys())
-            )
-        if self.domain_name_to_permission_map:
-            cond = _OR_coalesce(
-                cond, VFolderRow.domain_name.in_(self.domain_name_to_permission_map.keys())
-            )
-        if self.object_id_to_additional_permission_map:
-            cond = _OR_coalesce(
-                cond, VFolderRow.id.in_(self.object_id_to_additional_permission_map.keys())
-            )
-        if self.object_id_to_overriding_permission_map:
-            cond = _OR_coalesce(
-                cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
-            )
-
-        return cond
-
-    async def build_query(self) -> sa.sql.Select | None:
-        cond = self.query_condition
-        if cond is None:
-            return None
-        return sa.select(VFolderRow).where(cond)
-
-    async def calculate_final_permission(
-        self, acl_obj: VFolderRow
-    ) -> frozenset[VFolderRBACPermission]:
-        vfolder_row = acl_obj
-        vfolder_id = cast(uuid.UUID, vfolder_row.id)
-        if (
-            overriding_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
-        ) is not None:
-            return overriding_perm
-        permissions: set[VFolderRBACPermission] = set()
-        permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
-        permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
-        permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
-        permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
-        return frozenset(permissions)
-
-
-class PermissionContextBuilder(
-    AbstractPermissionContextBuilder[VFolderRBACPermission, PermissionContext]
-):
-    db_session: SASession
-
-    def __init__(self, db_session: SASession) -> None:
-        self.db_session = db_session
-
-    async def _build_in_user_scope(
-        self,
-        ctx: ClientContext,
-        user_id: uuid.UUID,
-    ) -> PermissionContext:
-        match ctx.user_role:
-            case UserRole.SUPERADMIN | UserRole.MONITOR:
-                if ctx.user_id == user_id:
-                    additional_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (
-                                VFolderRow.ownership_type == VFolderOwnershipType.USER
-                            )  # filter out project vfolders
-                        )
-                    )
-                    object_id_to_additional_permission_map = {
-                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                        for row in await self.db_session.scalars(additional_stmt)
-                    }
-                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                    )
-                else:
-                    additional_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (
-                                VFolderRow.ownership_type == VFolderOwnershipType.USER
-                            )  # filter out project vfolders
-                        )
-                    )
-                    object_id_to_additional_permission_map = {
-                        row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
-                        for row in await self.db_session.scalars(additional_stmt)
-                    }
-                    user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                    )
-            case UserRole.ADMIN:
-                if ctx.user_id == user_id:
-                    additional_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (
-                                VFolderRow.ownership_type == VFolderOwnershipType.USER
-                            )  # filter out project vfolders
-                        )
-                    )
-                    object_id_to_additional_permission_map = {
-                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                        for row in await self.db_session.scalars(additional_stmt)
-                    }
-
-                    user_id_to_permission_map = {user_id: OWNER_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                    )
-                else:
-                    # domain admins cannot access to users in another domain
-                    user_domain_stmt = (
-                        sa.select(UserRow)
-                        .where(UserRow.uuid == user_id)
-                        .options(load_only(UserRow.domain_name))
-                    )
-                    user_row = cast(UserRow | None, await self.db_session.scalar(user_domain_stmt))
-                    if user_row is None:
-                        return PermissionContext()
-                    if user_row.domain_name != ctx.domain_name:
-                        return PermissionContext()
-                    additional_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (
-                                VFolderRow.ownership_type == VFolderOwnershipType.USER
-                            )  # filter out project vfolders
-                        )
-                    )
-                    object_id_to_additional_permission_map = {
-                        row.vfolder: ADMIN_PERMISSIONS_ON_OTHER_USER_INVITED_FOLDERS
-                        for row in await self.db_session.scalars(additional_stmt)
-                    }
-                    user_id_to_permission_map = {user_id: ADMIN_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                    )
-            case UserRole.USER:
-                if ctx.user_id == user_id:
-                    overriding_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (
-                                VFolderRow.ownership_type == VFolderOwnershipType.USER
-                            )  # filter out project vfolders
-                        )
-                    )
-                    object_id_to_overriding_permission_map = {
-                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                        for row in await self.db_session.scalars(overriding_stmt)
-                    }
-
-                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
-                    )
-                else:
-                    return PermissionContext()
-
-    async def _build_in_project_scope(
-        self,
-        ctx: ClientContext,
-        project_id: uuid.UUID,
-    ) -> PermissionContext:
-        role_in_project = await ctx.get_user_role_in_project(self.db_session, project_id)
-        match role_in_project:
-            case UserRoleInProject.ADMIN:
-                project_id_to_permission_map = {project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS}
-                return PermissionContext(project_id_to_permission_map=project_id_to_permission_map)
-            case UserRoleInProject.USER:
-                project_id_to_permission_map = {project_id: USER_PERMISSIONS_ON_PROJECT_FOLDERS}
-                overriding_stmt = (
-                    sa.select(VFolderPermissionRow)
-                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                    .where(
-                        (VFolderPermissionRow.user == ctx.user_id)
-                        & (VFolderRow.group == project_id)
-                    )
-                )
-                object_id_to_overriding_permission_map = {
-                    row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                    for row in await self.db_session.scalars(overriding_stmt)
-                }
-                return PermissionContext(
-                    project_id_to_permission_map=project_id_to_permission_map,
-                    object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
-                )
-            case UserRoleInProject.NONE:
-                return PermissionContext()
-
-    async def _build_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
-    ) -> PermissionContext:
-        match ctx.user_role:
-            case UserRole.SUPERADMIN | UserRole.MONITOR:
-                domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
-
-                project_ctx = await ctx.get_accessible_projects_in_domain(
-                    self.db_session, domain_name
-                )
-                if project_ctx is not None:
-                    project_id_to_permission_map = {
-                        project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                        for project_id, _ in project_ctx.items()
-                    }
-                else:
-                    project_id_to_permission_map = {}
-                additional_stmt = (
-                    sa.select(VFolderPermissionRow)
-                    .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                    .where(
-                        (VFolderPermissionRow.user == ctx.user_id)
-                        & (VFolderRow.domain_name == domain_name)
-                    )
-                )
-                object_id_to_additional_permission_map = {
-                    row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                    for row in await self.db_session.scalars(additional_stmt)
-                }
-
-                user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
-                return PermissionContext(
-                    user_id_to_permission_map,
-                    project_id_to_permission_map,
-                    domain_name_to_permission_map,
-                    object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                )
-            case UserRole.ADMIN:
-                if ctx.domain_name == domain_name:
-                    domain_name_to_permission_map = {domain_name: ADMIN_PERMISSIONS}
-                    project_ctx = await ctx.get_accessible_projects_in_domain(
-                        self.db_session, domain_name
-                    )
-                    if project_ctx is not None:
-                        project_id_to_permission_map = {
-                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                            for project_id, _ in project_ctx.items()
-                        }
-                    else:
-                        project_id_to_permission_map = {}
-                    additional_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (VFolderRow.domain_name == domain_name)
-                        )
-                    )
-                    object_id_to_additional_permission_map = {
-                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                        for row in await self.db_session.scalars(additional_stmt)
-                    }
-
-                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        project_id_to_permission_map,
-                        domain_name_to_permission_map,
-                        object_id_to_additional_permission_map=object_id_to_additional_permission_map,
-                    )
-                else:
-                    # Only superadmin can access to another domains
-                    return PermissionContext()
-            case UserRole.USER:
-                if ctx.domain_name == domain_name:
-                    project_ctx = await ctx.get_accessible_projects_in_domain(
-                        self.db_session, domain_name
-                    )
-                    if project_ctx is not None:
-                        project_id_to_permission_map = {
-                            project_id: ADMIN_PERMISSIONS_ON_PROJECT_FOLDERS
-                            if role == UserRoleInProject.ADMIN
-                            else USER_PERMISSIONS_ON_PROJECT_FOLDERS
-                            for project_id, role in project_ctx.items()
-                        }
-                    else:
-                        project_id_to_permission_map = {}
-                    overriding_stmt = (
-                        sa.select(VFolderPermissionRow)
-                        .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-                        .where(
-                            (VFolderPermissionRow.user == ctx.user_id)
-                            & (VFolderRow.domain_name == domain_name)
-                        )
-                    )
-                    object_id_to_overriding_permission_map = {
-                        row.vfolder: PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-                        for row in await self.db_session.scalars(overriding_stmt)
-                    }
-
-                    user_id_to_permission_map = {ctx.user_id: OWNER_PERMISSIONS}
-                    return PermissionContext(
-                        user_id_to_permission_map,
-                        project_id_to_permission_map,
-                        object_id_to_overriding_permission_map=object_id_to_overriding_permission_map,
-                    )
-                else:
-                    # Only superadmin can access to another domains
-                    return PermissionContext()
-
-
-class VFolderWithPermissionSet(NamedTuple):
-    vfolder_row: VFolderRow
-    permissions: frozenset[VFolderRBACPermission]
-
-
-async def get_vfolders(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: BaseScope,
-    extra_scope: StorageHost | None = None,
-    requested_permission: VFolderRBACPermission | None = None,
-    *,
-    vfolder_id: uuid.UUID | None = None,
-    vfolder_name: str | None = None,
-    usage_mode: VFolderUsageMode | None = None,
-    allowed_status: Container[VFolderOperationStatus] | None = None,
-    blocked_status: Container[VFolderOperationStatus] | None = None,
-) -> list[VFolderWithPermissionSet]:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        ctx_builder = PermissionContextBuilder(db_session)
-        permission_ctx = await ctx_builder.build(ctx, target_scope, permission=requested_permission)
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            return []
-        if vfolder_id is not None:
-            query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
-        if vfolder_name is not None:
-            query_stmt = query_stmt.where(VFolderRow.name == vfolder_name)
-        if usage_mode is not None:
-            query_stmt = query_stmt.where(VFolderRow.usage_mode == usage_mode)
-        if allowed_status is not None:
-            query_stmt = query_stmt.where(VFolderRow.status.in_(allowed_status))
-        if blocked_status is not None:
-            query_stmt = query_stmt.where(VFolderRow.status.not_in(blocked_status))
-
-        result: list[VFolderWithPermissionSet] = []
-        for row in await db_session.scalars(query_stmt):
-            row = cast(VFolderRow, row)
-            permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(VFolderWithPermissionSet(row, permissions))
-        return result
-
-
-async def validate_permission(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: BaseScope,
-    extra_scope: StorageHost | None = None,
-    *,
-    permission: VFolderRBACPermission,
-    vfolder_id: uuid.UUID,
-) -> None:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        ctx_builder = PermissionContextBuilder(db_session)
-        permission_ctx = await ctx_builder.build(ctx, target_scope, permission=permission)
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
-        query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
-        vfolder_row = cast(VFolderRow | None, await db_session.scalar(query_stmt))
-        if vfolder_row is None:
-            raise VFolderNotFound(
-                f"VFolder not found (id:{vfolder_id}, permission:{permission.name})"
-            )
-        final_perms = await permission_ctx.calculate_final_permission(vfolder_row)
-        if permission not in final_perms:
-            raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
 
 
 async def get_allowed_vfolder_hosts_by_group(
@@ -2296,7 +1798,7 @@ class VirtualFolderNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 24.03.4."
 
-    row_id = graphene.UUID(description="Added in 24.03.4. UUID type id of DB vfolders row")
+    row_id = graphene.UUID(description="Added in 24.03.4. ID of VFolder.")
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
@@ -2783,6 +2285,7 @@ class ModelCard(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
+    row_id = graphene.UUID(description="Added in 24.03.8. ID of VFolder.")
     vfolder = graphene.Field(VirtualFolder)
     vfolder_node = graphene.Field(VirtualFolderNode, description="Added in 24.09.0.")
     author = graphene.String()
@@ -2804,6 +2307,7 @@ class ModelCard(graphene.ObjectType):
             "Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ..."
         )
     )
+    error_msg = graphene.String(description="Added in 24.03.8.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
@@ -2901,6 +2405,7 @@ class ModelCard(graphene.ObjectType):
             name = vfolder_row.name
         return cls(
             id=vfolder_row.id,
+            row_id=vfolder_row.id,
             vfolder=VirtualFolder.from_orm_row(vfolder_row),
             vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
             name=name,
@@ -2922,7 +2427,36 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow) -> ModelCard:
+    async def from_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
+    ) -> ModelCard | None:
+        graph_ctx: GraphQueryContext = info.context
+
+        try:
+            return await cls.parse_row(info, vfolder_row)
+        except Exception as e:
+            if isinstance(e, ModelCardProcessError):
+                error_msg = e.msg
+            else:
+                error_msg = "Unknown error"
+            if (
+                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user["email"]
+            ):
+                return cls(
+                    id=vfolder_row.id,
+                    row_id=vfolder_row.id,
+                    name=vfolder_row.name,
+                    author=vfolder_row.creator or "",
+                    error_msg=error_msg,
+                )
+            else:
+                return None
+
+    @classmethod
+    async def parse_row(
+        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
+    ) -> ModelCard | None:
         async def _fetch_file(
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
@@ -2949,25 +2483,29 @@ class ModelCard(graphene.ObjectType):
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
-        folder_name = vfolder_row.name
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/list",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": ".",
-            },
-        ) as (_, storage_resp):
-            vfolder_files = (await storage_resp.json())["items"]
+        try:
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/file/list",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(vfolder_id),
+                    "relpath": ".",
+                },
+            ) as (_, storage_resp):
+                vfolder_files = (await storage_resp.json())["items"]
+        except VFolderOperationFailed as e:
+            raise ModelCardProcessError(
+                f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
+            )
 
         model_definition_filename: str | None = None
         readme_idx: int | None = None
 
-        for idx, item in zip(range(len(vfolder_files)), vfolder_files):
+        for idx, item in enumerate(vfolder_files):
             if (item["name"] in ("model-definition.yml", "model-definition.yaml")) and (
                 not model_definition_filename
             ):
@@ -2975,32 +2513,44 @@ class ModelCard(graphene.ObjectType):
             if item["name"].lower().startswith("readme."):
                 readme_idx = idx
 
-        if readme_idx is not None:
-            readme_filename: str = vfolder_files[readme_idx]["name"]
-            chunks = await _fetch_file(readme_filename)
-            readme = chunks.decode("utf-8")
-            readme_filetype = readme_filename.split(".")[-1]
-        else:
-            readme = None
-            readme_filetype = None
-
         if model_definition_filename:
-            chunks = await _fetch_file(model_definition_filename)
+            try:
+                chunks = await _fetch_file(model_definition_filename)
+            except VFolderOperationFailed as e:
+                raise ModelCardProcessError(
+                    f"Failed to fetch model definition file (detail:{e.extra_msg})"
+                )
             model_definition_yaml = chunks.decode("utf-8")
-            model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            try:
+                model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+            except yaml.error.YAMLError as e:
+                raise ModelCardProcessError(
+                    f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
+                )
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
-                assert model_definition is not None
             except t.DataError as e:
-                raise InvalidAPIParameters(
-                    f"Failed to validate model definition from vFolder {folder_name} (ID"
-                    f" {vfolder_row_id}): {e}",
-                ) from e
-            except yaml.error.YAMLError as e:
-                raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
+                raise ModelCardProcessError(
+                    f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
+                )
+            assert model_definition is not None
             model_definition["id"] = vfolder_row_id
         else:
             model_definition = None
+
+        if readme_idx is not None:
+            readme_filename: str = vfolder_files[readme_idx]["name"]
+            try:
+                chunks = await _fetch_file(readme_filename)
+            except VFolderOperationFailed:
+                readme = "Failed to fetch README file."
+                readme_filetype = None
+            else:
+                readme = chunks.decode("utf-8")
+                readme_filetype = readme_filename.split(".")[-1]
+        else:
+            readme = None
+            readme_filetype = None
 
         return cls.parse_model(
             info,
@@ -3011,7 +2561,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -3028,7 +2578,7 @@ class ModelCard(graphene.ObjectType):
                 raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
-            return await cls.from_row(info, vfolder_row)
+        return await cls.from_row(info, vfolder_row)
 
     @classmethod
     async def get_connection(
@@ -3085,20 +2635,24 @@ class ModelCard(graphene.ObjectType):
                 .scalars()
                 .all()
             )
-        additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
-            VFolderRow.group.in_(model_store_project_gids)
-        )
-        query = query.where(additional_cond)
-        query = query.options(
-            joinedload(VFolderRow.user_row),
-            joinedload(VFolderRow.group_row),
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+            additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+                VFolderRow.group.in_(model_store_project_gids)
+            )
+            query = query.where(additional_cond)
+            cnt_query = cnt_query.where(additional_cond)
+            query = query.options(
+                joinedload(VFolderRow.user_row),
+                joinedload(VFolderRow.group_row),
+            )
             vfolder_rows = (await db_session.scalars(query)).all()
-            result = [(await cls.from_row(info, vf)) for vf in vfolder_rows]
-
             total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+        result = []
+        for vf in vfolder_rows:
+            if (_node := await cls.from_row(info, vf)) is not None:
+                result.append(_node)
+            else:
+                total_cnt -= 1
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
 class ModelCardConnection(Connection):

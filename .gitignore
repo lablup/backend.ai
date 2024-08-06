@@ -127,6 +127,7 @@ ENV/
 /scratches/
 logs/
 /*.pid
+/.postgres-volume-backup
 
 # Additional clones for editable components
 /src/ai/backend/webui/

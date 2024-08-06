@@ -16,6 +16,7 @@ jobs:
       latest_release: ${{ steps.commit.outputs.latest_release }}
       author: ${{ steps.commit.outputs.author }}
       author_email: ${{ steps.commit.outputs.author_email }}
+      labels: ${{ steps.commit.outputs.labels }}
     steps:
       - name: Checkout the revision
         uses: actions/checkout@v4
@@ -38,6 +39,10 @@ jobs:
           echo "author=$author" >> $GITHUB_OUTPUT
           author_email=$(git show -s --format=%ae $latest_commit)
           echo "author_email=$author_email" >> $GITHUB_OUTPUT
+          labels=$(gh pr view $pr_number --json labels | jq -r '.labels[].name')
+          echo "labels<<EOF" >> $GITHUB_OUTPUT
+          echo "$labels" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Check if this is a merged pr commit
         run: |
           if [[ -z "${{ steps.commit.outputs.pr_number }}" ]]; then
@@ -94,13 +99,15 @@ jobs:
         with:
           ref: ${{ matrix.milestone }}
       - name: Cherry-pick
+        env:
+          COMMIT_MESSAGE: ${{ needs.backport-target-branch.outputs.commit_message }}
         run: |
           git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
           git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
           git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \
-            --amend -m '${{ needs.backport-target-branch.outputs.commit_message }}' \
+            --amend -m "${COMMIT_MESSAGE}" \
             --trailer "Backported-from=main (${{ needs.backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.milestone }}" \
             --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
@@ -132,10 +139,10 @@ jobs:
           body: "This is an auto-generated backport PR of #${{ needs.backport-target-branch.outputs.pr_number }} to the ${{ matrix.milestone }} release."
           branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.milestone }}"
           base: ${{ matrix.milestone }}
-          labels: backport
+          labels: |
+            backport
+            ${{ needs.backport-target-branch.outputs.labels }}
           assignees: ${{ needs.backport-target-branch.outputs.author }}
-      - run: |
-          gh pr view ${{ needs.backport-target-branch.outputs.pr_number }} --json labels | jq -r '.labels[].name' | xargs -I {} gh pr edit ${{ steps.pr.outputs.pull-request-number }} --add-label {}
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, TypedDict
 
 import graphene
@@ -20,6 +19,7 @@ from ..defs import RESERVED_DOTFILES
 from .base import (
     Base,
     ResourceSlotColumn,
+    SlugType,
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
@@ -52,12 +52,11 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 domains = sa.Table(
     "domains",
     mapper_registry.metadata,
-    sa.Column("name", sa.String(length=64), primary_key=True),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -125,7 +124,9 @@ class Domain(graphene.ObjectType):
             is_active=row["is_active"],
             created_at=row["created_at"],
             modified_at=row["modified_at"],
-            total_resource_slots=row["total_resource_slots"].to_json(),
+            total_resource_slots=row["total_resource_slots"].to_json()
+            if row["total_resource_slots"] is not None
+            else {},
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             allowed_docker_registries=row["allowed_docker_registries"],
             integration_id=row["integration_id"],
@@ -210,8 +211,6 @@ class CreateDomain(graphene.Mutation):
         name: str,
         props: DomainInput,
     ) -> CreateDomain:
-        if _rx_slug.search(name) is None:
-            return cls(False, "invalid name format. slug format required.", None)
         ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -259,8 +258,6 @@ class ModifyDomain(graphene.Mutation):
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "allowed_docker_registries")
         set_if_set(props, data, "integration_id")
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
         update_query = sa.update(domains).values(data).where(domains.c.name == name)
         return await simple_db_mutate_returning_item(cls, ctx, update_query, item_cls=Domain)
 

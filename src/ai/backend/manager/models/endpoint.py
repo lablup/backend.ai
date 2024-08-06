@@ -1045,6 +1045,8 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
 
 class ModifyEndpoint(graphene.Mutation):
+    allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
+
     class Arguments:
         endpoint_id = graphene.UUID(required=True)
         props = ModifyEndpointInput(required=True)

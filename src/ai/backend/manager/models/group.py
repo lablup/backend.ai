@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import re
 import uuid
 from typing import (
     TYPE_CHECKING,
@@ -42,6 +41,7 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     ResourceSlotColumn,
+    SlugType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
@@ -92,13 +92,6 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
-
-
-class UserRoleInProject(enum.StrEnum):
-    ADMIN = enum.auto()  # TODO: impl project admin
-    USER = enum.auto()  # UserRole.USER is associated as user
-    NONE = enum.auto()
 
 
 association_groups_users = sa.Table(
@@ -141,7 +134,7 @@ groups = sa.Table(
     "groups",
     mapper_registry.metadata,
     IDColumn("id"),
-    sa.Column("name", sa.String(length=64), nullable=False),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -305,7 +298,9 @@ class Group(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
-            total_resource_slots=row["total_resource_slots"].to_json(),
+            total_resource_slots=row["total_resource_slots"].to_json()
+            if row["total_resource_slots"] is not None
+            else {},
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
@@ -498,8 +493,6 @@ class CreateGroup(graphene.Mutation):
         name: str,
         props: GroupInput,
     ) -> CreateGroup:
-        if _rx_slug.search(name) is None:
-            raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -563,8 +556,6 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "container_registry")
 
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
@@ -678,6 +669,7 @@ class PurgeGroup(graphene.Mutation):
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
+            await cls.delete_sessions(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
@@ -747,6 +739,20 @@ class PurgeGroup(graphene.Mutation):
         if result.rowcount > 0:
             log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
         return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        db_conn: SAConnection,
+        group_id: uuid.UUID,
+    ) -> None:
+        """
+        Delete all sessions run from the target groups.
+        """
+        from .session import SessionRow
+
+        stmt = sa.delet(SessionRow).where(SessionRow.group_id == group_id)
+        await db_conn.execute(stmt)
 
     @classmethod
     async def group_vfolder_mounted_to_active_kernels(
