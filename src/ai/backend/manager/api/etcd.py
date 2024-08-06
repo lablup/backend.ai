@@ -302,7 +302,7 @@ async def get_docker_registries(request: web.Request) -> web.Response:
         "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd. Use /resource/container-registries API instead."
     )
 
-    return get_container_registries(request)
+    return await get_container_registries(request)
 
 
 def create_app(
