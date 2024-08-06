@@ -267,6 +267,7 @@ async def execute(
                 now = time.perf_counter()
                 if now - first_trial >= command_timeout + 1.0:
                     show_retry_warning(e)
+                first_trial = now
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
