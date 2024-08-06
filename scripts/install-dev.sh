@@ -204,7 +204,7 @@ show_guide() {
   echo "that can be accessible from both the client SDK and the web browser."
   echo " "
   echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
-  echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
+  echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}gatewayServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
   echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
   echo " "
   echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
@@ -615,10 +615,10 @@ install_editable_webui() {
     # The gateway endpoint to use in the session mode.
     sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${GATEWAY_PORT}"'"@' config.toml
     sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
-    # webServerURL lets the electron app use the web UI contents from the server.
+    # gatewayServerURL lets the electron app use the web UI contents from the server.
     # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.gateway.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
-    sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${GATEWAY_PORT}"'"@' config.toml
+    sed_inplace "s@gatewayServerURL =.*@gatewayServerURL = "'"'"http://127.0.0.1:${GATEWAY_PORT}"'"@' config.toml
     sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
     echo "PROXYLISTENIP=0.0.0.0" >> .env
     echo "PROXYBASEHOST=localhost" >> .env
