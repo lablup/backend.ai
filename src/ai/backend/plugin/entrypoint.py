@@ -67,7 +67,7 @@ def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoin
 
 _default_glob_excluded_patterns = [
     "ai/backend/webui",
-    "ai/backend/web/static",
+    "ai/backend/gateway/static",
     "ai/backend/runner",
     "ai/backend/kernel",
 ]

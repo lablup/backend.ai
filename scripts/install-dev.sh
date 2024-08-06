@@ -98,7 +98,7 @@ usage() {
   echo "    The port to bind the etcd container service."
   echo "    (default: 8121)"
   echo ""
-  echo "  ${LWHITE}--webserver-port PORT${NC}"
+  echo "  ${LWHITE}--gateway-port PORT${NC}"
   echo "    The port to expose the web server."
   echo "    (default: 8090)"
   echo ""
@@ -173,12 +173,12 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai ag start-server --debug${NC}"
   show_note "How to run Backend.AI storage-proxy:"
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
-  show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
-  echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run Backend.AI gateway server (for ID/Password login and Web UI):"
+  echo "  > ${WHITE}./py -m ai.backend.gateway.server${NC}"
   show_note "How to run Backend.AI wsproxy:"
   echo "  > ${WHITE}./py -m ai.backend.wsproxy.server${NC}"
-  echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
-  echo "  to prevent misbehavior of the client used inside the web server.${NC}"
+  echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the gateway server"
+  echo "  to prevent misbehavior of the client used inside the gateway server.${NC}"
   show_info "How to run your first code:"
   echo "  > ${WHITE}./backend.ai --help${NC}"
   echo "  > ${WHITE}source env-local-admin-api.sh${NC}"
@@ -195,7 +195,7 @@ show_guide() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
     echo "(Terminal 2)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
+    echo "If you just run ${WHITE}./py -m ai.backend.gateway.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
   echo " "
@@ -295,7 +295,7 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
-WEBSERVER_PORT="8090"
+GATEWAY_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
@@ -336,8 +336,8 @@ while [ $# -gt 0 ]; do
     --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
     --manager-port)         MANAGER_PORT=$2; shift ;;
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
-    --webserver-port)       WEBSERVER_PORT=$2; shift ;;
-    --webserver-port=*)     WEBSERVER_PORT="${1#*=}" ;;
+    --gateway-port)       GATEWAY_PORT=$2; shift ;;
+    --gateway-port=*)     GATEWAY_PORT="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -612,13 +612,13 @@ install_editable_webui() {
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false@" config.toml
-    # The webserver endpoint to use in the session mode.
-    sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    # The gateway endpoint to use in the session mode.
+    sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${GATEWAY_PORT}"'"@' config.toml
     sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
     # webServerURL lets the electron app use the web UI contents from the server.
-    # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
+    # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.gateway.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
-    sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${GATEWAY_PORT}"'"@' config.toml
     sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
     echo "PROXYLISTENIP=0.0.0.0" >> .env
     echo "PROXYBASEHOST=localhost" >> .env
@@ -919,28 +919,28 @@ configure_backendai() {
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-  # configure webserver
-  cp configs/webserver/halfstack.conf ./webserver.conf
-  sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+  # configure gateway
+  cp configs/gateway/halfstack.conf ./gateway.conf
+  sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./gateway.conf
 
   # configure wsproxy
   cp configs/wsproxy/halfstack.toml ./wsproxy.toml
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
-    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
-    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
-    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./gateway.conf
+    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./gateway.conf
+    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./gateway.conf
+    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./gateway.conf
   else
-    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./gateway.conf
   fi
 
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
-    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./gateway.conf
   else
-    webui_version=$(jq -r '.package + " (built at " + .buildDate + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
+    webui_version=$(jq -r '.package + " (built at " + .buildDate + ", rev " + .revision + ")"' src/ai/backend/gateway/static/version.json)
     show_note "The currently embedded webui version: $webui_version"
   fi
 
@@ -1002,7 +1002,7 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${GATEWAY_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
     fish)
@@ -1029,7 +1029,7 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${GATEWAY_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
     fish)
@@ -1064,7 +1064,7 @@ configure_backendai() {
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${GATEWAY_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
     fish)

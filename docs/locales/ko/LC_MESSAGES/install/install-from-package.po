@@ -67,7 +67,7 @@ msgstr ""
 
 #: ../../install/install-from-package.rst:25 daf19b1c39cd4a8ea97ee1587753e0fd
 msgid ""
-"Backend.AI Webserver : A web server that provides persistent user web "
+"Backend.AI Gateway : (Backend.AI Webserver previous 24.09.) A web server that provides persistent user web "
 "sessions. Users can use the Backend.AI features without subsequent "
 "authentication upon initial login. It also serves the statically built "
 "graphical user interface in an Enterprise environment."
@@ -78,7 +78,7 @@ msgid ""
 "Backend.AI Web UI : Web application with a graphical user interface. "
 "Users can enjoy the easy-to-use interface to launch their secure "
 "execution environment and use apps like Jupyter and Terminal. It can be "
-"served as statically built JavaScript via Webserver. Or, it also offers "
+"served as statically built JavaScript via Gateway. Or, it also offers "
 "desktop applications for many operating systems and architectures."
 msgstr ""
 

@@ -9,7 +9,9 @@ import yarl
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 
-default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
+default_static_path = Path(
+    pkg_resources.resource_filename("ai.backend.gateway", "static")
+).resolve()
 
 license_defs = {
     "edition": "Open Source",
@@ -139,7 +141,7 @@ config_iv = t.Dict({
         t.Key("valid_since", default=license_defs["valid_since"]): t.String(allow_blank=True),
         t.Key("valid_until", default=license_defs["valid_until"]): t.String(allow_blank=True),
     }).allow_extra("*"),
-    t.Key("webserver"): t.Dict({
+    tx.AliasedKey(["gateway", "webserver"]): t.Dict({  # Allow `webserver` for compatibility
         t.Key("event-loop", default="uvloop"): t.Enum("asyncio", "uvloop"),
         t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
             type="dir", auto_create=True

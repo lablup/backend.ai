@@ -236,7 +236,7 @@ class InstallReport(Static):
             textwrap.dedent(
                 f"""
         Follow each tab's instructions.  Once all 5 service daemons are ready, you may connect to
-        `http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}`.
+        `http://{service.gateway_addr.face.host}:{service.gateway_addr.face.port}`.
 
         Use the following credentials for the admin access:
         - Username: `admin@lablup.com`
@@ -247,21 +247,21 @@ class InstallReport(Static):
             )
         )
         with TabbedContent():
-            with TabPane("Web Server", id="webserver"):
+            with TabPane("Gateway Server", id="gateway"):
                 yield Markdown(
                     textwrap.dedent(
                         f"""
                 Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
-                $ ./backendai-webserver web start-server
+                $ ./backendai-gateway web start-server
                 ```
 
                 It works if the console output ends with something like:
                 ```
                 ...
-                INFO ai.backend.web.server [2215731] serving at {service.webserver_addr.bind.host}:{service.webserver_addr.bind.port}
-                INFO ai.backend.web.server [2215731] Using uvloop as the event loop backend
+                INFO ai.backend.gateway.server [2215731] serving at {service.gateway_addr.bind.host}:{service.gateway_addr.bind.port}
+                INFO ai.backend.gateway.server [2215731] Using uvloop as the event loop backend
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.

@@ -140,9 +140,9 @@ class ServiceConfig:
     manager_addr: ServerAddr
     manager_ipc_base_path: str
     manager_var_base_path: str
-    webserver_addr: ServerAddr
-    webserver_ipc_base_path: str
-    webserver_var_base_path: str
+    gateway_addr: ServerAddr
+    gateway_ipc_base_path: str
+    gateway_var_base_path: str
     webui_menu_blocklist: list[str]
     webui_menu_inactivelist: list[str]
     local_proxy_addr: ServerAddr

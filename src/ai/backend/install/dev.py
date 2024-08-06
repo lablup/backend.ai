@@ -99,11 +99,11 @@ async def install_editable_webui(ctx: Context) -> None:
       # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
       # (e.g., separate debugging of Electron's renderer and main threads)
       sed_inplace "s@debug = true@debug = false@" config.toml
-      # The webserver endpoint to use in the session mode.
+      # The gateway endpoint to use in the session mode.
       sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
       sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
       # webServerURL lets the electron app use the web UI contents from the server.
-      # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
+      # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.gateway.server` instance.
       # In the former case, you may live-edit the webui sources while running them in the electron app.
       sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
       sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml

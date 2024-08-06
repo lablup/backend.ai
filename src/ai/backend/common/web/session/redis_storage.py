@@ -14,7 +14,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session, extra_config_headers
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.gateway.server"))
 
 
 class RedisStorage(AbstractStorage):

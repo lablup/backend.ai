@@ -6,7 +6,7 @@
   "postCreateCommand": "cd /workspaces/backend.ai && bash /workspaces/backend.ai/scripts/install-dev.sh --codespaces-post-create",
   "forwardPorts": [
     6022, // storage-proxy
-    8090, // webserver
+    8090, // webserver or gateway
     8091, // manager API
     // wsproxy ports
     10200,

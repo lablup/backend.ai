@@ -24,14 +24,14 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-webserver",
+        name="backend.ai-gateway",
         description="Backend.AI WebUI Host",
         license="LGPLv3",
     ),
     entry_points={
         "backendai_cli_v10": {
-            "web": "ai.backend.web.cli:main",
-            "web.start-server": "ai.backend.web.server:main",
+            "gateway": "ai.backend.gateway.cli:main",
+            "gateway.start-server": "ai.backend.gateway.server:main",
         },
     },
     generate_setup=True,
@@ -49,14 +49,14 @@ pex_binary(
 )
 
 scie_binary(
-    name="backendai-webserver",
+    name="backendai-gateway",
     fat=False,
     dependencies=[":pex"],
     tags=["scie", "lazy"],
 )
 
 scie_binary(
-    name="backendai-webserver-fat",
+    name="backendai-gateway-fat",
     fat=True,
     dependencies=[":pex"],
     tags=["scie", "fat"],
@@ -65,13 +65,13 @@ scie_binary(
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-webserver-*' -not -name '*.sha256' | xargs -I {} sh -c"
+        "find . -name 'backendai-gateway-*' -not -name '*.sha256' | xargs -I {} sh -c"
         " 'sha256sum {} > {}.sha256'"
     ),
     workdir="/dist",
     execution_dependencies=[
-        ":backendai-webserver",
-        ":backendai-webserver-fat",
+        ":backendai-gateway",
+        ":backendai-gateway-fat",
     ],
     tags=["checksum"],
 )

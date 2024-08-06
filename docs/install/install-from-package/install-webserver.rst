@@ -1,31 +1,31 @@
-Install Backend.AI Webserver
+Install Backend.AI Gateway
 ============================
 
 Refer to :ref:`prepare_python_and_venv` to setup Python and virtual environment
 for the service.
 
-Install the latest version of Backend.AI Webserver for the current Python
+Install the latest version of Backend.AI Gateway for the current Python
 version:
 
 .. code-block:: console
 
-   $ cd "${HOME}/webserver"
+   $ cd "${HOME}/gateway"
    $ # Activate a virtual environment if needed.
-   $ pip install -U backend.ai-webserver
+   $ pip install -U backend.ai-gateway
 
 If you want to install a specific version:
 
 .. code-block:: console
 
-   $ pip install -U backend.ai-webserver==${BACKEND_PKG_VERSION}
+   $ pip install -U backend.ai-gateway==${BACKEND_PKG_VERSION}
 
 
 Local configuration
 -------------------
 
-Backend.AI Webserver uses a config file (``webserver.conf``) to configure
+Backend.AI Gateway uses a config file (``gateway.conf``) to configure
 local service. Refer to the
-`webserver.conf sample file <https://github.com/lablup/backend.ai/blob/main/configs/webserver/sample.conf>`_
+`gateway.conf sample file <https://github.com/lablup/backend.ai/blob/main/configs/gateway/sample.conf>`_
 for a detailed description of each section and item. A configuration example
 would be:
 
@@ -89,7 +89,7 @@ would be:
 
    [license]
 
-   [webserver]
+   [gateway]
 
    [logging]
    # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
@@ -115,7 +115,7 @@ would be:
    # Rotated logs may have additional suffixes.
    # For production, "/var/log/backend.ai" is recommended.
    path = "./logs"
-   filename = "webserver.log"
+   filename = "gateway.log"
 
    # Set the maximum number of recent container coredumps in the coredump directory.
    # Oldest coredumps are deleted if there is more than this number of coredumps.
@@ -152,18 +152,18 @@ would be:
 
    [pipeline]
 
-Save the contents to ``${HOME}/.config/backend.ai/webserver.conf``.
+Save the contents to ``${HOME}/.config/backend.ai/gateway.conf``.
 
 
-Run Backend.AI Webserver service
+Run Backend.AI Gateway service
 ------------------------------------
 
 You can run the service by specifying the config file path with ``-f`` option:
 
 .. code-block:: console
 
-   $ cd "${HOME}/webserver"
-   $ python -m ai.backend.web.server -f ${HOME}/.config/backend.ai/webserver.conf
+   $ cd "${HOME}/gateway"
+   $ python -m ai.backend.gateway.server -f ${HOME}/.config/backend.ai/gateway.conf
 
 Press ``Ctrl-C`` to stop both services.
 
@@ -175,7 +175,7 @@ The service can be registered as a systemd daemon. It is recommended to
 automatically run the service after rebooting the host machine, although this is
 entirely optional.
 
-First, create a runner script at ``${HOME}/bin/run-webserver.sh``:
+First, create a runner script at ``${HOME}/bin/run-gateway.sh``:
 
 .. code-block:: bash
 
@@ -198,7 +198,7 @@ First, create a runner script at ``${HOME}/bin/run-webserver.sh``:
    eval "$(pyenv virtualenv-init -)"
 
    if [ "$#" -eq 0 ]; then
-      exec python -m ai.backend.web.server -f ${HOME}/.config/backend.ai/webserver.conf
+      exec python -m ai.backend.gateway.server -f ${HOME}/.config/backend.ai/gateway.conf
    else
       exec "$@"
    fi
@@ -207,23 +207,23 @@ Make the scripts executable:
 
 .. code-block:: console
 
-   $ chmod +x "${HOME}/bin/run-webserver.sh"
+   $ chmod +x "${HOME}/bin/run-gateway.sh"
 
 Then, create a systemd service file at
-``/etc/systemd/system/backendai-webserver.service``:
+``/etc/systemd/system/backendai-gateway.service``:
 
 .. code-block:: dosini
 
    [Unit]
-   Description= Backend.AI Webserver
+   Description= Backend.AI Gateway
    Requires=network.target
    After=network.target remote-fs.target
 
    [Service]
    Type=simple
-   ExecStart=/home/bai/bin/run-webserver.sh
-   PIDFile=/home/bai/webserver/webserver.pid
-   WorkingDirectory=/home/bai/webserver
+   ExecStart=/home/bai/bin/run-gateway.sh
+   PIDFile=/home/bai/gateway/gateway.pid
+   WorkingDirectory=/home/bai/gateway
    User=1100
    Group=1100
    TimeoutStopSec=5
@@ -243,16 +243,16 @@ Finally, enable and start the service:
 .. code-block:: console
 
    $ sudo systemctl daemon-reload
-   $ sudo systemctl enable --now backendai-webserver
+   $ sudo systemctl enable --now backendai-gateway
 
    $ # To check the service status
-   $ sudo systemctl status backendai-webserver
+   $ sudo systemctl status backendai-gateway
    $ # To restart the service
-   $ sudo systemctl restart backendai-webserver
+   $ sudo systemctl restart backendai-gateway
    $ # To stop the service
-   $ sudo systemctl stop backendai-webserver
+   $ sudo systemctl stop backendai-gateway
    $ # To check the service log and follow
-   $ sudo journalctl --output cat -u backendai-webserver -f
+   $ sudo journalctl --output cat -u backendai-gateway -f
 
 
 Check user GUI access via web

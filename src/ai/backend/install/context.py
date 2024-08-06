@@ -526,8 +526,8 @@ class Context(metaclass=ABCMeta):
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
-    async def configure_webserver(self) -> None:
-        conf_path = self.copy_config("webserver.conf")
+    async def configure_gateway_server(self) -> None:
+        conf_path = self.copy_config("gateway.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         assert halfstack.redis_addr is not None
@@ -636,7 +636,7 @@ class Context(metaclass=ABCMeta):
                 )
                 print(
                     "export"
-                    f" BACKEND_ENDPOINT=http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}/",
+                    f" BACKEND_ENDPOINT=http://{service.gateway_addr.face.host}:{service.gateway_addr.face.port}/",
                     file=fp,
                 )
                 print("export BACKEND_ENDPOINT_TYPE=session", file=fp)
@@ -825,12 +825,12 @@ class DevContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
+            gateway_addr=ServerAddr(
                 bind=HostPortPair(public_component_bind_address, 8090),
                 face=HostPortPair(public_facing_address, 8090),
             ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
+            gateway_ipc_base_path="ipc/gateway",
+            gateway_var_base_path="var/gateway",
             webui_menu_blocklist=["pipeline"],
             webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
@@ -896,8 +896,8 @@ class DevContext(Context):
         await self.configure_agent()
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
-        self.log_header("Configuring webserver and webui...")
-        await self.configure_webserver()
+        self.log_header("Configuring gateway server and webui...")
+        await self.configure_gateway_server()
         await self.configure_webui()
         self.log_header("Configuring wsproxy...")
         await self.configure_wsproxy()
@@ -931,12 +931,12 @@ class PackageContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
+            gateway_addr=ServerAddr(
                 bind=HostPortPair(public_component_bind_address, 8090),
                 face=HostPortPair(public_facing_address, 8090),
             ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
+            gateway_ipc_base_path="ipc/gateway",
+            gateway_var_base_path="var/gateway",
             webui_menu_blocklist=["pipeline"],
             webui_menu_inactivelist=["statistics"],
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
@@ -1067,7 +1067,7 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("manager", vpane))
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
-                        tg.create_task(self._fetch_package("webserver", vpane))
+                        tg.create_task(self._fetch_package("gateway", vpane))
                         tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
@@ -1075,7 +1075,7 @@ class PackageContext(Context):
                     await self._verify_package("manager", fat=False)
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
-                    await self._verify_package("webserver", fat=False)
+                    await self._verify_package("gateway", fat=False)
                     await self._verify_package("wsproxy", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
@@ -1088,9 +1088,7 @@ class PackageContext(Context):
                     await self._install_package(
                         "agent-watcher", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package(
-                        "webserver", vpane, fat=self.dist_info.use_fat_binary
-                    )
+                    await self._install_package("gateway", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
@@ -1100,7 +1098,7 @@ class PackageContext(Context):
                     await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("gateway", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
@@ -1116,8 +1114,8 @@ class PackageContext(Context):
         await self.configure_agent()
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
-        self.log_header("Configuring webserver and webui...")
-        await self.configure_webserver()
+        self.log_header("Configuring gateway server and webui...")
+        await self.configure_gateway_server()
         await self.configure_webui()
         self.log_header("Configuring wsproxy...")
         await self.configure_wsproxy()

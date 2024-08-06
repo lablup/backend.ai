@@ -22,14 +22,14 @@ modules. Some of the major components are:
   offloads the Manager's burden of handling long-running file I/O operations. It
   embeds a plugin backend structure that provides dedicated features for each
   storage type.
-- Backend.AI Webserver : A web server that provides persistent user web
+- Backend.AI Gateway : (Backend.AI Webserver previous 24.09.) A web server that provides persistent user web
   sessions. Users can use the Backend.AI features without subsequent
   authentication upon initial login. It also serves the statically built
   graphical user interface in an Enterprise environment.
 - Backend.AI Web UI : Web application with a graphical user interface. Users
   can enjoy the easy-to-use interface to launch their secure execution
   environment and use apps like Jupyter and Terminal. It can be served as
-  statically built JavaScript via Webserver. Or, it also offers desktop
+  statically built JavaScript via Gateway. Or, it also offers desktop
   applications for many operating systems and architectures.
 
 Most components can be installed in a single management node except Agent,
@@ -51,4 +51,4 @@ more management nodes, although this is not the focus of this guide.
    install-from-package/install-manager
    install-from-package/install-agent
    install-from-package/install-storage-proxy
-   install-from-package/install-webserver
+   install-from-package/install-gateway
