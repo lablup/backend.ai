@@ -21,7 +21,7 @@ CONTAINER_REGISTRY_FIELDS = """
 """
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def context(get_base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
     shared_config = SharedConfig(
         etcd_addr=etcd_container[1],
