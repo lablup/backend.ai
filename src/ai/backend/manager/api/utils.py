@@ -168,7 +168,7 @@ def check_api_params(
             body: str = ""
             try:
                 body_exists = request.can_read_body
-                if body_exists and request.method not in ("GET", "DELETE", "HEAD"):
+                if body_exists and request.method not in ("GET", "HEAD"):
                     body = await request.text()
                     if request.content_type == "text/yaml":
                         orig_params = yaml.load(body, Loader=yaml.BaseLoader)
