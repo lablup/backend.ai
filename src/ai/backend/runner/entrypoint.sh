@@ -16,6 +16,11 @@ fi
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
 
+# Symlink the scp binary
+if [ ! -f "/usr/bin/scp" ]; then
+  ln -s /opt/kernel/dropbearmulti /usr/bin/scp
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."
