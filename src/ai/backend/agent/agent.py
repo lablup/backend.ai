@@ -438,14 +438,15 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        def mount_binary(bin_name: str, target_path: str) -> None:
+            resolved_path = self.resolve_krunner_filepath("runner/" + bin_name)
+            _mount(MountTypes.BIND, resolved_path, target_path)
+
+        mount_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
-        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
-        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
-        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
-        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
+        mount_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
+        mount_binary(f"sftp-server.{arch}.bin", "/usr/libexec/sftp-server")
+        mount_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
