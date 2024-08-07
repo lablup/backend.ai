@@ -41,7 +41,7 @@ class LocalRegistry(BaseContainerRegistry):
                 labels = item["Labels"]
                 if not labels:
                     continue
-                if "ai.backend.kernelspec" in labels and item["RepoTags"] is not None:
+                if item["RepoTags"] is not None:
                     for image_ref_str in item["RepoTags"]:
                         if image_ref_str == "<none>:<none>":
                             # cache images
