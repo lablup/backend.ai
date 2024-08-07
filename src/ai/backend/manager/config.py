@@ -296,6 +296,7 @@ manager_local_config_iv = (
                 "agent-selection-resource-priority",
                 default=["cuda", "rocm", "tpu", "cpu", "mem"],
             ): t.List(t.String),
+            t.Key("anonymous-ratelimit", default=None): t.Null | t.ToInt,
             t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
             t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
             tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48100): t.ToInt[

@@ -6,6 +6,7 @@ from contextlib import closing
 from typing import TYPE_CHECKING, Callable, Mapping, TypeVar
 
 import aiohttp
+from aiohttp import web
 from async_timeout import timeout as _timeout
 
 if TYPE_CHECKING:
@@ -52,3 +53,12 @@ def find_free_port(bind_addr: str = "127.0.0.1") -> int:
         s.bind((bind_addr, 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+
+def get_client_ip(request: web.Request) -> str | None:
+    client_ip = request.headers.get("X-Forwarded-For")
+    if not client_ip and request.transport:
+        client_ip = request.transport.get_extra_info("peername")[0]
+    if not client_ip:
+        client_ip = request.remote
+    return client_ip
