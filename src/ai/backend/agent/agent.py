@@ -438,8 +438,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        def mount_static_binary(bin_name: str, target_path: str) -> None:
-            resolved_path = self.resolve_krunner_filepath("runner/" + bin_name)
+        def mount_static_binary(filename: str, target_path: str) -> None:
+            resolved_path = self.resolve_krunner_filepath("runner/" + filename)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
         mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
