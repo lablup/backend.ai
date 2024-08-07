@@ -164,13 +164,13 @@ acceleration APIs.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/storage/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-storage-proxy
 
-### Webserver
+### Gateway
 
 It hosts the SPA (single-page application) packaged from our web UI codebase for end-users
 and basic administration tasks.
 
-* `src/ai/backend/web`
-  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
+* `src/ai/backend/gateway`
+  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/gateway/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
 **Synchronizing the static Backend.AI WebUI version:**

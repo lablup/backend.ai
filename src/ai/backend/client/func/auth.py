@@ -105,7 +105,7 @@ class Auth(BaseFunction):
     ) -> dict:
         """
         Update user's password. This is used to update `EXPIRED` password only.
-        This function fetch a request to webserver.
+        This function fetch a request to gateway server.
         """
 
         rqst = Request("POST", "/server/update-password-no-auth")

@@ -5,7 +5,7 @@ import pytest
 import yarl
 from aiohttp import web
 
-from ai.backend.web.auth import get_anonymous_session, get_api_session
+from ai.backend.gateway.auth import get_anonymous_session, get_api_session
 
 
 class DummyRequest:

@@ -10,55 +10,55 @@ A webapp hosting daemon which serves our `webui` as a SPA and proxies API reques
 Prepare a Python virtualenv (Python 3.9 or higher) and a Redis server (6.2 or higher).
 
 ```console
-$ git clone https://github.com/lablup/backend.ai-webserver webserver
-$ cd webserver
+$ git clone https://github.com/lablup/backend.ai-gateway gateway
+$ cd gateway
 $ pip install -U -e .
-$ cp webserver.sample.conf webserver.conf
+$ cp gateway.sample.conf gateway.conf
 ```
 
 ## Mode
 
-If `service.mode` is set "webui" (the default), the webserver handles
+If `service.mode` is set "webui" (the default), the gateway handles
 PWA-style fallbacks (e.g., serving `index.html` when there are no matching
 files for the requested URL path).
 The PWA must exclude `/server` and `/func` URL prefixes from its own routing
-to work with the webserver's web sessions and the API proxy.
+to work with the gateway's web sessions and the API proxy.
 
-If it is set "static", the webserver serves the static files as-is,
+If it is set "static", the gateway serves the static files as-is,
 without any fallbacks or hooking, while preserving the `/server` and `/func`
 prefixed URLs and their functionalities.
 
-If you want to serve web UI in webserver with "webui" mode, prepare static web UI source by choosing one of the followings.
+If you want to serve web UI in gateway with "webui" mode, prepare static web UI source by choosing one of the followings.
 
 ### Option 1: Build web UI from source
 
 Build **[backend.ai-webui](https://github.com/lablup/backend.ai-webui)** and copy all files under `build/bundle`
-into the `src/ai/backend/web/static` directory.
+into the `src/ai/backend/gateway/static` directory.
 
 ### Option 2: Use pre-built web UI
 
 To download and deploy web UI from pre-built source, do the following:
 
 ```console
-cd src/ai/backend/web
+cd src/ai/backend/gateway
 curl --fail -sL https://github.com/lablup/backend.ai-webui/releases/download/v$TARGET_VERSION/backend.ai-webui-bundle-$TARGET_VERSION.zip > /tmp/bai-webui.zip
 rm -rf static
 mkdir static
 cd static
 unzip /tmp/bai-webui.zip
 ```
-### Setup configuration for webserver
+### Setup configuration for gateway
 
-You don't have to write `config.toml` for the web UI as this webserver auto-generates it on-the-fly.
+You don't have to write `config.toml` for the web UI as this gateway auto-generates it on-the-fly.
 
-Edit `webserver.conf` to match with your environment.
+Edit `gateway.conf` to match with your environment.
 
 
 ## Usage
 
-To execute web server, run command below. (for debugging, append a `--debug` flag)
+To execute gateway server, run command below. (for debugging, append a `--debug` flag)
 
 
 ```console
-$ python -m ai.backend.web.server
+$ python -m ai.backend.gateway.server
 ```

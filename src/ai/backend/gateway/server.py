@@ -432,7 +432,7 @@ async def logout_handler(request: web.Request) -> web.Response:
     return web.Response(status=201)
 
 
-async def webserver_healthcheck(request: web.Request) -> web.Response:
+async def gateway_server_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
     result = {
@@ -556,7 +556,7 @@ async def server_main_logwrapper(
     pidx: int,
     _args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
-    setproctitle(f"backend.ai: webserver worker-{pidx}")
+    setproctitle(f"backend.ai: gateway worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
     try:
@@ -578,10 +578,10 @@ async def server_main(
     app["config"] = config
     j2env = jinja2.Environment(
         extensions=[
-            "ai.backend.web.template.TOMLField",
-            "ai.backend.web.template.TOMLStringListField",
+            "ai.backend.gateway.template.TOMLField",
+            "ai.backend.gateway.template.TOMLStringListField",
         ],
-        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
+        loader=jinja2.PackageLoader("ai.backend.gateway", "templates"),
     )
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
@@ -636,7 +636,7 @@ async def server_main(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
     cors.add(app.router.add_route("GET", "/stats", view_stats))
-    cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
+    cors.add(app.router.add_route("GET", "/func/ping", gateway_server_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
@@ -715,7 +715,7 @@ async def server_main(
     "--config",
     "config_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default="webserver.conf",
+    default="gateway.conf",
     help="The configuration file to use.",
 )
 @click.option(
@@ -751,28 +751,27 @@ def main(
     config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
 
     if ctx.invoked_subcommand is None:
-        cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
-        ipc_base_path = cfg["webserver"]["ipc-base-path"]
-        log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
+        gateway_cfg = cfg["gateway"]
+        gateway_cfg["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = gateway_cfg["ipc-base-path"]
+        log_sockpath = ipc_base_path / f"gateway-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
         cfg["logging"]["endpoint"] = log_endpoint
         try:
             logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
             with logger:
-                setproctitle(
-                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
-                )
+                setproctitle(f"backend.ai: gateway {cfg['service']['ip']}:{cfg['service']['port']}")
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
-                log_config = logging.getLogger("ai.backend.web.config")
+                log_config = logging.getLogger("ai.backend.gateway.config")
                 if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
                     pprint(cfg)
                 log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
-                if cfg["webserver"]["event-loop"] == "uvloop":
+                if gateway_cfg["event-loop"] == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -786,9 +785,9 @@ def main(
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg["webserver"]["pid-file"].is_file():
+            if gateway_cfg["pid-file"].is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg["webserver"]["pid-file"].unlink()
+                gateway_cfg["pid-file"].unlink()
     else:
         # Click is going to invoke a subcommand.
         pass
