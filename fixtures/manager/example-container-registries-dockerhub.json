@@ -5,7 +5,8 @@
             "registry_name": "index.docker.io",
             "url": "https://registry-1.docker.io",
             "type": "docker",
-            "username": "lablup"
+            "username": "lablup",
+            "project": "library"
         }
     ]
 }
