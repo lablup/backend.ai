@@ -221,7 +221,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
         self.kernel_features = frozenset(
-            self.image_labels.get("ai.backend.features", "batch query uid-match user-input").split()
+            self.image_labels.get("ai.backend.features", "uid-match").split()
         )
         self.kernel_id = kernel_id
         self.session_id = session_id
