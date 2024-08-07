@@ -76,7 +76,7 @@ class LocalRegistry(BaseContainerRegistry):
                 "Id": data["Id"],
                 "RepoDigests": data.get("RepoDigests", []),
                 "Config.Image": data["Config"]["Image"],
-                "ContainerConfig.Image": data["ContainerConfig"]["Image"],
+                "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
                 "Architecture": data["Architecture"],
             }
             log.debug("scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2))
