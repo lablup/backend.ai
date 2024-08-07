@@ -213,8 +213,10 @@ your initial superadmin and sample user accounts for security.
 .. code-block:: console
 
    $ backend.ai mgr schema oneshot
+   $ backend.ai mgr fixture populate ./users.json
    $ backend.ai mgr fixture populate ./keypairs.json
    $ backend.ai mgr fixture populate ./resource-presets.json
+   $ backend.ai mgr fixture populate ./set-user-main-access-keys.json
 
 
 Sync the information of container registry
