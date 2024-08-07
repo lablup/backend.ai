@@ -454,7 +454,8 @@
     "PushToImage": "Prześlij sesję do spersonalizowanego obrazu",
     "SaveWithoutClose": "Zapisz bez zamykania",
     "Collapse": "Zawalić się",
-    "Expand": "Zwiększać"
+    "Expand": "Zwiększać",
+    "Clear": "Usuwać"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -669,10 +670,11 @@
       "DeleteForever": "Usuń na zawsze",
       "FolderRestored": "Folder {{ folderName }} został przywrócony.",
       "FolderDeletedForever": "Folder {{ folderName }} został usunięty na zawsze.",
-      "MoveToTrashBin": "Przenieś do kosza",
+      "MoveToTrash": "Przenieść do kosza",
       "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza.",
       "FolderCloneFailed": "Nie udało się sklonować folderu.",
-      "FolderClonePending": "Klonowanie folderu jest w toku."
+      "FolderClonePending": "Klonowanie folderu jest w toku.",
+      "MoveToTrashDescription": "Czy na pewno chcesz przenieść folder \"{{ folderName }}\" do kosza?"
     },
     "explorer": {
       "Delete": "Kasować...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Maksymalna dostosowana liczba obrazów",
     "CreatedAt": "Utworzono o godz",
     "MaxFolderCount": "Maksymalna liczba folderów",
-    "ProjectResourcePolicy": "Polityka zasobów projektu"
+    "ProjectResourcePolicy": "Polityka zasobów projektu",
+    "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
+    "ExportCSV": "eksportuj plik CSV",
+    "Tools": "Narzędzia"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1534,7 +1539,8 @@
     "SyncRoutesRequested": "Zażądano synchronizacji tras.",
     "UpdateService": "Aktualizuj usługę",
     "StartNewService": "Uruchom nową usługę",
-    "RuntimeVariant": "Inference Runtime Variant"
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Czatowanie"
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Czy chcesz zalogować się przy użyciu konta {{username}} ({{email}})?",
     "ServiceName": "Nazwa usługi",
     "useAnotherAccount": "Zaloguj się przy użyciu innego konta"
+  },
+  "chatui": {
+    "CannotFindModel": "Nie można znaleźć modeli LLM. \nProszę dostosować model.",
+    "NewChat": "Nowy czat",
+    "DeleteChatHistory": "Usuń historię czatów",
+    "SelectModel": "Wybierz Model",
+    "DeleteChattingSession": "Usuń sesję czatu",
+    "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
+    "SelectEndpoint": "Wybierz Punkt końcowy",
+    "Sync": "Synchronizuj"
   }
 }
