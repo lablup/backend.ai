@@ -57,6 +57,7 @@ from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, 
 from .graphql.vfolder import (
     ModelCard,
     ModelCardConnection,
+    VFolderPermissionValueField,
     VirtualFolderConnection,
     VirtualFolderNode,
 )
@@ -93,6 +94,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
@@ -537,7 +539,10 @@ class Queries(graphene.ObjectType):
         VirtualFolderNode, id=graphene.String(required=True), description="Added in 24.03.4."
     )
     vfolder_nodes = PaginatedConnectionField(
-        VirtualFolderConnection, description="Added in 24.03.4."
+        VirtualFolderConnection,
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=VFolderPermissionValueField(description="Added in 24.09.0."),
+        description="Added in 24.03.4.",
     )
 
     vfolder_list = graphene.Field(  # legacy non-paginated list
@@ -919,6 +924,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
+        project_id: uuid.UUID,
+        permission: VFolderRBACPermission,
         filter: str | None = None,
         order: str | None = None,
         offset: int | None = None,
@@ -929,6 +936,8 @@ class Queries(graphene.ObjectType):
     ) -> ConnectionResolverResult:
         return await VirtualFolderNode.get_connection(
             info,
+            project_id,
+            permission,
             filter,
             order,
             offset,
