@@ -54,6 +54,12 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .graphql.vfolder import (
+    ModelCard,
+    ModelCardConnection,
+    VirtualFolderConnection,
+    VirtualFolderNode,
+)
 from .group import (
     CreateGroup,
     DeleteGroup,
@@ -137,15 +143,11 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
-    ModelCard,
-    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
     VirtualFolder,
-    VirtualFolderConnection,
     VirtualFolderList,
-    VirtualFolderNode,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
