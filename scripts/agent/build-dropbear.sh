@@ -35,6 +35,8 @@ autoconf && autoheader
 sed -i 's/\(DEFAULT_RECV_WINDOW\) [0-9][0-9]*/\1 2097152/' src/default_options.h
 sed -i 's/\(RECV_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' src/default_options.h
 sed -i 's/\(TRANS_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' src/default_options.h
+sed -i 's/\(TRANS_MAX_PAYLOAD_LEN\) [0-9][0-9]*/\1 2621440/' src/default_options.h
+sed -i 's/\(SFTPSERVER_PATH\) "[^"]\+"/\1 "\/opt\/kernel\/sftp-server"/' src/default_options.h
 sed -i 's/\(MAX_CMD_LEN\) [0-9][0-9]*/\1 20000/' src/sysoptions.h
 sed -i '/channel->transwindow -= len;/s/^/\/\//' src/common-channel.c
 sed -i 's/DEFAULT_PATH/getenv("PATH")/' src/svr-chansession.c
@@ -42,10 +44,8 @@ sed -i 's/DEFAULT_PATH/getenv("PATH")/' src/svr-chansession.c
 # Disable clearing environment variables for new pty sessions and remote commands
 sed -i 's%/\* *#define \+DEBUG_VALGRIND *\*/%#define DEBUG_VALGRIND%' src/debug.h
 
-make -j$(nproc)
-cp dropbear        ../dropbear.$X_ARCH.bin
-cp dropbearkey     ../dropbearkey.$X_ARCH.bin
-cp dropbearconvert ../dropbearconvert.$X_ARCH.bin
+make -j$(nproc) PROGRAMS='dropbear dropbearkey dropbearconvert scp' MULTI=1 SCPPROGRESS=1
+cp dropbearmulti ../dropbearmulti.$X_ARCH.bin
 make clean
 EOF
 )
@@ -68,9 +68,7 @@ docker run --rm -it \
   dropbear-builder \
   /workspace/build.sh
 
-cp $temp_dir/dropbear.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
-cp $temp_dir/dropbearkey.*.bin     $SCRIPT_DIR/../../src/ai/backend/runner
-cp $temp_dir/dropbearconvert.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
+cp $temp_dir/dropbearmulti.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
 ls -lh src/ai/backend/runner
 
 rm -rf "$temp_dir"

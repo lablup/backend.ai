@@ -448,11 +448,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_static_binary(f"sftp-server.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_static_binary(f"scp.{arch}.bin", "/usr/bin/scp")
-        mount_static_binary(f"dropbear.{arch}.bin", "/opt/kernel/dropbear")
-        mount_static_binary(f"dropbearconvert.{arch}.bin", "/opt/kernel/dropbearconvert")
-        mount_static_binary(f"dropbearkey.{arch}.bin", "/opt/kernel/dropbearkey")
+        mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
+        mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
