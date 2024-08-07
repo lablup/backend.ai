@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.8rc2 (2024-08-08)
+
+### Fixes
+* skip resolving malformed `ModelCard` GQL item ([#2570](https://github.com/lablup/backend.ai/issues/2570))
+* Robust type check when idle checker fetches utilization data. ([#2601](https://github.com/lablup/backend.ai/issues/2601))
+* Let `GET /resource/usage/period` request contain data in query parameter rather than JSON body. ([#2661](https://github.com/lablup/backend.ai/issues/2661))
+
+
 ## 24.03.8rc1 (2024-08-06)
 
 ### Fixes
