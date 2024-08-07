@@ -1336,7 +1336,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         cursor = before
@@ -1346,7 +1346,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         requested_page_size = last
@@ -1452,7 +1452,7 @@ def _build_sql_stmt_from_sql_arg(
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
-    limit: int | None = None,
+    limit: int,
     offset: int | None = None,
 ) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)

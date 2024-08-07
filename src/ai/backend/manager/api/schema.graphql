@@ -97,7 +97,20 @@ type Queries {
   vfolder_node(id: String!): VirtualFolderNode
 
   """Added in 24.03.4."""
-  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
+  vfolder_nodes(
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0."""
+    permission: VFolderPermissionValueField
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
@@ -780,7 +793,17 @@ type VirtualFolderNode implements Node {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """
+  Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+  """
+  permissions: [VFolderPermissionValueField]
 }
+
+"""
+Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+"""
+scalar VFolderPermissionValueField
 
 type VirtualFolderConnection {
   """Pagination data for this connection."""
