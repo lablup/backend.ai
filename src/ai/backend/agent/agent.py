@@ -1985,7 +1985,7 @@ class AbstractAgent(
                         kernel_config,
                     )
 
-                runtime_type = image_labels.get("ai.backend.runtime-type", "python")
+                runtime_type = image_labels.get("ai.backend.runtime-type", "app")
                 runtime_path = image_labels.get("ai.backend.runtime-path", None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
