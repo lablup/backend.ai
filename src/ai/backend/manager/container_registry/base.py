@@ -451,20 +451,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 except ValueError as e:
                     skip_reason = str(e)
                     continue
-                if self.registry_name == "local":
-                    if image.partition("/")[1] == "":
-                        image = "library/" + image
-                    update_key = ImageRef(
-                        f"{image}:{tag}",
-                        ["index.docker.io"],
-                        architecture,
-                    )
-                else:
-                    update_key = ImageRef(
-                        f"{self.registry_name}/{image}:{tag}",
-                        [self.registry_name],
-                        architecture,
-                    )
+
+                update_key = ImageRef(
+                    f"{self.registry_name}/{image}:{tag}",
+                    [self.registry_name],
+                    architecture,
+                )
+
                 updates = {
                     "config_digest": manifest["digest"],
                     "size_bytes": manifest["size"],
