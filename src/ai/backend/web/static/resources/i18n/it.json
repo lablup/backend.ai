@@ -455,7 +455,8 @@
     "PushToImage": "Push della sessione all'immagine personalizzata",
     "SaveWithoutClose": "Salva senza chiudere",
     "Collapse": "Crollo",
-    "Expand": "Espandere"
+    "Expand": "Espandere",
+    "Clear": "Eliminare"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -670,10 +671,11 @@
       "DeleteForever": "Elimina per sempre",
       "FolderRestored": "La cartella {{ folderName }} è stata ripristinata.",
       "FolderDeletedForever": "La cartella {{ folderName }} è stata eliminata per sempre.",
-      "MoveToTrashBin": "Sposta nel cestino",
+      "MoveToTrash": "Sposta nel cestino",
       "MovedToTrashBin": "La cartella {{ folderName }} è stata spostata nel cestino.",
       "FolderCloneFailed": "Non è stato possibile clonare la cartella.",
-      "FolderClonePending": "La clonazione della cartella è in corso."
+      "FolderClonePending": "La clonazione della cartella è in corso.",
+      "MoveToTrashDescription": "Sei sicuro di voler spostare \"{{ folderName }}\" nel cestino?"
     },
     "explorer": {
       "Delete": "Elimina...",
@@ -992,7 +994,10 @@
     "MaxQuotaScopeSize": "Dimensione massima ambito quota (GB)",
     "MaxCustomizedImageCount": "Conteggio massimo di immagini personalizzate",
     "CreatedAt": "Creato a",
-    "MaxFolderCount": "Conteggio massimo cartelle"
+    "MaxFolderCount": "Conteggio massimo cartelle",
+    "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
+    "ExportCSV": "esportare CSV",
+    "Tools": "Utensili"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1534,7 +1539,8 @@
     "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso.",
     "UpdateService": "Servizio di aggiornamento",
     "StartNewService": "Avvia nuovo servizio",
-    "RuntimeVariant": "Variante di runtime dell'inferenza"
+    "RuntimeVariant": "Variante di runtime dell'inferenza",
+    "Chatting": "Chiacchierando"
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Vuoi accedere con l'account {{username}} ({{email}})?",
     "ServiceName": "Nome del servizio",
     "useAnotherAccount": "Accedere con un altro account"
+  },
+  "chatui": {
+    "CannotFindModel": "Impossibile trovare i modelli LLM. \nSi prega di personalizzare il modello.",
+    "NewChat": "Nuova chiacchierata",
+    "DeleteChatHistory": "Elimina cronologia chat",
+    "SelectModel": "Seleziona modello",
+    "DeleteChattingSession": "Elimina la sessione di chat",
+    "DeleteChattingSessionDescription": "Stai per eliminare questo argomento. \nUna volta eliminato, non può essere recuperato. \nSi prega di procedere con cautela.",
+    "SelectEndpoint": "Seleziona punto finale",
+    "Sync": "Sincronizzazione"
   }
 }

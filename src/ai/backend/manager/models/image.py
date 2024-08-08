@@ -85,6 +85,8 @@ __all__ = (
 
 
 class PublicImageLoadFilter(enum.StrEnum):
+    """Shorthand of `ImageLoadFilter` enum with `CUSTOMIZED_GLOBAL` removed (as it is not intended for API input)."""
+
     GENERAL = "general"
     """Include general purpose images."""
     OPERATIONAL = "operational"
@@ -94,6 +96,8 @@ class PublicImageLoadFilter(enum.StrEnum):
 
 
 class ImageLoadFilter(enum.StrEnum):
+    """Enum describing kind of a "search preset" when loading Image data via GQL. Not intended for declaring attributes of image data itself."""
+
     GENERAL = "general"
     """Include general purpose images."""
     OPERATIONAL = "operational"
@@ -200,7 +204,7 @@ class ImageRow(Base):
     )
     type = sa.Column("type", sa.Enum(ImageType), nullable=False)
     accelerators = sa.Column("accelerators", sa.String)
-    labels = sa.Column("labels", sa.JSON, nullable=False)
+    labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
     resources = sa.Column(
         "resources",
         StructuredJSONColumn(
@@ -387,6 +391,10 @@ class ImageRow(Base):
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
+        # When the original image does not have any metadata label, self.resources is already filled
+        # with the intrinsic resource slots with their defualt minimums (defs.INTRINSIC_SLOTS_MIN)
+        # during rescanning the registry.
+        assert self.resources is not None
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
@@ -423,6 +431,7 @@ class ImageRow(Base):
 
     def _parse_row(self):
         res_limits = []
+        assert self.resources is not None
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
             if min_value is None:
@@ -676,12 +685,12 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        filters: set[ImageLoadFilter] = set(),
+        types: set[ImageLoadFilter] = set(),
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, filters)
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
         ]
 
         return items
@@ -712,35 +721,35 @@ class Image(graphene.ObjectType):
     def matches_filter(
         self,
         ctx: GraphQueryContext,
-        filters: set[ImageLoadFilter],
+        load_filters: set[ImageLoadFilter],
     ) -> bool:
         """
-        Determine if the image is filtered according to the `filters` parameter.
+        Determine if the image is filtered according to the `load_filters` parameter.
         """
         user_role = ctx.user["role"]
 
         # If the image filtered by any of its labels, return False early.
         # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
-        is_valid = ImageLoadFilter.GENERAL in filters
+        is_valid = ImageLoadFilter.GENERAL in load_filters
         for label in self.labels:
             match label.key:
                 case "ai.backend.features" if "operation" in label.value:
-                    if ImageLoadFilter.OPERATIONAL in filters:
+                    if ImageLoadFilter.OPERATIONAL in load_filters:
                         is_valid = True
                     else:
                         return False
                 case "ai.backend.customized-image.owner":
                     if (
-                        ImageLoadFilter.CUSTOMIZED not in filters
-                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in filters
+                        ImageLoadFilter.CUSTOMIZED not in load_filters
+                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
                     ):
                         return False
-                    if ImageLoadFilter.CUSTOMIZED in filters:
+                    if ImageLoadFilter.CUSTOMIZED in load_filters:
                         if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
-                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in filters:
+                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in load_filters:
                         if user_role == UserRole.SUPERADMIN:
                             is_valid = True
                         else:

@@ -454,7 +454,8 @@
     "PushToImage": "Отправить сеанс на настроенное изображение",
     "SaveWithoutClose": "Сохранить без закрытия",
     "Collapse": "Крах",
-    "Expand": "Расширять"
+    "Expand": "Расширять",
+    "Clear": "Удалить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -669,10 +670,11 @@
       "DeleteForever": "Удалить навсегда",
       "FolderRestored": "Папка {{ folderName }} восстановлена.",
       "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
-      "MoveToTrashBin": "Переместить в мусорное ведро",
+      "MoveToTrash": "Переместить в корзину",
       "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину.",
       "FolderCloneFailed": "Не удалось клонировать папку.",
-      "FolderClonePending": "Выполняется клонирование папки."
+      "FolderClonePending": "Выполняется клонирование папки.",
+      "MoveToTrashDescription": "Вы уверены, что хотите переместить папку \"{{ folderName }}\" в корзину?"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
     "CreatedAt": "Создан в",
     "MaxFolderCount": "Максимальное количество папок",
-    "ProjectResourcePolicy": "Ресурсная политика проекта"
+    "ProjectResourcePolicy": "Ресурсная политика проекта",
+    "NoDataToExport": "Данные для извлечения CSV не существуют.",
+    "ExportCSV": "экспортировать CSV",
+    "Tools": "Инструменты"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1587,7 +1592,8 @@
     "SyncRoutesRequested": "Запрошена синхронизация маршрутов.",
     "UpdateService": "Служба обновлений",
     "StartNewService": "Запустить новую услугу",
-    "RuntimeVariant": "Вариант времени выполнения вывода"
+    "RuntimeVariant": "Вариант времени выполнения вывода",
+    "Chatting": "Общение"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
     "ServiceName": "Название услуги",
     "useAnotherAccount": "Войдите в систему под другой учетной записью"
+  },
+  "chatui": {
+    "CannotFindModel": "Модели LLM не могут быть найдены. \nПожалуйста, настройте модель.",
+    "NewChat": "Новый чат",
+    "DeleteChatHistory": "Удалить историю чата",
+    "SelectModel": "Выберите модель",
+    "DeleteChattingSession": "Удалить сеанс чата",
+    "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
+    "SelectEndpoint": "Выберите конечную точку",
+    "Sync": "Синхронизировать"
   }
 }
