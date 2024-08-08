@@ -48,6 +48,7 @@ class ContainerRegistryType(enum.StrEnum):
     DOCKER = "docker"
     HARBOR = "harbor"
     HARBOR2 = "harbor2"
+    GITHUB = "github"
     LOCAL = "local"
 
 
@@ -73,6 +74,7 @@ class ContainerRegistryRow(Base):
     is_global = sa.Column(
         "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
+    extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
 
     @classmethod
     async def get(
