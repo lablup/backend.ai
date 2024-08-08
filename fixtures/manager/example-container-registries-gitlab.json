@@ -7,10 +7,7 @@
             "type": "gitlab",
             "username": "<username>",
             "password": "<gitlab_pat>",
-            "project": "<username>",
-            "extra": {
-                "gitlab_project": "<project>"
-            }
+            "project": "<username>"
         }
     ]
 }
