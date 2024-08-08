@@ -18,9 +18,14 @@ from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverRes
 
 from .container_registry import (
     ContainerRegistry,
+    ContainerRegistryConnection,
+    ContainerRegistryNode,
     CreateContainerRegistry,
+    CreateContainerRegistryNode,
     DeleteContainerRegistry,
+    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
+    ModifyContainerRegistryNode,
 )
 
 if TYPE_CHECKING:
@@ -252,6 +257,17 @@ class Mutations(graphene.ObjectType):
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
+    create_container_registry_node = CreateContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    modify_container_registry_node = ModifyContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    delete_container_registry_node = DeleteContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+
+    # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
@@ -715,6 +731,14 @@ class Queries(graphene.ObjectType):
     container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
     container_registries = graphene.List(ContainerRegistry)
+
+    container_registry_node = graphene.Field(
+        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
+    )
+
+    container_registry_nodes = PaginatedConnectionField(
+        ContainerRegistryConnection, description="Added in 24.09.0."
+    )
 
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
@@ -2211,9 +2235,44 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
+        registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> ContainerRegistryNode:
+        return await ContainerRegistryNode.get_node(info, id)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ContainerRegistryNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     async def resolve_model_card(
         root: Any,
