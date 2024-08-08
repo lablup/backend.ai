@@ -43,7 +43,11 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+)
 from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
@@ -71,6 +75,7 @@ from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentKernelRegistryByStatus,
     ClusterMode,
     ImageRegistry,
     KernelId,
@@ -82,6 +87,7 @@ from ai.backend.common.types import (
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ..exceptions import MultiAgentError
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
@@ -967,6 +973,43 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
     return web.json_response({}, status=200)
+
+
+class SyncAgentResourceRequestModel(BaseModel):
+    agent_id: AgentId = Field(
+        validation_alias=AliasChoices("agent_id", "agent"),
+        description="Target agent id to sync resource.",
+    )
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@pydantic_params_api_handler(SyncAgentResourceRequestModel)
+async def sync_agent_resource(
+    request: web.Request, params: SyncAgentResourceRequestModel
+) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    agent_id = params.agent_id
+    log.info(
+        "SYNC_AGENT_RESOURCE (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
+    )
+
+    try:
+        result = await root_ctx.registry.sync_agent_resource(root_ctx.db, [agent_id])
+    except BackendError:
+        log.exception("SYNC_AGENT_RESOURCE: exception")
+        raise
+    val = result.get(agent_id)
+    match val:
+        case AgentKernelRegistryByStatus():
+            pass
+        case MultiAgentError():
+            return web.Response(status=500)
+        case _:
+            pass
+    return web.Response(status=204)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -2315,6 +2358,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
+    cors.add(app.router.add_route("POST", "/_/sync-agent-resource", sync_agent_resource))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
