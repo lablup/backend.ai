@@ -104,17 +104,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
-    async def get_registry_id(self, registry_name: str, project: Optional[str]) -> Optional[str]:
-        async with self.db.begin_readonly() as db_session:
-            query = sa.select(ContainerRegistryRow.id).where(
-                ContainerRegistryRow.registry_name == registry_name
-            )
-
-            if project:
-                query = query.where(ContainerRegistryRow.project == project)
-
-            return (await db_session.execute(query)).scalar()
-
     async def commit_rescan_result(self) -> None:
         _all_updates = all_updates.get()
         if not _all_updates:
@@ -142,27 +131,44 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
-                session.add_all([
-                    ImageRow(
-                        name=image_ref.canonical,
-                        registry=image_ref.registry,
-                        registry_id=await self.get_registry_id(
-                            registry_name=image_ref.registry,
-                            project=image_ref.name.split("/")[0] if "/" in image_ref.name else None,
-                        ),
-                        image=image_ref.name,
-                        tag=image_ref.tag,
-                        architecture=image_ref.architecture,
-                        is_local=is_local,
-                        config_digest=v["config_digest"],
-                        size_bytes=v["size_bytes"],
-                        type=ImageType.COMPUTE,
-                        accelerators=v.get("accels"),
-                        labels=v["labels"],
-                        resources=v["resources"],
-                    )
-                    for image_ref, v in _all_updates.items()
-                ])
+                registry_cache = {}
+
+                for image_ref, v in _all_updates.items():
+                    if image_ref.registry not in registry_cache:
+                        query = sa.select([
+                            ContainerRegistryRow.id,
+                            ContainerRegistryRow.project,
+                        ]).where(ContainerRegistryRow.registry_name == image_ref.registry)
+
+                        registries = (await session.execute(query)).fetchall()
+                        registry_cache[image_ref.registry] = registries
+                    else:
+                        registries = registry_cache[image_ref.registry]
+
+                    for registry in registries:
+                        if image_ref.name.startswith(registry.project):
+                            if not image_ref.name.split(registry.project)[1].startswith("/"):
+                                continue
+
+                            session.add(
+                                ImageRow(
+                                    name=image_ref.canonical,
+                                    registry=image_ref.registry,
+                                    registry_id=registry.id,
+                                    image=image_ref.name,
+                                    tag=image_ref.tag,
+                                    architecture=image_ref.architecture,
+                                    is_local=is_local,
+                                    config_digest=v["config_digest"],
+                                    size_bytes=v["size_bytes"],
+                                    type=ImageType.COMPUTE,
+                                    accelerators=v.get("accels"),
+                                    labels=v["labels"],
+                                    resources=v["resources"],
+                                )
+                            )
+                            break
+
                 await session.flush()
 
     async def scan_single_ref(self, image_ref: str) -> None:
