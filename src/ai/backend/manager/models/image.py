@@ -718,31 +718,6 @@ class Image(graphene.ObjectType):
 
         return filtered_items
 
-    async def resolve_supported_accelerators(self, info: graphene.ResolveInfo) -> Any:
-        ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, "Image.supported_accelerators")
-        return await loader.load(",".join(self.supported_accelerators))
-
-    @classmethod
-    async def batch_load_supported_accelerators(
-        cls, ctx: GraphQueryContext, known_accelerators_batch: Sequence[str]
-    ) -> Sequence[Any]:
-        known_slot_types = await ctx.shared_config.get_resource_slots()
-        log.debug("Known slot types: {}", known_slot_types)
-        every_available_accelerators: set[str] = set()
-        for slot_type in known_slot_types.keys():
-            if slot_type not in ("cpu", "mem"):
-                # `cpu` and `mem` are instrinsic accelerators and thus does not have to be exposed as supported_accelerator
-                every_available_accelerators.add(slot_type.partition(".")[0])
-        ret = []
-        for raw_known_accelerators in known_accelerators_batch:
-            known_accelerators = raw_known_accelerators.split(",")
-            if "*" in known_accelerators:
-                ret.append(list(every_available_accelerators))
-            else:
-                ret.append(known_accelerators)
-        return ret
-
     def matches_filter(
         self,
         ctx: GraphQueryContext,
