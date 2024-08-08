@@ -45,7 +45,7 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
@@ -1139,41 +1139,41 @@ async def convert_session_to_image(
     registry_project = project.container_registry["project"]
 
     async with root_ctx.db.begin_readonly() as db_session:
-        query = sa.select([
-            ContainerRegistryRow.username,
-            ContainerRegistryRow.password,
-            ContainerRegistryRow.project,
-            ContainerRegistryRow.url,
-        ]).where(ContainerRegistryRow.registry_name == registry_hostname)
+        query = (
+            sa.select(ContainerRegistryRow)
+            .where(
+                ContainerRegistryRow.registry_name == registry_hostname
+                and ContainerRegistryRow.project == registry_project
+            )
+            .options(
+                load_only(
+                    ContainerRegistryRow.url,
+                    ContainerRegistryRow.username,
+                    ContainerRegistryRow.password,
+                )
+            )
+        )
 
-        registry_conf = (await db_session.execute(query)).fetchall()[0]
-
-    if not registry_conf:
-        raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.project:
-        raise InvalidAPIParameters(f"Project {registry_project} not found")
+        registry_conf = (await db_session.execute(query)).fetchone()
+        if not registry_conf:
+            raise InvalidAPIParameters(
+                f"Project {registry_project} not found in registry {registry_hostname}."
+            )
 
     base_image_ref = session.main_kernel.image_ref
-
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
         reporter.total_progress = 3
         await reporter.update(message="Commit started")
         try:
-            if "/" in base_image_ref.name:
-                new_name = base_image_ref.name.split("/", maxsplit=1)[1]
-            else:
-                # for cases where project name is not specified (e.g. redis, nginx, ...)
-                new_name = base_image_ref.name
-
             # remove any existing customized related tag from base canonical
             filtered_tag_set = [
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
             new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
+                f"{registry_hostname}/{base_image_ref.name}:{'-'.join(filtered_tag_set)}"
             )
 
             async with root_ctx.db.begin_readonly_session() as sess:
