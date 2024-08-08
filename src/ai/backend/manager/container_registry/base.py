@@ -147,7 +147,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                     for registry in registries:
                         if image_ref.name.startswith(registry.project):
-                            if not image_ref.name.split(registry.project)[1].startswith("/"):
+                            # Assume empty project values as always matching
+                            if registry.project != "" and not image_ref.name.split(
+                                registry.project
+                            )[1].startswith("/"):
                                 continue
 
                             session.add(
