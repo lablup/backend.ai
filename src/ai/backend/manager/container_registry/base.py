@@ -168,6 +168,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 )
                             )
                             break
+                    else:
+                        log.warning("No project found for image: {}", image_ref.canonical)
 
                 await session.flush()
 
