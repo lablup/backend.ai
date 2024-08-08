@@ -10,6 +10,7 @@ import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
+from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
@@ -1279,3 +1280,59 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
+
+
+class PromMetricPrimitive(enum.StrEnum):
+    counter = enum.auto()
+    gauge = enum.auto()
+    histogram = enum.auto()
+    summary = enum.auto()
+    untyped = enum.auto()
+
+
+class PromMetric(metaclass=ABCMeta):
+    @abstractmethod
+    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+        pass
+
+
+MetricType = TypeVar("MetricType", bound=PromMetric)
+
+
+class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
+    """
+    Support text format to expose metric data to Prometheus.
+
+    ref: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
+    """
+
+    def __init__(self, metrics: Iterable[MetricType]) -> None:
+        self.metrics = metrics
+
+    @property
+    @abstractmethod
+    def metric_name(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def metric_primitive(self) -> PromMetricPrimitive:
+        pass
+
+    def help_string(self) -> str:
+        return f"HELP {self.metric_name} {self.description}"
+
+    def type_string(self) -> str:
+        return f"TYPE {self.metric_name} {self.metric_primitive.value}"
+
+    def metric_string(self) -> str:
+        result = f"{self.help_string()}\n{self.type_string()}\n"
+        for metric in self.metrics:
+            val = metric.metric_value_string(self.metric_name, self.metric_primitive)
+            result += f"{val}\n"
+        return result
