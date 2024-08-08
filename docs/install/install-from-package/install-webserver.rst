@@ -77,8 +77,7 @@ would be:
    ssl-verify = false
 
    [session]
-   redis.host = "bai-m1"
-   redis.port = 8110
+   redis.addr = "bai-m1:8110"
    redis.db = 5
    redis.password = "develove"
    max_age = 604800  # 1 week

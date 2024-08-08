@@ -51,6 +51,11 @@ would be:
    ssl-enabled = false
 
    heartbeat-timeout = 30.0
+   # Set the manager's RPC client certificate (public key and secret key).
+   # This is a mandatory option even when no agents require authentication.
+   # It must be generated for any new setup for security using
+   # the `backend.ai mgr generate-rpc-keypair` command.
+   rpc-auth-manager-keypair = "/home/bai/manager/manager.key_secret"
    pid-file = "/home/bai/manager/manager.pid"
    disabled-plugins = []
    hide-agents = true
@@ -208,8 +213,10 @@ your initial superadmin and sample user accounts for security.
 .. code-block:: console
 
    $ backend.ai mgr schema oneshot
+   $ backend.ai mgr fixture populate ./users.json
    $ backend.ai mgr fixture populate ./keypairs.json
    $ backend.ai mgr fixture populate ./resource-presets.json
+   $ backend.ai mgr fixture populate ./set-user-main-access-keys.json
 
 
 Sync the information of container registry
