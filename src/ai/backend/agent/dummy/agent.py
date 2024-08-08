@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -54,6 +55,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
@@ -66,6 +68,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             agent_id,
             event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -243,6 +246,9 @@ class DummyAgent(
     ) -> Sequence[Tuple[KernelId, Container]]:
         return []
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        return "ubuntu16.04"
+
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config, self.dummy_config)
 
@@ -287,12 +293,14 @@ class DummyAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DummyKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
             self.computers,
             restarting=restarting,
