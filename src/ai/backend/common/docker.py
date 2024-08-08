@@ -10,7 +10,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import (
     Any,
     Final,
@@ -81,7 +81,7 @@ common_image_label_schema = t.Dict({
     # ai.backend.resource.min.*
     t.Key("ai.backend.base-distro", default=None): t.Null | t.String(),
     t.Key("ai.backend.runtime-type", default="app"): t.String(),
-    t.Key("ai.backend.runtime-path", default=None): tx.PurePath(),
+    t.Key("ai.backend.runtime-path", default=PurePath("/bin/true")): tx.PurePath(),
     # Optional labels
     t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
     t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
