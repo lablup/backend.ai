@@ -19,8 +19,9 @@ from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import SlotName, SSLContextType
 
-from ...common.types import SSLContextType
+from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -348,8 +349,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     updates["accels"] = "*"
 
                 resources = {  # default fallback if not defined
-                    "cpu": {"min": "1", "max": None},
-                    "mem": {"min": "1g", "max": None},
+                    "cpu": {"min": INTRINSIC_SLOTS_MIN[SlotName("cpu")], "max": None},
+                    "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
                 }
                 res_prefix = "ai.backend.resource.min."
                 for k, v in filter(

@@ -204,7 +204,7 @@ class ImageRow(Base):
     )
     type = sa.Column("type", sa.Enum(ImageType), nullable=False)
     accelerators = sa.Column("accelerators", sa.String)
-    labels = sa.Column("labels", sa.JSON, nullable=False)
+    labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
     resources = sa.Column(
         "resources",
         StructuredJSONColumn(
@@ -391,6 +391,10 @@ class ImageRow(Base):
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
+        # When the original image does not have any metadata label, self.resources is already filled
+        # with the intrinsic resource slots with their defualt minimums (defs.INTRINSIC_SLOTS_MIN)
+        # during rescanning the registry.
+        assert self.resources is not None
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
@@ -427,6 +431,7 @@ class ImageRow(Base):
 
     def _parse_row(self):
         res_limits = []
+        assert self.resources is not None
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
             if min_value is None:
