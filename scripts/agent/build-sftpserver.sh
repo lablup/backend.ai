@@ -29,9 +29,8 @@ autoreconf
 
 sed -i 's/^# \?define SFTP_MAX_MSG_LENGTH[ \t]*.*/#define SFTP_MAX_MSG_LENGTH 5242880/g' sftp-common.h
 
-make -j$(nproc) sftp-server scp
+make -j$(nproc) sftp-server
 cp sftp-server /workspace/sftp-server.$X_ARCH.bin
-cp scp /workspace/scp.$X_ARCH.bin
 EOF
 )
 
@@ -53,7 +52,6 @@ docker run --rm -it \
     /workspace/build.sh
 
 cp $temp_dir/sftp-server.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
-cp $temp_dir/scp.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 ls -lh src/ai/backend/runner
 
 cd $SCRIPT_DIR/..
