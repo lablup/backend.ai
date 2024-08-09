@@ -39,7 +39,7 @@ from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
 
-from ..models import UserRole, users
+from ..models import AuditLogAction, AuditLogTargetType, UserRole, users
 from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
@@ -209,6 +209,25 @@ def check_api_params(
         set_handler_attr(wrapped, "request_scheme", checker)
         if request_examples:
             set_handler_attr(wrapped, "request_examples", request_examples)
+        return wrapped
+
+    return wrap
+
+
+def audit_log(
+    action: AuditLogAction,
+    target_type: AuditLogTargetType,
+):
+    def wrap(handler: Callable[..., Awaitable[TAnyResponse]]):
+        @functools.wraps(handler)
+        async def wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
+            request["audit_log"] = True
+            request["audit_log_action"] = action
+            request["audit_log_target_type"] = target_type
+
+            # Call the original function
+            return await handler(request, *args, **kwargs)
+
         return wrapped
 
     return wrap
@@ -406,7 +425,7 @@ def set_handler_attr(func, key, value):
 
 def get_handler_attr(request, key, default=None):
     # When used in the aiohttp server-side codes, we should use
-    # request.match_info.hanlder instead of handler passed to the middleware
+    # request.match_info.handler instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
     # multiple times to implement its internal middleware processing.
     attrs = getattr(request.match_info.handler, "_backend_attrs", None)
