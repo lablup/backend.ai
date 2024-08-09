@@ -339,6 +339,7 @@ type GroupNode implements Node {
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
+"""Added in 24.03.0"""
 type UserConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -410,6 +411,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
+"""Added in 24.03.0"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -782,6 +784,7 @@ type VirtualFolderNode implements Node {
   status: String
 }
 
+"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1077,6 +1080,7 @@ type ModelCard implements Node {
   error_msg: String
 }
 
+"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!

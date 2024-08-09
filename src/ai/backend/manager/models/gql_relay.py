@@ -172,6 +172,8 @@ class Connection(graphene.ObjectType):
 
         if "edges" not in _meta.fields:
             edge_class = get_edge_class(cls, node, base_name, strict_types)  # type: ignore
+            if hasattr(edge_class, "Meta") and hasattr(edge_class.Meta, "description"):
+                edge_class.Meta.description = getattr(cls, "description", None)
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
                 graphene.NonNull(
