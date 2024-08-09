@@ -70,7 +70,7 @@ from ai.backend.common.types import (
     SlotName,
     current_resource_slots,
 )
-from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.common.utils import AsyncFileWriter, current_loop, update_nested_dict
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import ContainerCreationError, UnsupportedResource
@@ -86,7 +86,6 @@ from ..utils import (
     container_pid_to_host_pid,
     get_kernel_id_from_container,
     host_pid_to_container_pid,
-    update_nested_dict,
 )
 from .kernel import DockerKernel
 from .metadata.server import MetadataServer

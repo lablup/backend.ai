@@ -38,7 +38,7 @@ from ai.backend.agent.resources import (
     FractionAllocMap,
 )
 from ai.backend.agent.types import Container, MountInfo
-from ai.backend.agent.utils import update_nested_dict
+from ai.backend.common.utils import update_nested_dict
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore

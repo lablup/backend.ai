@@ -10,9 +10,10 @@ from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.utils import update_nested_dict
 
 from ..exception import InitializationError
-from ..utils import closing_async, get_arch_name, update_nested_dict
+from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

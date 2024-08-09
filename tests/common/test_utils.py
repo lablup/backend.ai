@@ -23,6 +23,7 @@ from ai.backend.common.utils import (
     odict,
     readable_size_to_bytes,
     str_to_timedelta,
+    update_nested_dict,
 )
 from ai.backend.testutils.mock import AsyncContextManagerMock, mock_awaitable, mock_corofunc
 
@@ -339,3 +340,46 @@ async def test_async_file_writer_bytes() -> None:
 
     # 5. Check initial and final data
     assert init_data == final_data
+
+
+def test_update_nested_dict():
+    o = {
+        "a": 1,
+        "b": 2,
+    }
+    update_nested_dict(o, {"a": 3, "c": 4})
+    assert o == {
+        "a": 3,
+        "b": 2,
+        "c": 4,
+    }
+
+    o = {
+        "a": {
+            "x": 1,
+        },
+        "b": 2,
+    }
+    with pytest.raises(AssertionError):
+        update_nested_dict(o, {"a": 3})
+
+    o = {
+        "a": {
+            "x": 1,
+        },
+        "b": 2,
+    }
+    update_nested_dict(o, {"a": {"x": 3, "y": 4}, "b": 5})
+    assert o["a"] == {
+        "x": 3,
+        "y": 4,
+    }
+    assert o["b"] == 5
+
+    o = {
+        "a": [1, 2],
+        "b": 3,
+    }
+    update_nested_dict(o, {"a": [4, 5], "b": 6})
+    assert o["a"] == [1, 2, 4, 5]
+    assert o["b"] == 6
