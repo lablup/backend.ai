@@ -81,7 +81,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
         backend: HTTPBackend = request["backend"]
 
         if (
-            request.headers.get("connection", "").lower() == "upgrade"
+            "upgrade" in request.headers.get("connection", "").lower()
             and request.headers.get("upgrade", "").lower() == "websocket"
         ):
             return await backend.proxy_ws(request)
