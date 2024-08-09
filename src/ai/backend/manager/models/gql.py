@@ -16,7 +16,7 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,
@@ -2204,7 +2204,7 @@ class Queries(graphene.ObjectType):
         hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

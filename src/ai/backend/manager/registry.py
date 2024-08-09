@@ -54,7 +54,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -82,7 +82,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, UnknownImageRegistry
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -113,6 +113,8 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.models.base import GUID
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -202,6 +204,58 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 SESSION_NAME_LEN_LIMIT = 10
+
+
+async def get_known_container_registries(
+    db: ExtendedAsyncSAEngine,
+) -> Mapping[str, Mapping[str, yarl.URL]]:
+    async with db.begin_readonly_session() as db_session:
+        registries: list[tuple[str, str, str]] = (
+            await db_session.execute(
+                sa.select([
+                    ContainerRegistryRow.project,
+                    ContainerRegistryRow.registry_name,
+                    ContainerRegistryRow.url,
+                ])
+            )
+        ).fetchall()
+
+        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
+
+        for registry_row in registries:
+            project, registry_name, url = registry_row
+
+            if project not in result:
+                result[registry_row[0]] = {}
+
+            result[project][registry_name] = yarl.URL(url)
+
+        return result
+
+
+async def get_container_registry_info(
+    db: ExtendedAsyncSAEngine, registry_id: str
+) -> tuple[yarl.URL, dict]:
+    async with db.begin_readonly_session() as db_session:
+        results = (
+            await db_session.execute(
+                sa.select([
+                    ContainerRegistryRow.url,
+                    ContainerRegistryRow.username,
+                    ContainerRegistryRow.password,
+                ]).where(ContainerRegistryRow.id == registry_id)
+            )
+        ).fetchall()
+
+        if not results:
+            raise UnknownImageRegistry(registry_id)
+
+        result: tuple[str, Optional[str], Optional[str]] = results[0]
+
+        url, username, password = result
+        creds = {"username": username, "password": password}
+
+        return yarl.URL(url), creds
 
 
 class AgentRegistry:
@@ -1381,9 +1435,11 @@ class AgentRegistry:
                 image_infos[str(image_ref)] = resolved_image_info
                 if not resolved_image_info.image_ref.is_local:
                     is_local_image = False
-                    registry_url, registry_creds = await get_registry_info(
-                        self.shared_config.etcd, image_ref.registry
+
+                    registry_url, registry_creds = await get_container_registry_info(
+                        self.db, cast(GUID, resolved_image_info.registry_id)
                     )
+
         image_info = {
             "image_infos": image_infos,
             "registry_url": registry_url,
@@ -3053,7 +3109,7 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            known_registries = await get_known_registries(self.shared_config.etcd)
+            known_registries = await get_known_container_registries(self.db)
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):

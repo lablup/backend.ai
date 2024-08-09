@@ -42,14 +42,14 @@ def vfolder_types() -> None:
             print_error(e)
 
 
-@resource.command()
-def docker_registries() -> None:
+@resource.command(aliases=["docker-registries"])
+def container_registries() -> None:
     """
-    Get registered docker registries.
+    Get registered container registries.
     """
     with Session() as session:
         try:
-            ret = session.Resource.get_docker_registries()
+            ret = session.Resource.get_container_registries()
             for t in ret:
                 print(t)
         except Exception as e:
