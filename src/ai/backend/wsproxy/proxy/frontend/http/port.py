@@ -66,9 +66,13 @@ class PortFrontend(AbstractHTTPFrontend[int]):
     @web.middleware
     async def _ensure_slot(self, request: web.Request, handler: Handler) -> web.StreamResponse:
         port: int = request.app["port"]
+
+        if port not in self.circuits:
+            raise GenericBadRequest(f"Unregistered slot {port}")
+
         circuit = self.circuits[port]
         if not circuit:
-            raise GenericBadRequest(f"Unregistered slot {port}")  # noqa: F821
+            raise GenericBadRequest(f"Circuit for registered port {port} is not available.")
 
         self.ensure_credential(request, circuit)
         circuit = self.circuits[port]
