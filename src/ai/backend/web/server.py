@@ -28,7 +28,7 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
-from ai.backend.common.web.session import extra_config_headers, get_session
+from ai.backend.common.web.session import extra_config_headers, get_session, update_expires
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
@@ -432,6 +432,12 @@ async def logout_handler(request: web.Request) -> web.Response:
     return web.Response(status=201)
 
 
+async def extend_login_session(request: web.Request) -> web.Response:
+    expires = await update_expires(request)
+    result = {"status": 201, "expires": expires}
+    return web.json_response(result)
+
+
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
@@ -608,6 +614,7 @@ async def server_main(
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
+        login_session_extend_time=config["session"]["login_session_extend_time"],
     )
 
     setup_session(app, redis_storage)
@@ -635,6 +642,7 @@ async def server_main(
     cors.add(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
+    cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
