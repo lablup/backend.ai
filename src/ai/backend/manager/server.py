@@ -772,9 +772,9 @@ def build_root_app(
     pidx: int,
     local_config: LocalConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    cleanup_contexts: Sequence[CleanupContext] | None = None,
+    subapp_pkgs: Sequence[str] | None = None,
+    scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     public_interface_objs.clear()
     app = web.Application(

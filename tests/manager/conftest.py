@@ -561,9 +561,9 @@ async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
     _outer_ctxs: List[AsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] = None,
-        subapp_pkgs: Sequence[str] = None,
-        scheduler_opts: Mapping[str, Any] = None,
+        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
     ) -> Tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs

@@ -146,8 +146,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Sequence[str] = None,
-        envs: Sequence[str] = None,
+        args: Sequence[str] | None = None,
+        envs: Sequence[str] | None = None,
     ) -> None:
         self.host = host
         self.port = port

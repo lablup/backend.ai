@@ -21,8 +21,8 @@ class AsyncFileWriter:
         self,
         target_filename: str | Path,
         access_mode: str,
-        encode: Callable[[str], bytes] = None,
-        max_chunks: int = None,
+        encode: Callable[[str], bytes] | None = None,
+        max_chunks: int | None = None,
     ) -> None:
         if max_chunks is None:
             max_chunks = 0

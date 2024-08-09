@@ -47,7 +47,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
     async def capture_exception(
         self,
         exc_instance: Exception = None,
-        context: Mapping[str, Any] = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         if not self.enabled:
             return

@@ -303,11 +303,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        limit: int = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        limit: int | None = None,
     ) -> Sequence[User]:
         """
         Load user's information. Group names associated with the user are also returned.
@@ -380,11 +380,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        filter: str = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
     ) -> int:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -421,12 +421,12 @@ class User(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[User]:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -479,11 +479,11 @@ class User(graphene.ObjectType):
     async def batch_load_by_email(
         cls,
         ctx: GraphQueryContext,
-        emails: Sequence[str] = None,
+        emails: Sequence[str] | None = None,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        status: str = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
     ) -> Sequence[Optional[User]]:
         if not emails:
             return []
@@ -509,11 +509,11 @@ class User(graphene.ObjectType):
     async def batch_load_by_uuid(
         cls,
         ctx: GraphQueryContext,
-        user_ids: Sequence[UUID] = None,
+        user_ids: Sequence[UUID] | None = None,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        status: str = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
     ) -> Sequence[Optional[User]]:
         if not user_ids:
             return []

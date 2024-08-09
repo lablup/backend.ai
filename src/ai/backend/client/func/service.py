@@ -49,8 +49,8 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult:
         """ """
         return await fetch_paginated_result(

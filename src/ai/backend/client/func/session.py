@@ -99,14 +99,14 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = None,
-        access_key: str = None,
+        status: str | None = None,
+        access_key: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of sessions.
@@ -166,32 +166,32 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: str = None,
+        name: str | None = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        starts_at: str = None,
+        starts_at: str | None = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Sequence[str] = None,
+        dependencies: Sequence[str] | None = None,
         callback_url: Optional[str] = None,
-        mounts: List[str] = None,
-        mount_map: Mapping[str, str] = None,
+        mounts: List[str] | None = None,
+        mount_map: Mapping[str, str] | None = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        envs: Mapping[str, str] = None,
-        startup_command: str = None,
-        resources: Mapping[str, str | int] = None,
-        resource_opts: Mapping[str, str | int] = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
+        resources: Mapping[str, str | int] | None = None,
+        resource_opts: Mapping[str, str | int] | None = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: str = None,
-        group_name: str = None,
-        bootstrap_script: str = None,
-        tag: str = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: str = None,
-        owner_access_key: str = None,
-        preopen_ports: List[int] = None,
-        assign_agent: List[str] = None,
+        scaling_group: str | None = None,
+        owner_access_key: str | None = None,
+        preopen_ports: List[int] | None = None,
+        assign_agent: List[str] | None = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -503,7 +503,7 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: str = None) -> None:
+    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -644,7 +644,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -757,7 +757,11 @@ class ComputeSession(BaseFunction):
 
     @api_function
     async def execute(
-        self, run_id: str = None, code: str = None, mode: str = "query", opts: dict = None
+        self,
+        run_id: str | None = None,
+        code: str | None = None,
+        mode: str = "query",
+        opts: dict | None = None,
     ):
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -1111,7 +1115,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict = None
+        self, code: str = "", *, mode: str = "query", opts: dict | None = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1177,8 +1181,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.

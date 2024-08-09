@@ -7,7 +7,11 @@ class NumberMeta(TrafaretMeta):
 
 class Float(Trafaret, metaclass=NumberMeta):
     def __init__(
-        self, gte: float = None, lte: float = None, gt: float = None, lt: float = None
+        self,
+        gte: float | None = None,
+        lte: float | None = None,
+        gt: float | None = None,
+        lt: float | None = None,
     ): ...
 
 class ToFloat(Float): ...

@@ -429,8 +429,8 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: set[str] = None,
-        blocklist: set[str] = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
