@@ -1272,6 +1272,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
             container = await docker.containers.create(container_config)
             await container.start()
+            await container.wait()  # wait until container finishes to prevent race condition
             container_log = await container.log(stdout=True, stderr=True, follow=False)
             await container.stop()
             await container.delete()
