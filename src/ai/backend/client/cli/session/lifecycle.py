@@ -74,6 +74,13 @@ def _create_cmd(docs: str = None):
             "The session will get scheduled after all of them successfully finish."
         ),
     )
+    @click.option(
+        "--continue-on-dependency-error",
+        metavar="CONTINUE_DEPENDENCY_ERROR",
+        type=bool,
+        default=False,
+        help="",
+    )
     # extra options
     @click.option(
         "--bootstrap-script",
@@ -128,6 +135,7 @@ def _create_cmd(docs: str = None):
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[str],
+        continue_on_dependency_error: bool,
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
@@ -184,6 +192,7 @@ def _create_cmd(docs: str = None):
                     max_wait=max_wait,
                     no_reuse=no_reuse,
                     dependencies=depends,
+                    continue_on_dependency_error=continue_on_dependency_error,
                     callback_url=callback_url,
                     cluster_size=cluster_size,
                     cluster_mode=cluster_mode,

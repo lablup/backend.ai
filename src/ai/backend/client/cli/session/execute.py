@@ -386,6 +386,7 @@ def run(
     max_wait,  # click_start_option
     no_reuse,  # click_start_option
     callback_url,  # click_start_option
+    # continue_on_dependency_error,
     code,
     terminal,  # query-mode options
     clean,
@@ -619,6 +620,8 @@ def run(
                 enqueue_only=enqueue_only,
                 max_wait=max_wait,
                 no_reuse=no_reuse,
+                # dependencies=...,
+                # continue_on_dependency_error=...,
                 callback_url=callback_url,
                 cluster_size=cluster_size,
                 cluster_mode=cluster_mode,
