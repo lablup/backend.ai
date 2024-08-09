@@ -454,7 +454,8 @@
     "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh",
     "SaveWithoutClose": "Lưu mà không đóng",
     "Collapse": "Sụp đổ",
-    "Expand": "Mở rộng"
+    "Expand": "Mở rộng",
+    "Clear": "Xóa bỏ"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -669,10 +670,11 @@
       "DeleteForever": "Xóa vĩnh viễn",
       "FolderRestored": "Thư mục {{ folderName }} đã được khôi phục.",
       "FolderDeletedForever": "Thư mục {{ folderName }} đã bị xóa vĩnh viễn.",
-      "MoveToTrashBin": "Di chuyển vào thùng rác",
+      "MoveToTrash": "Di chuyển vào thùng rác",
       "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác.",
       "FolderCloneFailed": "Không sao chép được thư mục.",
-      "FolderClonePending": "Đang nhân bản thư mục."
+      "FolderClonePending": "Đang nhân bản thư mục.",
+      "MoveToTrashDescription": "Bạn có chắc chắn muốn chuyển \"{{ folderName }}\" vào thùng rác không?"
     },
     "explorer": {
       "Delete": "Xóa bỏ...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Số lượng hình ảnh tùy chỉnh tối đa",
     "CreatedAt": "Được tạo tại",
     "MaxFolderCount": "Số lượng thư mục tối đa",
-    "ProjectResourcePolicy": "Chính sách tài nguyên dự án"
+    "ProjectResourcePolicy": "Chính sách tài nguyên dự án",
+    "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
+    "ExportCSV": "xuất CSV",
+    "Tools": "Công cụ"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1575,7 +1580,8 @@
     "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu.",
     "UpdateService": "Dịch vụ cập nhật",
     "StartNewService": "Bắt đầu dịch vụ mới",
-    "RuntimeVariant": "Biến thể thời gian chạy suy luận"
+    "RuntimeVariant": "Biến thể thời gian chạy suy luận",
+    "Chatting": "Trò chuyện"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?",
     "ServiceName": "Tên dịch vụ",
     "useAnotherAccount": "Đăng nhập bằng tài khoản khác"
+  },
+  "chatui": {
+    "CannotFindModel": "Không thể tìm thấy mô hình LLM. \nVui lòng tùy chỉnh mô hình.",
+    "NewChat": "Cuộc trò truyện mới",
+    "DeleteChatHistory": "Xóa lịch sử trò chuyện",
+    "SelectModel": "Chọn mẫu",
+    "DeleteChattingSession": "Xóa phiên trò chuyện",
+    "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
+    "SelectEndpoint": "Chọn điểm cuối",
+    "Sync": "Đồng bộ hóa"
   }
 }

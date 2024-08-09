@@ -18,7 +18,7 @@ DEFAULT_PYFLAGS: List[str] = []
 
 class Runner(BaseRunner):
     log_prefix = "python-kernel"
-    default_runtime_path = "/usr/bin/python"
+    default_runtime_path = "/opt/backend.ai/bin/python"
     default_child_env = {
         **BaseRunner.default_child_env,
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),

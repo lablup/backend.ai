@@ -45,6 +45,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -104,6 +105,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -117,6 +119,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             agent_id,
             event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -981,6 +984,13 @@ class KubernetesAgent(
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+        raise NotImplementedError
+
     async def scan_images(self) -> Mapping[str, str]:
         # Retrieving image label from registry api is not possible
         return {}
@@ -1009,12 +1019,14 @@ class KubernetesAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
             self.agent_sockpath,
             self.computers,
