@@ -15,6 +15,9 @@ class ApplicationRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=True, nullable=False)
     redirect_to = sa.Column("redirect_to", sa.Text, nullable=True)
     token_secret = sa.Column("token_secret", sa.Text, nullable=False)
+    token_lifespan = sa.Column(
+        "token_lifespan", sa.Interval, nullable=False, server_default="1 hours"
+    )
 
     user_assoc_rows = relationship(
         "AssociationApplicationUserRow",

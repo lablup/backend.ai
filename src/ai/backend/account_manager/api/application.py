@@ -5,6 +5,33 @@ from ..types import (
     WebMiddleware,
 )
 
+# async def add_application(
+#     request: web.Request,
+#     params: EndpointAPITokenGenerationRequestModel,
+# ) -> ResponseModel[]:
+#     pass
+
+
+# async def update_application(
+#     request: web.Request,
+#     params: EndpointAPITokenGenerationRequestModel,
+# ) -> ResponseModel[]:
+#     pass
+
+
+# async def register_user_to_application(
+#     request: web.Request,
+#     params: EndpointAPITokenGenerationRequestModel,
+# ) -> ResponseModel[]:
+#     pass
+
+
+# async def deregister_user_to_application(
+#     request: web.Request,
+#     params: EndpointAPITokenGenerationRequestModel,
+# ) -> ResponseModel[]:
+#     pass
+
 
 async def init(app: web.Application) -> None:
     pass

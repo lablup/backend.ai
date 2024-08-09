@@ -18,19 +18,29 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..defs import AUTH_REQUIRED_ATTR_KEY, CLIENT_ROLE_ATTR_KEY
 from ..exceptions import AuthorizationFailed, InvalidAPIParameters
+from ..types import UserRole
 
 
-def auth_required(handler):
-    @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
-        if request.get("is_authorized", False):
+def auth_required(role: UserRole) -> Callable[[Handler], Handler]:
+    def wrapper(handler: Handler) -> Handler:
+        @functools.wraps(handler)
+        async def wrapped(request: web.Request, *args, **kwargs):
+            client_role: UserRole | None = request.get(CLIENT_ROLE_ATTR_KEY)
+            match role:
+                case UserRole.ADMIN:
+                    if client_role != role:
+                        raise AuthorizationFailed("Unauthorized access")
+                case UserRole.USER:
+                    if client_role not in (UserRole.ADMIN, UserRole.USER):
+                        raise AuthorizationFailed("Unauthorized access")
             return await handler(request, *args, **kwargs)
-        raise AuthorizationFailed("Unauthorized access")
 
-    set_handler_attr(wrapped, "auth_required", True)
-    set_handler_attr(wrapped, "auth_scope", "user")
-    return wrapped
+        set_handler_attr(wrapped, AUTH_REQUIRED_ATTR_KEY, True)
+        return wrapped
+
+    return wrapper
 
 
 def set_handler_attr(func, key, value):
@@ -41,7 +51,7 @@ def set_handler_attr(func, key, value):
     setattr(func, "_backend_attrs", attrs)
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request: web.Request, key: str, default: Any = None):
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial

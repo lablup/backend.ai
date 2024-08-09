@@ -1269,3 +1269,54 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
+
+
+class IDTokenPayload(BaseModel):
+    # Registered claims
+
+    # Issuer Identifier for the Issuer of the response. The iss value is a case-sensitive URL using the https scheme.
+    iss: str
+
+    # Subject Identifier. A locally unique and never reassigned identifier within the Issuer for the End-User.
+    # In this system, it should be a stringified user id.
+    sub: str
+
+    # Audience(s) that this ID Token is intended for.
+    # In this system, it should be a stringified application id.
+    aud: str
+
+    # Expiration time.
+    exp: int
+
+    # Time at which the JWT was issued.
+    iat: int
+
+    # Private claims
+    # https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+    preferred_username: str | None = None
+    email: str | None = None
+
+
+class AccessTokenPayload(BaseModel):
+    # Issuer Identifier for the Issuer of the response. The iss value is a case-sensitive URL using the https scheme.
+    iss: str
+
+    # Subject Identifier. A locally unique and never reassigned identifier within the Issuer for the End-User.
+    # In this system, it should be a stringified user id.
+    sub: str
+
+    # Audience(s) that this ID Token is intended for.
+    # In this system, it should be a stringified application id.
+    aud: str
+
+    # Expiration time.
+    exp: int
+
+    # Time at which the JWT was issued.
+    iat: int
+
+    # Anything that identify client. Recommend to use a stringified user id.
+    client_id: str
+
+    # Unique token id. Recommend to use a stringified uuid.
+    jti: str

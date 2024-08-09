@@ -1,4 +1,10 @@
+import base64
+import secrets
+import uuid
+from datetime import datetime
+
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
 from .base import GUID, Base, IDColumn
@@ -29,3 +35,31 @@ class KeypairRow(Base):
         back_populates="keypair_rows",
         primaryjoin="UserRow.uuid == foreign(KeypairRow.user_id)",
     )
+
+    @staticmethod
+    def generate_keypair() -> tuple[str, str]:
+        """
+        AWS-like access key and secret key generation.
+        """
+        ak = "AKIA" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
+        sk = secrets.token_urlsafe(30)
+        return ak, sk
+
+    @classmethod
+    async def create_keypair(
+        cls, user_id: uuid.UUID, *, db_session: AsyncSession
+    ) -> tuple[str, str]:
+        ak, sk = cls.generate_keypair()
+        await db_session.execute(
+            sa.insert(KeypairRow).values(
+                user_id=user_id,
+                access_key=ak,
+                secret_key=sk,
+            )
+        )
+        return ak, sk
+
+    def is_expired(self, current_dt: datetime) -> bool:
+        if self.expired_at is None or self.expired_at > current_dt:
+            return False
+        return True

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import grp
+import importlib
 import logging
 import os
 import pwd
@@ -29,13 +30,14 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common.defs import SHARED_CONFIG_KEY
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
-from .config import AccountManagerConfig, ServerConfig
+from .config import AccountManagerConfig, ServerConfig, SharedConfig
 from .config import load as load_config
 from .context import CleanupContext, RootContext
 from .exceptions import (
@@ -176,7 +178,7 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
-def build_root_app(
+async def build_root_app(
     pidx: int,
     local_config: ServerConfig,
     *,
@@ -186,8 +188,8 @@ def build_root_app(
 ) -> web.Application:
     app = web.Application(
         middlewares=[
-            exception_middleware,
             api_middleware,
+            exception_middleware,
         ]
     )
 
@@ -207,9 +209,12 @@ def build_root_app(
         scope_prefix_map,
         credentials=etcd_credentials,
     )
+    raw_shared_config = cast(dict[str, Any], await etcd.get_prefix(SHARED_CONFIG_KEY))
+    shared_config = SharedConfig(**raw_shared_config)
     root_ctx = RootContext()
     root_ctx.etcd = etcd
     root_ctx.local_config = local_config
+    root_ctx.shared_config = shared_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(
@@ -256,6 +261,15 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(app.router.add_route("GET", r"/health", hello))
+
+    if subapp_pkgs is None:
+        subapp_pkgs = []
+    for pkg_name in subapp_pkgs:
+        if pidx == 0:
+            log.info("Loading module: {0}", pkg_name[1:])
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.account_manager.api")
+        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
 
     return app
 
@@ -266,7 +280,7 @@ async def server_main(
     pidx: int,
     _args: list[Any],
 ) -> AsyncIterator[None]:
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    root_app = await build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
 
     local_cfg = cast(ServerConfig, root_ctx.local_config)

@@ -6,6 +6,7 @@ import sys
 import types
 import typing
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any
@@ -23,6 +24,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.common import typed_validators as tv
 
 from .types import EventLoopType
 from .utils import config_key_to_snake_case
@@ -408,6 +410,53 @@ def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConf
         raise click.Abort()
     else:
         return cfg
+
+
+class SharedConfig(BaseSchema):
+    access_token_secret: Annotated[
+        str,
+        Field(
+            description="Secret used to encode/decode access-token. It is used only for account manager.",
+            alias="access-token-secret",
+        ),
+    ]
+    access_token_lifespan: Annotated[
+        tv.TimeDuration,
+        Field(
+            description="Lifespan of access token. Default is 12 hour. It is used only for account manager.",
+            alias="access-token-lifespan",
+            default=timedelta(hours=12),
+        ),
+    ]
+    refresh_token_secret: Annotated[
+        str,
+        Field(
+            description="Secret used to encode/decode refresh-token.",
+            alias="refresh-token-secret",
+        ),
+    ]
+    refresh_token_lifespan: Annotated[
+        tv.TimeDuration,
+        Field(
+            description="Lifespan of refresh token. Default is 12 hour.",
+            alias="refresh-token-lifespan",
+            default=timedelta(hours=12),
+        ),
+    ]
+    allow_admin_only_to_create_user: Annotated[
+        bool,
+        Field(
+            description="Only admins can create new users. Default is `false`.",
+            default=False,
+        ),
+    ]
+    signup_requires_verification: Annotated[
+        bool,
+        Field(
+            description="Signup process requires admin's verification it if it is `true`. Default is `false`.",
+            default=False,
+        ),
+    ]
 
 
 class Undefined:
