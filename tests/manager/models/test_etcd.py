@@ -1,10 +1,9 @@
 import pytest
-from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext
 from ai.backend.testutils.bootstrap import etcd_container  # noqa: F401
 
 CONTAINER_REGISTRY_FIELDS = """
@@ -22,38 +21,16 @@ CONTAINER_REGISTRY_FIELDS = """
 """
 
 
-@pytest.fixture(scope="module")
-def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
-
-
-@pytest.fixture(scope="module")
-def context(etcd_container) -> GraphQueryContext:  # noqa: F811
+@pytest.fixture(scope="function")
+def context(get_base_context, etcd_container) -> GraphQueryContext:  # noqa: F811
     shared_config = SharedConfig(
         etcd_addr=etcd_container[1],
         etcd_user="",
         etcd_password="",
         namespace="local",
     )
-    return GraphQueryContext(
-        schema=None,  # type: ignore
-        dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=shared_config,  # type: ignore
-        etcd=None,  # type: ignore
-        user={"domain": "default", "role": "superadmin"},
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        db=None,  # type: ignore
-        redis_stat=None,  # type: ignore
-        redis_image=None,  # type: ignore
-        redis_live=None,  # type: ignore
-        manager_status=None,  # type: ignore
-        known_slot_types=None,  # type: ignore
-        background_task_manager=None,  # type: ignore
-        storage_manager=None,  # type: ignore
-        registry=None,  # type: ignore
-        idle_checker_host=None,  # type: ignore
-    )
+    superadmin_user = {"role": "superadmin"}
+    return get_base_context(shared_config=shared_config, user=superadmin_user)
 
 
 @pytest.mark.dependency()
