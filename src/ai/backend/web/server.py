@@ -429,7 +429,7 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
-    return web.Response(status=201)
+    return web.HTTPOk()
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
