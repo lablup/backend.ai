@@ -79,6 +79,7 @@ config_iv = t.Dict({
         t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
         t.Key("max_atom_devices_per_container", default=8): t.ToInt,
         t.Key("max_gaudi2_devices_per_container", default=8): t.ToInt,
+        t.Key("max_atom_plus_devices_per_container", default=8): t.ToInt,
         t.Key("max_warboy_devices_per_container", default=8): t.ToInt,
         t.Key("max_shm_per_container", default=2): t.ToFloat,
         t.Key("max_file_upload_size", default=4294967296): t.ToInt,
