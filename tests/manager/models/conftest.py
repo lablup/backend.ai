@@ -5,8 +5,9 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.common.utils import update_nested_dict
+from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+
 
 @pytest.fixture(scope="module", autouse=True)
 def client() -> Client:
